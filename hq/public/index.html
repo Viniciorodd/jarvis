@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JARVIS HQ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0B1024">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="hud">
+    <div>
+      <div class="px gold title">JARVIS HQ</div>
+      <div class="hud-sub">
+        <span class="px chip" id="rank-chip">—</span>
+        <span class="dim small" id="streak">🔥 EOD streak · 0</span>
+        <span class="dim small" id="mode-tag"></span>
+      </div>
+    </div>
+    <div class="bankroll">
+      <div class="mono gold big" id="earned">$0</div>
+      <div class="dim small">lifetime banked</div>
+    </div>
+  </div>
+
+  <div class="bars">
+    <div class="panel pad">
+      <div class="row small"><span class="dim">⚡ Operator level</span><span class="mono mint" id="level">LV 1</span></div>
+      <div class="barbg"><div class="fill mintfill" id="xp-bar"></div></div>
+    </div>
+    <div class="panel pad">
+      <div class="row small"><span class="dim" id="next-label">Next rank · —</span><span class="mono gold" id="next-amt">—</span></div>
+      <div class="barbg"><div class="fill goldfill" id="rank-bar"></div></div>
+    </div>
+  </div>
+
+  <div class="panel pad road-wrap"><div class="road" id="road"></div></div>
+
+  <div class="section">
+    <div class="row">
+      <h2 class="px alertc" id="needs-title">NEEDS YOU (0)</h2>
+      <span class="dim small">same gates as your Telegram bot</span>
+    </div>
+    <div id="approvals" class="stack"></div>
+  </div>
+
+  <div class="section">
+    <h2 class="px mint">THE FLOOR</h2>
+    <div id="floor" class="floor"></div>
+  </div>
+
+  <div class="section grid-2">
+    <div class="panel pad">
+      <h2 class="px gold">WEEKLY QUESTS</h2>
+      <div id="quests" class="stack-sm"></div>
+    </div>
+    <div class="panel pad wide">
+      <h2 class="px dim">OPS FEED</h2>
+      <div id="feed" class="feed"></div>
+    </div>
+  </div>
+
+  <div class="dim small center foot" id="foot"></div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<div class="overlay hidden" id="rankup">
+  <div class="panel2 rankcard">
+    <div class="stars" id="stars"></div>
+    <div class="px dim small">RANK UP</div>
+    <div class="px gold rankname" id="rankup-name">—</div>
+    <div class="ranktext" id="rankup-text"></div>
+    <div class="dim small">Loot table says this one's worth claiming. Go get it.</div>
+    <button class="btn gold-btn" id="rankup-close">Open the new wing</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

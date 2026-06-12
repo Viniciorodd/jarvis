@@ -1,0 +1,36 @@
+{
+  "name": "JARVIS · 00 HQ heartbeat",
+  "nodes": [
+    {
+      "id": "hb1",
+      "name": "Every 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 15 }] }
+      }
+    },
+    {
+      "id": "hb2",
+      "name": "Ping HQ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HQ_URL }}/api/event",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.HQ_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'CORE', pod: 'cos', state: 'idle', text: 'n8n heartbeat · all systems nominal' }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Every 15 min": { "main": [[{ "node": "Ping HQ", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

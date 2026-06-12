@@ -1,0 +1,47 @@
+{
+  "name": "JARVIS · 05 Approval executor (the gate's far side)",
+  "nodes": [
+    {
+      "id": "x1",
+      "name": "Approval webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "approval-gate",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "x2",
+      "name": "Route decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "// HQ posts { id, action: 'approve'|'pass', pod, title, amount } here when you tap a button.\n// THIS is where real executor actions belong, per pod, e.g.:\n//   pod 'Fiverr Studio' + approve  -> mark order ready, you deliver in the Fiverr UI\n//   pod 'Gov War Room'  + approve  -> send the RFQ emails via Gmail node\n// Until an executor is wired, we just confirm on Telegram — a safe default.\nconst b = $json.body || $json;\nconst icon = b.action === 'approve' ? '✅' : '⏭️';\nreturn [{ json: { ...b, text: icon + ' ' + (b.action === 'approve' ? 'Approved' : 'Passed') + ': ' + b.title + (b.amount ? ' (+$' + b.amount + ')' : '') + '\\npod: ' + (b.pod || '?') } }];"
+      }
+    },
+    {
+      "id": "x3",
+      "name": "Telegram confirm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: $json.text }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Approval webhook": { "main": [[{ "node": "Route decision", "type": "main", "index": 0 }]] },
+    "Route decision": { "main": [[{ "node": "Telegram confirm", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

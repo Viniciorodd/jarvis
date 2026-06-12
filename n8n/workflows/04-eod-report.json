@@ -1,0 +1,83 @@
+{
+  "name": "JARVIS · 04 End-of-day report",
+  "nodes": [
+    {
+      "id": "e1",
+      "name": "Daily 18:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 18 * * *" }] }
+      }
+    },
+    {
+      "id": "e2",
+      "name": "Read HQ state",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.HQ_URL }}/api/state"
+      }
+    },
+    {
+      "id": "e3",
+      "name": "Sonnet report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+          { "name": "anthropic-version", "value": "2023-06-01" }
+        ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1200, system: 'You are EOD-BOT. Write the end-of-day report for a solo operator, Telegram-friendly, terse, emoji section headers: 💰 money in today (from feed events starting with ✓ that banked dollars), 📦 shipped/done, ⏳ waiting on the operator (open approvals), 🤖 what the floor did (from operator statuses), 🌅 tomorrow\\u2019s queue (your best inference). End with one honest sentence on momentum.', messages: [{ role: 'user', content: 'HQ state JSON:\\n' + JSON.stringify({ earned: $json.earned, xp: $json.xp, streak: $json.streak, quests: $json.quests, operators: $json.operators, approvals: $json.approvals, feed: $json.feed }) }] }) }}"
+      }
+    },
+    {
+      "id": "e4",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: ('🌙 EOD report\\n\\n' + ($json.content || []).filter(b => b.type === 'text').map(b => b.text).join('\\n')).slice(0, 4000) }) }}"
+      }
+    },
+    {
+      "id": "e5",
+      "name": "HQ status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HQ_URL }}/api/event",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.HQ_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'EOD-BOT', pod: 'cos', state: 'idle', text: 'EOD report sent · next at 18:00' }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Daily 18:00": { "main": [[{ "node": "Read HQ state", "type": "main", "index": 0 }]] },
+    "Read HQ state": { "main": [[{ "node": "Sonnet report", "type": "main", "index": 0 }]] },
+    "Sonnet report": { "main": [[{ "node": "Telegram", "type": "main", "index": 0 }]] },
+    "Telegram": { "main": [[{ "node": "HQ status", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

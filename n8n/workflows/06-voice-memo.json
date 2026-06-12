@@ -1,0 +1,114 @@
+{
+  "name": "JARVIS · 06 Voice memo → Whisper → Telegram/Notion",
+  "nodes": [
+    {
+      "id": "v1",
+      "name": "Watch voice-inbox",
+      "type": "n8n-nodes-base.localFileTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {
+        "path": "/data/voice-inbox",
+        "events": ["add"],
+        "options": { "awaitWriteFinish": true }
+      }
+    },
+    {
+      "id": "v2",
+      "name": "Read audio",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [220, 0],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $json.path }}"
+      }
+    },
+    {
+      "id": "v3",
+      "name": "Whisper transcribe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "http://whisper:9000/asr?output=json",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": { "parameters": [
+          { "parameterType": "formBinaryData", "name": "audio_file", "inputDataFieldName": "data" }
+        ] }
+      }
+    },
+    {
+      "id": "v4",
+      "name": "Extract text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0],
+      "parameters": {
+        "jsCode": "const text = $json.text || ($json.segments || []).map(s => s.text).join(' ') || '(empty transcription)';\nconst file = $('Watch voice-inbox').first().json.path || 'memo';\nreturn [{ json: { text: text.trim(), file } }];"
+      }
+    },
+    {
+      "id": "v5",
+      "name": "Telegram transcript",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, -90],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: ('🎙️ Voice memo filed\\n\\n' + $json.text).slice(0, 4000) }) }}"
+      }
+    },
+    {
+      "id": "v6",
+      "name": "Notion page (optional)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [880, 90],
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_NOTION_DATABASE_ID"
+        },
+        "title": "={{ 'Voice memo · ' + new Date().toISOString().slice(0, 10) }}",
+        "blockUi": { "blockValues": [{ "type": "paragraph", "textContent": "={{ $json.text }}" }] }
+      },
+      "credentials": { "notionApi": { "id": "REPLACE_ME", "name": "Notion account" } }
+    },
+    {
+      "id": "v7",
+      "name": "HQ status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, -90],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HQ_URL }}/api/event",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.HQ_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent: 'WHISPER', pod: 'cos', state: 'idle', text: 'Voice memo transcribed + filed' }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Watch voice-inbox": { "main": [[{ "node": "Read audio", "type": "main", "index": 0 }]] },
+    "Read audio": { "main": [[{ "node": "Whisper transcribe", "type": "main", "index": 0 }]] },
+    "Whisper transcribe": { "main": [[{ "node": "Extract text", "type": "main", "index": 0 }]] },
+    "Extract text": { "main": [[
+      { "node": "Telegram transcript", "type": "main", "index": 0 },
+      { "node": "Notion page (optional)", "type": "main", "index": 0 }
+    ]] },
+    "Telegram transcript": { "main": [[{ "node": "HQ status", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

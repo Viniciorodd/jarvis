@@ -1,0 +1,11 @@
+{
+  "name": "JARVIS HQ",
+  "short_name": "JARVIS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B1024",
+  "theme_color": "#0B1024",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

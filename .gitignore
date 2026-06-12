@@ -1,0 +1,7 @@
+.env
+node_modules/
+hq/data/
+prompts/operator-profile.md
+*.log
+.DS_Store
+Thumbs.db

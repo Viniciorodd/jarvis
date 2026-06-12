@@ -1,0 +1,13 @@
+[
+  { "id": "cos",   "name": "Chief of Staff",        "icon": "📬", "unlockAt": 0,       "flavor": "Email · calendar · briefings" },
+  { "id": "fiv",   "name": "Fiverr Studio",         "icon": "🎨", "unlockAt": 0,       "flavor": "Thumbnails · covers · pages" },
+  { "id": "gov",   "name": "Gov War Room",          "icon": "🏛️", "unlockAt": 0,       "flavor": "SAM.gov scout · bid memos" },
+  { "id": "etsy",  "name": "Etsy & POD Workshop",   "icon": "👕", "unlockAt": 1000,    "flavor": "Trend scout · original designs" },
+  { "id": "lab",   "name": "Content Lab",           "icon": "🎬", "unlockAt": 5000,    "flavor": "Blog · affiliate · short-form" },
+  { "id": "music", "name": "Music Studio",          "icon": "🎵", "unlockAt": 10000,   "flavor": "Beats · lofi · licensing" },
+  { "id": "kids",  "name": "Kids Animation Bay",    "icon": "🧸", "unlockAt": 10000,   "flavor": "One show · human-reviewed" },
+  { "id": "re",    "name": "Real Estate Desk",      "icon": "🏠", "unlockAt": 25000,   "flavor": "Deal scout · comps · drafts" },
+  { "id": "trade", "name": "Trading Watchtower",    "icon": "📈", "unlockAt": 50000,   "flavor": "Monitor-only. Always." },
+  { "id": "supp",  "name": "Supplement Lab",        "icon": "💊", "unlockAt": 50000,   "flavor": "With counsel on claims" },
+  { "id": "myst",  "name": "???",                   "icon": "👑", "unlockAt": 1000000, "flavor": "Empire rank" }
+]

@@ -15,14 +15,22 @@ The single rule: **prioritize what can bank money in month 1–2, run the slow p
 | Etsy/POD | after $1k rank | thin margins, volume game | Locked until Fiverr proves the pipeline. |
 | Everything else | per rank table | — | Content $5k · music/kids $10k · real estate desk $25k · trading-monitor/supplements $50k. |
 
-## Phase 0 — Foundation (weeks 1–2) ☐
+## Phase 0 — Foundation (weeks 1–2)
+**Paperwork: DONE ✅** — Rodgate, LLC is formed (PA), EIN issued, US Bank account open,
+SAM.gov registered (UEI Z1SWBFEK7EM4, CAGE assigned), SDB/minority/Hispanic-owned +
+small/micro self-certs in place, and registered as a PA COSTARS / Commonwealth vendor.
+This means the **Gov pod can start producing in Phase 2, not Phase 3.** Entity details live
+in `prompts/gov/entity-profile.md` (gitignored).
+- ☐ Confirm sam.gov shows **"Active"** (not "Submitted") and the CAGE code — fill it into entity-profile.md
+- ☐ Calendar the **SAM renewal: ~Jan 3, 2027** (expires Feb 2, 2027)
 - ☐ NAS stack up (`docs/nas-setup.md`): Tailscale, n8n, HQ, Whisper
 - ☐ Telegram bot created, `.env` filled, heartbeat workflow green, HQ on iPhone home screen
 - ☐ **Operator Profile v1 written** (don't rush this — it's the soul of the system)
-- ☐ Notion restructured: Vision page · Lessons DB · one pipeline DB per pod
+- ☐ Notion restructured: Vision page · Lessons DB · Gov pipeline DB · Fiverr DB
 - ☐ Voice memo → Whisper → Telegram/Notion loop working
-- ☐ *Paperwork in parallel*: LLC + EIN + business bank account; **SAM.gov registration started**
-  (free — never pay a third party; takes ~2 weeks to activate)
+- ☐ Build the boilerplate library for proposals: capabilities statement (janitorial/grounds
+  focus, lead with SDB/minority/Hispanic-owned), past-performance sheet (note: new entity —
+  use the owner's relevant experience), pricing template
 
 ## Phase 1 — Chief of Staff live (weeks 2–4) ☐
 - ☐ Morning brief 07:00 · EOD report 18:00 · email triage → Gmail drafts (fully gated)
@@ -31,13 +39,17 @@ The single rule: **prioritize what can bank money in month 1–2, run the slow p
 ## Phase 2 — First revenue (weeks 4–8) ☐
 - ☐ Pick 2–3 Fiverr gigs (thumbnails / book covers / blog articles / landing pages / photo cleanup)
 - ☐ Gig pages live; producer + revision prompts wired; **every delivery = your 5-min QC**
-- ☐ SAM scout + bid analyst running daily in the background; sub database growing in Notion
+- ☐ SAM scout (NAICS 561210/561720/561990) + bid analyst running daily; sub database in Notion
+- ☐ **Gov pod accelerated** (paperwork already done): respond to first sources-sought notices
+  and small janitorial/grounds set-asides — federal AND PA COSTARS/eMarketplace
 - ☐ Quest: first $100 banked → first 15 reviews → raise prices
 
 ## Phase 3 — Gov at full power (weeks 8–12) ☐
-- ☐ First sources-sought responses out (you submit)
 - ☐ RFQ producer → sub quotes → first small proposal (you sign + submit)
 - ☐ Auto-drafted debrief request on every loss
+- ☐ Add PA COSTARS / eMarketplace scout as a second source alongside SAM.gov
+- ☐ Roadmap item: pursue **SBA 8(a) certification** (you're already SDB/minority-owned —
+  8(a) is the highest-value upgrade for winnable sole-source + set-aside work)
 
 ## Phase 4 — Expansion (month 4+, rank-gated) ☐
 - Etsy/POD at $1k · Content Lab at $5k · Music or Kids bay at $10k (pick ONE first) ·

@@ -15,7 +15,8 @@ const args = Object.fromEntries(
   process.argv.slice(2).join(' ').split('--').filter(Boolean)
     .map((s) => { const [k, ...v] = s.trim().split(' '); return [k, v.join(' ') || true]; })
 );
-const NAICS = String(args.naics || '561720').split(',').map((s) => s.trim());
+// Rodgate, LLC primary codes: facilities support / janitorial / all-other support
+const NAICS = String(args.naics || '561210,561720,561990').split(',').map((s) => s.trim());
 const DAYS = Number(args.days || 2);
 const MAX_VALUE = Number(args.max || 250000); // simplified-acquisition sweet spot
 const SAM_KEY = process.env.SAM_API_KEY;

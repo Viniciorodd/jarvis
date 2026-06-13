@@ -18,7 +18,7 @@
       "typeVersion": 2,
       "position": [220, 0],
       "parameters": {
-        "jsCode": "// EDIT: your NAICS codes and lookback window\nconst NAICS = ['561720'];\nconst DAYS = 2;\nconst fmt = d => `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;\nconst to = new Date();\nconst from = new Date(Date.now() - DAYS * 86400000);\nreturn NAICS.map(code => ({ json: { code, postedFrom: fmt(from), postedTo: fmt(to) } }));"
+        "jsCode": "// Rodgate, LLC NAICS: facilities support, janitorial, all-other support\nconst NAICS = ['561210','561720','561990'];\nconst DAYS = 2;\nconst fmt = d => `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;\nconst to = new Date();\nconst from = new Date(Date.now() - DAYS * 86400000);\nreturn NAICS.map(code => ({ json: { code, postedFrom: fmt(from), postedTo: fmt(to) } }));"
       }
     },
     {

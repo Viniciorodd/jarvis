@@ -2,6 +2,7 @@
 node_modules/
 hq/data/
 prompts/operator-profile.md
+prompts/gov/entity-profile.md
 *.log
 .DS_Store
 Thumbs.db

@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "adm-zip": "^0.5.17",
     "pdfkit": "^0.19.1"
   }
 }

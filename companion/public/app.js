@@ -44,14 +44,32 @@ function pickVoice() {
     || vs.find((v) => /en/i.test(v.lang)) || vs[0] || null;
 }
 if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-function speak(text) {
-  if (!speakOn || !('speechSynthesis' in window)) return;
+let hasVoice = false; // ElevenLabs available?
+let curAudio = null;
+function afterSpeak() { if (!busy) setState(wakeOn ? 'listening' : 'idle', wakeOn ? 'listening' : 'standby'); }
+function browserSpeak(text) {
+  if (!('speechSynthesis' in window)) { afterSpeak(); return; }
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   if (preferredVoice) u.voice = preferredVoice;
-  u.rate = 1.04; u.pitch = 1.0;
-  u.onend = () => { if (!busy) setState(wakeOn ? 'listening' : 'idle', wakeOn ? 'listening' : 'standby'); };
+  u.rate = 1.04; u.pitch = 1.0; u.onend = afterSpeak;
   speechSynthesis.speak(u);
+}
+async function speak(text) {
+  if (!speakOn) { afterSpeak(); return; }
+  if (hasVoice) {
+    try {
+      const r = await fetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+      if (r.ok) {
+        const url = URL.createObjectURL(await r.blob());
+        if (curAudio) { curAudio.pause(); }
+        curAudio = new Audio(url);
+        curAudio.onended = () => { URL.revokeObjectURL(url); afterSpeak(); };
+        await curAudio.play(); return;
+      }
+    } catch { /* fall through to browser voice */ }
+  }
+  browserSpeak(text);
 }
 
 // ── the brain ────────────────────────────────────────────────────────────
@@ -119,7 +137,7 @@ $('voiceBtn').addEventListener('click', () => {
 $('voiceBtn').classList.add('on');
 
 let hqUrl = 'http://192.168.6.121:8099';
-fetch('/api/info').then((r) => r.json()).then((i) => { if (i.hqUrl) hqUrl = i.hqUrl; }).catch(() => {});
+fetch('/api/info').then((r) => r.json()).then((i) => { if (i.hqUrl) hqUrl = i.hqUrl; hasVoice = !!i.hasVoice; }).catch(() => {});
 $('floorBtn').addEventListener('click', () => window.open(hqUrl, '_blank'));
 
 // greeting

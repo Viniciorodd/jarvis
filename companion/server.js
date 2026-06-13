@@ -30,6 +30,15 @@ if (!API_KEY) {
   } catch { /* none */ }
 }
 
+// Optional ElevenLabs voice — used automatically when a key is present, else browser TTS.
+let ELEVEN_KEY = process.env.ELEVENLABS_API_KEY || '';
+let ELEVEN_VOICE = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL'; // 'Sarah' (public default)
+try {
+  const e = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8');
+  if (!ELEVEN_KEY) { const m = e.match(/^ELEVENLABS_API_KEY=(.+)$/m); if (m) ELEVEN_KEY = m[1].trim(); }
+  const v = e.match(/^ELEVENLABS_VOICE_ID=(.+)$/m); if (v) ELEVEN_VOICE = v[1].trim();
+} catch { /* none */ }
+
 const SYSTEM = `You are JARVIS — Vinicio's voice-first AI chief of staff, modeled on Iron Man's Jarvis but warmer and human. You help run his businesses (Rodgate, a government-contracting LLC; Fiverr creative services; and more) and his day.
 
 Voice & style: concise, calm, sharp, a little wit. You are spoken aloud — keep replies SHORT (1-3 sentences) unless he asks for detail. Talk like a person, not a document. No markdown when speaking.
@@ -160,7 +169,23 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.method === 'GET' && url.pathname === '/api/info') {
-    return send(res, 200, JSON.stringify({ root: ROOT, hasKey: !!API_KEY, hqUrl: HQ_URL }));
+    return send(res, 200, JSON.stringify({ root: ROOT, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY }));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/tts') {
+    if (!ELEVEN_KEY) return send(res, 501, JSON.stringify({ error: 'no ElevenLabs key' }));
+    try {
+      const { text } = await readBody(req);
+      if (!text) return send(res, 400, JSON.stringify({ error: 'text required' }));
+      const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE}`, {
+        method: 'POST',
+        headers: { 'xi-api-key': ELEVEN_KEY, 'content-type': 'application/json', accept: 'audio/mpeg' },
+        body: JSON.stringify({ text: String(text).slice(0, 1500), model_id: 'eleven_turbo_v2_5' }),
+      });
+      if (!r.ok) return send(res, 502, JSON.stringify({ error: 'ElevenLabs ' + r.status }));
+      const buf = Buffer.from(await r.arrayBuffer());
+      res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' });
+      return res.end(buf);
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   if (req.method === 'POST' && url.pathname === '/api/chat') {
     if (!API_KEY) return send(res, 500, JSON.stringify({ error: 'No ANTHROPIC_API_KEY (env or ../.env).' }));

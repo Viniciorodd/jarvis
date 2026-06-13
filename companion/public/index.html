@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="px brand">J A R V I S</div>
+      <div class="state" id="state">standby</div>
+      <button class="floor-btn" id="floorBtn" title="Open the pod floor">▦ HQ</button>
+    </div>
+
+    <div class="stage">
+      <canvas id="orb"></canvas>
+      <div class="orb-center" id="orbCenter">
+        <div class="hint" id="hint">tap the orb or type below</div>
+      </div>
+    </div>
+
+    <div class="transcript" id="transcript"></div>
+
+    <form class="composer" id="composer">
+      <button type="button" class="mic" id="mic" title="Talk (voice coming in Phase B)">🎙</button>
+      <input id="input" autocomplete="off" placeholder="Talk to Jarvis…" />
+      <button type="submit" class="send">➤</button>
+    </form>
+  </div>
+  <script src="orb.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -118,7 +118,9 @@ $('voiceBtn').addEventListener('click', () => {
 });
 $('voiceBtn').classList.add('on');
 
-$('floorBtn').addEventListener('click', () => window.open('http://localhost:8099', '_blank'));
+let hqUrl = 'http://192.168.6.121:8099';
+fetch('/api/info').then((r) => r.json()).then((i) => { if (i.hqUrl) hqUrl = i.hqUrl; }).catch(() => {});
+$('floorBtn').addEventListener('click', () => window.open(hqUrl, '_blank'));
 
 // greeting
 setState('idle', 'standby');

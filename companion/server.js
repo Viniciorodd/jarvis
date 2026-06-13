@@ -19,6 +19,7 @@ const PORT = Number(process.env.COMPANION_PORT || 8095);
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const ROOT = path.resolve(process.env.JARVIS_ROOT || path.join(os.homedir(), 'Desktop', 'JARVIS-Workspace'));
 fs.mkdirSync(ROOT, { recursive: true });
+const HQ_URL = (process.env.JARVIS_HQ_URL || 'http://192.168.6.121:8099').replace(/\/$/, '');
 
 // --- API key from env or project .env ---
 let API_KEY = process.env.ANTHROPIC_API_KEY || '';
@@ -35,7 +36,9 @@ Voice & style: concise, calm, sharp, a little wit. You are spoken aloud — keep
 
 YOUR HANDS: You can work with files and folders inside your workspace using your tools (list_dir, read_file, write_file, make_dir, edit_file). All paths are relative to your workspace root. Use them to actually create folders, write and edit documents, and organize his work — don't just describe, do it, then tell him briefly what you did. If a write would overwrite something, mention it.
 
-NOT YET WIRED (say so honestly, never pretend): deleting or moving files, controlling the broader PC/apps, sending email, calendar, Stripe, your own voice, and triggering the agent pods. These come in later build phases. If asked, say it's coming and offer what you CAN do now (think it through, draft it, or create it in the workspace).`;
+THE EMPIRE: use read_hq to check the live JARVIS HQ — lifetime earnings, the agent pods/operators working on the NAS, pending approvals, and recent activity. When he asks "how's the floor / how are we doing / what's happening", read it and give him the headline, not a data dump.
+
+NOT YET WIRED (say so honestly, never pretend): deleting or moving files, controlling the broader PC/apps, sending email, calendar, Stripe, your own voice (browser voice is a placeholder), and TRIGGERING pods/workflows (you can read HQ, not yet command it). These come in later build phases. If asked, say it's coming and offer what you CAN do now (think it through, draft it, create it in the workspace, or check HQ).`;
 
 const TOOLS = [
   { name: 'list_dir', description: 'List files and folders at a path inside the workspace.',
@@ -48,6 +51,8 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } },
   { name: 'edit_file', description: 'Replace the first occurrence of old_text with new_text in an existing file.',
     input_schema: { type: 'object', properties: { path: { type: 'string' }, old_text: { type: 'string' }, new_text: { type: 'string' } }, required: ['path', 'old_text', 'new_text'] } },
+  { name: 'read_hq', description: 'Read live JARVIS HQ status: lifetime earnings, XP, active agent operators on the floor, pending approvals, and recent activity.',
+    input_schema: { type: 'object', properties: {} } },
 ];
 
 // resolve a user/agent path safely inside ROOT
@@ -85,12 +90,21 @@ async function runTool(name, input) {
     await fsp.writeFile(p, cur.replace(input.old_text, input.new_text), 'utf8');
     return `edited file: ${rel}`;
   }
+  if (name === 'read_hq') {
+    const r = await fetch(HQ_URL + '/api/state');
+    if (!r.ok) throw new Error(`HQ unreachable (${r.status})`);
+    const s = await r.json();
+    const ops = Object.entries(s.operators || {}).map(([n, o]) => `${n} [${o.state}]: ${o.text}`).join('; ') || 'none active';
+    const appr = (s.approvals || []).map((a) => a.title).join('; ') || 'none';
+    const feed = (s.feed || []).slice(0, 6).map((e) => e.s).join(' | ') || 'quiet';
+    return `Lifetime banked $${s.earned}, XP ${s.xp}, EOD streak ${s.streak || 0}. Operators: ${ops}. Awaiting your approval: ${appr}. Recent activity: ${feed}`;
+  }
   throw new Error('unknown tool: ' + name);
 }
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited' }[name] || name;
+  const verb = { list_dir: 'looked in', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', read_hq: 'checked HQ' }[name] || name;
   return { tool: name, label: `${verb} ${input.path || ''}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
 
@@ -146,7 +160,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.method === 'GET' && url.pathname === '/api/info') {
-    return send(res, 200, JSON.stringify({ root: ROOT, hasKey: !!API_KEY }));
+    return send(res, 200, JSON.stringify({ root: ROOT, hasKey: !!API_KEY, hqUrl: HQ_URL }));
   }
   if (req.method === 'POST' && url.pathname === '/api/chat') {
     if (!API_KEY) return send(res, 500, JSON.stringify({ error: 'No ANTHROPIC_API_KEY (env or ../.env).' }));

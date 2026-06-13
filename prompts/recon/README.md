@@ -4,7 +4,15 @@ Runs the same six-role pipeline as every pod, tuned for shipping and growing sof
 Recon Tweaks is the first product (Windows tweak utility, Electron); the pod is built to take on
 more apps later — each is a "product" config (name, channels, repo, store/payment link).
 
-> Recon Tweaks is an EXISTING product with real users, so this pod can contribute near-term cash.
+> STATUS (from the operator): NOT selling yet; support channels = Email + Discord.
+> So the pod's FIRST sprint is LAUNCH, not revenue-tracking:
+>  1. Get it sellable — recommended channel: **Gumroad** (fastest for a downloadable Windows app;
+>     simple checkout, license keys, has an API for later revenue tracking). Stripe/own-site later.
+>  2. Launch content kit (Producer): landing/store page copy, demo video script, screenshots,
+>     changelog, 5-10 social/launch posts, a Reddit/forum launch plan.
+>  3. Support pipeline: email triage (reuse the chief-of-staff email pattern, scoped to Recon support)
+>     + a Discord monitor (webhook → triage → drafted replies, gated).
+> Then, once selling, the Bookkeeper tracks Gumroad/Stripe revenue → HQ (pod `recon`).
 > Unlocked from the start (not rank-gated). Keep autonomy gated until trust is earned, like all pods.
 
 ## Roles

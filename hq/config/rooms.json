@@ -2,6 +2,8 @@
   { "id": "cos",   "name": "Chief of Staff",        "icon": "📬", "unlockAt": 0,       "flavor": "Email · calendar · briefings" },
   { "id": "fiv",   "name": "Fiverr Studio",         "icon": "🎨", "unlockAt": 0,       "flavor": "Thumbnails · covers · pages" },
   { "id": "gov",   "name": "Gov War Room",          "icon": "🏛️", "unlockAt": 0,       "flavor": "SAM.gov scout · bid memos" },
+  { "id": "recon", "name": "Software Lab",           "icon": "🛠️", "unlockAt": 0,       "flavor": "Recon Tweaks + SaaS · support, releases, growth" },
+  { "id": "vault", "name": "Knowledge Vault",        "icon": "🧠", "unlockAt": 0,       "flavor": "Ingest · transcribe · organize · recall" },
   { "id": "etsy",  "name": "Etsy & POD Workshop",   "icon": "👕", "unlockAt": 1000,    "flavor": "Trend scout · original designs" },
   { "id": "lab",   "name": "Content Lab",           "icon": "🎬", "unlockAt": 5000,    "flavor": "Blog · affiliate · short-form" },
   { "id": "music", "name": "Music Studio",          "icon": "🎵", "unlockAt": 10000,   "flavor": "Beats · lofi · licensing" },

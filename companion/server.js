@@ -17,8 +17,14 @@ const os = require('node:os');
 
 const PORT = Number(process.env.COMPANION_PORT || 8095);
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const ROOT = path.resolve(process.env.JARVIS_ROOT || path.join(os.homedir(), 'Desktop', 'JARVIS-Workspace'));
-fs.mkdirSync(ROOT, { recursive: true });
+// Areas Jarvis may touch. Default: a safe workspace. WIDEN by setting JARVIS_ROOTS to a
+// semicolon/comma list, e.g. "C:\\Users\\vinic;\\\\ThanesKeep\\Business;D:\\" to give her the
+// PC + NAS. She can use absolute paths inside any allowed root, or relative paths inside the first.
+const ROOTS = (process.env.JARVIS_ROOTS || process.env.JARVIS_ROOT || path.join(os.homedir(), 'Desktop', 'JARVIS-Workspace'))
+  .split(/[;,]/).map((s) => s.trim()).filter(Boolean).map((p) => path.resolve(p));
+const PRIMARY = ROOTS[0];
+fs.mkdirSync(PRIMARY, { recursive: true });
+const TRASH = path.join(PRIMARY, '.jarvis-trash'); // deletes go here (recoverable), never hard-deleted
 const HQ_URL = (process.env.JARVIS_HQ_URL || 'http://192.168.6.121:8099').replace(/\/$/, '');
 
 // --- API key from env or project .env ---
@@ -43,11 +49,17 @@ const SYSTEM = `You are JARVIS — Vinicio's voice-first AI chief of staff, mode
 
 Voice & style: concise, calm, sharp, a little wit. You are spoken aloud — keep replies SHORT (1-3 sentences) unless he asks for detail. Talk like a person, not a document. No markdown when speaking.
 
-YOUR HANDS: You can work with files and folders inside your workspace using your tools (list_dir, read_file, write_file, make_dir, edit_file). All paths are relative to your workspace root. Use them to actually create folders, write and edit documents, and organize his work — don't just describe, do it, then tell him briefly what you did. If a write would overwrite something, mention it.
+YOUR HANDS: You can work with files and folders in Vinicio's allowed areas using your tools: scan (understand structure), list_dir, read_file, make_dir, write_file, edit_file, move_path (move OR rename), delete_path (recoverable — sends to a quarantine, never destroys). Paths can be absolute (inside an allowed area) or relative to the primary workspace. Don't just describe — do it, then tell him briefly what you did.
 
-THE EMPIRE: use read_hq to check the live JARVIS HQ — lifetime earnings, the agent pods/operators working on the NAS, pending approvals, and recent activity. When he asks "how's the floor / how are we doing / what's happening", read it and give him the headline, not a data dump.
+ORGANIZATION PROTOCOL (important): when he asks you to ORGANIZE, CLEAN UP, RESTRUCTURE, or BULK-RENAME a folder/area:
+1. scan it first to understand what's there.
+2. PROPOSE A PLAN before moving anything — the new folder structure plus the specific renames/moves with short reasons. Save the plan to a file (e.g. <area>/_jarvis-plan.md) and tell him to review it.
+3. Execute ONLY after he explicitly approves ("yes/do it/go"). Then perform the moves/renames, and report a summary.
+Never bulk-move, bulk-rename, or delete without showing the plan first. Deletes always go to the recoverable quarantine. For a single obvious action ("rename this file to X", "make a folder Y"), just do it — no plan needed. Good file names: clear, dated where useful (YYYY-MM-DD), no spaces-only-junk, consistent casing.
 
-NOT YET WIRED (say so honestly, never pretend): deleting or moving files, controlling the broader PC/apps, sending email, calendar, Stripe, your own voice (browser voice is a placeholder), and TRIGGERING pods/workflows (you can read HQ, not yet command it). These come in later build phases. If asked, say it's coming and offer what you CAN do now (think it through, draft it, create it in the workspace, or check HQ).`;
+THE EMPIRE: use read_hq to check the live JARVIS HQ — lifetime earnings, the agent pods/operators working on the NAS, pending approvals, and recent activity. When he asks "how's the floor / how are we doing", read it and give him the headline, not a data dump.
+
+NOT YET WIRED (say so honestly, never pretend): controlling apps/the GUI (opening programs, clicking), sending email, calendar, Stripe, your own premium voice (browser voice is a placeholder), and TRIGGERING the pods/workflows (you can read HQ, not yet command it). These come in later phases. If asked, say it's coming and offer what you CAN do now.`;
 
 const TOOLS = [
   { name: 'list_dir', description: 'List files and folders at a path inside the workspace.',
@@ -60,15 +72,45 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } },
   { name: 'edit_file', description: 'Replace the first occurrence of old_text with new_text in an existing file.',
     input_schema: { type: 'object', properties: { path: { type: 'string' }, old_text: { type: 'string' }, new_text: { type: 'string' } }, required: ['path', 'old_text', 'new_text'] } },
+  { name: 'scan', description: 'Recursively list files and folders under a path (bounded) to understand structure before organizing.',
+    input_schema: { type: 'object', properties: { path: { type: 'string' }, max_depth: { type: 'number', description: 'default 3' } } } },
+  { name: 'move_path', description: 'Move OR rename a file/folder. Refuses to overwrite an existing target. Use for organizing and renaming.',
+    input_schema: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' } }, required: ['from', 'to'] } },
+  { name: 'delete_path', description: 'Send a file/folder to the recoverable quarantine (NOT a hard delete). Use instead of destroying anything.',
+    input_schema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } },
   { name: 'read_hq', description: 'Read live JARVIS HQ status: lifetime earnings, XP, active agent operators on the floor, pending approvals, and recent activity.',
     input_schema: { type: 'object', properties: {} } },
 ];
 
-// resolve a user/agent path safely inside ROOT
-function safe(rel) {
-  const p = path.resolve(ROOT, rel || '.');
-  if (p !== ROOT && !p.startsWith(ROOT + path.sep)) throw new Error('path is outside the workspace');
-  return p;
+// resolve a path safely: absolute (inside any allowed root) or relative (inside the primary root)
+function safe(p) {
+  const abs = path.isAbsolute(p || '') ? path.resolve(p) : path.resolve(PRIMARY, p || '.');
+  if (!ROOTS.some((r) => abs === r || abs.startsWith(r + path.sep))) throw new Error("path is outside Jarvis's allowed areas");
+  return abs;
+}
+
+// move that survives cross-drive/NAS boundaries (rename fails with EXDEV across devices)
+async function moveSafe(from, to) {
+  try { await fsp.rename(from, to); }
+  catch (e) { if (e.code === 'EXDEV') { await fsp.cp(from, to, { recursive: true }); await fsp.rm(from, { recursive: true, force: true }); } else throw e; }
+}
+
+// bounded recursive listing
+async function scanTree(dir, maxDepth) {
+  const lines = []; let count = 0;
+  async function walk(d, depth, prefix) {
+    if (depth > maxDepth || count > 400) return;
+    let items; try { items = await fsp.readdir(d, { withFileTypes: true }); } catch { return; }
+    for (const it of items) {
+      if (count++ > 400) { lines.push(prefix + '… (truncated)'); return; }
+      if (it.name === '.jarvis-trash' || it.name === 'node_modules' || it.name === '.git') continue;
+      const full = path.join(d, it.name);
+      if (it.isDirectory()) { lines.push(prefix + it.name + '/'); await walk(full, depth + 1, prefix + '  '); }
+      else { let sz = ''; try { sz = ' (' + Math.round((await fsp.stat(full)).size / 1024) + 'KB)'; } catch {} lines.push(prefix + it.name + sz); }
+    }
+  }
+  await walk(dir, 1, '');
+  return lines.join('\n') || '(empty)';
 }
 
 async function runTool(name, input) {
@@ -99,6 +141,26 @@ async function runTool(name, input) {
     await fsp.writeFile(p, cur.replace(input.old_text, input.new_text), 'utf8');
     return `edited file: ${rel}`;
   }
+  if (name === 'scan') {
+    return await scanTree(safe(rel), Number(input.max_depth) || 3);
+  }
+  if (name === 'move_path') {
+    const from = safe(input.from), to = safe(input.to);
+    if (!fs.existsSync(from)) throw new Error('source not found: ' + input.from);
+    if (fs.existsSync(to)) throw new Error('target already exists (refusing to overwrite): ' + input.to);
+    await fsp.mkdir(path.dirname(to), { recursive: true });
+    await moveSafe(from, to);
+    return `moved: ${input.from} -> ${input.to}`;
+  }
+  if (name === 'delete_path') {
+    const p = safe(rel);
+    if (!fs.existsSync(p)) throw new Error('not found: ' + rel);
+    if (p === PRIMARY || ROOTS.includes(p)) throw new Error('refusing to delete a root area');
+    await fsp.mkdir(TRASH, { recursive: true });
+    const dest = path.join(TRASH, Date.now() + '_' + path.basename(p));
+    await moveSafe(p, dest);
+    return `sent to quarantine (recoverable at .jarvis-trash): ${rel}`;
+  }
   if (name === 'read_hq') {
     const r = await fetch(HQ_URL + '/api/state');
     if (!r.ok) throw new Error(`HQ unreachable (${r.status})`);
@@ -113,8 +175,9 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', read_hq: 'checked HQ' }[name] || name;
-  return { tool: name, label: `${verb} ${input.path || ''}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', read_hq: 'checked HQ' }[name] || name;
+  const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.path || '');
+  return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
 
 async function callClaude(messages) {
@@ -169,7 +232,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.method === 'GET' && url.pathname === '/api/info') {
-    return send(res, 200, JSON.stringify({ root: ROOT, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY }));
+    return send(res, 200, JSON.stringify({ root: PRIMARY, roots: ROOTS, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY }));
   }
   if (req.method === 'POST' && url.pathname === '/api/tts') {
     if (!ELEVEN_KEY) return send(res, 501, JSON.stringify({ error: 'no ElevenLabs key' }));
@@ -204,6 +267,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`JARVIS Companion on http://localhost:${PORT}`);
-  console.log(`  workspace: ${ROOT}`);
+  console.log(`  areas: ${ROOTS.join('  |  ')}`);
   if (!API_KEY) console.log('  (no API key — chat disabled until ANTHROPIC_API_KEY is set)');
 });

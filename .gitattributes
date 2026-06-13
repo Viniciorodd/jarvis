@@ -1,0 +1,7 @@
+# Shell scripts and the compose/env files must stay LF — they run on the Linux NAS.
+# CRLF would cause "bad interpreter: /bin/bash^M" and break docker compose.
+*.sh            text eol=lf
+docker-compose.yml text eol=lf
+.env.example    text eol=lf
+*.mjs           text eol=lf
+*.json          text eol=lf

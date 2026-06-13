@@ -6,15 +6,30 @@ CPUs handle this stack easily; heavy AI stays on the Claude API by design.
 
 ## 1. Tailscale first (private access, nothing public)
 
-Preferred: install Tailscale from UGREEN's App Center if available, else run the container
-(commented block in `docker-compose.yml` — pick ONE method, not both).
-UGREEN's guide: https://nas.ugreen.com/blogs/how-to/ugreen-nas-remote-access
+Pick ONE method:
 
-- Install Tailscale on iPhone + iPad too; log into the same tailnet.
-- **Do not** use UGREENlink, DDNS, or port forwarding for any of this. Exposed NAS devices
-  are the #1 ransomware target in self-hosting; Tailscale keeps yours invisible.
-- Known UGOS quirk: it occupies port 53 and can fight Tailscale's DNS. Fix documented at
-  guide.ugreen.community if you hit it.
+**Method A — UGREEN App Center (easiest).** If "Tailscale" is in the App Center, install it,
+log in, done. Then DELETE the `tailscale:` service from `docker-compose.yml` (don't run both).
+
+**Method B — Docker container (already in this compose file).** Use when there's no App Center app.
+1. Auth key: https://login.tailscale.com/admin/settings/keys → **Generate auth key**.
+   Reusable OFF, Ephemeral OFF (state persists in `./volumes/tailscale`). Copy `tskey-auth-...`.
+2. Paste it into `.env` as `TS_AUTHKEY=`.
+3. Confirm the TUN device on the NAS: `ls -l /dev/net/tun`. If missing: `sudo modprobe tun`
+   (add `tun` to `/etc/modules` so it survives reboot).
+4. Bring up Tailscale first, alone: `docker compose up -d tailscale`
+5. Verify: `docker compose logs tailscale` → look for "Success." + a `100.x.y.z` IP. The machine
+   shows up as **jarvis-nas** in your Tailscale admin console.
+6. In the admin console: enable **MagicDNS** (DNS tab) so `jarvis-nas` resolves tailnet-wide,
+   and disable key expiry for the machine so it doesn't drop off later.
+
+Either method:
+- Install the Tailscale app on iPhone + iPad, logged into the **same** tailnet account.
+- **Never** use UGREENlink, DDNS, or port forwarding. Exposed NAS devices are the #1
+  ransomware target in self-hosting; Tailscale keeps yours invisible to the public internet.
+- Known UGOS quirk: it occupies port 53 and can fight Tailscale's DNS — the compose service
+  already passes `--accept-dns=false` to sidestep it. More at guide.ugreen.community.
+- Reference: https://nas.ugreen.com/blogs/how-to/ugreen-nas-remote-access
 
 ## 2. Deploy the stack
 

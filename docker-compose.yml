@@ -34,7 +34,8 @@ services:
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
       N8N_HOST: ${N8N_HOST}
-      WEBHOOK_URL: https://${N8N_HOST}:5678/
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://${N8N_HOST}:5678/
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE}
       TZ: ${GENERIC_TIMEZONE}
       # Let workflows read these via {{ $env.X }} expressions
@@ -73,17 +74,26 @@ services:
     volumes:
       - ./volumes/whisper-cache:/root/.cache
 
-  # OPTIONAL: Tailscale as a container. UGREEN's own guide may have you install it
-  # at the OS level instead — either works; pick ONE. See docs/nas-setup.md.
-  # tailscale:
-  #   image: tailscale/tailscale:latest
-  #   restart: unless-stopped
-  #   hostname: jarvis-nas
-  #   network_mode: host
-  #   cap_add: [NET_ADMIN]
-  #   environment:
-  #     TS_AUTHKEY: ${TS_AUTHKEY}
-  #     TS_STATE_DIR: /var/lib/tailscale
-  #   volumes:
-  #     - ./volumes/tailscale:/var/lib/tailscale
-  #     - /dev/net/tun:/dev/net/tun
+  # Tailscale as a container (host networking). This brings the tailnet interface
+  # up ON the host, so the published container ports above (5678, 8099, 9000) become
+  # reachable across your tailnet at  http://<hostname>:<port>  — nothing public.
+  # ALTERNATIVE: install Tailscale from the UGREEN App Center instead and skip this
+  # service entirely. Pick ONE. See docs/nas-setup.md.
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: jarvis-tailscale
+    hostname: jarvis-nas              # becomes the MagicDNS name → http://jarvis-nas:8099
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "false"
+      # --accept-dns=false avoids the known UGOS port-53 / DNS fight (plan §11)
+      TS_EXTRA_ARGS: "--accept-dns=false"
+    volumes:
+      - ./volumes/tailscale:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun

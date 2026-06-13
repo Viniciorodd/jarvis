@@ -20,11 +20,18 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 // Areas Jarvis may touch. Default: a safe workspace. WIDEN by setting JARVIS_ROOTS to a
 // semicolon/comma list, e.g. "C:\\Users\\vinic;\\\\ThanesKeep\\Business;D:\\" to give her the
 // PC + NAS. She can use absolute paths inside any allowed root, or relative paths inside the first.
-const ROOTS = (process.env.JARVIS_ROOTS || process.env.JARVIS_ROOT || path.join(os.homedir(), 'Desktop', 'JARVIS-Workspace'))
-  .split(/[;,]/).map((s) => s.trim()).filter(Boolean).map((p) => path.resolve(p));
+let rootsRaw = process.env.JARVIS_ROOTS || process.env.JARVIS_ROOT || '';
+if (!rootsRaw) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^JARVIS_ROOTS=(.+)$/m); if (m) rootsRaw = m[1].trim(); } catch { /* none */ } }
+if (!rootsRaw) rootsRaw = path.join(os.homedir(), 'Desktop', 'JARVIS-Workspace');
+const ROOTS = rootsRaw.split(';').map((s) => s.trim()).filter(Boolean).map((p) => path.resolve(p));
 const PRIMARY = ROOTS[0];
 fs.mkdirSync(PRIMARY, { recursive: true });
-const TRASH = path.join(PRIMARY, '.jarvis-trash'); // deletes go here (recoverable), never hard-deleted
+const isInside = (root, abs) => { const rel = path.relative(root, abs); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+const rootOf = (abs) => ROOTS.find((r) => isInside(r, abs)) || PRIMARY;
+// Folders Jarvis must never traverse or reorganize — app-sync dirs (would fight Google Drive /
+// OneDrive / iCloud) and system dirs. She leaves these strictly alone.
+const OFF_LIMITS = new Set(['.jarvis-trash', 'node_modules', '.git', '#recycle', '#snapshot', '@eaDir',
+  '.cloud', '.storage', 'Google Drive Sync Folder', 'OneDrive Sync Folder', 'iCloud', 'Dropbox']);
 const HQ_URL = (process.env.JARVIS_HQ_URL || 'http://192.168.6.121:8099').replace(/\/$/, '');
 
 // --- API key from env or project .env ---
@@ -74,6 +81,8 @@ ORGANIZATION PROTOCOL (important): when he asks you to ORGANIZE, CLEAN UP, RESTR
 3. Execute ONLY after he explicitly approves ("yes/do it/go"). Then perform the moves/renames, and report a summary.
 Never bulk-move, bulk-rename, or delete without showing the plan first. Deletes always go to the recoverable quarantine. For a single obvious action ("rename this file to X", "make a folder Y"), just do it — no plan needed. Good file names: clear, dated where useful (YYYY-MM-DD), no spaces-only-junk, consistent casing.
 
+NEVER touch app-sync or system folders — "Google Drive Sync Folder", "OneDrive Sync Folder", iCloud/Dropbox folders, #recycle, .cloud, .storage, @eaDir. Don't move, rename, delete, or reorganize anything inside them; reorganizing a synced folder would fight that app and risk his data. If something useful lives only inside one, tell him to move it out himself first.
+
 NOTION: you can search and read his Notion workspace (notion_search, notion_read) — read-only for now. Use it to find notes and answer from them. (You only see pages he's shared with the integration; if a search is empty, tell him to share the pages/databases with the Jarvis integration in Notion.) Writing to / migrating Notion comes in a later phase.
 
 THE EMPIRE: use read_hq to check the live JARVIS HQ — lifetime earnings, the agent pods/operators working on the NAS, pending approvals, and recent activity. When he asks "how's the floor / how are we doing", read it and give him the headline, not a data dump.
@@ -108,7 +117,7 @@ const TOOLS = [
 // resolve a path safely: absolute (inside any allowed root) or relative (inside the primary root)
 function safe(p) {
   const abs = path.isAbsolute(p || '') ? path.resolve(p) : path.resolve(PRIMARY, p || '.');
-  if (!ROOTS.some((r) => abs === r || abs.startsWith(r + path.sep))) throw new Error("path is outside Jarvis's allowed areas");
+  if (!ROOTS.some((r) => isInside(r, abs))) throw new Error("path is outside Jarvis's allowed areas");
   return abs;
 }
 
@@ -126,7 +135,7 @@ async function scanTree(dir, maxDepth) {
     let items; try { items = await fsp.readdir(d, { withFileTypes: true }); } catch { return; }
     for (const it of items) {
       if (count++ > 400) { lines.push(prefix + '… (truncated)'); return; }
-      if (it.name === '.jarvis-trash' || it.name === 'node_modules' || it.name === '.git') continue;
+      if (OFF_LIMITS.has(it.name)) { lines.push(prefix + it.name + '/  ⟨left alone — app-sync/system⟩'); continue; }
       const full = path.join(d, it.name);
       if (it.isDirectory()) { lines.push(prefix + it.name + '/'); await walk(full, depth + 1, prefix + '  '); }
       else { let sz = ''; try { sz = ' (' + Math.round((await fsp.stat(full)).size / 1024) + 'KB)'; } catch {} lines.push(prefix + it.name + sz); }
@@ -178,11 +187,12 @@ async function runTool(name, input) {
   if (name === 'delete_path') {
     const p = safe(rel);
     if (!fs.existsSync(p)) throw new Error('not found: ' + rel);
-    if (p === PRIMARY || ROOTS.includes(p)) throw new Error('refusing to delete a root area');
-    await fsp.mkdir(TRASH, { recursive: true });
-    const dest = path.join(TRASH, Date.now() + '_' + path.basename(p));
-    await moveSafe(p, dest);
-    return `sent to quarantine (recoverable at .jarvis-trash): ${rel}`;
+    if (ROOTS.includes(p)) throw new Error('refusing to delete a root area');
+    if (OFF_LIMITS.has(path.basename(p))) throw new Error('refusing to touch an app-sync/system folder');
+    const trash = path.join(rootOf(p), '.jarvis-trash'); // quarantine stays on the same drive/NAS
+    await fsp.mkdir(trash, { recursive: true });
+    await moveSafe(p, path.join(trash, Date.now() + '_' + path.basename(p)));
+    return `sent to quarantine (recoverable in .jarvis-trash on the same drive): ${rel}`;
   }
   if (name === 'notion_search') {
     if (!NOTION_KEY) throw new Error('Notion not connected (no NOTION_API_KEY)');

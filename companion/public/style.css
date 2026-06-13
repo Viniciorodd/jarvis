@@ -15,7 +15,8 @@ body{
 .app{ height:100vh; display:flex; flex-direction:column; }
 .px{ font-family:'Silkscreen', monospace; }
 
-.topbar{ display:flex; align-items:center; gap:16px; padding:16px 22px; }
+.topbar{ display:flex; align-items:center; gap:16px; padding:16px 22px; -webkit-app-region:drag; }
+.topbar button, .composer{ -webkit-app-region:no-drag; }
 .brand{ font-size:15px; letter-spacing:.35em; color:var(--teal); text-shadow:0 0 12px var(--glow); }
 .state{ font-size:12px; color:var(--dim); letter-spacing:.18em; text-transform:uppercase; flex:1; }
 .floor-btn, .t-btn{ background:transparent; border:1px solid var(--teal-dim); color:var(--teal);

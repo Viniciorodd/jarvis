@@ -1,0 +1,12 @@
+{
+  "name": "jarvis-companion-desktop",
+  "version": "0.1.0",
+  "description": "JARVIS Companion — desktop app (Electron wrapper around the orb + brain)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.7.7"
+  }
+}

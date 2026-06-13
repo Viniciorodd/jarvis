@@ -1,4 +1,4 @@
-# Operator Profile — [YOUR NAME]
+# Operator Profile — VINICIO RODRIGUEZ
 <!-- Copy to operator-profile.md and fill in. 2–3 pages max. Update weekly (the Sunday
      strategy agent proposes edits from your new voice memos and Notion notes — you approve). -->
 
@@ -37,3 +37,5 @@
 - This week's #1 priority:
 - Active pods and their status:
 - Things I'm explicitly NOT doing right now:
+
+"never bid base-operations or anything needing past performance I don't have; favor sub-$150k janitorial/custodial SBA set-asides; respond to every relevant sources-sought."

@@ -1,7 +1,8 @@
 # Role: PROPOSAL-ASSEMBLER (Gov pod) · Sonnet, Opus for final pass
 
 Input: solicitation requirements + winning sub quote + our boilerplate library
-(capabilities statement, past performance, pricing template) + Operator Profile.
+(`boilerplate/capabilities-statement.md`, `boilerplate/sources-sought-response.md`,
+`boilerplate/pricing-template.md`) + the entity profile + Operator Profile.
 
 1. Map every requirement in the solicitation to a section of our response. Produce a
    compliance matrix first — requirement → where we answer it. Missing anything = flag loudly.

@@ -11,15 +11,25 @@ material into your Operator Profile.
 
 ---
 
-## 1. The golden safety rule (your instinct, made architectural)
+## 0. Two different jobs (don't conflate them)
 
-**Never point ingestion at another app's live sync/working folder.** Reading an iCloud Drive,
-Notability auto-sync, or Notion-cache folder risks pulling half-synced data, or worse, an agent
-writing into a space another app owns and corrupting it.
+- **ORGANIZING what's already yours** (NAS work areas, business folders, personal folders, the PC):
+  Jarvis gets **full access** here — that's the point. Safe because she works *plan → you approve →
+  execute*, renames/moves are reversible, and deletes go to a recoverable quarantine
+  (`.jarvis-trash`), never hard-deleted. This is already built in the Companion (`JARVIS_ROOTS`,
+  `scan`/`move_path`/`delete_path`, the organize protocol). Point her at everything.
+- **IMPORTING new external material** (Apple Notes, Notability, Day One, iCloud): this is where the
+  drop-zone rule applies — see §1.
 
-Instead: **one-way drop zone.** You *export* from each app into a dedicated inbox the vault owns.
-Ingestion reads the inbox, processes, files into the vault, and **archives the original**. It never
-reads from, writes to, or watches any source app's folder.
+## 1. The golden safety rule — for IMPORTS only
+
+**Don't auto-pull from another app's live sync/working folder.** Watching an iCloud Drive,
+Notability auto-sync, or a Notion cache risks pulling half-synced data or fighting that app.
+
+Instead, for imports: **one-way drop zone.** You *export* from each app into a dedicated inbox the
+vault owns. Ingestion reads the inbox, processes, files into the vault, **archives the original**,
+and never watches the source app's folder. (This does NOT limit Jarvis's organizing — she still has
+full run of your real NAS/PC folders per §0; the drop-zone is only about how outside notes get *in*.)
 
 ```
 Source apps  ──(you export)──▶  Vault/_inbox/   ──(ingestion)──▶  Vault/<organized>/  +  search index
@@ -106,6 +116,19 @@ the embeddings/semantic layer once the corpus is in and the pipeline is proven.
 - Backed up encrypted offsite with the rest of the irreplaceable 1% (see nas-setup.md §4).
 
 ---
+
+## 6b. End state — ONE source of truth
+
+The point of all this isn't just tidiness; it's so you can **stop juggling four note apps.** Today:
+Apple Notes + Notability + Day One + Notion. Target: **everything organized, then consolidate to one
+home** and retire the rest.
+
+Recommended single home: **Notion** — it has an API (agents can read/write it), handles text +
+docs + databases, and is already your company brain. The flow: ingest/organize everything → migrate
+the keepers into a clean Notion structure (or the NAS vault for big files Notion shouldn't hold) →
+go forward writing in *one* place. Day One can stay separate **only** for private journaling if you
+want that walled off; otherwise it folds in too. Jarvis does the migration grunt-work; you decide
+the final structure. After cutover, new notes have exactly one destination — simple by design.
 
 ## 7. Build phases
 - **V0:** create the vault + `_inbox` on the NAS; ingestion script: detect new file → (Whisper if

@@ -45,6 +45,23 @@ try {
   const v = e.match(/^ELEVENLABS_VOICE_ID=(.+)$/m); if (v) ELEVEN_VOICE = v[1].trim();
 } catch { /* none */ }
 
+// Optional Notion (read-only for now) — lets her search/read your Notion workspace.
+let NOTION_KEY = process.env.NOTION_API_KEY || '';
+if (!NOTION_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^NOTION_API_KEY=(.+)$/m); if (m) NOTION_KEY = m[1].trim(); } catch { /* none */ } }
+async function notionFetch(pathPart, method = 'GET', body) {
+  const r = await fetch('https://api.notion.com/v1/' + pathPart, {
+    method, headers: { Authorization: `Bearer ${NOTION_KEY}`, 'Notion-Version': '2022-06-28', 'content-type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) throw new Error(`Notion ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return r.json();
+}
+function notionTitle(r) {
+  if (r.properties) for (const k in r.properties) { const p = r.properties[k]; if (p.type === 'title') return (p.title || []).map((t) => t.plain_text).join('') || '(untitled)'; }
+  if (r.title) return (r.title || []).map((t) => t.plain_text).join('') || '(untitled)';
+  return '(untitled)';
+}
+
 const SYSTEM = `You are JARVIS — Vinicio's voice-first AI chief of staff, modeled on Iron Man's Jarvis but warmer and human. You help run his businesses (Rodgate, a government-contracting LLC; Fiverr creative services; and more) and his day.
 
 Voice & style: concise, calm, sharp, a little wit. You are spoken aloud — keep replies SHORT (1-3 sentences) unless he asks for detail. Talk like a person, not a document. No markdown when speaking.
@@ -56,6 +73,8 @@ ORGANIZATION PROTOCOL (important): when he asks you to ORGANIZE, CLEAN UP, RESTR
 2. PROPOSE A PLAN before moving anything — the new folder structure plus the specific renames/moves with short reasons. Save the plan to a file (e.g. <area>/_jarvis-plan.md) and tell him to review it.
 3. Execute ONLY after he explicitly approves ("yes/do it/go"). Then perform the moves/renames, and report a summary.
 Never bulk-move, bulk-rename, or delete without showing the plan first. Deletes always go to the recoverable quarantine. For a single obvious action ("rename this file to X", "make a folder Y"), just do it — no plan needed. Good file names: clear, dated where useful (YYYY-MM-DD), no spaces-only-junk, consistent casing.
+
+NOTION: you can search and read his Notion workspace (notion_search, notion_read) — read-only for now. Use it to find notes and answer from them. (You only see pages he's shared with the integration; if a search is empty, tell him to share the pages/databases with the Jarvis integration in Notion.) Writing to / migrating Notion comes in a later phase.
 
 THE EMPIRE: use read_hq to check the live JARVIS HQ — lifetime earnings, the agent pods/operators working on the NAS, pending approvals, and recent activity. When he asks "how's the floor / how are we doing", read it and give him the headline, not a data dump.
 
@@ -80,6 +99,10 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } },
   { name: 'read_hq', description: 'Read live JARVIS HQ status: lifetime earnings, XP, active agent operators on the floor, pending approvals, and recent activity.',
     input_schema: { type: 'object', properties: {} } },
+  { name: 'notion_search', description: 'Search the connected Notion workspace by keyword. Returns matching pages/databases with their IDs.',
+    input_schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
+  { name: 'notion_read', description: 'Read the text content of a Notion page by its ID (from notion_search).',
+    input_schema: { type: 'object', properties: { page_id: { type: 'string' } }, required: ['page_id'] } },
 ];
 
 // resolve a path safely: absolute (inside any allowed root) or relative (inside the primary root)
@@ -161,6 +184,23 @@ async function runTool(name, input) {
     await moveSafe(p, dest);
     return `sent to quarantine (recoverable at .jarvis-trash): ${rel}`;
   }
+  if (name === 'notion_search') {
+    if (!NOTION_KEY) throw new Error('Notion not connected (no NOTION_API_KEY)');
+    const data = await notionFetch('search', 'POST', { query: input.query || '', page_size: 10 });
+    const rows = (data.results || []).map((r) => `${notionTitle(r)} — ${r.object} — id:${r.id}${r.url ? ' — ' + r.url : ''}`);
+    return rows.join('\n') || '(no matches — note: Notion only shows pages you shared with the integration)';
+  }
+  if (name === 'notion_read') {
+    if (!NOTION_KEY) throw new Error('Notion not connected (no NOTION_API_KEY)');
+    const data = await notionFetch(`blocks/${input.page_id}/children?page_size=80`);
+    const lines = [];
+    for (const b of data.results || []) {
+      const t = b.type; const rich = (b[t] && b[t].rich_text) || [];
+      const txt = rich.map((x) => x.plain_text).join('');
+      if (txt) lines.push((/heading/.test(t) ? '# ' : (/list_item|to_do/.test(t) ? '- ' : '')) + txt);
+    }
+    return lines.join('\n').slice(0, 12000) || '(page has no readable text blocks)';
+  }
   if (name === 'read_hq') {
     const r = await fetch(HQ_URL + '/api/state');
     if (!r.ok) throw new Error(`HQ unreachable (${r.status})`);
@@ -175,8 +215,8 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', read_hq: 'checked HQ' }[name] || name;
-  const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.path || '');
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', read_hq: 'checked HQ', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.path || input.query || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
 
@@ -232,7 +272,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.method === 'GET' && url.pathname === '/api/info') {
-    return send(res, 200, JSON.stringify({ root: PRIMARY, roots: ROOTS, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY }));
+    return send(res, 200, JSON.stringify({ root: PRIMARY, roots: ROOTS, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY, hasNotion: !!NOTION_KEY }));
   }
   if (req.method === 'POST' && url.pathname === '/api/tts') {
     if (!ELEVEN_KEY) return send(res, 501, JSON.stringify({ error: 'no ElevenLabs key' }));

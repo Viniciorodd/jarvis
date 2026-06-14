@@ -12,7 +12,13 @@ _Updated 2026-06-14. Everything is committed to git + saved to memory. Resume fr
 - **Operator Profile — FINALIZED & live** (`prompts/operator-profile.md`, gitignored): merged from 232
   notes/voice/journals + his confirmed facts. Key: gov #1, $10 spend gate, trading off 6mo, RE passive,
   $10k/mo net goal, "be hard on me," family-driven why.
-- **Data ingested:** 65 Notability .note · 166 voice transcripts · 12 Day One journals (incl 520-entry main).
+- **Data ingested (full archive, searchable):** 65 Notability .note · 166 voice transcripts ·
+  12 Day One journals (520-entry main) · **280/284 handwritten PDFs OCR'd** (4 large ones failed —
+  retry with split: "Getting to $1M by 2027", "Main Street Millionaire", "ICT Mentorship", one 413).
+- **Voice + comms LIVE (keys in .env, verified):** ElevenLabs (she speaks) · Deepgram (she hears) ·
+  **Slack bridge** (DM her / approvals with buttons, Socket Mode). Launch both: `companion\start-jarvis.cmd`.
+- **Operator Profile v3** built from 512 sources; live profile enriched (no-equity rule, gov margin).
+  Private mental-health content kept OUT of the agent-injected profile by design.
 - **Tooling:** ingest.mjs (always-scan, all types) · transcribe-audio · read-notability · build-operator-profile
   · sam-scout (profile-aware) · Fiverr gig pack · gov capability boilerplate + a drafted sources-sought response.
 

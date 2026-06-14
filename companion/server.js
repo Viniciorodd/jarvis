@@ -230,11 +230,16 @@ function actionLabel(name, input, result, ok) {
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
 
+// Inject the Operator Profile (who she works for) ahead of her persona, if present.
+let OPERATOR = '';
+try { OPERATOR = fs.readFileSync(path.join(__dirname, '..', 'prompts', 'operator-profile.md'), 'utf8'); } catch { /* not written yet */ }
+const FULL_SYSTEM = (OPERATOR ? `# WHO YOU WORK FOR — your operator's profile (know this cold)\n${OPERATOR}\n\n---\n\n` : '') + SYSTEM;
+
 async function callClaude(messages) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1200, system: SYSTEM, tools: TOOLS, messages }),
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1200, system: FULL_SYSTEM, tools: TOOLS, messages }),
   });
   if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text()).slice(0, 300)}`);
   return r.json();

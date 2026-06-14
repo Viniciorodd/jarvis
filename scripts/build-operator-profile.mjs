@@ -11,25 +11,31 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // jarvis/
 const VAULT = path.join(os.homedir(), 'Desktop', 'JARVIS-Workspace');
-const SOURCES = [path.join(VAULT, 'notability'), path.join(VAULT, 'transcripts')];
+const SOURCES = [path.join(VAULT, 'notability'), path.join(VAULT, 'transcripts'), path.join(VAULT, '_ingested')];
 const TEMPLATE = path.join(ROOT, 'prompts', 'operator-profile-template.md');
 const OUT = path.join(ROOT, 'prompts', 'operator-profile.draft.md');
-const MAX_CHARS = 320000; // keep well within context
+const MAX_CHARS = 800000; // Opus handles it; covers notes + voice + journals
 
 let KEY = process.env.ANTHROPIC_API_KEY || '';
 if (!KEY) { try { const m = fs.readFileSync(path.join(ROOT, '.env'), 'utf8').match(/^ANTHROPIC_API_KEY=(.+)$/m); if (m) KEY = m[1].trim(); } catch { /* */ } }
 if (!KEY) { console.error('No ANTHROPIC_API_KEY'); process.exit(1); }
 
+function* walk(dir) {
+  let items = []; try { items = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const it of items) {
+    const full = path.join(dir, it.name);
+    if (it.isDirectory()) yield* walk(full);
+    else if (/\.(md|txt)$/i.test(it.name)) yield full;
+  }
+}
 let corpus = '';
 let count = 0;
 for (const dir of SOURCES) {
-  if (!fs.existsSync(dir)) continue;
-  for (const f of fs.readdirSync(dir)) {
-    if (!/\.(md|txt)$/i.test(f)) continue;
+  for (const f of walk(dir)) {
     try {
-      const body = fs.readFileSync(path.join(dir, f), 'utf8');
-      const chunk = `\n\n===== ${f} =====\n${body}`;
-      if (corpus.length + chunk.length > MAX_CHARS) break;
+      const body = fs.readFileSync(f, 'utf8');
+      const chunk = `\n\n===== ${path.basename(f)} =====\n${body}`;
+      if (corpus.length + chunk.length > MAX_CHARS) continue;
       corpus += chunk; count++;
     } catch { /* skip */ }
   }

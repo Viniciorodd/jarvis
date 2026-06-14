@@ -14,7 +14,7 @@ const VAULT = path.join(os.homedir(), 'Desktop', 'JARVIS-Workspace');
 const SOURCES = [path.join(VAULT, 'notability'), path.join(VAULT, 'transcripts'), path.join(VAULT, '_ingested')];
 const TEMPLATE = path.join(ROOT, 'prompts', 'operator-profile-template.md');
 const OUT = path.join(ROOT, 'prompts', 'operator-profile.draft.md');
-const MAX_CHARS = 800000; // Opus handles it; covers notes + voice + journals
+const MAX_CHARS = 1300000; // Opus 1M-token context; covers notes + voice + journals + handwritten PDFs
 
 let KEY = process.env.ANTHROPIC_API_KEY || '';
 if (!KEY) { try { const m = fs.readFileSync(path.join(ROOT, '.env'), 'utf8').match(/^ANTHROPIC_API_KEY=(.+)$/m); if (m) KEY = m[1].trim(); } catch { /* */ } }

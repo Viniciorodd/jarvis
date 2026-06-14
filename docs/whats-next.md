@@ -14,7 +14,7 @@ _Last updated: 2026-06-14. Tick items as you finish them._
 - Specs written: Companion PRD, Knowledge Vault, SaaS/Recon pod
 
 ## 🟦 TRACK A — Make Jarvis fully know you (→ Operator Profile)
-- [ ] **A1. Transcribe Notability** (no NAS step needed): `node scripts\read-notability.mjs "//192.168.6.121/NotabilityBackups"`
+- [x] **A1. Transcribe Notability** — DONE: 64 notes → vault\notability\*.md (2026-06-14)
 - [ ] **A2. Deploy Whisper on the NAS** (one SSH session) then `node scripts\transcribe-audio.mjs`
 - [ ] **A3. Share remaining Notion pages** with the integration (more = smarter)
 - [ ] **A4. Operator Profile deep-pass** — once A1–A3 done, Jarvis distills it from your real data

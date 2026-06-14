@@ -41,6 +41,7 @@ if (!dirsRaw) { try { const m = fs.readFileSync(path.join(ROOT, '.env'), 'utf8')
 const DIRS = (dirsRaw ? dirsRaw.split(';') : DEFAULT_DIRS).map((d) => d.trim()).filter(Boolean)
   .map((d) => (process.platform === 'win32' ? d.replace(/\//g, '\\') : d));
 
+const ONLY = (process.env.JARVIS_ONLY_EXT || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 let KEY = process.env.ANTHROPIC_API_KEY || '';
 if (!KEY) { try { const m = fs.readFileSync(path.join(ROOT, '.env'), 'utf8').match(/^ANTHROPIC_API_KEY=(.+)$/m); if (m) KEY = m[1].trim(); } catch { /* */ } }
 
@@ -53,13 +54,17 @@ for (const d of [VAULT, INBOX, OUT, INDEX]) fs.mkdirSync(d, { recursive: true })
 let manifest = {}; try { manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')); } catch { /* fresh */ }
 const saveManifest = () => fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2));
 
-async function claude(body) {
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST', headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error('Claude ' + r.status + ': ' + (await r.text()).slice(0, 200));
-  const d = await r.json();
-  return (d.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+async function claude(body, timeoutMs = 150000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs); // don't let one slow/huge file freeze the batch
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal,
+    });
+    if (!r.ok) throw new Error('Claude ' + r.status + ': ' + (await r.text()).slice(0, 200));
+    const d = await r.json();
+    return (d.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  } finally { clearTimeout(timer); }
 }
 const visionOCR = (buf, media) => claude({ model: 'claude-sonnet-4-6', max_tokens: 1500, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: media, data: buf.toString('base64') } }, { type: 'text', text: 'Transcribe ALL text in this image verbatim (handwritten or typed), preserving line breaks. Mark unclear words [unclear]. If no text, reply "(no readable text)".' }] }] });
 const pdfOCR = (buf) => claude({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buf.toString('base64') } }, { type: 'text', text: 'Transcribe ALL text from every page of this document verbatim (including handwriting), preserving structure and page breaks. Mark unclear words [unclear].' }] }] });
@@ -103,7 +108,12 @@ async function ingestOne(file) {
   let text = '', kind = ext.slice(1) || 'file';
   if (AUDIO.has(ext)) { kind = 'audio'; text = await transcribeAudio(file); }
   else if (ext === '.note') { const z = new AdmZip(await fsp.readFile(file)); const s = z.getEntries().find((e) => /Session\.plist$/.test(e.entryName)); const thumb = z.getEntries().find((e) => /thumb.*\.png$/i.test(e.entryName)); kind = 'notability'; text = `## Typed\n${s ? noteTyped(s.getData()) : ''}\n\n## Handwriting (page 1)\n${thumb ? await visionOCR(thumb.getData(), 'image/png') : '(none)'}`; }
-  else if (ext === '.pdf') { kind = 'pdf'; text = await pdfOCR(await fsp.readFile(file)); }
+  else if (ext === '.pdf') {
+    kind = 'pdf';
+    const st = await fsp.stat(file);
+    if (st.size > 28 * 1024 * 1024) { text = `(skipped — PDF too large for OCR: ${Math.round(st.size / 1e6)}MB; split it or export fewer pages)`; }
+    else { text = await pdfOCR(await fsp.readFile(file)); }
+  }
   else if (IMAGE.has(ext)) { kind = 'image'; text = await visionOCR(await fsp.readFile(file), IMG_MEDIA[ext]); }
   else if (ext === '.zip') { const t = await dayOneEntries(file); if (t === null) return null; kind = 'dayone'; text = t; }
   else if (ext === '.txt' || ext === '.md') { kind = 'text'; text = await fsp.readFile(file, 'utf8'); }
@@ -127,6 +137,7 @@ async function pass() {
   for (const dir of DIRS) {
     if (!fs.existsSync(dir)) { console.log('(source missing, skipping) ' + dir); continue; }
     for (const file of walk(dir)) {
+      if (ONLY.length && !ONLY.includes(path.extname(file).slice(1).toLowerCase())) continue;
       let st; try { st = fs.statSync(file); } catch { continue; }
       const sig = `${st.mtimeMs}:${st.size}`;
       if (manifest[file] === sig) { skip++; continue; }

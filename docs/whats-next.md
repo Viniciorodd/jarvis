@@ -1,35 +1,42 @@
-# Where we are & what's next (living checklist)
+# Where we are & what's next (handoff — read this first in a new chat)
 
-_Last updated: 2026-06-14. Tick items as you finish them._
+_Updated 2026-06-14. Everything is committed to git + saved to memory. Resume from here._
 
-## ✅ Already done
-- NAS stack deployed & live 24/7 (HQ :8099, n8n :5678, Postgres) — survived reboot
-- HQ heartbeat active (CORE operator on the floor)
-- 7 n8n workflows imported (only heartbeat activated so far)
-- Companion ("her") built: orb UI, chat brain, file tools + organize engine, browser voice,
-  HQ fusion, Notion read, full NAS access (BusinessVault/PersonalVault/NotabilityBackups)
-- Notion pages shared with the integration ✓ · NAS drives mapped ✓
-- Notability reader built & tested · voice-transcription script built
-- Fiverr gig pack + samples ready · gov entity + capability boilerplate ready
-- Specs written: Companion PRD, Knowledge Vault, SaaS/Recon pod
+## ✅ DONE & LIVE
+- **NAS stack 24/7:** n8n, Postgres, HQ (`192.168.6.121:8099`), Whisper (port 9100). HQ heartbeat active.
+- **Gov pod LIVE:** SAM scout (daily 6:10am, profile-aware ranking) + EOD report + approval-executor —
+  activated & tested (Telegram digest + SAM-SCOUT on HQ floor both confirmed working).
+- **Companion ("her"):** orb UI, Claude brain, file + organize tools (plan→approve→reversible quarantine),
+  full NAS access, Notion read, HQ read, browser voice. **Loads the Operator Profile** (she knows him).
+  Open: `node companion\server.js` → http://localhost:8095  (or companion\start-jarvis.cmd).
+- **Operator Profile — FINALIZED & live** (`prompts/operator-profile.md`, gitignored): merged from 232
+  notes/voice/journals + his confirmed facts. Key: gov #1, $10 spend gate, trading off 6mo, RE passive,
+  $10k/mo net goal, "be hard on me," family-driven why.
+- **Data ingested:** 65 Notability .note · 166 voice transcripts · 12 Day One journals (incl 520-entry main).
+- **Tooling:** ingest.mjs (always-scan, all types) · transcribe-audio · read-notability · build-operator-profile
+  · sam-scout (profile-aware) · Fiverr gig pack · gov capability boilerplate + a drafted sources-sought response.
 
-## 🟦 TRACK A — Make Jarvis fully know you (→ Operator Profile)
-- [x] **A1. Transcribe Notability** — DONE: 64 notes → vault\notability\*.md (2026-06-14)
-- [ ] **A2. Deploy Whisper on the NAS** (one SSH session) then `node scripts\transcribe-audio.mjs`
-- [ ] **A3. Share remaining Notion pages** with the integration (more = smarter)
-- [ ] **A4. Operator Profile deep-pass** — once A1–A3 done, Jarvis distills it from your real data
+## 🔜 NEXT (in priority order)
+1. **SEND 1 GOV PROPOSAL (his #1 priority).** Draft ready: `prompts/gov/boilerplate/DRAFT-sources-sought-westpoint-cleaning.md`.
+   Pull the real notice (CO email + exact #) from SAM.gov, fill 3 brackets, send. (Or run `node scripts/sam-scout.mjs --days 7` for fresh targets.)
+2. **Slack command center** (he chose this as the unifier): create workspace + bot token → wire pods + Jarvis
+   + approval buttons; replaces Telegram.
+3. **Gmail pods:** morning brief + email triage need a Gmail OAuth credential in n8n (fiddly — its own step).
+4. **Jarvis always-on:** containerize Companion + schedule ingestion on the NAS (so she's 24/7 + auto-updated).
+5. **HQ rebuild** for new rooms (`docker compose up -d --build hq`) + have pods ping HQ.
+6. **Device→NAS auto-backup** (Notability WebDAV, Just Press Record, Day One, photos) so the data-lake self-fills.
+7. **Recon Tweaks launch kit** — needs his goals/affiliates folder; pre-revenue → Gumroad listing + content.
 
-## 💵 TRACK B — Make money (can run in parallel, needs no system)
-- [ ] **B1. Post your 5 Fiverr gigs** (copy + samples in `fiverr-assets/gigs/`)
-- [ ] **B2. Activate gov SAM scout** in n8n (daily winnable-contract digest)
-- [ ] **B3. Recon Tweaks launch kit** — point me at your goals/affiliates folder, then Gumroad listing + content
-- [ ] **B4. Activate Chief-of-Staff workflows** (Gmail credential → morning brief, email triage, EOD report)
+## 🔧 Housekeeping / security (do soon)
+- Rotate the Claude API key + Telegram bot token (both were pasted in chat).
+- Change the temporary NAS password (`Jarvis2026deploy`).
+- First encrypted offsite backup (volumes/hq, volumes/n8n, operator-profile.md).
 
-## 🔧 TRACK C — Housekeeping / security (do soon)
-- [ ] **C1. Rotate the Claude API key** (console.anthropic.com) + **Telegram token** (@BotFather /revoke) — both were pasted in chat
-- [ ] **C2. Change the temporary NAS password** (`Jarvis2026deploy`) to something permanent
-- [ ] **C3. Rebuild HQ on NAS** to show the new rooms: `docker compose up -d --build hq`
-- [ ] **C4. First encrypted offsite backup** of volumes/hq, volumes/n8n, Operator Profile
+## Decisions on the table
+- **Notability 284 PDFs (320MB):** NOT bulk-OCR'd (cost vs marginal gain — profile already rich). OCR
+  high-value ones on demand later if wanted.
 
-## Optional upgrades (anytime)
-- ElevenLabs voice (drop key in `.env`) · Electron desktop app (`companion/desktop` → npm install)
+## How to resume in a new chat
+Open Claude Code **in `C:\Users\vinic\Desktop\jarvis`** and say:
+> "Read docs/whats-next.md and the memory. We left off with the gov pod live and my Operator Profile done.
+>  Let's [send the gov proposal / set up Slack / do the Gmail pods]."

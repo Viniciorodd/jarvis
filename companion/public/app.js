@@ -120,7 +120,11 @@ function startListen(continuous) {
   try { r.start(); listening = true; setState('listening', continuous ? 'listening' : 'listening…'); } catch {}
 }
 
-$('mic').addEventListener('click', () => { if (!SR) return startListen(false); if (listening && !wakeOn) { rec.stop(); } else startListen(false); });
+$('mic').addEventListener('click', () => {
+  if (hasStt) return toggleRecord(); // Deepgram: record → transcribe → send
+  if (!SR) return startListen(false); // else browser STT
+  if (listening && !wakeOn) { rec.stop(); } else startListen(false);
+});
 
 $('wakeBtn').addEventListener('click', () => {
   wakeOn = !wakeOn; $('wakeBtn').classList.toggle('on', wakeOn);
@@ -137,7 +141,31 @@ $('voiceBtn').addEventListener('click', () => {
 $('voiceBtn').classList.add('on');
 
 let hqUrl = 'http://192.168.6.121:8099';
-fetch('/api/info').then((r) => r.json()).then((i) => { if (i.hqUrl) hqUrl = i.hqUrl; hasVoice = !!i.hasVoice; }).catch(() => {});
+let hasStt = false; // Deepgram available?
+fetch('/api/info').then((r) => r.json()).then((i) => { if (i.hqUrl) hqUrl = i.hqUrl; hasVoice = !!i.hasVoice; hasStt = !!i.hasStt; }).catch(() => {});
+
+// Deepgram path: record mic audio, POST to /api/stt, send the transcript to her brain.
+let mediaRec = null, recChunks = [], recording = false;
+async function toggleRecord() {
+  if (recording && mediaRec) { mediaRec.stop(); return; }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch { addMsg('err', 'Mic blocked — allow microphone access.'); return; }
+  mediaRec = new MediaRecorder(stream, MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : {});
+  recChunks = []; recording = true; setState('listening', 'listening · tap mic to send');
+  mediaRec.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
+  mediaRec.onstop = async () => {
+    recording = false; stream.getTracks().forEach((t) => t.stop());
+    setState('thinking', 'transcribing…');
+    try {
+      const blob = new Blob(recChunks, { type: 'audio/webm' });
+      const r = await fetch('/api/stt', { method: 'POST', headers: { 'content-type': 'audio/webm' }, body: blob });
+      const d = await r.json();
+      if (d.text && d.text.trim()) sendToJarvis(d.text.trim()); else setState('idle', 'standby');
+    } catch { setState('idle', 'standby'); }
+  };
+  mediaRec.start();
+}
 $('floorBtn').addEventListener('click', () => window.open(hqUrl, '_blank'));
 
 // greeting

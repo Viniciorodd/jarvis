@@ -52,6 +52,10 @@ try {
   const v = e.match(/^ELEVENLABS_VOICE_ID=(.+)$/m); if (v) ELEVEN_VOICE = v[1].trim();
 } catch { /* none */ }
 
+// Optional Deepgram speech-to-text — better/cross-browser voice-in; else the browser's own STT.
+let DEEPGRAM_KEY = process.env.DEEPGRAM_API_KEY || '';
+if (!DEEPGRAM_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^DEEPGRAM_API_KEY=(.+)$/m); if (m) DEEPGRAM_KEY = m[1].trim(); } catch { /* */ } }
+
 // Optional Notion (read-only for now) — lets her search/read your Notion workspace.
 let NOTION_KEY = process.env.NOTION_API_KEY || '';
 if (!NOTION_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^NOTION_API_KEY=(.+)$/m); if (m) NOTION_KEY = m[1].trim(); } catch { /* none */ } }
@@ -287,7 +291,25 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.method === 'GET' && url.pathname === '/api/info') {
-    return send(res, 200, JSON.stringify({ root: PRIMARY, roots: ROOTS, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY, hasNotion: !!NOTION_KEY }));
+    return send(res, 200, JSON.stringify({ root: PRIMARY, roots: ROOTS, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY, hasNotion: !!NOTION_KEY, hasStt: !!DEEPGRAM_KEY }));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/stt') {
+    if (!DEEPGRAM_KEY) return send(res, 501, JSON.stringify({ error: 'no Deepgram key' }));
+    try {
+      const chunks = []; let n = 0;
+      await new Promise((resolve, reject) => {
+        req.on('data', (c) => { n += c.length; if (n > 25e6) { req.destroy(); reject(new Error('audio too large')); } chunks.push(c); });
+        req.on('end', resolve); req.on('error', reject);
+      });
+      const audio = Buffer.concat(chunks);
+      const r = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true', {
+        method: 'POST', headers: { Authorization: 'Token ' + DEEPGRAM_KEY, 'content-type': req.headers['content-type'] || 'audio/webm' }, body: audio,
+      });
+      if (!r.ok) return send(res, 502, JSON.stringify({ error: 'Deepgram ' + r.status }));
+      const d = await r.json();
+      const text = d.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
+      return send(res, 200, JSON.stringify({ text }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   if (req.method === 'POST' && url.pathname === '/api/tts') {
     if (!ELEVEN_KEY) return send(res, 501, JSON.stringify({ error: 'no ElevenLabs key' }));

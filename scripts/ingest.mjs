@@ -17,6 +17,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import AdmZip from 'adm-zip';
+import StreamZip from 'node-stream-zip';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const VAULT = process.env.JARVIS_VAULT || path.join(os.homedir(), 'Desktop', 'JARVIS-Workspace');
@@ -25,8 +26,20 @@ const OUT = path.join(VAULT, '_ingested');
 const INDEX = path.join(VAULT, 'index');
 const MANIFEST = path.join(INDEX, 'processed.json');
 const WHISPER = (process.env.WHISPER_URL || 'http://192.168.6.121:9100').replace(/\/$/, '');
-const DEFAULT_DIRS = [INBOX, '\\\\192.168.6.121\\NotabilityBackups', '\\\\192.168.6.121\\PersonalVault\\Just Press Record'];
-const DIRS = (process.env.JARVIS_INGEST_DIRS ? process.env.JARVIS_INGEST_DIRS.split(';') : DEFAULT_DIRS).map((d) => d.trim()).filter(Boolean);
+// Data-lake model: Jarvis reads your note/journal/audio folders ON THE NAS directly. Devices
+// (PC/Mac/iPhone/iPad) back up into these; Jarvis pulls — you never hand-feed a single folder.
+const NAS = '\\\\192.168.6.121';
+const DEFAULT_DIRS = [
+  INBOX, // optional extra drop-zone, still works
+  `${NAS}\\NotabilityBackups`,
+  `${NAS}\\PersonalVault\\Just Press Record`,
+  `${NAS}\\PersonalVault\\DayOne Backups`,
+  `${NAS}\\PersonalVault\\Notability PDFs`, // create this folder + back up Notability PDFs here
+];
+let dirsRaw = process.env.JARVIS_INGEST_DIRS || '';
+if (!dirsRaw) { try { const m = fs.readFileSync(path.join(ROOT, '.env'), 'utf8').match(/^JARVIS_INGEST_DIRS=(.+)$/m); if (m) dirsRaw = m[1].trim(); } catch { /* */ } }
+const DIRS = (dirsRaw ? dirsRaw.split(';') : DEFAULT_DIRS).map((d) => d.trim()).filter(Boolean)
+  .map((d) => (process.platform === 'win32' ? d.replace(/\//g, '\\') : d));
 
 let KEY = process.env.ANTHROPIC_API_KEY || '';
 if (!KEY) { try { const m = fs.readFileSync(path.join(ROOT, '.env'), 'utf8').match(/^ANTHROPIC_API_KEY=(.+)$/m); if (m) KEY = m[1].trim(); } catch { /* */ } }
@@ -65,13 +78,23 @@ async function transcribeAudio(file) {
   return (await r.text()).trim();
 }
 
-function dayOneEntries(zipBuf) {
-  const zip = new AdmZip(zipBuf);
-  const jsonEntry = zip.getEntries().find((e) => /\.json$/i.test(e.entryName));
-  if (!jsonEntry) return null;
-  let data; try { data = JSON.parse(jsonEntry.getData().toString('utf8')); } catch { return null; }
-  const entries = data.entries || [];
-  return entries.map((e) => `## ${e.creationDate || ''}\n${(e.text || '').trim()}`).join('\n\n---\n\n');
+// Day One zips are large and use a format adm-zip mishandles — use node-stream-zip. Async; takes a path.
+async function dayOneEntries(filePath) {
+  const zip = new StreamZip.async({ file: filePath });
+  let names = [];
+  try { names = Object.keys(await zip.entries()); } catch { await zip.close(); return null; }
+  const out = [];
+  for (const name of names.filter((n) => /\.json$/i.test(n))) {
+    let data; try { data = JSON.parse((await zip.entryData(name)).toString('utf8')); } catch { continue; }
+    const entries = data.entries || [];
+    if (!entries.length) continue;
+    let journal = name.replace(/\.json$/i, '');
+    try { journal = decodeURIComponent(journal); } catch { /* keep raw */ }
+    out.push(`# Journal: ${journal} (${entries.length} entries)`);
+    for (const e of entries) out.push(`## ${e.creationDate || ''}\n${(e.text || '').trim()}`);
+  }
+  await zip.close();
+  return out.length ? out.join('\n\n---\n\n') : null;
 }
 
 async function ingestOne(file) {
@@ -82,7 +105,7 @@ async function ingestOne(file) {
   else if (ext === '.note') { const z = new AdmZip(await fsp.readFile(file)); const s = z.getEntries().find((e) => /Session\.plist$/.test(e.entryName)); const thumb = z.getEntries().find((e) => /thumb.*\.png$/i.test(e.entryName)); kind = 'notability'; text = `## Typed\n${s ? noteTyped(s.getData()) : ''}\n\n## Handwriting (page 1)\n${thumb ? await visionOCR(thumb.getData(), 'image/png') : '(none)'}`; }
   else if (ext === '.pdf') { kind = 'pdf'; text = await pdfOCR(await fsp.readFile(file)); }
   else if (IMAGE.has(ext)) { kind = 'image'; text = await visionOCR(await fsp.readFile(file), IMG_MEDIA[ext]); }
-  else if (ext === '.zip') { const t = dayOneEntries(await fsp.readFile(file)); if (t === null) return null; kind = 'dayone'; text = t; }
+  else if (ext === '.zip') { const t = await dayOneEntries(file); if (t === null) return null; kind = 'dayone'; text = t; }
   else if (ext === '.txt' || ext === '.md') { kind = 'text'; text = await fsp.readFile(file, 'utf8'); }
   else return null; // unsupported type — skip silently
   const outDir = path.join(OUT, kind); fs.mkdirSync(outDir, { recursive: true });

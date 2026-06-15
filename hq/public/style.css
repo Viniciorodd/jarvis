@@ -1,12 +1,15 @@
+/* Palette harmonized with the JARVIS AI companion (dark ink + glowing teal) so HQ and the
+   assistant read as ONE product. Semantic names kept; gold/mint now teal-family, alert = companion coral. */
 :root{
-  --ink:#0B1024; --panel:#151D3D; --panel2:#1B2450; --line:#2B3768;
-  --gold:#F5B83D; --mint:#5BE3B7; --alert:#FF8A5C; --cream:#F2EFE4; --dim:#8A93BE;
+  --ink:#04070f; --panel:#0a141b; --panel2:#0d1a22; --line:#163a39;
+  --teal:#39e0d0; --gold:#39e0d0; --mint:#6fece0; --alert:#ff9a7a; --cream:#dfeef0; --dim:#5d7480;
+  --glow:rgba(57,224,208,.45);
 }
 *{ box-sizing:border-box; }
 body{
   margin:0; min-height:100vh; color:var(--cream);
   font-family:'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
-  background: radial-gradient(1100px 500px at 80% -10%, #1A2450 0%, transparent 60%), var(--ink);
+  background: radial-gradient(900px 600px at 50% 35%, #07131a 0%, transparent 70%), var(--ink);
 }
 .wrap{ max-width:880px; margin:0 auto; padding:20px 16px 48px; }
 .px{ font-family:'Silkscreen', monospace; letter-spacing:.02em; }
@@ -20,18 +23,18 @@ body{
 h2{ font-size:12px; margin:0 0 4px; }
 
 .hud{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
-.title{ font-size:19px; }
+.title{ font-size:19px; letter-spacing:.18em; text-shadow:0 0 14px var(--glow); }
 .hud-sub{ margin-top:7px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .chip{ font-size:11px; background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:4px 8px; }
 .bankroll{ text-align:right; }
-.big{ font-size:30px; font-weight:700; line-height:1; }
+.big{ font-size:30px; font-weight:700; line-height:1; text-shadow:0 0 16px var(--glow); }
 
 .bars{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
 .row{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
-.barbg{ background:#0E1530; border:1px solid var(--line); border-radius:99px; height:8px; margin-top:9px; overflow:hidden; }
+.barbg{ background:#06121a; border:1px solid var(--line); border-radius:99px; height:8px; margin-top:9px; overflow:hidden; }
 .fill{ height:100%; border-radius:99px; transition:width .6s ease; }
-.goldfill{ background:linear-gradient(90deg,#C98F1E,var(--gold)); }
-.mintfill{ background:var(--mint); }
+.goldfill{ background:linear-gradient(90deg,#1c6e69,var(--teal)); box-shadow:0 0 12px var(--glow); }
+.mintfill{ background:var(--mint); box-shadow:0 0 10px var(--glow); }
 
 .road-wrap{ margin-top:12px; overflow-x:auto; scrollbar-width:none; }
 .road-wrap::-webkit-scrollbar{ display:none; }
@@ -54,7 +57,7 @@ h2{ font-size:12px; margin:0 0 4px; }
 .approval .amt{ font-weight:700; white-space:nowrap; }
 .approval .acts{ display:flex; gap:8px; margin-top:12px; }
 .btn{ border-radius:10px; padding:7px 13px; font-size:13px; cursor:pointer; font-family:inherit; }
-.gold-btn{ background:var(--gold); color:#221a05; border:none; font-weight:700; }
+.gold-btn{ background:var(--teal); color:#04070f; border:none; font-weight:700; box-shadow:0 0 18px var(--glow); }
 .ghost-btn{ background:transparent; border:1px solid var(--line); color:var(--dim); }
 .ghost-btn:hover{ color:var(--cream); border-color:var(--dim); }
 .empty{ padding:16px; font-size:13px; }
@@ -69,10 +72,10 @@ h2{ font-size:12px; margin:0 0 4px; }
 .op{ display:flex; gap:10px; align-items:flex-start; }
 .led-wrap{ position:relative; margin-top:5px; flex:none; }
 .led{ display:block; width:8px; height:8px; border-radius:99px; }
-.led-work{ background:var(--mint); animation:ledPulse 1.6s ease-in-out infinite; }
-.led-idle{ background:#3A4577; }
+.led-work{ background:var(--teal); box-shadow:0 0 8px var(--glow); animation:ledPulse 1.6s ease-in-out infinite; }
+.led-idle{ background:#2a4a4a; }
 .led-need{ background:var(--alert); }
-.led-error{ background:#FF5C7A; animation:ledPulse .8s ease-in-out infinite; }
+.led-error{ background:#ff5c7a; animation:ledPulse .8s ease-in-out infinite; }
 .ring{ position:absolute; inset:-4px; border-radius:99px; border:2px solid var(--alert); opacity:.7; animation:needPing 1.4s ease-out infinite; }
 .op .nm{ font-size:11px; }
 .op .txt{ font-size:12.5px; line-height:1.35; }
@@ -92,10 +95,10 @@ h2{ font-size:12px; margin:0 0 4px; }
 .foot{ margin-top:26px; }
 
 .toasts{ position:fixed; bottom:28px; left:0; right:0; display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; z-index:60; }
-.toast{ background:var(--gold); color:#221a05; font-family:'Silkscreen',monospace; font-size:12px; font-weight:700;
-  border-radius:10px; padding:7px 13px; box-shadow:0 6px 24px rgba(0,0,0,.45); animation:floatUp 1.9s ease-out forwards; }
+.toast{ background:var(--teal); color:#04070f; font-family:'Silkscreen',monospace; font-size:12px; font-weight:700;
+  border-radius:10px; padding:7px 13px; box-shadow:0 6px 24px rgba(0,0,0,.45), 0 0 20px var(--glow); animation:floatUp 1.9s ease-out forwards; }
 
-.overlay{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(7,10,26,.88); }
+.overlay{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(4,7,15,.9); }
 .overlay.hidden{ display:none; }
 .rankcard{ padding:34px 30px; max-width:380px; width:100%; text-align:center; position:relative; overflow:hidden; animation:riseIn .35s ease-out; }
 .rankname{ font-size:24px; margin-top:8px; }

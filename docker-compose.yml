@@ -62,6 +62,37 @@ services:
     volumes:
       - ./volumes/hq:/data
 
+  # Control-plane spine: append-only event store + spend gate + KPIs + Chief-of-Staff router.
+  # Build context is the repo root so the image can include ../pods (router target).
+  control-plane:
+    build:
+      context: .
+      dockerfile: control-plane/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      CONTROL_PLANE_PORT: 8787
+      SPEND_ACTION_CAP_USD: ${SPEND_ACTION_CAP_USD:-2}
+      SPEND_DAILY_CAP_USD: ${SPEND_DAILY_CAP_USD:-5}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      COS_MODEL: ${COS_MODEL:-claude-haiku-4-5}
+      HQ_URL: http://hq:8099
+      HQ_TOKEN: ${HQ_TOKEN}
+    volumes:
+      - ./volumes/control-plane:/app/control-plane/data
+
+  # Jarvis World — the game-like PWA window into the floor. Static build served by nginx, which
+  # proxies /hq and /cp to the services above. Reachable over Tailscale at http://<host>:8095.
+  jarvis-world:
+    build: ./jarvis-world
+    restart: unless-stopped
+    depends_on:
+      - hq
+      - control-plane
+    ports:
+      - "8095:80"
+
   # Local, private voice transcription. POST multipart audio_file → /asr?output=json
   whisper:
     image: onerahmet/openai-whisper-asr-webservice:latest

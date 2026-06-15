@@ -70,7 +70,16 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       if (!b.text) return send(res, 400, { error: 'text required' });
       const rec = store.appendEvent({ kind: 'command', actor: 'operator', pod: 'chief-of-staff', action: 'command', payload: { text: b.text, source: b.source || 'api' } });
-      return send(res, 201, { id: rec.id, note: 'logged; Chief-of-Staff router dispatch is a later pod' });
+      // Chief-of-Staff router classifies + dispatches + gates. Loaded lazily so the control-plane still
+      // boots if the pod is absent; failures are logged, never fatal (doctrine §11 graceful failure).
+      let routing = null;
+      try {
+        const cos = await import('../pods/chief-of-staff/router.mjs');
+        routing = await cos.routeCommand({ text: b.text, source: b.source || 'api', commandId: rec.id, store, anthropicKey: process.env.ANTHROPIC_API_KEY });
+      } catch (e) {
+        store.appendEvent({ kind: 'trace', actor: 'chief-of-staff', pod: 'chief-of-staff', action: 'router.error', status: 'error', rationale: e.message, ref: rec.id });
+      }
+      return send(res, 201, { id: rec.id, routing });
     }
     if (req.method === 'GET' && p === '/kpis') return send(res, 200, kpis.computeKpis());
 

@@ -44,11 +44,20 @@ and formal **autonomy ladder with promotion rules** (workflows are human-gated b
   order didn't ask for yet.
 - ✅ Inbox cleanup tooling (audit + clean, both gated). ✅ Rodgate website live (rodgate-llc.netlify.app).
 - ✅ Data ingestion (Notability/voice/journals/OCR) + Operator Profile pipeline.
+- ✅ **Jarvis World** (`jarvis-world/`) — React + Vite PWA: a live, game-like window into the floor. Each
+  agent is an NPC at its pod's desk that bobs while working, shows a task speech-bubble, pings coral when
+  it needs you, shakes on error. Polls HQ `/api/state` + control-plane `/state`; one-tap approvals + a
+  command bar that routes through the CoS. Builds clean (PWA: service worker + manifest). Dockerized +
+  wired into `docker-compose.yml` (nginx proxies `/hq` + `/cp`); installable on iPhone/iPad over Tailscale.
+- ✅ **HQ reskinned** to the companion's dark/teal palette — HQ + the Jarvis AI now read as one product.
+- ✅ **Control-plane Dockerfile** added (was missing) + `control-plane` service in compose.
 
 ## Extra gaps the FULL doctrine surfaces (beyond the 5 directives)
 The real `operating-doctrine.md` (now canonical) asks for more than the 5 directives:
 - **Chief-of-Staff-as-router** (§2 org model) — a classifying front door that dispatches to pods and
-  aggregates back. The Companion is a chat UI, **not** yet this router. ❌
+  aggregates back. ✅ BUILT (`pods/chief-of-staff/`): `/command` → Claude (Haiku) classifies → deterministic
+  gate decision (irreversibles → approval.request) → routes to the pod registry, logs every step with
+  rationale, mirrors the agent onto the HQ floor. 18/18 evals green (incl. the gate-decision regression).
 - **Autonomy ladder L0–L4 + promotion rule** (§8) — promote a workflow only when evals pass AND
   human-edit-rate < threshold. Not implemented; autonomy is informal. ❌
 - **Two-layer KPIs** (§10) — Layer-2 system metrics (autonomy ratio, **human-edit rate**, escalation
@@ -67,7 +76,9 @@ The real `operating-doctrine.md` (now canonical) asks for more than the 5 direct
    **TESTED & WORKING** — generated sample thumbnail (shocked entrepreneur, blue rim lighting, bold text).
    Note: FLUX-schnell text-rendering is imperfect; for production, either avoid fine text or post-edit with
    Photoroom / remove.bg. Next: wire into gig-producer flow + add product-edit step (bg removal, relight).
-5. ❌ **Chief of Staff router + email triage at L0→L1** — consumes `/command`, dispatches to pods.
+5. 🟡 **Chief of Staff router + email triage at L0→L1** — ✅ ROUTER BUILT (`pods/chief-of-staff/`:
+   classify → gate → dispatch → log → HQ mirror; eval-pinned). Remaining: wire the actual email-triage
+   pod behind it and formalize the L0→L1 promotion (evals + human-edit-rate threshold).
 6. ❌ **Per-agent scoped credentials + a vault** (directive #3) — split shared keys; secrets out of `.env`.
 7. ❌ **Research-&-Risk desk — monitor + journal ONLY**, zero execution (§7).
 8. ✅ **Offline wake word (Vosk)** — built + model downloaded + served (hasVosk:true verified). Porcupine

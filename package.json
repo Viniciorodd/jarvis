@@ -2,7 +2,9 @@
   "dependencies": {
     "@slack/bolt": "^4.7.3",
     "adm-zip": "^0.5.17",
+    "imapflow": "^1.4.0",
     "node-stream-zip": "^1.15.0",
+    "nodemailer": "^8.0.11",
     "pdfkit": "^0.19.1"
   }
 }

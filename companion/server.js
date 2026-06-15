@@ -14,9 +14,11 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
+const { spawn } = require('node:child_process');
 
 const PORT = Number(process.env.COMPANION_PORT || 8095);
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const VOSK_MODEL = path.join(PUBLIC_DIR, 'models', 'vosk-model-small-en-us-0.15.tar.gz'); // offline wake model (run scripts/get-vosk-model.mjs)
 // Areas Jarvis may touch. Default: a safe workspace. WIDEN by setting JARVIS_ROOTS to a
 // semicolon/comma list, e.g. "C:\\Users\\vinic;\\\\ThanesKeep\\Business;D:\\" to give her the
 // PC + NAS. She can use absolute paths inside any allowed root, or relative paths inside the first.
@@ -79,6 +81,14 @@ Voice & style: concise, calm, sharp, a little wit. You are spoken aloud — keep
 
 YOUR HANDS: You can work with files and folders in Vinicio's allowed areas using your tools: scan (understand structure), list_dir, read_file, make_dir, write_file, edit_file, move_path (move OR rename), delete_path (recoverable — sends to a quarantine, never destroys). Paths can be absolute (inside an allowed area) or relative to the primary workspace. Don't just describe — do it, then tell him briefly what you did.
 
+OPENING THINGS ON HIS PC: use open_path to actually OPEN a file, folder, app, or URL on his machine in its default program — this is what he means by "open X file" or "pull up Y." If he names a file vaguely ("open the West Point proposal"), scan/list to find the real path first, then open it. You can also open a website or app by name (e.g. notepad, explorer, calc). Confirm out loud what you opened.
+
+SHOWING VISUALS: use show_visual to put something on his screen inside the Jarvis window — a MAP (type "map", give a place/address as query), an IMAGE (type "image", give an image URL), or a WEBPAGE (type "web", give a URL). When he says "show me a map of X" or "pull up an image of Y", call show_visual. Say one line about what you're showing.
+
+DROPPED FILES: when he drags a document onto you, you'll get a system note with its saved path under _dropbox/. Read it and help — summarize, edit, answer questions about it.
+
+MAKING IMAGES (Fiverr pod): use generate_image to actually CREATE real raster art (FLUX via fal.ai) — thumbnails, book covers, product shots, logos. Use it when he asks you to "make/design/generate" an image. It displays in your window. Tell him it's a draft to QC before delivering to any client, and that a per-image cost cap is enforced in code. If it errors about a missing key, tell him to add FAL_KEY to .env.
+
 ORGANIZATION PROTOCOL (important): when he asks you to ORGANIZE, CLEAN UP, RESTRUCTURE, or BULK-RENAME a folder/area:
 1. scan it first to understand what's there.
 2. PROPOSE A PLAN before moving anything — the new folder structure plus the specific renames/moves with short reasons. Save the plan to a file (e.g. <area>/_jarvis-plan.md) and tell him to review it.
@@ -91,7 +101,7 @@ NOTION: you can search and read his Notion workspace (notion_search, notion_read
 
 THE EMPIRE: use read_hq to check the live JARVIS HQ — lifetime earnings, the agent pods/operators working on the NAS, pending approvals, and recent activity. When he asks "how's the floor / how are we doing", read it and give him the headline, not a data dump.
 
-NOT YET WIRED (say so honestly, never pretend): controlling apps/the GUI (opening programs, clicking), sending email, calendar, Stripe, your own premium voice (browser voice is a placeholder), and TRIGGERING the pods/workflows (you can read HQ, not yet command it). These come in later phases. If asked, say it's coming and offer what you CAN do now.`;
+NOT YET WIRED (say so honestly, never pretend): clicking around inside other apps' GUIs, sending email from here, calendar, Stripe, and TRIGGERING the pods/workflows (you can read HQ, not yet command it). These come in later phases. If asked, say it's coming and offer what you CAN do now.`;
 
 const TOOLS = [
   { name: 'list_dir', description: 'List files and folders at a path inside the workspace.',
@@ -110,6 +120,12 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' } }, required: ['from', 'to'] } },
   { name: 'delete_path', description: 'Send a file/folder to the recoverable quarantine (NOT a hard delete). Use instead of destroying anything.',
     input_schema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } },
+  { name: 'open_path', description: 'OPEN a file, folder, app, or URL on the PC in its default program (what the user means by "open X"). Use for files inside allowed areas, http/https URLs, or a known app name (notepad, explorer, calc, chrome, code).',
+    input_schema: { type: 'object', properties: { target: { type: 'string', description: 'a file/folder path, a URL, or an app name' } }, required: ['target'] } },
+  { name: 'show_visual', description: 'Display something on the user\'s screen inside the Jarvis window: a map, an image, or a webpage. Use when he says "show me / pull up / open a map of …".',
+    input_schema: { type: 'object', properties: { type: { type: 'string', enum: ['map', 'image', 'web'], description: 'map = a place; image = an image URL; web = any URL' }, query: { type: 'string', description: 'for map: a place or address. for image/web: the URL.' }, caption: { type: 'string', description: 'short caption to show under it' } }, required: ['type', 'query'] } },
+  { name: 'generate_image', description: 'CREATE a real raster image with FLUX (thumbnails, covers, product shots, logos) and display it. Use for "make/design/generate an image of …". A per-image spend cap is enforced in code.',
+    input_schema: { type: 'object', properties: { prompt: { type: 'string', description: 'detailed image description' }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'], description: 'default 1024x1024; use 1536x1024 for YouTube thumbnails' }, quality: { type: 'string', enum: ['low', 'medium', 'high'], description: 'default medium' } }, required: ['prompt'] } },
   { name: 'read_hq', description: 'Read live JARVIS HQ status: lifetime earnings, XP, active agent operators on the floor, pending approvals, and recent activity.',
     input_schema: { type: 'object', properties: {} } },
   { name: 'notion_search', description: 'Search the connected Notion workspace by keyword. Returns matching pages/databases with their IDs.',
@@ -123,6 +139,49 @@ function safe(p) {
   const abs = path.isAbsolute(p || '') ? path.resolve(p) : path.resolve(PRIMARY, p || '.');
   if (!ROOTS.some((r) => isInside(r, abs))) throw new Error("path is outside Jarvis's allowed areas");
   return abs;
+}
+
+// --- OS open: launch a file/folder/app/URL in its default program (Vinicio's "open X") ---
+const APP_OK = /^[a-z0-9][a-z0-9 ._-]{0,40}$/i; // a plain app name like notepad / msedge / calc
+function osOpen(target) {
+  const plat = process.platform;
+  let child;
+  if (plat === 'win32') child = spawn('cmd', ['/c', 'start', '', target], { detached: true, stdio: 'ignore', windowsHide: true });
+  else child = spawn(plat === 'darwin' ? 'open' : 'xdg-open', [target], { detached: true, stdio: 'ignore' });
+  child.unref();
+}
+// Decide what a target is and open it. Files/folders must live inside an allowed root.
+function openTarget(raw) {
+  const t = String(raw || '').trim();
+  if (!t) throw new Error('nothing to open');
+  if (/^https?:\/\//i.test(t)) { osOpen(t); return `opened in browser: ${t}`; }
+  // try as a path first (absolute inside a root, or relative to the workspace)
+  let asPath = null;
+  try { asPath = safe(t); } catch { /* not a valid in-root path */ }
+  if (asPath && fs.existsSync(asPath)) { osOpen(asPath); return `opened: ${t}`; }
+  // otherwise treat as an app name
+  if (APP_OK.test(t) && !t.includes('/') && !t.includes('\\')) { osOpen(t); return `launched app: ${t}`; }
+  throw new Error(`can't open "${t}" — not a file in an allowed area, a URL, or a known app name`);
+}
+function buildMapUrl(query) {
+  // Google Maps embed works without an API key and accepts a free-text place query.
+  const q = encodeURIComponent(String(query || '').trim());
+  return `https://maps.google.com/maps?q=${q}&t=&z=12&ie=UTF8&iwloc=&output=embed`;
+}
+
+// --- usage / spend tracking (persisted) — powers the dashboard ---
+const USAGE_FILE = path.join(__dirname, '.usage.json');
+// Sonnet 4.x rough public rates per 1M tokens (input/output); adjust if pricing changes.
+const PRICE_IN = 3 / 1e6, PRICE_OUT = 15 / 1e6;
+function loadUsage() { try { return JSON.parse(fs.readFileSync(USAGE_FILE, 'utf8')); } catch { return { in: 0, out: 0, calls: 0, since: new Date().toISOString().slice(0, 10), today: {}, }; } }
+function addUsage(u) {
+  if (!u) return;
+  const s = loadUsage();
+  const day = new Date().toISOString().slice(0, 10);
+  s.in += u.input_tokens || 0; s.out += u.output_tokens || 0; s.calls += 1;
+  s.today[day] = s.today[day] || { in: 0, out: 0 };
+  s.today[day].in += u.input_tokens || 0; s.today[day].out += u.output_tokens || 0;
+  try { fs.writeFileSync(USAGE_FILE, JSON.stringify(s)); } catch { /* best effort */ }
 }
 
 // move that survives cross-drive/NAS boundaries (rename fails with EXDEV across devices)
@@ -215,6 +274,33 @@ async function runTool(name, input) {
     }
     return lines.join('\n').slice(0, 12000) || '(page has no readable text blocks)';
   }
+  if (name === 'open_path') {
+    return openTarget(input.target);
+  }
+  if (name === 'show_visual') {
+    const type = ['map', 'image', 'web'].includes(input.type) ? input.type : 'web';
+    const url = type === 'map' ? buildMapUrl(input.query) : String(input.query || '');
+    if (type !== 'map' && !/^https?:\/\//i.test(url)) throw new Error('image/web needs a full http(s) URL');
+    // marker is picked up by converse() and forwarded to the UI to render
+    return '__VISUAL__' + JSON.stringify({ type, url, caption: input.caption || input.query || '' });
+  }
+  if (name === 'generate_image') {
+    if (!input.prompt) throw new Error('prompt required');
+    const rel = '_generated/' + Date.now() + '.png';
+    const outAbs = path.join(PUBLIC_DIR, rel);
+    const script = path.join(__dirname, '..', 'scripts', 'gen-image.mjs');
+    const args = [script, String(input.prompt), '--out', outAbs];
+    if (input.size) args.push('--size', input.size);
+    if (input.quality) args.push('--quality', input.quality);
+    const r = await new Promise((resolve) => {
+      const c = spawn(process.execPath, args, { cwd: path.join(__dirname, '..') });
+      let out = '', err = ''; c.stdout.on('data', (d) => (out += d)); c.stderr.on('data', (d) => (err += d));
+      c.on('close', (code) => resolve({ code, out, err }));
+      c.on('error', (e) => resolve({ code: 1, out: '', err: e.message }));
+    });
+    if (r.code !== 0) throw new Error((r.err || r.out || 'image generation failed').trim().slice(0, 220));
+    return '__VISUAL__' + JSON.stringify({ type: 'image', url: '/' + rel, caption: String(input.prompt).slice(0, 80) });
+  }
   if (name === 'read_hq') {
     const r = await fetch(HQ_URL + '/api/state');
     if (!r.ok) throw new Error(`HQ unreachable (${r.status})`);
@@ -229,8 +315,8 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', read_hq: 'checked HQ', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
-  const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.path || input.query || '');
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
 
@@ -253,12 +339,14 @@ async function callClaude(messages) {
 async function converse(history) {
   const messages = history.map((m) => ({ role: m.role, content: m.content })); // strings ok
   const actions = [];
+  const visuals = [];
   for (let i = 0; i < 8; i++) {
     const resp = await callClaude(messages);
+    addUsage(resp.usage);
     const toolUses = (resp.content || []).filter((b) => b.type === 'tool_use');
     if (resp.stop_reason !== 'tool_use' || toolUses.length === 0) {
       const text = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-      return { text, actions, usage: resp.usage };
+      return { text, actions, visuals, usage: resp.usage };
     }
     messages.push({ role: 'assistant', content: resp.content });
     const results = [];
@@ -266,12 +354,17 @@ async function converse(history) {
       let out, ok = true;
       try { out = await runTool(tu.name, tu.input || {}); }
       catch (e) { out = 'ERROR: ' + e.message; ok = false; }
+      // a show_visual result is a directive for the UI, not text for the model
+      if (ok && typeof out === 'string' && out.startsWith('__VISUAL__')) {
+        try { visuals.push(JSON.parse(out.slice('__VISUAL__'.length))); } catch { /* skip */ }
+        out = 'Displayed it on his screen.';
+      }
       actions.push(actionLabel(tu.name, tu.input || {}, out, ok));
       results.push({ type: 'tool_result', tool_use_id: tu.id, content: String(out), is_error: !ok });
     }
     messages.push({ role: 'user', content: results });
   }
-  return { text: "I worked through several steps but stopped to avoid looping — tell me if you want me to continue.", actions };
+  return { text: "I worked through several steps but stopped to avoid looping — tell me if you want me to continue.", actions, visuals };
 }
 
 function send(res, code, body, type = 'application/json') {
@@ -286,12 +379,12 @@ function readBody(req) {
     req.on('error', reject);
   });
 }
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.gz': 'application/gzip', '.tar': 'application/x-tar', '.wasm': 'application/wasm' };
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.method === 'GET' && url.pathname === '/api/info') {
-    return send(res, 200, JSON.stringify({ root: PRIMARY, roots: ROOTS, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY, hasNotion: !!NOTION_KEY, hasStt: !!DEEPGRAM_KEY }));
+    return send(res, 200, JSON.stringify({ root: PRIMARY, roots: ROOTS, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY, hasNotion: !!NOTION_KEY, hasStt: !!DEEPGRAM_KEY, hasVosk: fs.existsSync(VOSK_MODEL) }));
   }
   if (req.method === 'POST' && url.pathname === '/api/stt') {
     if (!DEEPGRAM_KEY) return send(res, 501, JSON.stringify({ error: 'no Deepgram key' }));
@@ -326,6 +419,55 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' });
       return res.end(buf);
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/dashboard') {
+    try {
+      const u = loadUsage();
+      const day = new Date().toISOString().slice(0, 10);
+      const td = u.today?.[day] || { in: 0, out: 0 };
+      const spend = u.in * PRICE_IN + u.out * PRICE_OUT;
+      const spendToday = td.in * PRICE_IN + td.out * PRICE_OUT;
+      let hq = null;
+      try {
+        const r = await fetch(HQ_URL + '/api/state', { signal: AbortSignal.timeout(2500) });
+        if (r.ok) {
+          const s = await r.json();
+          hq = {
+            earned: s.earned || 0, xp: s.xp || 0, streak: s.streak || 0,
+            operators: Object.entries(s.operators || {}).map(([n, o]) => ({ name: n, state: o.state, text: o.text })),
+            approvals: (s.approvals || []).map((a) => a.title || a),
+            feed: (s.feed || []).slice(0, 8).map((e) => e.s),
+          };
+        }
+      } catch { /* HQ offline — dashboard still renders */ }
+      // tasks / urgent / emails can be populated by other pods writing companion/.dashboard.json
+      let extra = {};
+      try { extra = JSON.parse(fs.readFileSync(path.join(__dirname, '.dashboard.json'), 'utf8')); } catch { /* none yet */ }
+      return send(res, 200, JSON.stringify({
+        spend: { total: spend, today: spendToday, calls: u.calls || 0, since: u.since },
+        tokens: { in: u.in || 0, out: u.out || 0, total: (u.in || 0) + (u.out || 0) },
+        hq,
+        tasks: extra.tasks || [],
+        urgent: extra.urgent || [],
+        emails: extra.emails || [],
+      }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/upload') {
+    try {
+      const nameRaw = decodeURIComponent(req.headers['x-filename'] || 'dropped.bin');
+      const name = path.basename(nameRaw).replace(/[^\w.\- ]/g, '_').slice(0, 120) || 'dropped.bin';
+      const chunks = []; let n = 0;
+      await new Promise((resolve, reject) => {
+        req.on('data', (c) => { n += c.length; if (n > 30e6) { req.destroy(); reject(new Error('file too large (30MB max)')); } chunks.push(c); });
+        req.on('end', resolve); req.on('error', reject);
+      });
+      const dropDir = path.join(PRIMARY, '_dropbox');
+      await fsp.mkdir(dropDir, { recursive: true });
+      const dest = path.join(dropDir, name);
+      await fsp.writeFile(dest, Buffer.concat(chunks));
+      return send(res, 200, JSON.stringify({ path: dest, name, rel: path.relative(PRIMARY, dest) }));
+    } catch (e) { return send(res, 400, JSON.stringify({ error: e.message })); }
   }
   if (req.method === 'POST' && url.pathname === '/api/chat') {
     if (!API_KEY) return send(res, 500, JSON.stringify({ error: 'No ANTHROPIC_API_KEY (env or ../.env).' }));

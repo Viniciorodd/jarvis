@@ -9,30 +9,82 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
-    <div class="topbar">
-      <div class="px brand">J A R V I S</div>
-      <div class="state" id="state">standby</div>
-      <button class="t-btn" id="wakeBtn" title="Hands-free: say 'Jarvis ...'">‘‘ Hello Jarvis ’’ : off</button>
-      <button class="t-btn" id="voiceBtn" title="Toggle her speaking voice">🔊 voice</button>
-      <button class="floor-btn" id="floorBtn" title="Open the pod floor">▦ HQ</button>
-    </div>
-
-    <div class="stage">
-      <canvas id="orb"></canvas>
-      <div class="orb-center" id="orbCenter">
-        <div class="hint" id="hint">tap the orb or type below</div>
+  <div class="shell">
+    <div class="app">
+      <div class="topbar">
+        <div class="px brand">J A R V I S</div>
+        <div class="state" id="state">standby</div>
+        <button class="t-btn" id="wakeBtn" title="Hands-free: say 'Jarvis ...'">‘‘ Hello Jarvis ’’ : off</button>
+        <button class="t-btn" id="voiceBtn" title="Toggle her speaking voice">🔊 voice</button>
+        <button class="t-btn" id="dashBtn" title="Toggle the dashboard">📊 dash</button>
+        <button class="floor-btn" id="floorBtn" title="Open the pod floor">▦ HQ</button>
       </div>
+
+      <div class="stage" id="stage">
+        <canvas id="orb"></canvas>
+        <div class="orb-center" id="orbCenter">
+          <div class="hint" id="hint">tap the orb, type, or drag a file in</div>
+        </div>
+        <!-- visual panel: maps / images / web she pulls up -->
+        <div class="visual" id="visual" hidden>
+          <div class="visual-bar">
+            <span class="visual-cap" id="visualCap"></span>
+            <button class="visual-x" id="visualX" title="Close">✕</button>
+          </div>
+          <div class="visual-body" id="visualBody"></div>
+        </div>
+      </div>
+
+      <div class="transcript" id="transcript"></div>
+
+      <form class="composer" id="composer">
+        <button type="button" class="mic" id="mic" title="Talk">🎙</button>
+        <input id="input" autocomplete="off" placeholder="Talk to Jarvis…  (or drag a document onto the window)" />
+        <button type="submit" class="send">➤</button>
+      </form>
     </div>
 
-    <div class="transcript" id="transcript"></div>
+    <!-- DASHBOARD RAIL -->
+    <aside class="dash" id="dash">
+      <div class="dash-head"><span class="px">FLOOR</span><button class="dash-refresh" id="dashRefresh" title="Refresh">⟳</button></div>
 
-    <form class="composer" id="composer">
-      <button type="button" class="mic" id="mic" title="Talk (voice coming in Phase B)">🎙</button>
-      <input id="input" autocomplete="off" placeholder="Talk to Jarvis…" />
-      <button type="submit" class="send">➤</button>
-    </form>
+      <div class="dash-grid">
+        <div class="metric"><div class="m-k">Income · pods (lifetime)</div><div class="m-v teal" id="mIncome">—</div><div class="m-sub" id="mXp"></div></div>
+        <div class="metric"><div class="m-k">Spend · AI (total)</div><div class="m-v" id="mSpend">—</div><div class="m-sub" id="mSpendToday"></div></div>
+        <div class="metric"><div class="m-k">Tokens used</div><div class="m-v" id="mTokens">—</div><div class="m-sub" id="mCalls"></div></div>
+        <div class="metric"><div class="m-k">Net</div><div class="m-v" id="mNet">—</div><div class="m-sub">income − AI spend</div></div>
+      </div>
+
+      <div class="dash-sec">
+        <div class="ds-h">⚑ Needs you <span class="ds-n" id="nUrgent">0</span></div>
+        <ul class="ds-list" id="urgentList"><li class="ds-empty">nothing urgent</li></ul>
+      </div>
+
+      <div class="dash-sec">
+        <div class="ds-h">✉ Emails to answer <span class="ds-n" id="nEmails">0</span></div>
+        <ul class="ds-list" id="emailList"><li class="ds-empty">inbox quiet</li></ul>
+      </div>
+
+      <div class="dash-sec">
+        <div class="ds-h">✔ Tasks <span class="ds-n" id="nTasks">0</span></div>
+        <ul class="ds-list" id="taskList"><li class="ds-empty">no open tasks</li></ul>
+      </div>
+
+      <div class="dash-sec">
+        <div class="ds-h">▦ Pods on the floor</div>
+        <ul class="ds-list" id="opsList"><li class="ds-empty">HQ offline</li></ul>
+      </div>
+
+      <div class="dash-sec">
+        <div class="ds-h">⟁ Recent activity</div>
+        <ul class="ds-list feed" id="feedList"><li class="ds-empty">quiet</li></ul>
+      </div>
+    </aside>
   </div>
+
+  <!-- drag-drop overlay -->
+  <div class="dropmask" id="dropmask"><div class="dropmask-inner">⤓ Drop the file — Jarvis will read it</div></div>
+
   <script src="orb.js"></script>
   <script src="app.js"></script>
 </body>

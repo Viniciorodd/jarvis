@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rodgate, LLC — Proudly Serving America's Facilities</title>
+<meta name="description" content="Rodgate, LLC (DBA Rodgate Group) — an American-owned Small Disadvantaged, Minority-Owned (Hispanic American) small business providing janitorial, custodial, grounds, and haul-away services to federal, state, and local government in PA, NJ, and FL." />
+<style>
+  :root{
+    --blue:#0a1f44;        /* Old Glory Blue (deep) */
+    --blue2:#102a54;
+    --red:#b22234;         /* Old Glory Red */
+    --red2:#9e1b2c;
+    --white:#ffffff;
+    --parchment:#f7f6f1;
+    --ink:#0a1f44;
+    --line:#d9dde6;
+    --muted:#54607a;
+    --gold:#c9a227;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--parchment);line-height:1.6}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+  /* flag ribbon */
+  .ribbon{height:6px;background:repeating-linear-gradient(90deg,var(--red) 0 60px,var(--white) 60px 120px)}
+  /* header */
+  header{position:relative;color:#eef2fa;background:
+      radial-gradient(circle at 12% 18%, rgba(255,255,255,.10) 0 1.4px, transparent 1.6px) 0 0/46px 46px,
+      radial-gradient(circle at 32% 60%, rgba(255,255,255,.08) 0 1.2px, transparent 1.4px) 0 0/64px 64px,
+      linear-gradient(160deg,var(--blue),var(--blue2));}
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:1px;font-size:18px}
+  .star{width:40px;height:40px;display:grid;place-items:center;background:var(--red);border-radius:8px;box-shadow:0 0 0 2px rgba(255,255,255,.25) inset}
+  .star svg{width:24px;height:24px;fill:#fff}
+  .nav a{color:#cdd8ea;text-decoration:none;margin-left:22px;font-size:14px;font-weight:600}
+  .nav a:hover{color:#fff}
+  .hero{padding:52px 0 66px;position:relative}
+  .flagchip{display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#fff;background:rgba(178,34,52,.85);padding:6px 14px;border-radius:999px;font-weight:700}
+  .hero h1{font-size:42px;line-height:1.12;margin:20px 0 14px;font-weight:800}
+  .hero h1 .red{color:#ff6b78}
+  .hero p{font-size:18px;color:#c4d0e4;max-width:700px}
+  .cta{margin-top:28px;display:flex;gap:14px;flex-wrap:wrap}
+  .btn{display:inline-block;padding:13px 24px;border-radius:8px;font-weight:700;text-decoration:none;font-size:15px}
+  .btn-red{background:var(--red);color:#fff}
+  .btn-red:hover{background:var(--red2)}
+  .btn-ghost{border:2px solid rgba(255,255,255,.45);color:#eef2fa}
+  .btn-ghost:hover{border-color:#fff}
+  .creds{margin-top:30px;display:flex;gap:26px;flex-wrap:wrap;color:#9fb0cc;font-size:13px}
+  .creds b{color:#fff;font-weight:700}
+  /* sections */
+  section{padding:58px 0}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--red);font-weight:800;margin:0 0 6px}
+  .eyebrow::before{content:"★";color:var(--gold)}
+  .lead{font-size:27px;font-weight:800;margin:0 0 26px;color:var(--blue)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
+  .card{background:var(--white);border:1px solid var(--line);border-top:3px solid var(--red);border-radius:12px;padding:22px}
+  .card h3{margin:0 0 8px;font-size:17px;color:var(--blue)}
+  .card p{margin:0;color:var(--muted);font-size:14.5px}
+  .ico{width:36px;height:36px;border-radius:8px;background:#eef2fb;color:var(--blue);display:grid;place-items:center;margin-bottom:12px;font-size:19px}
+  ul.diff{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+  ul.diff li{background:var(--white);border:1px solid var(--line);border-radius:8px;padding:14px 16px 14px 40px;font-size:14.5px;position:relative}
+  ul.diff li::before{content:"★";position:absolute;left:15px;top:13px;color:var(--red);font-size:15px}
+  /* banner */
+  .banner{background:var(--red);color:#fff;text-align:center;padding:26px;border-radius:14px;font-size:20px;font-weight:700;letter-spacing:.3px;position:relative;overflow:hidden}
+  .banner small{display:block;font-weight:500;font-size:14px;color:#ffe1e5;margin-top:6px;letter-spacing:0}
+  /* data table */
+  .data{background:var(--blue2);color:#e7eef8;border-radius:14px;overflow:hidden;border:1px solid #1c3666}
+  .data table{width:100%;border-collapse:collapse}
+  .data td{padding:13px 22px;border-bottom:1px solid rgba(255,255,255,.08);font-size:14.5px;vertical-align:top}
+  .data tr:last-child td{border-bottom:none}
+  .data td.k{color:#9fc1ff;width:200px;font-weight:700;white-space:nowrap}
+  .pill{display:inline-block;background:rgba(178,34,52,.9);color:#fff;border-radius:999px;padding:3px 11px;font-size:12px;margin:2px 4px 2px 0;font-weight:700}
+  /* contact */
+  .contact{background:
+      radial-gradient(circle at 85% 20%, rgba(255,255,255,.08) 0 1.4px, transparent 1.6px) 0 0/46px 46px,
+      linear-gradient(160deg,var(--blue2),var(--blue));color:#eef2fa;border-radius:14px;padding:36px;display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center}
+  .contact h3{margin:0 0 6px;font-size:23px}
+  .contact p{margin:0;color:#c4d0e4}
+  .contact a{color:#fff;font-weight:700}
+  footer{padding:28px 0;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+  @media(max-width:640px){.hero h1{font-size:31px}.contact{padding:24px}.data td.k{width:140px}}
+</style>
+</head>
+<body>
+<div class="ribbon"></div>
+<header>
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand">
+        <span class="star"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17.9 5.9 20.4 7.4 13.6 2.2 9l6.9-.7z"/></svg></span>
+        RODGATE,&nbsp;LLC
+      </div>
+      <nav>
+        <a href="#services">Services</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </div>
+    <div class="hero">
+      <span class="flagchip">🇺🇸 An American-Owned Small Business</span>
+      <h1>Proudly keeping <span class="red">America's</span> facilities<br>clean, safe, and mission-ready.</h1>
+      <p>Rodgate, LLC (DBA Rodgate Group) is a Small Disadvantaged, Minority-Owned (Hispanic
+        American) small business serving federal, state, and local government. We deliver
+        dependable custodial, grounds, and haul-away services through a vetted network of
+        American crews — with the accountability of an owner-managed firm.</p>
+      <div class="cta">
+        <a class="btn btn-red" href="#contact">Request a capability briefing</a>
+        <a class="btn btn-ghost" href="#capabilities">Company data &amp; codes</a>
+      </div>
+      <div class="creds">
+        <span><b>UEI</b> Z1SWBFEK7EM4</span>
+        <span><b>CAGE</b> 18S75</span>
+        <span><b>NAICS</b> 561720</span>
+        <span><b>SAM.gov</b> Active</span>
+      </div>
+    </div>
+  </div>
+</header>
+<div class="ribbon"></div>
+
+<section id="services" class="wrap">
+  <span class="eyebrow">What we do</span>
+  <div class="lead">Core competencies</div>
+  <div class="grid">
+    <div class="card"><div class="ico">🧹</div><h3>Custodial &amp; Janitorial</h3><p>Recurring cleaning for offices, public buildings, and federal facilities — daily, weekly, or by call.</p></div>
+    <div class="card"><div class="ico">🌿</div><h3>Grounds &amp; Landscaping</h3><p>Grounds maintenance and upkeep that keeps installations presentable and compliant year-round.</p></div>
+    <div class="card"><div class="ico">🚛</div><h3>Trash &amp; Haul-Away</h3><p>Refuse collection, removal, and haul-away services scaled to the size of the requirement.</p></div>
+    <div class="card"><div class="ico">🏢</div><h3>Facilities Support</h3><p>Facilities operations and maintenance support, carpet care, and general building upkeep.</p></div>
+  </div>
+</section>
+
+<section class="wrap" style="padding-top:0">
+  <div class="banner">
+    Built on service, accountability, and American values.
+    <small>A family-driven small business earning its place serving the United States Government.</small>
+  </div>
+</section>
+
+<section id="why" class="wrap">
+  <span class="eyebrow">Why Rodgate</span>
+  <div class="lead">Our differentiators</div>
+  <ul class="diff">
+    <li><strong>Small Disadvantaged Business</strong> — Minority-Owned, Hispanic American Owned.</li>
+    <li><strong>Owner-managed</strong> — direct accountability, fast response, no layers.</li>
+    <li><strong>Scalable American crews</strong> — regional teams sized to each job.</li>
+    <li><strong>Dual pipeline</strong> — SAM.gov registered <em>and</em> a PA COSTARS / Commonwealth vendor.</li>
+  </ul>
+</section>
+
+<section id="capabilities" class="wrap" style="padding-top:0">
+  <span class="eyebrow">Capability statement</span>
+  <div class="lead">Company data</div>
+  <div class="data">
+    <table>
+      <tr><td class="k">Legal name</td><td>Rodgate, LLC &nbsp;(DBA Rodgate Group)</td></tr>
+      <tr><td class="k">UEI</td><td>Z1SWBFEK7EM4</td></tr>
+      <tr><td class="k">CAGE</td><td>18S75</td></tr>
+      <tr><td class="k">NAICS</td><td>561720 Janitorial · 561210 Facilities Support · 561990 All Other Support Services</td></tr>
+      <tr><td class="k">PSC / FSC</td><td>S201, S205, S208, S214, S216, M1AZ, Z1AA, Z1AZ</td></tr>
+      <tr><td class="k">Socio-economic</td><td>
+        <span class="pill">Small Business</span><span class="pill">Small Disadvantaged (SDB)</span>
+        <span class="pill">Minority-Owned</span><span class="pill">Hispanic American Owned</span></td></tr>
+      <tr><td class="k">SAM.gov</td><td>Active · "All Awards" · registered through Feb 2027</td></tr>
+      <tr><td class="k">State pipeline</td><td>PA Commonwealth procurement vendor · COSTARS cooperative</td></tr>
+      <tr><td class="k">Service area</td><td>Pennsylvania · New Jersey · Florida</td></tr>
+      <tr><td class="k">Bonding</td><td>No bonding required to bid (per SAM record)</td></tr>
+      <tr><td class="k">Business type</td><td>Pennsylvania LLC · Congressional District PA-08</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="contact" class="wrap" style="padding-top:0">
+  <div class="contact">
+    <div>
+      <h3>Let's talk about your requirement</h3>
+      <p>Vinicio Rodriguez · Managing Member<br>218 W Ridge St, Nanticoke, PA 18634</p>
+    </div>
+    <div>
+      <p style="margin-bottom:6px">📧 <a href="mailto:RodGateGroup@gmail.com">RodGateGroup@gmail.com</a></p>
+      <p>📞 <a href="tel:+12019208457" style="color:#fff;text-decoration:none">201-920-8457</a></p>
+    </div>
+  </div>
+</section>
+
+<div class="ribbon"></div>
+<footer>
+  <div class="wrap">
+    © <span id="yr"></span> Rodgate, LLC (DBA Rodgate Group). All rights reserved. ·
+    🇺🇸 An American-owned, Small Disadvantaged, Minority-Owned small business ·
+    UEI Z1SWBFEK7EM4 · CAGE 18S75
+  </div>
+</footer>
+<script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
+</body>
+</html>

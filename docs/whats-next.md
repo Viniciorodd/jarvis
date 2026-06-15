@@ -2,6 +2,17 @@
 
 _Updated 2026-06-14. Everything is committed to git + saved to memory. Resume from here._
 
+### 🆕 2026-06-14 (PM session) — shipped
+- **Rodgate site LIVE → https://rodgate-llc.netlify.app** (Netlify free; redeploy: `netlify deploy --dir=site --prod --site 2c860be1-48f8-497b-a1c1-46d1772d2973`).
+- **Inbox cleanup executed** (reversible): Rodgate inbox → ~623 (archived 967 / trashed 420);
+  Personal viniciorodd@ scanned all 35,818 → inbox ~13,322 (archived 5,832 / trashed 16,664).
+  Deal-flow (biz-for-sale + RE listings) preserved; junk unsubscribe list = `reports/unsubscribe-personal-2026-06-14.md` (user actions it).
+- **Jarvis Companion v2**: open files/apps/URLs on the PC (`open_path`), drag-drop docs to read,
+  show maps/images/web (`show_visual`), live dashboard rail (income/spend/tokens/net + urgent/emails/tasks/pods),
+  Deepgram-based wake (fixes Electron's missing browser speech API). See `project-jarvis-companion` memory.
+- **Fiverr gig gallery**: `fiverr/portfolio/index.html` — 8 screenshot-ready samples across the gig types.
+- ⏭ Pending: Porcupine always-on wake word; auto-sync `.dashboard.json`; respond to the 3 open SAM leads.
+
 ## ✅ DONE & LIVE
 - **NAS stack 24/7:** n8n, Postgres, HQ (`192.168.6.121:8099`), Whisper (port 9100). HQ heartbeat active.
 - **Gov pod LIVE:** SAM scout (daily 6:10am, profile-aware ranking) + EOD report + approval-executor —
@@ -23,8 +34,12 @@ _Updated 2026-06-14. Everything is committed to git + saved to memory. Resume fr
   · sam-scout (profile-aware) · Fiverr gig pack · gov capability boilerplate + a drafted sources-sought response.
 
 ## 🔜 NEXT (in priority order)
-1. **SEND 1 GOV PROPOSAL (his #1 priority).** Draft ready: `prompts/gov/boilerplate/DRAFT-sources-sought-westpoint-cleaning.md`.
-   Pull the real notice (CO email + exact #) from SAM.gov, fill 3 brackets, send. (Or run `node scripts/sam-scout.mjs --days 7` for fresh targets.)
+1. ✅ **DONE 2026-06-14 — FIRST GOV PROPOSAL SENT.** West Point sources-sought **W911SD06102026**
+   (Army MICC West Point, janitorial BPA) emailed to CO **Leslie Duron** via the new gated emailer
+   `scripts/gov-send.mjs` (RodGateGroup@gmail.com, app-password SMTP; dry-run → approve → `--send`).
+   Final text: `prompts/gov/boilerplate/READY-westpoint-W911SD06102026-sources-sought.md`.
+   → NEXT gov action: respond to the other live sources-sought leads from the scout (VA Hampton,
+     Navy Norfolk, Forest Service) the same way.
 2. **Slack command center** (he chose this as the unifier): create workspace + bot token → wire pods + Jarvis
    + approval buttons; replaces Telegram.
 3. **Gmail pods:** morning brief + email triage need a Gmail OAuth credential in n8n (fiddly — its own step).

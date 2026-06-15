@@ -10,3 +10,19 @@ Thumbs.db
 node_modules/
 fiverr-assets/
 prompts/operator-profile.draft.md
+# companion runtime state (regenerated locally; usage/spend + live dashboard feed)
+companion/.usage.json
+companion/.dashboard.json
+# media-generation spend ledger (code-enforced monthly cap state)
+scripts/.media-usage.json
+# control-plane event store (system of record — local runtime data) + eval results
+control-plane/data/
+evals/.results.json
+# companion-generated images (work product, regenerated)
+companion/public/_generated/
+# offline Vosk wake model (~41MB binary — download via scripts/get-vosk-model.mjs)
+companion/public/models/
+# netlify CLI local link state
+.netlify/
+# inbox audit/unsubscribe reports contain personal sender lists — keep them local
+reports/

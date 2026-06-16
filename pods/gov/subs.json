@@ -1,7 +1,13 @@
 {
-  "_comment": "Subcontractor CRM for the Gov pod (Hector / CONNECT-01). Real subs you add over time. The two entries below are TEMPLATES — replace with real local vendors. trade: janitorial|grounds|hvac|electrical|pest|guard|facilities. status: prospect|contacted|vetted|active.",
+  "_comment": "Subcontractor / local-business CRM for the Gov pod (Hector). Replace the [Example] rows with real vendors. trade: janitorial|grounds|hvac|electrical|pest|guard|facilities. status: prospect|contacted|quoted|vetted|selected. past_performance: 0-100 (your confidence/CPARS-style score). capabilities: keywords Hector matches against the SOW. quote: their price once they respond.",
   "subs": [
-    { "id": "SUB-EXAMPLE-1", "name": "[Example] NEPA Cleaning Co.", "trade": "janitorial", "location": "Wilkes-Barre, PA", "contact_email": "", "contact_name": "", "notes": "Template — replace with a real local janitorial crew.", "status": "prospect", "last_contacted": null },
-    { "id": "SUB-EXAMPLE-2", "name": "[Example] Keystone Grounds LLC", "trade": "grounds", "location": "Scranton, PA", "contact_email": "", "contact_name": "", "notes": "Template — replace with a real grounds/landscaping vendor.", "status": "prospect", "last_contacted": null }
+    { "id": "SUB-EXAMPLE-1", "name": "[Example] NEPA Cleaning Co.", "trade": "janitorial", "location": "Wilkes-Barre, PA",
+      "contact_name": "", "contact_email": "", "phone": "",
+      "capabilities": ["custodial", "floor care", "restroom", "day porter", "federal"], "past_performance": 0,
+      "quote": "", "status": "prospect", "notes": "Template — replace with a real local janitorial crew.", "last_contacted": null },
+    { "id": "SUB-EXAMPLE-2", "name": "[Example] Keystone Grounds LLC", "trade": "grounds", "location": "Scranton, PA",
+      "contact_name": "", "contact_email": "", "phone": "",
+      "capabilities": ["landscaping", "snow removal", "mowing", "grounds"], "past_performance": 0,
+      "quote": "", "status": "prospect", "notes": "Template — replace with a real grounds vendor.", "last_contacted": null }
   ]
 }

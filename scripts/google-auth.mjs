@@ -51,8 +51,13 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log('Opening your browser to approve Gmail + Calendar (read-only)…');
-  console.log('If it does not open, paste this URL into your browser:\n' + authUrl + '\n');
-  const cmd = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', authUrl]] : process.platform === 'darwin' ? ['open', [authUrl]] : ['xdg-open', [authUrl]];
-  try { spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref(); } catch { /* user pastes the URL */ }
+  console.log('\n========================================================================');
+  console.log('COPY this URL and paste it into your browser (most reliable):\n');
+  console.log(authUrl);
+  console.log('\n========================================================================\n');
+  // Best-effort auto-open. On Windows use PowerShell Start-Process — `cmd start` mangles the & in the URL.
+  const opener = process.platform === 'win32'
+    ? ['powershell', ['-NoProfile', '-Command', `Start-Process '${authUrl}'`]]
+    : process.platform === 'darwin' ? ['open', [authUrl]] : ['xdg-open', [authUrl]];
+  try { spawn(opener[0], opener[1], { detached: true, stdio: 'ignore' }).unref(); } catch { /* paste the URL above */ }
 });

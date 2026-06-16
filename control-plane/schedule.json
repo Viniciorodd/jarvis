@@ -1,0 +1,23 @@
+{
+  "_comment": "Conservative-by-default work schedule. Agents wake ONLY inside working hours and ONLY on cadence; idle polls log a 'rest' and spend nothing. Going more aggressive is an evals-gated promotion the operator approves (doctrine §8). Edit freely — this is policy, not code.",
+  "timezone": "America/New_York",
+  "working_hours": { "start": 7, "end": 21 },
+  "global_daily_budget_usd": 5,
+  "jobs": [
+    { "id": "morning-brief", "person": "MAILROOM-01", "pod": "chief-of-staff", "type": "brief",
+      "cadence_hours": 24, "at_hour": 7, "tier": "cheap",
+      "command": "compile the morning brief: what needs me, money, and today's priorities" },
+    { "id": "gov-daily-scan", "person": "SAM-SCOUT", "pod": "gov", "type": "scan",
+      "cadence_hours": 24, "at_hour": 8, "tier": "cheap",
+      "command": "scan SAM.gov and state portals for new janitorial opportunities; score bid/no-bid" },
+    { "id": "fiverr-order-poll", "person": "STUDIO-01", "pod": "fiverr", "type": "poll",
+      "cadence_hours": 4, "tier": "cheap",
+      "command": "a new Fiverr order came in — produce and prepare it for delivery" },
+    { "id": "saas-support-poll", "person": "RECON-DEV", "pod": "saas", "type": "poll",
+      "cadence_hours": 6, "tier": "cheap",
+      "command": "new support tickets came in — triage and draft replies" },
+    { "id": "weekly-reflection", "person": "EXEC-01", "pod": "exec", "type": "reflect",
+      "cadence_hours": 168, "at_hour": 18, "at_dow": 0, "tier": "reflect",
+      "command": "weekly strategy review: KPIs, human-edit rate, where to push or pull back" }
+  ]
+}

@@ -11,6 +11,7 @@ async function jget(url) {
 
 export const getHqState = () => jget(`${HQ}/api/state`);
 export const getCpState = () => jget(`${CP}/state`);
+export const getRoster = () => jget(`${CP}/roster`);
 
 export async function decideApproval(id, action) {
   const r = await fetch(`${HQ}/api/approval/${id}/${action}`, { method: 'POST' });

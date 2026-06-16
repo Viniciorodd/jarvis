@@ -4,7 +4,7 @@ import { TopBar, NeedsYou, Feed, CommandBar } from './Panels.jsx';
 import { World } from './World.jsx';
 
 export default function App() {
-  const { hq, cp, online, refresh } = useStore();
+  const { hq, cp, roster, online, refresh } = useStore();
   const [railOpen, setRailOpen] = useState(true);
 
   return (
@@ -12,7 +12,7 @@ export default function App() {
       <TopBar hq={hq} cp={cp} online={online} onToggleRail={() => setRailOpen((o) => !o)} />
       <div className="jw-body">
         <main className="jw-main">
-          <World hq={hq} />
+          <World hq={hq} roster={roster} />
           <CommandBar />
         </main>
         <aside className={'jw-rail' + (railOpen ? '' : ' closed')}>

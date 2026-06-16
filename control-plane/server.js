@@ -83,6 +83,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && p === '/kpis') return send(res, 200, kpis.computeKpis());
 
+    if (req.method === 'GET' && p === '/roster') {
+      const org = await import('../pods/org.mjs');
+      return send(res, 200, { roster: org.ROSTER, pods: org.POD_IDS });
+    }
+
     if (req.method === 'POST' && p === '/spend/check') {
       const b = await readBody(req);
       const result = spend.checkSpend({

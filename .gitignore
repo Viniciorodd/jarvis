@@ -31,3 +31,6 @@ jarvis-world/dist/
 jarvis-world/dev-dist/
 # Docker bind-mount volumes created on the NAS at runtime
 volumes/
+# local dev tooling (preview launch config, scheduler runtime state)
+.claude/
+control-plane/data/

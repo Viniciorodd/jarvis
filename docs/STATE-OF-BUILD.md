@@ -76,9 +76,13 @@ The real `operating-doctrine.md` (now canonical) asks for more than the 5 direct
    **TESTED & WORKING** — generated sample thumbnail (shocked entrepreneur, blue rim lighting, bold text).
    Note: FLUX-schnell text-rendering is imperfect; for production, either avoid fine text or post-edit with
    Photoroom / remove.bg. Next: wire into gig-producer flow + add product-edit step (bg removal, relight).
-5. 🟡 **Chief of Staff router + email triage at L0→L1** — ✅ ROUTER BUILT (`pods/chief-of-staff/`:
-   classify → gate → dispatch → log → HQ mirror; eval-pinned). Remaining: wire the actual email-triage
-   pod behind it and formalize the L0→L1 promotion (evals + human-edit-rate threshold).
+5. 🟡 **Chief of Staff router + email triage at L0→L1** — ✅ ROUTER BUILT & persona-aware (`pods/org.mjs`
+   full chain of command: CEO/CFO/Elle + business pods + Real Estate/Legal/Personal, each with nickname +
+   codename + reports-to + model tier). Resolves "ask the CFO" → person; has `scan now` + `full report`
+   verbs; gate logic eval-pinned. ✅ Conservative SCHEDULER (`control-plane/scheduler.mjs` + `schedule.json`):
+   working-hours window, gov 1 scan/day, order polls that REST (zero LLM) when idle — eval-pinned (dueJobs).
+   Remaining: wire the actual pod WORKERS (the router routes/queues; pods don't execute the work yet) and
+   formalize L0→L1 promotion (evals + human-edit-rate threshold).
 6. ❌ **Per-agent scoped credentials + a vault** (directive #3) — split shared keys; secrets out of `.env`.
 7. ❌ **Research-&-Risk desk — monitor + journal ONLY**, zero execution (§7).
 8. ✅ **Offline wake word (Vosk)** — built + model downloaded + served (hasVosk:true verified). Porcupine

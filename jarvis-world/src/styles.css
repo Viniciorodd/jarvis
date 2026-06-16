@@ -39,7 +39,8 @@ body{
 
 /* ── the world: rooms ──────────────────────────────────────────────────── */
 .world{ flex:1; overflow-y:auto; padding:16px; display:grid; gap:14px;
-  grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); align-content:start;
+  grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); grid-auto-rows:max-content;
+  align-content:start; align-items:start;
   scrollbar-width:thin; scrollbar-color:var(--teal-dim) transparent; }
 .world::-webkit-scrollbar{ width:7px; } .world::-webkit-scrollbar-thumb{ background:var(--teal-dim); border-radius:9px; }
 .world-loading{ flex:1; display:flex; align-items:center; justify-content:center; gap:12px; color:var(--dim); letter-spacing:.06em; }
@@ -84,7 +85,9 @@ body{
 .npc-ping{ position:absolute; inset:-5px; border-radius:50%; border:2px solid var(--alert); animation:ping 1.5s ease-out infinite; }
 
 .npc-meta{ min-width:0; flex:1; padding-top:1px; }
-.npc-name{ font-size:11px; letter-spacing:.06em; color:var(--cream); font-weight:500; }
+.npc-name{ font-size:12px; letter-spacing:.04em; color:var(--cream); font-weight:500; }
+.npc-role{ color:var(--teal); font-weight:400; }
+.npc-code{ font-family:ui-monospace, Menlo, monospace; font-size:9.5px; letter-spacing:.05em; color:var(--dim); margin-top:1px; }
 .npc-tag{ font-size:11px; color:var(--dim); }
 .npc-say{ font-size:12px; line-height:1.35; color:var(--cream); margin-top:3px; position:relative;
   background:rgba(57,224,208,.06); border:1px solid rgba(57,224,208,.16); border-radius:9px; padding:5px 9px; }

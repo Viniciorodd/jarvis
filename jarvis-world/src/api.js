@@ -12,6 +12,8 @@ async function jget(url) {
 export const getHqState = () => jget(`${HQ}/api/state`);
 export const getCpState = () => jget(`${CP}/state`);
 export const getRoster = () => jget(`${CP}/roster`);
+// recent events for one pod (the "what's going on in this department" feed: opportunities, jobs, drafts)
+export const getPodEvents = (pod) => jget(`${CP}/events?pod=${encodeURIComponent(pod)}`);
 
 export async function decideApproval(id, action) {
   const r = await fetch(`${HQ}/api/approval/${id}/${action}`, { method: 'POST' });

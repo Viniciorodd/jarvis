@@ -34,7 +34,7 @@
   const PORTS = { world: 8095, hq: 8099 };
   const view = document.getElementById('view');
   const hostInput = document.getElementById('host');
-  let host = localStorage.getItem('jarvis-host') || 'localhost';
+  let host = localStorage.getItem('jarvis-host') || '192.168.6.121';
   let surface = 'world';
   hostInput.value = host;
   const url = (s) => `http://${host}:${PORTS[s]}/`;

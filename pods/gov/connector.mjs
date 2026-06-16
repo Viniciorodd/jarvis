@@ -44,7 +44,7 @@ export function findSubs(subs, { trade, location = '' }) {
 async function draftOutreach(op, sc, sub, trade) {
   const target = sub ? `the subcontractor "${sub.name}" (${sub.location})` : `a ${trade} subcontractor near ${op.place || 'the place of performance'}`;
   const sys = `You are the Procurement Lead for a GovCon prime. Draft a SHORT, professional outreach email to ${target} for a specific federal opportunity. Match the technical lingo of the scope. Reference the opportunity, location, and rough scope; ask about (a) availability for the period, (b) a ballpark quote / rate, (c) relevant past performance + insurance. Keep it under 180 words, warm but precise. ${sub ? '' : 'Since no named vendor exists yet, ALSO add a 2-line "where to find this sub" note (search terms / directories) at the top.'} End with "[REVIEW & SEND — do not auto-send]". Firm profile:\n${profile()}`;
-  const r = await claude(sys, `OPPORTUNITY:\n${JSON.stringify(op, null, 2)}\n\nNEEDS: a ${trade} subcontractor. ${sub ? 'Vendor: ' + JSON.stringify(sub) : 'No vendor on file yet.'}`, { tier: 'draft', maxTokens: 700 });
+  const r = await claude(sys, `OPPORTUNITY:\n${JSON.stringify(op, null, 2)}\n\nNEEDS: a ${trade} subcontractor. ${sub ? 'Vendor: ' + JSON.stringify(sub) : 'No vendor on file yet.'}`, { tier: 'draft', maxTokens: 700, agent: 'CONNECT-01' });
   return { md: r.text || '# (no outreach — model unavailable)\n', cost: r.cost || 0 };
 }
 

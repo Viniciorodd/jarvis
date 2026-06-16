@@ -20,7 +20,7 @@ export async function runOrder({ brief, orderId = 'order-' + Date.now() } = {}) 
   await mirror('STUDIO-01', 'work', `Producing: ${String(brief).slice(0, 56)}`, 'fiverr');
   await emit({ kind: 'action', actor: 'STUDIO-01', pod: 'fiverr', action: 'order.start', rationale: String(brief).slice(0, 120), payload: { orderId } });
 
-  const p = await claude('Turn this Fiverr order brief into ONE vivid, concrete image-generation prompt (<60 words). Output ONLY the prompt — no preamble.', String(brief), { tier: 'cheap', maxTokens: 120 });
+  const p = await claude('Turn this Fiverr order brief into ONE vivid, concrete image-generation prompt (<60 words). Output ONLY the prompt — no preamble.', String(brief), { tier: 'cheap', maxTokens: 120, agent: 'STUDIO-01' });
   const prompt = (p.text || String(brief)).trim().replace(/\s+/g, ' ').slice(0, 300);
 
   const out = `fiverr-assets/${orderId}.png`;

@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { modelFor } from './org.mjs';
+import { getSecret } from '../control-plane/vault.mjs';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // pods/ -> repo root
 export const CP_URL = (process.env.CONTROL_PLANE_URL || 'http://localhost:8787').replace(/\/$/, '');
@@ -33,8 +34,12 @@ export async function hqApproval(a) {
   try { await fetch(HQ_URL + '/api/approval', { method: 'POST', headers, body: JSON.stringify(a) }); } catch { /* */ }
 }
 
-export async function claude(system, user, { tier = 'cheap', maxTokens = 700 } = {}) {
-  const key = env('ANTHROPIC_API_KEY');
+// `agent` (a codename) routes the key request through the vault so least privilege is enforced in code
+// (doctrine #3). Without it, falls back to .env for back-compat (dev / the classifier path).
+export async function claude(system, user, { tier = 'cheap', maxTokens = 700, agent = null } = {}) {
+  let key;
+  try { key = agent ? getSecret(agent, 'ANTHROPIC_API_KEY') : env('ANTHROPIC_API_KEY'); }
+  catch (e) { return { text: '', cost: 0, error: e.message }; } // vault denied this agent
   if (!key) return { text: '', cost: 0, stub: true };
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {

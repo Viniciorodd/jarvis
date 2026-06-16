@@ -43,7 +43,7 @@ async function scout() {
 // ── B. STRATEGIST — bid/no-bid score against the firm profile ───────────────────────────────────
 async function score(op, prof) {
   const sys = `You are the GovCon Bid Analyst for this firm. Score one opportunity for bid/no-bid. Respond ONLY with JSON: {"match_score": 0-100, "recommendation": "bid"|"watch"|"no-bid", "rationale": "<=200 chars", "set_aside_fit": "strong"|"eligible"|"ineligible", "subcontractor_needed": boolean, "gaps": ["..."], "required_certs": ["..."]}. Be conservative and accurate: only claim set-aside fit the firm actually qualifies for. Firm profile:\n${prof}`;
-  const r = await claude(sys, JSON.stringify(op), { tier: 'cheap', maxTokens: 400 });
+  const r = await claude(sys, JSON.stringify(op), { tier: 'cheap', maxTokens: 400, agent: 'GOV-ANALYST' });
   let j = { match_score: 50, recommendation: 'watch', rationale: 'auto-scored (no model)', set_aside_fit: 'eligible', subcontractor_needed: true, gaps: [], required_certs: [] };
   const m = r.text && r.text.match(/\{[\s\S]*\}/);
   if (m) { try { j = { ...j, ...JSON.parse(m[0]) }; } catch { /* keep default */ } }
@@ -53,7 +53,7 @@ async function score(op, prof) {
 // ── D. CLOSER — draft the proposal (FAR/DFARS-aware, leads with SDB/minority, 50% sub rule) ──────
 async function draft(op, sc, prof) {
   const sys = `You are the GovCon Proposal Writer for this firm. Draft a proposal RESPONSE for the opportunity. Elite, compliant, concise. Sections: 1) Cover/Compliance summary (cite the set-aside and the firm's SDB/Minority/Hispanic status as the win theme), 2) Technical Approach, 3) Management Plan & Staffing, 4) Past Performance (note: new prime — emphasize PA registrations + disaster registry), 5) Subcontracting Plan (respect the 50% limit-on-subcontracting on small-business set-aside services; name the type of local sub needed), 6) FAR/DFARS compliance checklist (list the key clauses to verify, e.g. 52.219-14 Limitations on Subcontracting, 52.222 labor standards). End with "[HUMAN REVIEW REQUIRED — Vinicio signs & submits]". Markdown. Firm profile:\n${prof}`;
-  const r = await claude(sys, `OPPORTUNITY:\n${JSON.stringify(op, null, 2)}\n\nSCORE/ANALYSIS:\n${JSON.stringify(sc, null, 2)}`, { tier: 'draft', maxTokens: 1800 });
+  const r = await claude(sys, `OPPORTUNITY:\n${JSON.stringify(op, null, 2)}\n\nSCORE/ANALYSIS:\n${JSON.stringify(sc, null, 2)}`, { tier: 'draft', maxTokens: 1800, agent: 'GOV-ANALYST' });
   return { md: r.text || '# (no draft — model unavailable)\n', cost: r.cost || 0 };
 }
 

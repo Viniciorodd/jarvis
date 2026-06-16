@@ -14,7 +14,7 @@ export async function runTriage({ ticket, ticketId = 'tkt-' + Date.now() } = {})
   await mirror('RECON-DEV', 'work', `Triaging: ${String(ticket).slice(0, 56)}`, 'saas');
   await emit({ kind: 'action', actor: 'RECON-DEV', pod: 'saas', action: 'ticket.triage', rationale: String(ticket).slice(0, 120), payload: { ticketId } });
 
-  const r = await claude(SYS, String(ticket), { tier: 'draft', maxTokens: 500 });
+  const r = await claude(SYS, String(ticket), { tier: 'draft', maxTokens: 500, agent: 'RECON-DEV' });
   const reply = (r.text || '(no reply drafted — model unavailable)').trim();
   const sensitive = /\b(refund|chargeback|charge back|lawyer|legal|sue|gdpr|dmca)\b/i.test(String(ticket));
 

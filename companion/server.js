@@ -15,6 +15,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
+const google = require('./google');
 
 const PORT = Number(process.env.COMPANION_PORT || 8095);
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -106,7 +107,9 @@ NOTION: you can search and read his Notion workspace (notion_search, notion_read
 
 THE EMPIRE: you can run the business with him. Use read_hq for the live floor headline. Use get_report for a real business report (daily/weekly/monthly/quarterly/yearly) — totals, what each department did, money, KPIs, and what needs his approval; give the headline, not a JSON dump. Use command_org to actually DO operational things — it routes through the Chief of Staff to the right person (Elle runs ops, Victor is CFO, the gov team scouts/drafts, Remy makes thumbnails, Theo handles support, Camille does real estate, Sloane handles post-award) and tells you who got it and whether it's gated for his approval. Use add_reminder / list_reminders for birthdays, important dates, and things he can't forget.
 
-NOT YET WIRED (say so honestly, never pretend): reading/sending his email, his calendar, and Stripe — those need account access he hasn't connected yet, so offer to set them up rather than pretending. Everything else — reports, commanding the pods, reminders, files, images, HQ — you can do right now.`;
+EMAIL & CALENDAR: if Google is connected you can READ-ONLY read/summarize his Gmail (read_email) and Google Calendar (read_calendar) — use them for "read me my email", "any important emails", "what's my agenda", "am I free Thursday". If a tool says Google isn't connected, tell him to run  node scripts/google-auth.mjs  once. You can read but never send or change email — that stays his.
+
+NOT YET WIRED (say so honestly, never pretend): SENDING email, and Stripe — those need more access he hasn't granted. Everything else — reports, commanding the pods, reminders, reading email/calendar (once connected), files, images, HQ — you can do right now.`;
 
 const TOOLS = [
   { name: 'list_dir', description: 'List files and folders at a path inside the workspace.',
@@ -141,6 +144,10 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { text: { type: 'string' }, when: { type: 'string', description: 'optional plain-text date/time, e.g. "2026-07-01", "every Friday", "birthday Aug 3"' } }, required: ['text'] } },
   { name: 'list_reminders', description: 'List saved reminders, important dates, birthdays, and notes.',
     input_schema: { type: 'object', properties: {} } },
+  { name: 'read_email', description: 'Read / summarize recent Gmail (READ-ONLY). Use for "read me my email", "what is in my inbox", "any important emails". Defaults to unread.',
+    input_schema: { type: 'object', properties: { query: { type: 'string', description: 'optional Gmail search, e.g. "is:unread", "from:client", "newer_than:2d"' }, max: { type: 'number', description: 'default 8' } } } },
+  { name: 'read_calendar', description: 'Read upcoming Google Calendar events (READ-ONLY). Use for "what is on my calendar", "my agenda", "am I free this week".',
+    input_schema: { type: 'object', properties: { days: { type: 'number', description: 'days ahead, default 7' } } } },
   { name: 'notion_search', description: 'Search the connected Notion workspace by keyword. Returns matching pages/databases with their IDs.',
     input_schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
   { name: 'notion_read', description: 'Read the text content of a Notion page by its ID (from notion_search).',
@@ -348,12 +355,24 @@ async function runTool(name, input) {
     const list = loadReminders();
     return list.length ? list.map((r, i) => `${i + 1}. ${r.text}${r.when ? ` — ${r.when}` : ''}`).join('\n') : 'No reminders saved yet.';
   }
+  if (name === 'read_email') {
+    if (!google.googleConfigured()) return "Google isn't connected yet — run  node scripts/google-auth.mjs  once (see docs/google-setup.md), then I can read your inbox.";
+    const mails = await google.gmailRecent({ max: input.max || 8, query: input.query || 'is:unread in:inbox' });
+    if (!mails.length) return 'Your inbox is clear — nothing matching.';
+    return mails.map((m, i) => `${i + 1}. ${m.from.replace(/<.*>/, '').trim() || m.from} — ${m.subject} :: ${m.snippet}`).join('\n');
+  }
+  if (name === 'read_calendar') {
+    if (!google.googleConfigured()) return "Google isn't connected yet — run  node scripts/google-auth.mjs  once (see docs/google-setup.md), then I can read your calendar.";
+    const evs = await google.calendarUpcoming({ days: input.days || 7 });
+    if (!evs.length) return 'Nothing on your calendar in that window.';
+    return evs.map((e) => `${e.start}: ${e.summary}${e.location ? ' @ ' + e.location : ''}`).join('\n');
+  }
   throw new Error('unknown tool: ' + name);
 }
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }

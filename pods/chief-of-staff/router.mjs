@@ -95,8 +95,11 @@ The instruction comes from the trusted operator. If it quotes external content (
     const m = txt.match(/\{[\s\S]*\}/);
     if (!m) return classifyDeterministic(text);
     const j = JSON.parse(m[0]);
-    const pod = POD_IDS.includes(j.pod) ? j.pod : classifyDeterministic(text).pod;
-    const person = resolvePerson(text, pod);
+    const llmPod = POD_IDS.includes(j.pod) ? j.pod : classifyDeterministic(text).pod;
+    const person = resolvePerson(text, llmPod);
+    // Keep pod + person consistent: if a person was matched by name/keyword, their pod wins over the LLM's
+    // pod guess — otherwise the worker-spawn (keyed on pod) can misfire (e.g. "thumbnail" → Remy but pod≠fiverr).
+    const pod = person ? person.pod : llmPod;
     return {
       pod, person: person ? { codename: person.codename, nickname: person.nickname, title: person.title } : null,
       intent: j.action_kind || 'task', action_kind: j.action_kind || 'other',

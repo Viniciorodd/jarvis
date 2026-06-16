@@ -2,6 +2,10 @@
 # (see docker-compose) because the Chief-of-Staff router it dispatches to lives in ../pods.
 FROM node:20-alpine
 WORKDIR /app
+# optional email deps for the Gov pod (Hector's IMAP reply-reading + SMTP send). Guarded so a network
+# hiccup can NEVER fail the build — if install is skipped, reply-reading just degrades gracefully.
+COPY control-plane/package.json ./package.json
+RUN npm install --omit=dev --no-audit --no-fund || echo "optional email deps not installed; reply-reading will degrade"
 COPY control-plane ./control-plane
 COPY pods ./pods
 # what the pod workers need at runtime: the image engine (Fiverr) + entity/operator profiles (Gov).

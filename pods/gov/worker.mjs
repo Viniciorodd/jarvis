@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, DRAFTS, env, profile, emit, mirror, hqApproval, claude } from './lib.mjs';
 import { maybeConnect } from './connector.mjs';
+import { procurementPath } from './replies.mjs';
 
 // ── A. SCOUT — find opportunities (real SAM.gov, fallback to a realistic simulated feed) ────────
 function simulatedFeed() {
@@ -52,8 +53,11 @@ async function score(op, prof) {
 
 // ── D. CLOSER — draft the proposal (FAR/DFARS-aware, leads with SDB/minority, 50% sub rule) ──────
 async function draft(op, sc, prof) {
-  const sys = `You are the GovCon Proposal Writer for this firm. Draft a proposal RESPONSE for the opportunity. Elite, compliant, concise. Sections: 1) Cover/Compliance summary (cite the set-aside and the firm's SDB/Minority/Hispanic status as the win theme), 2) Technical Approach, 3) Management Plan & Staffing, 4) Past Performance (note: new prime — emphasize PA registrations + disaster registry), 5) Subcontracting Plan (respect the 50% limit-on-subcontracting on small-business set-aside services; name the type of local sub needed), 6) FAR/DFARS compliance checklist (list the key clauses to verify, e.g. 52.219-14 Limitations on Subcontracting, 52.222 labor standards). End with "[HUMAN REVIEW REQUIRED — Vinicio signs & submits]". Markdown. Firm profile:\n${prof}`;
-  const r = await claude(sys, `OPPORTUNITY:\n${JSON.stringify(op, null, 2)}\n\nSCORE/ANALYSIS:\n${JSON.stringify(sc, null, 2)}`, { tier: 'draft', maxTokens: 1800, agent: 'GOV-ANALYST' });
+  const sys = `You are the GovCon Proposal Writer for this firm. Draft a proposal RESPONSE for the opportunity. Elite, compliant, concise. Sections: 1) Cover/Compliance summary (cite the set-aside and the firm's SDB/Minority/Hispanic status as the win theme), 2) Technical Approach, 3) Management Plan & Staffing, 4) Past Performance (note: new prime — emphasize PA registrations + disaster registry; if a subcontractor's past performance is provided below, cite it), 5) Subcontracting Plan (respect the 50% limit-on-subcontracting on small-business set-aside services; if a selected subcontractor + quote is provided, name them and reflect the quote in pricing/management), 6) FAR/DFARS compliance checklist (list the key clauses to verify, e.g. 52.219-14 Limitations on Subcontracting, 52.222 labor standards). End with "[HUMAN REVIEW REQUIRED — Vinicio signs & submits]". Markdown. Firm profile:\n${prof}`;
+  // Fold in Hector's procurement package (selected sub + quote + past performance) if one was gathered.
+  let extra = '';
+  try { const pkg = JSON.parse(fs.readFileSync(procurementPath(op), 'utf8')); extra = `\n\nSELECTED SUBCONTRACTOR (cite their past performance + use their quote): ${pkg.sub} — quote: ${pkg.quote || 'TBD'}; past performance: ${pkg.past_performance || 'pending'}`; } catch { /* none gathered yet */ }
+  const r = await claude(sys, `OPPORTUNITY:\n${JSON.stringify(op, null, 2)}\n\nSCORE/ANALYSIS:\n${JSON.stringify(sc, null, 2)}${extra}`, { tier: 'draft', maxTokens: 1800, agent: 'GOV-ANALYST' });
   return { md: r.text || '# (no draft — model unavailable)\n', cost: r.cost || 0 };
 }
 

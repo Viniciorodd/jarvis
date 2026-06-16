@@ -1,0 +1,9 @@
+{
+  "name": "jarvis-control-plane",
+  "private": true,
+  "description": "Optional runtime deps for the pods the control-plane runs (Gov email read/send). The spine itself is dependency-free; these only power Hector's IMAP reply-reading + SMTP send.",
+  "dependencies": {
+    "imapflow": "^1.0.164",
+    "nodemailer": "^6.9.14"
+  }
+}

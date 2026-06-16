@@ -12,6 +12,7 @@ import { ROOT, DRAFTS, profile, emit, mirror, hqApproval, claude } from './lib.m
 
 const SUBS_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'subs.json');
 export function loadSubs() { try { return JSON.parse(fs.readFileSync(SUBS_FILE, 'utf8')).subs || []; } catch { return []; } }
+export function saveSubs(subs) { try { const cur = (() => { try { return JSON.parse(fs.readFileSync(SUBS_FILE, 'utf8')); } catch { return {}; } })(); cur.subs = subs; fs.writeFileSync(SUBS_FILE, JSON.stringify(cur, null, 2)); } catch { /* */ } }
 const real = (s) => !/^\[example\]/i.test(s.name || '');
 
 // PURE: map an opportunity to the trade of sub it needs. Eval-tested.

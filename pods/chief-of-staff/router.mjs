@@ -183,6 +183,10 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
   if (c.pod === 'gov' && !gate.gate && /\b(progress report|cpars|status update|post-award|milestone)\b/i.test(txt)) {
     import('../gov/operator.mjs').then((m) => m.runOps({ source: 'router' })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'OPERATOR-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
   }
+  // Connector (Hector): read subcontractor replies from the Rodgate inbox + capture quotes/past performance.
+  if (c.pod === 'gov' && !gate.gate && /\b(sub repl|subcontractor repl|gather quotes?|check .*(quotes?|sub|subcontractor)|collect .*quotes?|sub responses?)\b/i.test(txt)) {
+    import('../gov/replies.mjs').then((m) => m.gatherSubResponses({})).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'CONNECT-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+  }
 
   return { classification: c, gate, outcome, reply: composeReply(c, gate) };
 }

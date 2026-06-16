@@ -11,56 +11,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { modelFor } from '../org.mjs';
-
-const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-const CP_URL = (process.env.CONTROL_PLANE_URL || 'http://localhost:8787').replace(/\/$/, '');
-const HQ_URL = (process.env.HQ_URL || '').replace(/\/$/, '');
-const DRAFTS = path.join(ROOT, 'gov-drafts');
-
-function env(k, d = '') {
-  if (process.env[k]) return process.env[k];
-  try { const m = fs.readFileSync(path.join(ROOT, '.env'), 'utf8').match(new RegExp('^' + k + '=(.+)$', 'm')); if (m) return m[1].trim(); } catch { /* */ }
-  return d;
-}
-function profile() {
-  try { return fs.readFileSync(path.join(ROOT, 'prompts', 'gov', 'entity-profile.md'), 'utf8'); }
-  catch { return 'Rodgate, LLC — SDB/Minority/Hispanic-owned small business. NAICS 561210/561720/561990 (janitorial, facilities). PA/NJ/FL. Prime that subcontracts labor; respects 50% limit-on-subcontracting. Vinicio signs & submits everything.'; }
-}
-
-// ── emit/mirror: this worker is a client of the spine + the floor ──────────────────────────────
-async function emit(ev) { try { await fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(ev) }); } catch { /* spine offline */ } }
-async function mirror(agent, state, text) {
-  if (!HQ_URL) return;
-  const headers = { 'content-type': 'application/json' };
-  if (env('HQ_TOKEN')) headers.authorization = 'Bearer ' + env('HQ_TOKEN');
-  try { await fetch(HQ_URL + '/api/event', { method: 'POST', headers, body: JSON.stringify({ agent, pod: 'gov', state, text }) }); } catch { /* */ }
-}
-async function hqApproval(a) {
-  if (!HQ_URL) return;
-  const headers = { 'content-type': 'application/json' };
-  if (env('HQ_TOKEN')) headers.authorization = 'Bearer ' + env('HQ_TOKEN');
-  try { await fetch(HQ_URL + '/api/approval', { method: 'POST', headers, body: JSON.stringify(a) }); } catch { /* */ }
-}
-
-// ── Claude helper (raw fetch; falls back to a deterministic stub with no key) ───────────────────
-async function claude(system, user, { tier = 'cheap', maxTokens = 700, json = false } = {}) {
-  const key = env('ANTHROPIC_API_KEY');
-  if (!key) return { text: '', cost: 0, stub: true };
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: modelFor(tier), max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }),
-    });
-    if (!r.ok) return { text: '', cost: 0, error: r.status };
-    const data = await r.json();
-    const text = (data.content || []).map((c) => c.text || '').join('');
-    const usage = data.usage || {};
-    const cost = ((usage.input_tokens || 0) * 0.8 + (usage.output_tokens || 0) * 4) / 1e6; // ~Haiku rates
-    return { text, cost, usage };
-  } catch (e) { return { text: '', cost: 0, error: e.message }; }
-}
+import { ROOT, DRAFTS, env, profile, emit, mirror, hqApproval, claude } from './lib.mjs';
+import { maybeConnect } from './connector.mjs';
 
 // ── A. SCOUT — find opportunities (real SAM.gov, fallback to a realistic simulated feed) ────────
 function simulatedFeed() {
@@ -139,6 +91,8 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     // HITL gate — never auto-submit (doctrine §9 rule 2 + entity rule: Vinicio signs everything)
     await emit({ kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: `Proposal drafted for ${op.title} (score ${sc.match_score}). Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: sc.subcontractor_needed } });
     await hqApproval({ pod: 'Gov War Room', title: `Review & submit: ${op.title}`, detail: `Score ${sc.match_score}/100 · deadline ${op.deadline} · draft saved to ${file}${sc.subcontractor_needed ? ' · needs a local subcontractor' : ''}`, xp: 50, verb: 'Open draft' });
+    // Connector (Hector): if this bid needs subcontracted labor, draft the outreach now (you send it).
+    if (sc.subcontractor_needed) { try { await maybeConnect({ op, sc }); } catch { /* connector best-effort */ } }
     drafted.push({ op, sc, file });
   }
 

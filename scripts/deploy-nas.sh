@@ -48,18 +48,23 @@ sleep 25
 echo "== status =="
 $COMPOSE ps
 
-# 6. Quick reachability check on HQ (internal)
-echo "== HQ health =="
+# 6. Quick reachability checks (internal)
+echo "== health =="
 if command -v curl >/dev/null 2>&1; then
-  curl -fsS "http://localhost:8099/api/state" >/dev/null 2>&1 && echo "HQ responding on :8099 OK" || echo "HQ not responding yet — check: $COMPOSE logs hq"
+  curl -fsS "http://localhost:8099/api/state" >/dev/null 2>&1 && echo "HQ responding on :8099 OK"            || echo "HQ not responding yet — check: $COMPOSE logs hq"
+  curl -fsS "http://localhost:8787/health"    >/dev/null 2>&1 && echo "control-plane responding on :8787 OK" || echo "control-plane not responding yet — check: $COMPOSE logs control-plane"
+  curl -fsS "http://localhost:8095/"          >/dev/null 2>&1 && echo "Jarvis World responding on :8095 OK"  || echo "Jarvis World not responding yet — check: $COMPOSE logs jarvis-world"
 fi
 
 HOST="$(grep -E '^N8N_HOST=' .env | cut -d= -f2)"
 echo ""
 echo "== DONE =="
 echo "Open from a device on your Tailscale tailnet (or LAN IP 192.168.6.121):"
-echo "  HQ  dashboard : http://${HOST:-jarvis-nas}:8099   (add to iPhone home screen)"
+echo "  Jarvis World  : http://${HOST:-jarvis-nas}:8095   (add to iPhone/iPad home screen — PWA)"
+echo "  HQ  dashboard : http://${HOST:-jarvis-nas}:8099   (also a PWA)"
+echo "  control-plane : http://${HOST:-jarvis-nas}:8787   (API/spine)"
 echo "  n8n workflows : http://${HOST:-jarvis-nas}:5678   (create your owner login first)"
+echo "  Windows/Mac   : open the desktop app (desktop/), set host = ${HOST:-jarvis-nas}"
 echo ""
 echo "Next: 1) create the n8n owner account in the browser,"
 echo "      2) run  bash scripts/import-workflows.sh  to load the workflows,"

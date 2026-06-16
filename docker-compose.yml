@@ -77,10 +77,22 @@ services:
       SPEND_DAILY_CAP_USD: ${SPEND_DAILY_CAP_USD:-5}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       COS_MODEL: ${COS_MODEL:-claude-haiku-4-5}
+      MODEL_CHEAP: ${MODEL_CHEAP:-claude-haiku-4-5}
+      MODEL_DRAFT: ${MODEL_DRAFT:-claude-haiku-4-5}
+      MODEL_REFLECT: ${MODEL_REFLECT:-claude-haiku-4-5}
       HQ_URL: http://hq:8099
       HQ_TOKEN: ${HQ_TOKEN}
+      # the control-plane process runs the pod workers when commands route — give them their keys
+      SAM_API_KEY: ${SAM_API_KEY}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      FAL_KEY: ${FAL_KEY}
+      MEDIA_PROVIDER: ${MEDIA_PROVIDER}
+      MEDIA_BUDGET_USD: ${MEDIA_BUDGET_USD:-10}
     volumes:
       - ./volumes/control-plane:/app/control-plane/data
+      - ./volumes/gov-drafts:/app/gov-drafts        # proposal + outreach drafts (HITL review)
+      - ./volumes/fiverr-assets:/app/fiverr-assets   # produced deliverables
 
   # Jarvis World — the game-like PWA window into the floor. Static build served by nginx, which
   # proxies /hq and /cp to the services above. Reachable over Tailscale at http://<host>:8095.
@@ -92,6 +104,24 @@ services:
       - control-plane
     ports:
       - "8095:80"
+
+  # Conservative scheduler — same image as the control-plane, command overridden to run the cron loop.
+  # Wakes agents only inside working hours; idle polls rest (zero tokens). Posts /command to the spine.
+  scheduler:
+    build:
+      context: .
+      dockerfile: control-plane/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - control-plane
+      - hq
+    command: ["node", "control-plane/scheduler.mjs"]
+    environment:
+      CONTROL_PLANE_URL: http://control-plane:8787
+      HQ_URL: http://hq:8099
+      HQ_TOKEN: ${HQ_TOKEN}
+      SCHEDULER_TICK_MS: ${SCHEDULER_TICK_MS:-900000}
+      JOB_CHECK_URL: ${JOB_CHECK_URL}
 
   # Local, private voice transcription. POST multipart audio_file → /asr?output=json
   whisper:

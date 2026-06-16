@@ -160,5 +160,14 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
   }
 
   mirrorToHQ(c, gate);
+
+  // Gov scan is the first pod whose WORKER actually executes. Spawn it async (fire-and-forget) so the
+  // command returns instantly and you watch Gideon → Patricia work the scan live on the floor.
+  if (c.pod === 'gov' && (c.intent === 'manual_scan' || c.action_kind === 'scan') && !gate.gate) {
+    import('../gov/worker.mjs').then((m) => m.runScan({ source: 'router' })).catch((e) => {
+      store.appendEvent({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) });
+    });
+  }
+
   return { classification: c, gate, outcome, reply: composeReply(c, gate) };
 }

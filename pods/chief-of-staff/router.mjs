@@ -168,6 +168,14 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
       store.appendEvent({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) });
     });
   }
+  // Fiverr/SaaS workers execute too — spawn async on a clear "do work" command (not on a question).
+  const txt = String(text || '');
+  if (c.pod === 'fiverr' && !gate.gate && /\b(make|generate|create|produce|design|thumbnail|cover|logo|art|image|gig|order|banner|poster)\b/i.test(txt)) {
+    import('../fiverr/worker.mjs').then((m) => m.runOrder({ brief: txt })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'STUDIO-01', pod: 'fiverr', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+  }
+  if (c.pod === 'saas' && !gate.gate && /\b(ticket|support|bug|reply|respond|triage|customer|crash|error|issue)\b/i.test(txt)) {
+    import('../saas/worker.mjs').then((m) => m.runTriage({ ticket: txt })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'RECON-DEV', pod: 'saas', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+  }
 
   return { classification: c, gate, outcome, reply: composeReply(c, gate) };
 }

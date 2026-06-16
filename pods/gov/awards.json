@@ -1,0 +1,21 @@
+{
+  "_comment": "Active federal awards Sloane (OPERATOR-01) manages post-award. The entry below is a TEMPLATE — replace when you win one. status: active|closeout|complete. milestone status: pending|done|late.",
+  "awards": [
+    {
+      "id": "AWARD-EXAMPLE",
+      "title": "[Example] Custodial Services — replace on first award",
+      "agency": "Dept of the Army",
+      "cor": "TBD (Contracting Officer's Representative)",
+      "awardDate": "2026-08-01",
+      "popStart": "2026-09-01",
+      "popEnd": "2027-08-31",
+      "value": 0,
+      "status": "active",
+      "subs": [],
+      "milestones": [
+        { "name": "Mobilization complete", "due": "2026-09-14", "status": "pending" },
+        { "name": "Month 1 service report", "due": "2026-10-05", "status": "pending" }
+      ]
+    }
+  ]
+}

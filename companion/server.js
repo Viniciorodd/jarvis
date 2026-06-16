@@ -35,6 +35,11 @@ const rootOf = (abs) => ROOTS.find((r) => isInside(r, abs)) || PRIMARY;
 const OFF_LIMITS = new Set(['.jarvis-trash', 'node_modules', '.git', '#recycle', '#snapshot', '@eaDir',
   '.cloud', '.storage', 'Google Drive Sync Folder', 'OneDrive Sync Folder', 'iCloud', 'Dropbox']);
 const HQ_URL = (process.env.JARVIS_HQ_URL || 'http://192.168.6.121:8099').replace(/\/$/, '');
+const CP_URL = (process.env.JARVIS_CP_URL || 'http://192.168.6.121:8787').replace(/\/$/, '');
+// local store for reminders / important dates / birthdays (so "her" never forgets)
+const REMINDERS_FILE = path.join(__dirname, '.reminders.json');
+function loadReminders() { try { return JSON.parse(fs.readFileSync(REMINDERS_FILE, 'utf8')); } catch { return []; } }
+function saveReminders(l) { try { fs.writeFileSync(REMINDERS_FILE, JSON.stringify(l, null, 2)); } catch { /* */ } }
 
 // --- API key from env or project .env ---
 let API_KEY = process.env.ANTHROPIC_API_KEY || '';
@@ -99,9 +104,9 @@ NEVER touch app-sync or system folders — "Google Drive Sync Folder", "OneDrive
 
 NOTION: you can search and read his Notion workspace (notion_search, notion_read) — read-only for now. Use it to find notes and answer from them. (You only see pages he's shared with the integration; if a search is empty, tell him to share the pages/databases with the Jarvis integration in Notion.) Writing to / migrating Notion comes in a later phase.
 
-THE EMPIRE: use read_hq to check the live JARVIS HQ — lifetime earnings, the agent pods/operators working on the NAS, pending approvals, and recent activity. When he asks "how's the floor / how are we doing", read it and give him the headline, not a data dump.
+THE EMPIRE: you can run the business with him. Use read_hq for the live floor headline. Use get_report for a real business report (daily/weekly/monthly/quarterly/yearly) — totals, what each department did, money, KPIs, and what needs his approval; give the headline, not a JSON dump. Use command_org to actually DO operational things — it routes through the Chief of Staff to the right person (Elle runs ops, Victor is CFO, the gov team scouts/drafts, Remy makes thumbnails, Theo handles support, Camille does real estate, Sloane handles post-award) and tells you who got it and whether it's gated for his approval. Use add_reminder / list_reminders for birthdays, important dates, and things he can't forget.
 
-NOT YET WIRED (say so honestly, never pretend): clicking around inside other apps' GUIs, sending email from here, calendar, Stripe, and TRIGGERING the pods/workflows (you can read HQ, not yet command it). These come in later phases. If asked, say it's coming and offer what you CAN do now.`;
+NOT YET WIRED (say so honestly, never pretend): reading/sending his email, his calendar, and Stripe — those need account access he hasn't connected yet, so offer to set them up rather than pretending. Everything else — reports, commanding the pods, reminders, files, images, HQ — you can do right now.`;
 
 const TOOLS = [
   { name: 'list_dir', description: 'List files and folders at a path inside the workspace.',
@@ -127,6 +132,14 @@ const TOOLS = [
   { name: 'generate_image', description: 'CREATE a real raster image with FLUX (thumbnails, covers, product shots, logos) and display it. Use for "make/design/generate an image of …". A per-image spend cap is enforced in code.',
     input_schema: { type: 'object', properties: { prompt: { type: 'string', description: 'detailed image description' }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'], description: 'default 1024x1024; use 1536x1024 for YouTube thumbnails' }, quality: { type: 'string', enum: ['low', 'medium', 'high'], description: 'default medium' } }, required: ['prompt'] } },
   { name: 'read_hq', description: 'Read live JARVIS HQ status: lifetime earnings, XP, active agent operators on the floor, pending approvals, and recent activity.',
+    input_schema: { type: 'object', properties: {} } },
+  { name: 'get_report', description: 'Get a real business report for a period: totals, what each department did, money/spend, KPIs, and what needs his approval. Use for "give me the daily/weekly/monthly/quarterly/yearly report" or "how did we do this week".',
+    input_schema: { type: 'object', properties: { period: { type: 'string', enum: ['day', 'week', 'month', 'quarter', 'year'], description: 'default week' } } } },
+  { name: 'command_org', description: 'Send an instruction to the company — routes through the Chief of Staff to the right person/pod (e.g. "scan SAM.gov for janitorial work", "have Remy make a thumbnail of X", "ask the CFO Victor for a P&L"). Returns who got it and whether it needs his approval. Use whenever he tells you to DO something operational.',
+    input_schema: { type: 'object', properties: { instruction: { type: 'string' } }, required: ['instruction'] } },
+  { name: 'add_reminder', description: 'Save a reminder, important date, birthday, or note so it is not forgotten.',
+    input_schema: { type: 'object', properties: { text: { type: 'string' }, when: { type: 'string', description: 'optional plain-text date/time, e.g. "2026-07-01", "every Friday", "birthday Aug 3"' } }, required: ['text'] } },
+  { name: 'list_reminders', description: 'List saved reminders, important dates, birthdays, and notes.',
     input_schema: { type: 'object', properties: {} } },
   { name: 'notion_search', description: 'Search the connected Notion workspace by keyword. Returns matching pages/databases with their IDs.',
     input_schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
@@ -310,12 +323,37 @@ async function runTool(name, input) {
     const feed = (s.feed || []).slice(0, 6).map((e) => e.s).join(' | ') || 'quiet';
     return `Lifetime banked $${s.earned}, XP ${s.xp}, EOD streak ${s.streak || 0}. Operators: ${ops}. Awaiting your approval: ${appr}. Recent activity: ${feed}`;
   }
+  if (name === 'get_report') {
+    const period = ['day', 'week', 'month', 'quarter', 'year'].includes(input.period) ? input.period : 'week';
+    const r = await fetch(`${CP_URL}/report?period=${period}`);
+    if (!r.ok) throw new Error(`reports unreachable (${r.status})`);
+    const rep = await r.json();
+    const pods = (rep.pods || []).map((p) => `${p.name}: ${p.actions} actions${p.drafts ? `, ${p.drafts} prepared` : ''}${p.errors ? `, ${p.errors} errors` : ''}`).join('; ') || 'quiet';
+    const needs = (rep.needs_you || []).map((n) => n.rationale || n.action).join('; ') || 'nothing';
+    return `${rep.text}\nBy department — ${pods}.\nNeeds your approval: ${needs}.`;
+  }
+  if (name === 'command_org') {
+    const r = await fetch(`${CP_URL}/command`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: String(input.instruction), source: 'companion' }) });
+    if (!r.ok) throw new Error(`control-plane unreachable (${r.status})`);
+    const d = await r.json();
+    return (d.routing && d.routing.reply) || 'Sent to the Chief of Staff.';
+  }
+  if (name === 'add_reminder') {
+    const list = loadReminders();
+    list.push({ text: String(input.text), when: input.when || '', added: new Date().toISOString() });
+    saveReminders(list);
+    return `Saved: "${input.text}"${input.when ? ` (${input.when})` : ''}. You now have ${list.length} reminder(s).`;
+  }
+  if (name === 'list_reminders') {
+    const list = loadReminders();
+    return list.length ? list.map((r, i) => `${i + 1}. ${r.text}${r.when ? ` — ${r.when}` : ''}`).join('\n') : 'No reminders saved yet.';
+  }
   throw new Error('unknown tool: ' + name);
 }
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }

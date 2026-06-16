@@ -87,6 +87,12 @@ const server = http.createServer(async (req, res) => {
       const org = await import('../pods/org.mjs');
       return send(res, 200, { roster: org.ROSTER, pods: org.POD_IDS });
     }
+    if (req.method === 'GET' && p === '/report') {
+      const reports = await import('./reports.mjs');
+      const q = url.searchParams.get('period') || 'week';
+      const period = ['day', 'week', 'month', 'quarter', 'year'].includes(q) ? q : 'week';
+      return send(res, 200, reports.buildReport(period));
+    }
 
     if (req.method === 'POST' && p === '/spend/check') {
       const b = await readBody(req);

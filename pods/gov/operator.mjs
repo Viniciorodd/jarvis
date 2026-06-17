@@ -8,10 +8,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, DRAFTS, emit, mirror, hqApproval, claude, profile } from './lib.mjs';
 
-const AWARDS_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'awards.json');
+const SEED_DIR = path.dirname(fileURLToPath(import.meta.url));
+const AWARDS_FILE = path.join(process.env.GOV_DATA_DIR || SEED_DIR, 'awards.json');
+const AWARDS_SEED = path.join(SEED_DIR, 'awards.json');
 
 export function loadAwards() {
-  try { return JSON.parse(fs.readFileSync(AWARDS_FILE, 'utf8')).awards || []; } catch { return []; }
+  try { return JSON.parse(fs.readFileSync(AWARDS_FILE, 'utf8')).awards || []; }
+  catch { try { return JSON.parse(fs.readFileSync(AWARDS_SEED, 'utf8')).awards || []; } catch { return []; } }
 }
 const isTemplate = (a) => /^\[example\]/i.test(a.title || '') || a.id === 'AWARD-EXAMPLE';
 

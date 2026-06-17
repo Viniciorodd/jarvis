@@ -10,9 +10,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, DRAFTS, profile, emit, mirror, hqApproval, claude } from './lib.mjs';
 
-const SUBS_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'subs.json');
-export function loadSubs() { try { return JSON.parse(fs.readFileSync(SUBS_FILE, 'utf8')).subs || []; } catch { return []; } }
-export function saveSubs(subs) { try { const cur = (() => { try { return JSON.parse(fs.readFileSync(SUBS_FILE, 'utf8')); } catch { return {}; } })(); cur.subs = subs; fs.writeFileSync(SUBS_FILE, JSON.stringify(cur, null, 2)); } catch { /* */ } }
+// The CRM lives in GOV_DATA_DIR if set (a mounted volume on the NAS, so it persists + you can open it),
+// else next to the code (pods/gov, for local dev). The in-repo subs.json is the seed/fallback.
+const SEED_DIR = path.dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = process.env.GOV_DATA_DIR || SEED_DIR;
+const SUBS_FILE = path.join(DATA_DIR, 'subs.json');
+const SUBS_SEED = path.join(SEED_DIR, 'subs.json');
+function readSubsFile() {
+  try { return JSON.parse(fs.readFileSync(SUBS_FILE, 'utf8')); }
+  catch { try { return JSON.parse(fs.readFileSync(SUBS_SEED, 'utf8')); } catch { return { subs: [] }; } }
+}
+export function loadSubs() { return readSubsFile().subs || []; }
+export function saveSubs(subs) { try { const cur = readSubsFile(); cur.subs = subs; fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(SUBS_FILE, JSON.stringify(cur, null, 2)); } catch { /* */ } }
 const real = (s) => !/^\[example\]/i.test(s.name || '');
 
 // PURE: map an opportunity to the trade of sub it needs. Eval-tested.

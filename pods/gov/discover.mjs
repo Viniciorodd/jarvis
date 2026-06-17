@@ -10,15 +10,20 @@ import { loadSubs, saveSubs } from './connector.mjs';
 const TRADE_NAICS = { janitorial: '561720', grounds: '561730', facilities: '561210', hvac: '238220', electrical: '238210', pest: '561710', guard: '561612' };
 const stateOf = (loc) => (String(loc).match(/,\s*([A-Za-z]{2})\b/) || [])[1] || (String(loc).match(/\b([A-Za-z]{2})\b\s*$/) || [])[1] || '';
 
+// Places API (New) — Text Search. Returns website + phone in one call via the field mask (a direct email
+// still needs a paid finder; website/phone is the fast path to it). Requires "Places API (New)" enabled.
 async function viaPlaces({ trade, location }) {
   const key = env('GOOGLE_PLACES_API_KEY');
   if (!key) return { skipped: 'no GOOGLE_PLACES_API_KEY' };
   try {
-    const q = encodeURIComponent(`${trade} services near ${location}`);
-    const r = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${q}&key=${key}`);
+    const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber' },
+      body: JSON.stringify({ textQuery: `${trade} services near ${location}`, maxResultCount: 10 }),
+    });
     const d = await r.json();
-    if (d.status && !['OK', 'ZERO_RESULTS'].includes(d.status)) return { error: 'Places: ' + d.status + (d.error_message ? ' ' + d.error_message : '') };
-    return { results: (d.results || []).slice(0, 10).map((p) => ({ name: p.name, location: p.formatted_address || location, source: 'google-places', place_id: p.place_id })) };
+    if (d.error) return { error: 'Places: ' + (d.error.message || d.error.status || r.status) };
+    return { results: (d.places || []).map((p) => ({ name: (p.displayName && p.displayName.text) || '', location: p.formattedAddress || location, website: p.websiteUri || '', phone: p.nationalPhoneNumber || '', source: 'google-places' })) };
   } catch (e) { return { error: 'Places: ' + e.message }; }
 }
 
@@ -49,7 +54,7 @@ export async function discoverSubs({ trade = 'janitorial', location = '', naics 
     const key = String(f.name).toLowerCase().trim();
     if (!key || key === 'unknown' || known.has(key)) continue;
     known.add(key);
-    added.push({ id: 'SUB-' + key.replace(/[^a-z0-9]+/g, '-').slice(0, 22) + '-' + Math.random().toString(36).slice(2, 6), name: f.name, trade, location: f.location || location, contact_name: '', contact_email: '', phone: '', capabilities: [], past_performance: 0, quote: '', status: 'prospect', source: f.source, uei: f.uei || '', place_id: f.place_id || '', notes: 'auto-discovered — add a contact email to reach out', last_contacted: null });
+    added.push({ id: 'SUB-' + key.replace(/[^a-z0-9]+/g, '-').slice(0, 22) + '-' + Math.random().toString(36).slice(2, 6), name: f.name, trade, location: f.location || location, contact_name: '', contact_email: '', phone: f.phone || '', website: f.website || '', capabilities: [], past_performance: 0, quote: '', status: 'prospect', source: f.source, uei: f.uei || '', place_id: f.place_id || '', notes: f.website ? `auto-discovered — get email from ${f.website}` : 'auto-discovered — add a contact email to reach out', last_contacted: null });
   }
   if (added.length) saveSubs([...existing, ...added]);
 

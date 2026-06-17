@@ -89,8 +89,16 @@ services:
       FAL_KEY: ${FAL_KEY}
       MEDIA_PROVIDER: ${MEDIA_PROVIDER}
       MEDIA_BUDGET_USD: ${MEDIA_BUDGET_USD:-10}
+      # Gov pod (Hector): discovery + Rodgate inbox reading + award push alerts
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY}
+      RODGATE_GMAIL_USER: ${RODGATE_GMAIL_USER}
+      RODGATE_GMAIL_APP_PASSWORD: ${RODGATE_GMAIL_APP_PASSWORD}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      # CRM + awards live on a mounted volume so they persist + you can open them on the NAS
+      GOV_DATA_DIR: /app/control-plane/data/gov-crm
     volumes:
-      - ./volumes/control-plane:/app/control-plane/data
+      - ./volumes/control-plane:/app/control-plane/data   # event store + gov CRM (./volumes/control-plane/gov-crm/)
       - ./volumes/gov-drafts:/app/gov-drafts        # proposal + outreach drafts (HITL review)
       - ./volumes/fiverr-assets:/app/fiverr-assets   # produced deliverables
 

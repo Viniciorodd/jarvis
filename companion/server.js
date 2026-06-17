@@ -535,6 +535,55 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(out));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // ── OPERATIONS: one cockpit feed aggregated from the control-plane (leads/opps/proposals/CRM) ──
+  if (req.method === 'GET' && url.pathname === '/api/operations') {
+    try {
+      const cp = (pth) => fetch(CP_URL + pth, { signal: AbortSignal.timeout(4500) }).then((r) => r.json());
+      const [pending, govEvents, crm] = await Promise.all([
+        cp('/approvals/pending').catch(() => []),
+        cp('/events?pod=gov').catch(() => []),
+        cp('/crm').catch(() => ({ subs: [] })),
+      ]);
+      const leads = (Array.isArray(pending) ? pending : []).map((a) => ({
+        id: a.id, pod: a.pod, action: a.action, rationale: a.rationale,
+        file: a.payload && a.payload.file, ts: a.ts,
+      }));
+      const ev = Array.isArray(govEvents) ? govEvents : [];
+      const oppMap = new Map();
+      for (const e of ev.filter((x) => x.action === 'bid.score')) {
+        const pl = e.payload || {};
+        oppMap.set(pl.noticeId || e.id, {
+          noticeId: pl.noticeId, title: pl.title || (e.rationale || '').split(' — ')[0], score: pl.score,
+          recommendation: pl.recommendation, setAside: pl.setAside || pl.set_aside_fit, place: pl.place,
+          placeState: pl.placeState, deadline: pl.deadline, url: pl.url, agency: pl.agency, subNeeded: pl.subcontractor_needed,
+        });
+      }
+      const opportunities = [...oppMap.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
+      const propMap = new Map();
+      for (const e of ev.filter((x) => x.action === 'proposal.draft' && x.payload && x.payload.file)) {
+        propMap.set(e.payload.file, { file: e.payload.file, rationale: e.rationale, ts: e.ts });
+      }
+      const proposals = [...propMap.values()].reverse();
+      return send(res, 200, JSON.stringify({ leads, opportunities, proposals, crm: (crm && crm.subs) || [] }));
+    } catch (e) { return send(res, 200, JSON.stringify({ error: e.message, leads: [], opportunities: [], proposals: [], crm: [] })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/approve') {
+    try {
+      const { id, decision } = await readBody(req);
+      if (!id) return send(res, 400, JSON.stringify({ error: 'id required' }));
+      const r = await fetch(`${CP_URL}/approvals/${id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: decision || 'approve' }), signal: AbortSignal.timeout(25000) });
+      return send(res, 200, JSON.stringify(await r.json()));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/proposal') {
+    try {
+      const base = (url.searchParams.get('file') || '').split(/[\\/]/).pop();
+      if (!base) return send(res, 400, JSON.stringify({ error: 'file required' }));
+      const r = await fetch(`${CP_URL}/drafts/${encodeURIComponent(base)}`, { signal: AbortSignal.timeout(5000) });
+      return send(res, r.ok ? 200 : 404, JSON.stringify(await r.json()));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+
   let rel = url.pathname === '/' ? 'index.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');

@@ -17,6 +17,7 @@
         <button class="t-btn" id="wakeBtn" title="Hands-free: say 'Jarvis ...'">‘‘ Hello Jarvis ’’ : off</button>
         <button class="t-btn" id="voiceBtn" title="Toggle her speaking voice">🔊 voice</button>
         <button class="t-btn" id="dashBtn" title="Toggle the dashboard">📊 dash</button>
+        <button class="floor-btn" id="opsBtn" title="Operations cockpit — leads, opportunities, proposals, CRM">⛭ Operations</button>
         <button class="floor-btn" id="floorBtn" title="Open the pod floor">▦ HQ</button>
       </div>
 
@@ -82,10 +83,32 @@
     </aside>
   </div>
 
+  <!-- OPERATIONS view (cockpit overlay) -->
+  <div class="ops" id="ops" hidden>
+    <div class="ops-head">
+      <span class="px ops-brand">⛭ OPERATIONS</span>
+      <nav class="ops-tabs">
+        <button class="ops-tab on" data-tab="leads">⚑ Leads<span class="ops-c" id="cLeads"></span></button>
+        <button class="ops-tab" data-tab="opps">◎ Opportunities<span class="ops-c" id="cOpps"></span></button>
+        <button class="ops-tab" data-tab="props">▤ Proposals<span class="ops-c" id="cProps"></span></button>
+        <button class="ops-tab" data-tab="crm">⚇ CRM<span class="ops-c" id="cCrm"></span></button>
+      </nav>
+      <button class="ops-refresh" id="opsRefresh" title="Refresh">⟳</button>
+      <button class="ops-x" id="opsX" title="Close">✕</button>
+    </div>
+    <div class="ops-body" id="opsBody"><div class="ops-empty">loading…</div></div>
+    <!-- proposal reader -->
+    <div class="ops-reader" id="opsReader" hidden>
+      <div class="ops-reader-bar"><span class="ops-reader-cap px" id="opsReaderCap"></span><button class="ops-x" id="opsReaderX">✕</button></div>
+      <pre class="ops-reader-body" id="opsReaderBody"></pre>
+    </div>
+  </div>
+
   <!-- drag-drop overlay -->
   <div class="dropmask" id="dropmask"><div class="dropmask-inner">⤓ Drop the file — Jarvis will read it</div></div>
 
   <script src="orb.js"></script>
   <script src="app.js"></script>
+  <script src="ops.js"></script>
 </body>
 </html>

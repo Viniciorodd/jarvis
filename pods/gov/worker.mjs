@@ -55,6 +55,7 @@ export async function scout() {
           deadline: o.responseDeadLine || '', place: (pop.city || {}).name || '',
           placeState: (pop.state || {}).code || (pop.state || {}).name || '',
           url: o.uiLink || '', description: (o.description || '').slice(0, 600),
+          contactEmail: (o.pointOfContact && o.pointOfContact[0] && o.pointOfContact[0].email) || '', type: o.type || '',
         });
       }
     } catch (e) { note = 'SAM ' + e.message; }
@@ -103,6 +104,12 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     await emit({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'bid.score', cost_usd: sc._cost || 0, rationale: `${op.title} — ${sc.match_score}/100 (${sc.recommendation})`, payload: { noticeId: op.noticeId, title: op.title, score: sc.match_score, recommendation: sc.recommendation, set_aside_fit: sc.set_aside_fit, setAside: op.setAside, subcontractor_needed: sc.subcontractor_needed, place: op.place, placeState: op.placeState, deadline: op.deadline, url: op.url, agency: op.agency } });
   }
   scored.sort((a, b) => (b.sc.match_score || 0) - (a.sc.match_score || 0));
+
+  // Mirror the actionable pipeline (bid + watch) into the Notion company brain. Fire-and-forget, sequential
+  // to respect Notion's rate limit, capped, and graceful (no key / page not shared → skips silently).
+  import('../notion.mjs').then(async (N) => {
+    for (const { op, sc } of scored.filter((s) => s.sc.recommendation !== 'no-bid').slice(0, 20)) await N.syncOpportunity(op, sc);
+  }).catch(() => { /* notion optional */ });
 
   // D. draft the top N "bid" candidates (draft tier) → save + HITL approval (gate the submit)
   fs.mkdirSync(DRAFTS, { recursive: true });

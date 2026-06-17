@@ -1,0 +1,7 @@
+{
+  "_comment": "Notion database IDs for the JARVIS Company Brain (not secret — the NOTION_API_KEY in .env is). Share the 'JARVIS — Company Brain' page with the Jarvis integration so it can write here.",
+  "opportunities": "2f7d7d51000f4fe398926f66ee46c6d1",
+  "subs": "fe272acf42b4435e98e9a614cc7e6de7",
+  "lessons": "7f22dd25699047eabbb758bb43fc9da3",
+  "daily": "ef94b55202b94601b4ee940c308281f2"
+}

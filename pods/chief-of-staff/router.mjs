@@ -216,6 +216,10 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
   if (c.pod === 'gov' && !gate.gate && /\b(rodgate inbox|check (the )?inbox|any awards?|new mail|won.{0,15}contract|award letter)\b/i.test(txt)) {
     import('../gov/inbox.mjs').then((m) => m.watchRodgate({})).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'CONNECT-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
   }
+  // Sources-sought: draft capability responses to RFIs / sources-sought notices (each gated to send).
+  if (c.pod === 'gov' && !gate.gate && /\b(sources?[\s-]?sought|capability (statement|response)|respond to (the )?rfi|\brfi\b)\b/i.test(txt)) {
+    import('../gov/sources.mjs').then((m) => m.runSourcesSought({})).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+  }
 
   return { classification: c, gate, outcome, reply: composeReply(c, gate) };
 }

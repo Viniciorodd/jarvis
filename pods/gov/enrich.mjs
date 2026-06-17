@@ -121,6 +121,8 @@ export async function enrichSubs({ ids = null, all = false, limit = 8 } = {}) {
     }
   }
   if (targets.length) saveSubs(subs);
+  // mirror the enriched subs into the Notion CRM (fire-and-forget, graceful)
+  if (targets.length) import('../notion.mjs').then(async (N) => { for (const s of targets) await N.syncSub(s); }).catch(() => { /* notion optional */ });
   await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'subs.enriched', rationale: `Found ${found.length}/${targets.length} contact email(s)`, payload: { found } });
   await mirror('CONNECT-01', found.length ? 'need' : 'idle', found.length ? `Found ${found.length} contact email(s) — subs now reachable for outreach` : (targets.length ? `No emails found for ${targets.length} site(s) — add manually` : 'No subs needed enrichment'));
   return { checked: targets.length, found };

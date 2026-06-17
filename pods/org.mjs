@@ -53,13 +53,14 @@ export const ROSTER = [
     does: 'Calendar, reminders, errands, travel, personal-life logistics.' },
 ];
 
-// Model tiers — CONSERVATIVE defaults (everything on Haiku to start, per the operator's call). Bump
-// 'draft' to Sonnet and 'reflect' to Opus once momentum justifies it. Point any tier at a local Ollama
-// model (free, on the NAS) by setting e.g. MODEL_CHEAP=ollama/llama3.1 — the runtime cost lever.
+// Model tiers — EXPERT defaults: Haiku for high-volume scanning, Sonnet for the real work (proposals,
+// analysis, outreach), Opus for hard strategy. This is what makes the agents "best in field." Override any
+// tier via env (e.g. MODEL_DRAFT=claude-haiku-4-5 to economize, or MODEL_CHEAP=ollama/llama3.1 for local).
+// Cost rises vs all-Haiku, but the control-plane spend cap (per-action + per-day) still bounds it.
 export const MODEL_TIERS = {
-  cheap: process.env.MODEL_CHEAP || 'claude-haiku-4-5',     // scans, classification, idle polls
-  draft: process.env.MODEL_DRAFT || 'claude-haiku-4-5',     // proposals, replies, analysis (-> sonnet later)
-  reflect: process.env.MODEL_REFLECT || 'claude-haiku-4-5', // weekly strategy/reflection (-> opus later)
+  cheap: process.env.MODEL_CHEAP || 'claude-haiku-4-5',      // scans, classification, idle polls
+  draft: process.env.MODEL_DRAFT || 'claude-sonnet-4-6',     // proposals, replies, analysis — expert tier
+  reflect: process.env.MODEL_REFLECT || 'claude-opus-4-8',   // weekly strategy / hard reasoning — top tier
 };
 export const modelFor = (tier) => MODEL_TIERS[tier] || MODEL_TIERS.cheap;
 

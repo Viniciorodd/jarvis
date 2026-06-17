@@ -187,6 +187,16 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
   if (c.pod === 'gov' && !gate.gate && /\b(sub repl|subcontractor repl|gather quotes?|check .*(quotes?|sub|subcontractor)|collect .*quotes?|sub responses?)\b/i.test(txt)) {
     import('../gov/replies.mjs').then((m) => m.gatherSubResponses({})).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'CONNECT-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
   }
+  // Discovery: find local subs/businesses (Google Places + SAM.gov) → CRM.
+  if (c.pod === 'gov' && !gate.gate && /\b(find|source|discover|look for|search for).{0,30}\b(sub|subcontractor|vendor|business|compan)/i.test(txt)) {
+    const loc = (txt.match(/\b(?:near|in|around|for)\s+([A-Za-z][A-Za-z .,]{2,})$/i) || [])[1] || '';
+    const trade = ['janitorial', 'grounds', 'hvac', 'electrical', 'pest', 'guard', 'facilities'].find((t) => txt.toLowerCase().includes(t)) || 'janitorial';
+    import('../gov/discover.mjs').then((m) => m.discoverSubs({ trade, location: loc.trim() })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'CONNECT-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+  }
+  // Inbox watch: scan the Rodgate mailbox for awards / CO messages and alert.
+  if (c.pod === 'gov' && !gate.gate && /\b(rodgate inbox|check (the )?inbox|any awards?|new mail|won.{0,15}contract|award letter)\b/i.test(txt)) {
+    import('../gov/inbox.mjs').then((m) => m.watchRodgate({})).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'CONNECT-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+  }
 
   return { classification: c, gate, outcome, reply: composeReply(c, gate) };
 }

@@ -16,6 +16,9 @@
     { "id": "saas-support-poll", "person": "RECON-DEV", "pod": "saas", "type": "poll",
       "cadence_hours": 6, "tier": "cheap",
       "command": "new support tickets came in — triage and draft replies" },
+    { "id": "rodgate-inbox-poll", "person": "CONNECT-01", "pod": "gov", "type": "scan",
+      "cadence_hours": 4, "tier": "cheap",
+      "command": "check the rodgate inbox for awards and replies" },
     { "id": "weekly-reflection", "person": "EXEC-01", "pod": "exec", "type": "reflect",
       "cadence_hours": 168, "at_hour": 18, "at_dow": 0, "tier": "reflect",
       "command": "weekly strategy review: KPIs, human-edit rate, where to push or pull back" }

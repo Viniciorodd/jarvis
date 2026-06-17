@@ -11,7 +11,7 @@ import { loadSubs, saveSubs } from './connector.mjs';
 const slug = (op) => String(op.noticeId || op.title || 'op').replace(/[^\w]+/g, '-').slice(0, 44);
 export const procurementPath = (op) => path.join(ROOT, 'gov-drafts', `procurement-${slug(op)}.json`);
 
-async function readRodgateInbox({ days = 21, max = 25 } = {}) {
+export async function readRodgateInbox({ days = 21, max = 25 } = {}) {
   const USER = env('RODGATE_GMAIL_USER');
   const PASS = (env('RODGATE_GMAIL_APP_PASSWORD') || '').replace(/\s+/g, '');
   if (!USER || !PASS) return { error: 'Rodgate mailbox not connected — set RODGATE_GMAIL_USER + RODGATE_GMAIL_APP_PASSWORD in .env.' };

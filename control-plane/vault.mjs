@@ -19,11 +19,11 @@ const ENV_FILE = path.join(ROOT, '.env');
 const ENC_FILE = path.join(DIR, 'vault.enc');
 
 // ── per-agent ACL — the heart of least privilege. Wildcards (PREFIX_*) allowed. ──────────────────
-// Everyone who reasons gets ANTHROPIC_API_KEY; ONLY the Fiverr creative gets image-gen keys; nobody
-// gets a finance/bank key (none exist yet — and the broker is where that boundary will live).
+// Everyone who reasons gets ANTHROPIC_API_KEY; ONLY the Fiverr creative gets image-gen keys; ONLY the
+// CFO (LEDGER-01) gets the Stripe key — the scout/analyst/creative literally cannot read it in code.
 export const ACL = {
   'EXEC-01': ['ANTHROPIC_API_KEY'],
-  'LEDGER-01': ['ANTHROPIC_API_KEY'],
+  'LEDGER-01': ['ANTHROPIC_API_KEY', 'STRIPE_API_KEY'], // ONLY the CFO can read the Stripe key
   'MAILROOM-01': ['ANTHROPIC_API_KEY'],
   'SAM-SCOUT': ['SAM_API_KEY', 'ANTHROPIC_API_KEY'],
   'GOV-ANALYST': ['ANTHROPIC_API_KEY'],

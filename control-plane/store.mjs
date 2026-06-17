@@ -63,6 +63,12 @@ export function seenIdempotencyKey(key) {
   return readEvents().some((e) => e.idempotency_key === key);
 }
 
+/** Look up one event by id — the executor uses it to resolve a decision back to its approval.request. */
+export function getEvent(id) {
+  if (!id) return null;
+  return readEvents().find((e) => e.id === id) || null;
+}
+
 /** Open approval requests = approval.request events with no matching approval.decision. */
 export function pendingApprovals() {
   const events = readEvents();

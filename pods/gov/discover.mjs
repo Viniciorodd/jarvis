@@ -40,7 +40,7 @@ async function viaSam({ naics, state }) {
   } catch (e) { return { error: 'SAM: ' + e.message }; }
 }
 
-export async function discoverSubs({ trade = 'janitorial', location = '', naics = '' } = {}) {
+export async function discoverSubs({ trade = 'janitorial', location = '', naics = '', enrich = false } = {}) {
   naics = naics || TRADE_NAICS[trade] || '';
   const state = stateOf(location);
   await mirror('CONNECT-01', 'work', `Discovering ${trade} subs near ${location || state || 'region'}…`);
@@ -61,11 +61,20 @@ export async function discoverSubs({ trade = 'janitorial', location = '', naics 
   const notes = [places.skipped && `Places ${places.skipped}`, places.error, sam.skipped && `SAM ${sam.skipped}`, sam.error].filter(Boolean);
   await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'subs.discovered', rationale: `Discovered ${added.length} new ${trade} candidate(s) near ${location || state}${notes.length ? ' (' + notes.join('; ') + ')' : ''}`, payload: { trade, location, added: added.map((a) => a.name) } });
   await mirror('CONNECT-01', added.length ? 'need' : 'idle', added.length ? `Found ${added.length} ${trade} candidate(s) — added to the CRM (add emails to reach out)` : `No new ${trade} candidates${notes.length ? ' — ' + notes.join('; ') : ''}`);
-  return { added: added.length, names: added.map((a) => a.name), notes };
+
+  // Optionally chase down a contact email for each new row right away (the natural "find subs" flow).
+  let enriched = null;
+  if (added.length && enrich) {
+    try { const { enrichSubs } = await import('./enrich.mjs'); enriched = await enrichSubs({ ids: added.map((a) => a.id) }); }
+    catch { /* enrichment is best-effort; rows still land in the CRM */ }
+  }
+  return { added: added.length, names: added.map((a) => a.name), notes, enriched };
 }
 
 if (process.argv[1] && process.argv[1].endsWith('discover.mjs')) {
-  const trade = process.argv[2] || 'janitorial';
-  const location = process.argv.slice(3).join(' ') || 'Wilkes-Barre, PA';
-  discoverSubs({ trade, location }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(e); process.exitCode = 1; });
+  const args = process.argv.slice(2).filter((a) => a !== '--enrich');
+  const enrich = process.argv.includes('--enrich');
+  const trade = args[0] || 'janitorial';
+  const location = args.slice(1).join(' ') || 'Wilkes-Barre, PA';
+  discoverSubs({ trade, location, enrich }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(e); process.exitCode = 1; });
 }

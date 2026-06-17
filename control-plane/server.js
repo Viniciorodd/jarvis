@@ -14,6 +14,9 @@
 //   GET  /state                         summary for dashboards
 'use strict';
 const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const DRAFTS_DIR = path.join(__dirname, '..', 'gov-drafts'); // proposal + outreach drafts (read-only)
 
 const PORT = Number(process.env.CONTROL_PLANE_PORT || 8787);
 const ACTION_CAP = Number(process.env.SPEND_ACTION_CAP_USD || 2);
@@ -64,7 +67,57 @@ const server = http.createServer(async (req, res) => {
       const decision = ['approve', 'edit', 'pass'].includes(b.decision) ? b.decision : null;
       if (!decision) return send(res, 400, { error: 'decision must be approve|edit|pass' });
       const rec = store.appendEvent({ kind: 'approval.decision', actor: 'operator', pod: b.pod || 'system', action: decision, ref: id, payload: { decision, note: b.note || '' } });
-      return send(res, 200, { id: rec.id, decision });
+      // EXECUTOR: approving a gov email send IS the human gate firing (doctrine §9 rule 2 — irreversible,
+      // behind explicit approval). Auto-send is opt-in via GOV_AUTO_SEND; with it off we dry-run (log +
+      // Slack preview) so you SEE exactly what would go out. Lazily imported + never fatal to the response.
+      let executed = null;
+      if (decision === 'approve') {
+        const reqEv = store.getEvent(id);
+        // (1) Gov email send.
+        try {
+          const gov = await import('../pods/gov/sender.mjs');
+          const job = gov.approvalToSend(reqEv);
+          if (job) {
+            const auto = /^(1|true|yes|on)$/i.test(process.env.GOV_AUTO_SEND || '');
+            const r = await gov.sendGovEmail({ file: job.file, dryRun: !auto });
+            const action = r.sent ? 'email.sent' : (r.ok ? 'email.preview' : 'email.failed');
+            store.appendEvent({ kind: 'action', actor: 'GOV-SEND', pod: 'gov', action, reversible: false, status: r.ok ? 'done' : 'error',
+              rationale: r.sent ? `Sent "${r.subject}" → ${r.to}` : r.ok ? `Auto-send off (set GOV_AUTO_SEND=1) — previewed "${r.subject}" → ${r.to}` : `Send not done: ${r.reason}`,
+              ref: id, payload: { file: job.file, to: r.to || null, sent: !!r.sent, messageId: r.messageId || null } });
+            executed = { action, ok: r.ok, sent: !!r.sent, to: r.to || null, reason: r.reason || null };
+          }
+        } catch (e) {
+          store.appendEvent({ kind: 'trace', actor: 'GOV-SEND', pod: 'gov', action: 'executor.error', status: 'error', rationale: e.message, ref: id });
+          executed = { error: e.message };
+        }
+        // (2) Finance: create a Stripe payment link. Auto-create opt-in via FINANCE_AUTO_INVOICE (else dry-run).
+        if (!executed) {
+          try {
+            const fin = await import('../pods/finance/invoice.mjs');
+            const spec = fin.invoiceFromApproval(reqEv);
+            if (spec) {
+              const auto = /^(1|true|yes|on)$/i.test(process.env.FINANCE_AUTO_INVOICE || '');
+              if (!auto) {
+                store.appendEvent({ kind: 'action', actor: 'LEDGER-01', pod: 'exec', action: 'invoice.preview', reversible: false, status: 'done',
+                  rationale: `Auto-create off (set FINANCE_AUTO_INVOICE=1) — would create a $${(spec.cents / 100).toFixed(2)} ${String(spec.currency).toUpperCase()} payment link`, ref: id, payload: { cents: spec.cents } });
+                executed = { action: 'invoice.preview', ok: true, created: false };
+              } else {
+                const r = await fin.createPaymentLink(spec);
+                const emailFile = (r.ok && spec.customerEmail) ? fin.writeInvoiceEmail(spec, r.url) : null;
+                const action = r.ok ? 'invoice.created' : 'invoice.failed';
+                store.appendEvent({ kind: 'action', actor: 'LEDGER-01', pod: 'exec', action, reversible: false, status: r.ok ? 'done' : 'error',
+                  rationale: r.ok ? `Created ${r.mode} payment link ($${(spec.cents / 100).toFixed(2)}): ${r.url}` : `Payment link failed: ${r.reason}`,
+                  ref: id, payload: { url: r.url || null, id: r.id || null, mode: r.mode || null, emailFile } });
+                executed = { action, ok: r.ok, url: r.url || null, reason: r.reason || null, emailFile };
+              }
+            }
+          } catch (e) {
+            store.appendEvent({ kind: 'trace', actor: 'LEDGER-01', pod: 'exec', action: 'executor.error', status: 'error', rationale: e.message, ref: id });
+            executed = executed || { error: e.message };
+          }
+        }
+      }
+      return send(res, 200, { id: rec.id, decision, executed });
     }
     if (req.method === 'POST' && p === '/command') {
       const b = await readBody(req);
@@ -92,6 +145,22 @@ const server = http.createServer(async (req, res) => {
       const q = url.searchParams.get('period') || 'week';
       const period = ['day', 'week', 'month', 'quarter', 'year'].includes(q) ? q : 'week';
       return send(res, 200, reports.buildReport(period));
+    }
+    // CRM — the subcontractor database (Operations view reads this).
+    if (req.method === 'GET' && p === '/crm') {
+      try { const conn = await import('../pods/gov/connector.mjs'); return send(res, 200, { subs: conn.loadSubs() }); }
+      catch (e) { return send(res, 200, { subs: [], error: e.message }); }
+    }
+    // Drafts — list + read proposal/outreach text (Operations "Proposals" tab). Read-only, path-guarded.
+    if (req.method === 'GET' && p === '/drafts') {
+      let files = []; try { files = fs.readdirSync(DRAFTS_DIR).filter((f) => /\.(md|json)$/.test(f)); } catch { /* none yet */ }
+      return send(res, 200, { drafts: files });
+    }
+    if (req.method === 'GET' && p.startsWith('/drafts/')) {
+      const name = decodeURIComponent(p.slice('/drafts/'.length));
+      if (!name || /[\\/]|\.\./.test(name)) return send(res, 400, { error: 'bad name' });
+      try { return send(res, 200, { name, content: fs.readFileSync(path.join(DRAFTS_DIR, name), 'utf8') }); }
+      catch { return send(res, 404, { error: 'not found' }); }
     }
 
     if (req.method === 'POST' && p === '/spend/check') {

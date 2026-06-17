@@ -137,6 +137,12 @@ function mirrorToHQ(c, gate) {
  */
 export async function routeCommand({ text, source = 'api', commandId = null, store, anthropicKey = null }) {
   const c = await classifyWithClaude(text, anthropicKey);
+  // Finance: PREPARING an invoice/payment link is a reversible draft — the money gate is on CREATING the
+  // Stripe link, which Victor raises after drafting. So route the prep at L0 (don't let a "pay"/"payment"
+  // keyword gate the prep step itself); code disposes (doctrine §1). The Stripe call is still HITL-gated.
+  if (c.pod === 'exec' && /\b(invoice|payment link|bill\b|charge)\b/i.test(String(text))) {
+    c.reversible = true; c.action_kind = 'draft'; if (['pay', 'other', 'charge'].includes(c.intent)) c.intent = 'invoice_draft';
+  }
   const gate = decideGate(c);
   const actor = c.person ? c.person.codename : 'chief-of-staff';
 
@@ -187,11 +193,24 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
   if (c.pod === 'gov' && !gate.gate && /\b(sub repl|subcontractor repl|gather quotes?|check .*(quotes?|sub|subcontractor)|collect .*quotes?|sub responses?)\b/i.test(txt)) {
     import('../gov/replies.mjs').then((m) => m.gatherSubResponses({})).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'CONNECT-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
   }
-  // Discovery: find local subs/businesses (Google Places + SAM.gov) → CRM.
-  if (c.pod === 'gov' && !gate.gate && /\b(find|source|discover|look for|search for).{0,30}\b(sub|subcontractor|vendor|business|compan)/i.test(txt)) {
+  // Email enrichment: find a contact email for CRM subs that only have a website (so outreach can reach them).
+  // Checked BEFORE discovery so "find emails for the subs" enriches instead of re-running a discovery scan.
+  const wantsEnrich = /\benrich\b/i.test(txt) || /\b(find|get|look ?up|fill in)\b.{0,24}\b(email|contact info|contact detail)/i.test(txt);
+  if (c.pod === 'gov' && !gate.gate && wantsEnrich) {
+    import('../gov/enrich.mjs').then((m) => m.enrichSubs({ all: true })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'CONNECT-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+  }
+  // Discovery: find local subs/businesses (Google Places + SAM.gov) → CRM, then enrich their emails.
+  if (c.pod === 'gov' && !gate.gate && !wantsEnrich && /\b(find|source|discover|look for|search for).{0,30}\b(sub|subcontractor|vendor|business|compan)/i.test(txt)) {
     const loc = (txt.match(/\b(?:near|in|around|for)\s+([A-Za-z][A-Za-z .,]{2,})$/i) || [])[1] || '';
     const trade = ['janitorial', 'grounds', 'hvac', 'electrical', 'pest', 'guard', 'facilities'].find((t) => txt.toLowerCase().includes(t)) || 'janitorial';
-    import('../gov/discover.mjs').then((m) => m.discoverSubs({ trade, location: loc.trim() })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'CONNECT-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+    import('../gov/discover.mjs').then((m) => m.discoverSubs({ trade, location: loc.trim(), enrich: true })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'CONNECT-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+  }
+  // Finance (Victor): draft a Stripe payment link / invoice for a client. Amount parsed in code; gated.
+  if (c.pod === 'exec' && !gate.gate && /\b(invoice|payment link|bill\b|charge)\b/i.test(txt)) {
+    const amountUsd = (txt.match(/\$\s*([\d,]+(?:\.\d{1,2})?)/) || txt.match(/\b([\d,]+(?:\.\d{1,2})?)\s*(?:dollars|usd|bucks)\b/i) || [])[1] || '';
+    const customerEmail = (txt.match(/[^\s@]+@[^\s@]+\.[^\s@]+/) || [])[0] || '';
+    const description = (txt.match(/\bfor\s+(.+?)(?:\s*(?:\$|\bto\b|,|$))/i) || [])[1] || '';
+    import('../finance/invoice.mjs').then((m) => m.draftInvoice({ amountUsd, customerEmail, description })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'LEDGER-01', pod: 'exec', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
   }
   // Inbox watch: scan the Rodgate mailbox for awards / CO messages and alert.
   if (c.pod === 'gov' && !gate.gate && /\b(rodgate inbox|check (the )?inbox|any awards?|new mail|won.{0,15}contract|award letter)\b/i.test(txt)) {

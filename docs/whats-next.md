@@ -2,6 +2,31 @@
 
 _Updated 2026-06-14. Everything is committed to git + saved to memory. Resume from here._
 
+### 🆕 2026-06-16 — shipped
+- **Email-finder enrichment** (`pods/gov/enrich.mjs`): discovery gave subs a website but no email; this
+  scrapes the site + its contact/about pages (mailto + text), picks the best on-domain role inbox, and writes
+  `contact_email` back to the CRM. Free + read-only; optional Hunter.io fallback if `HUNTER_API_KEY` is set.
+  Wired into `discover.mjs` (auto-enriches new rows) + the CoS router ("find emails for the subs" / "enrich").
+  Pure extract/pick logic is eval-pinned (`evals/enrich.eval.mjs`).
+- **Gov email sending WIRED** (`pods/gov/sender.mjs` + control-plane executor): approvals used to be logged
+  but never executed. Now approving a gov **send/email** approval (HQ/Slack/companion) fires the sender on the
+  referenced draft. The human approval IS the gate (doctrine §9 rule 2); auto-send is **opt-in via
+  `GOV_AUTO_SEND=1`** — with it off the executor dry-runs + posts a Slack preview so you see what would go out.
+  `scripts/gov-send.mjs` is now a thin CLI over the same module. Connector writes a sendable `To:/Subject:`
+  header when the top sub has an (enriched) email, so the outreach loop actually closes. A **proposal `submit`
+  never auto-emails** (it goes out a portal). Pure parser + executor gate eval-pinned (`evals/gov-send.eval.mjs`).
+- **Stripe invoicing / payment links WIRED** (`pods/finance/invoice.mjs`, Victor / LEDGER-01): "invoice a
+  client for $X" → Victor validates the amount **in code** (integer cents, deterministic idempotency key),
+  drafts it, and raises ONE money gate. On approval the control-plane executor creates a Stripe **payment
+  link** (REST, no npm dep) and writes a ready-to-send email carrying the link. **Test mode first** — the key
+  is vault-scoped to LEDGER-01 only, a `sk_live_` key is refused unless `STRIPE_ALLOW_LIVE=1`, and auto-create
+  is opt-in via `FINANCE_AUTO_INVOICE=1` (off = dry-run/preview). Pure money core + gate eval-pinned
+  (`evals/finance.eval.mjs`) + a vault ACL eval. **Evals: 95/95 green.**
+  → **To go live (test mode):** add `STRIPE_API_KEY=sk_test_…` to `.env` (Stripe Dashboard → Developers → API
+    keys, in Test mode), set `FINANCE_AUTO_INVOICE=1`, then
+    `node pods/finance/invoice.mjs 500 client@email.com "Office cleaning"` → approve in HQ/companion → a real
+    **test-mode** payment link is created. Flip to `sk_live_` + `STRIPE_ALLOW_LIVE=1` when ready for real money.
+
 ### 🆕 2026-06-14 (PM session) — shipped
 - **Rodgate site LIVE → https://rodgate-llc.netlify.app** (Netlify free; redeploy: `netlify deploy --dir=site --prod --site 2c860be1-48f8-497b-a1c1-46d1772d2973`).
 - **Inbox cleanup executed** (reversible): Rodgate inbox → ~623 (archived 967 / trashed 420);

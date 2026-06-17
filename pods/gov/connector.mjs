@@ -93,7 +93,12 @@ export async function maybeConnect({ op, sc }) {
   const slug = (op.noticeId || op.title).replace(/[^\w]+/g, '-').slice(0, 44);
   const file = path.join('gov-drafts', `outreach-${slug}.md`);
   const rankNote = shortlist.length ? `\n<!-- rated shortlist: ${shortlist.map((s) => `${s.name} ${s.score}/100 [${s.reasons.join(', ')}]`).join(' | ')} -->\n` : '\n<!-- no vendor on file — source one -->\n';
-  fs.writeFileSync(path.join(ROOT, file), `<!-- sub outreach for ${op.title} · trade=${trade} -->${rankNote}\n${d.md}\n`);
+  // If the top candidate has an email (from enrichment), write a SENDABLE header (To:/Subject:/---) so the
+  // executor can dispatch it on your approval. No email yet → it's still a review draft (run enrichment first).
+  const header = top && top.contact_email
+    ? `To: ${top.contact_email}\nSubject: Teaming opportunity — ${op.title}\n${'-'.repeat(48)}\n`
+    : '';
+  fs.writeFileSync(path.join(ROOT, file), `<!-- sub outreach for ${op.title} · trade=${trade} -->${rankNote}\n${header}${d.md}\n`);
 
   await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.outreach.draft', cost_usd: d.cost || 0, reversible: true, rationale: `${trade} outreach drafted (asks for past performance + quote)`, payload: { noticeId: op.noticeId, trade, top: top ? top.id : null, file } });
   await emit({ kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send ${trade} outreach (SOW + ask for past performance + quote) for ${op.title}.`, payload: { noticeId: op.noticeId, trade, file, shortlist } });

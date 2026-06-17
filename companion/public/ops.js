@@ -12,6 +12,8 @@
 
   const recClass = (r) => (/^bid$/i.test(r) ? 'go' : /watch/i.test(r) ? 'mid' : 'no');
   const scoreClass = (n) => (n >= 75 ? 'go' : n >= 50 ? 'mid' : 'no');
+  const daysUntil = (d) => { if (!d) return null; const t = new Date(d); if (isNaN(t)) return null; return Math.ceil((t - Date.now()) / 864e5); };
+  const dueChip = (d) => { const du = daysUntil(d); if (du == null) return ''; const c = du <= 7 ? 'var(--warn)' : 'var(--dim)'; return `<span style="color:${c}">⏳ ${du < 0 ? 'closed' : 'due in ' + du + 'd'}</span>`; };
 
   async function load() {
     if (loading) return; loading = true;
@@ -71,7 +73,7 @@
         <div class="ops-meta">
           ${o.setAside ? `<span>🏷 ${esc(o.setAside)}</span>` : ''}
           ${(o.place || o.placeState) ? `<span>📍 ${esc([o.place, o.placeState].filter(Boolean).join(', '))}</span>` : ''}
-          ${o.deadline ? `<span>⏳ ${esc(String(o.deadline).slice(0, 10))}</span>` : ''}
+          ${dueChip(o.deadline)}
           ${o.agency ? `<span>🏛 ${esc(o.agency)}</span>` : ''}
         </div>
         ${o.url ? `<div class="ops-actions"><a class="btn ghost" href="${esc(o.url)}" target="_blank" rel="noreferrer">View on SAM.gov ↗</a></div>` : ''}

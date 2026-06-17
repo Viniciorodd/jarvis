@@ -11,6 +11,9 @@ const hint = $('hint');
 
 const history = [];
 let busy = false;
+let openConvo = false;   // keep listening so he can talk freely (no wake needed) within the window
+let lastConvo = 0;       // timestamp of the last voice interaction
+const CONVO_WINDOW = 30000;
 let speakOn = true;
 let hasVoice = false;   // ElevenLabs available?
 let hasStt = false;     // Deepgram available?
@@ -79,7 +82,7 @@ async function speak(text) {
 // ── the brain ────────────────────────────────────────────────────────────
 async function sendToJarvis(text) {
   if (busy || !text.trim()) return;
-  busy = true; if (hint) hint.style.display = 'none';
+  busy = true; lastConvo = Date.now(); if (hint) hint.style.display = 'none';
   addMsg('you', text); history.push({ role: 'user', content: text });
   setState('thinking', 'thinking…'); const typing = addTyping();
   try {
@@ -153,6 +156,27 @@ async function loadDash() {
 $('dashRefresh').addEventListener('click', loadDash);
 $('dashBtn').addEventListener('click', () => $('dash').classList.toggle('hidden'));
 
+// ── home view: command-center greeting + at-a-glance metrics (XSIAM-style headline) ──
+function greetWord() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
+async function updateHome() {
+  const g = $('homeGreet'); if (g) g.textContent = `${greetWord()}, Vinicio`;
+  try {
+    const [ops, dash] = await Promise.all([
+      fetch('/api/operations').then((r) => r.json()).catch(() => ({})),
+      fetch('/api/dashboard').then((r) => r.json()).catch(() => ({})),
+    ]);
+    const collected = (dash.money && typeof dash.money.collected === 'number') ? dash.money.collected : ((dash.hq && dash.hq.earned) || 0);
+    const rows = [
+      ['Opportunities', String((ops.opportunities || []).length)],
+      ['Needs you', String((ops.leads || []).length)],
+      ['Collected', money(collected)],
+      ['AI spend', dash.spend ? money(dash.spend.total) : '$0.00'],
+    ];
+    const el = $('homeMetrics');
+    if (el) el.innerHTML = rows.map(([k, v]) => `<div class="hm"><div class="hm-v">${esc(v)}</div><div class="hm-k">${esc(k)}</div></div>`).join('');
+  } catch { /* leave last values */ }
+}
+
 // ── drag-drop documents ────────────────────────────────────────────────────
 let dragDepth = 0;
 window.addEventListener('dragenter', (e) => { e.preventDefault(); if (++dragDepth === 1) $('dropmask').classList.add('show'); });
@@ -182,8 +206,14 @@ function ensureRec() {
   rec = new SR(); rec.lang = 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;
   rec.onresult = (ev) => {
     const said = ev.results[ev.results.length - 1][0].transcript.trim();
-    if (wakeOn) { const m = said.match(/jarvis[,\s]+(.*)/i); if (m && m[1]) sendToJarvis(m[1]); }
-    else if (said) sendToJarvis(said);
+    const now = Date.now();
+    if (wakeOn) {
+      if (/\bjarvis\b/i.test(said)) {
+        const cmd = said.replace(/^.*?\bjarvis\b[\s,:.!-]*/i, '').trim();
+        lastConvo = now;
+        if (cmd.length > 1) sendToJarvis(cmd); else { addMsg('j', 'Yes?'); speak('Yes?'); }
+      } else if (openConvo && (now - lastConvo) < CONVO_WINDOW && said) { sendToJarvis(said); }
+    } else if (said) sendToJarvis(said);
   };
   rec.onerror = () => { listening = false; };
   rec.onend = () => { listening = false; if (wakeOn && !usingDgWake) { try { rec.start(); listening = true; } catch {} } else if (!busy) setState('idle', 'standby'); };
@@ -213,13 +243,20 @@ async function dgWakeSegment() {
   dgRec = new MediaRecorder(dgStream, MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : {});
   dgRec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
   dgRec.onstop = async () => {
-    if (!busy && chunks.length) {
+    const speaking = curAudio && !curAudio.paused && !curAudio.ended; // don't transcribe her own voice
+    if (!busy && !speaking && chunks.length) {
       try {
         const blob = new Blob(chunks, { type: 'audio/webm' });
         const r = await fetch('/api/stt', { method: 'POST', headers: { 'content-type': 'audio/webm' }, body: blob });
         const d = await r.json(); const said = (d.text || '').trim();
-        const m = said.match(/jarvis[,\s]*(.*)/i);
-        if (m) { const cmd = m[1].trim(); if (cmd.length > 1) sendToJarvis(cmd); else addMsg('j', 'Yes?'); }
+        const now = Date.now();
+        if (/\bjarvis\b/i.test(said)) {                       // "Hey/Hello Jarvis ..." wake
+          const cmd = said.replace(/^.*?\bjarvis\b[\s,:.!-]*/i, '').trim();
+          lastConvo = now;
+          if (cmd.length > 1) sendToJarvis(cmd); else { addMsg('j', 'Yes?'); speak('Yes?'); }
+        } else if (openConvo && (now - lastConvo) < CONVO_WINDOW && said.length > 1) {
+          sendToJarvis(said);                                  // open conversation: no wake needed
+        }
       } catch { /* ignore a dropped segment */ }
     }
     if (!dgWakeStop) dgWakeSegment(); // next segment
@@ -234,13 +271,13 @@ function startWake() {
       if (st === 'error') addMsg('err', 'wake: ' + label);
       if (!busy) setState('listening', label || 'listening');
     });
-    addMsg('j', 'Hands-free on — offline. Say “Jarvis” then what you need.');
+    addMsg('j', 'Hands-free on — offline. Say “Hey Jarvis” then what you need.');
     return;
   }
   if (hasStt) { usingDgWake = true; dgWakeStop = false; dgWakeSegment(); }
   else { usingDgWake = false; startListen(true); }
   setState('listening', 'listening');
-  addMsg('j', 'Hands-free on. Say “Jarvis” then what you need.');
+  addMsg('j', 'Hands-free on. Say “Hey Jarvis” then what you need.');
 }
 function stopWake() {
   wakeOn = false; dgWakeStop = true; usingDgWake = false;
@@ -248,18 +285,26 @@ function stopWake() {
   try { dgRec && dgRec.stop(); } catch {}
   try { dgStream && dgStream.getTracks().forEach((t) => t.stop()); } catch {} dgStream = null;
   try { rec && rec.stop(); } catch {}
-  $('wakeBtn').classList.remove('on'); $('wakeBtn').textContent = '‘‘ Hello Jarvis ’’ : off';
+  $('wakeBtn').classList.remove('on'); $('wakeBtn').textContent = '‘‘ Hey Jarvis ’’ : off';
   setState('idle', 'standby');
 }
 $('wakeBtn').addEventListener('click', () => {
   wakeOn = !wakeOn; $('wakeBtn').classList.toggle('on', wakeOn);
-  $('wakeBtn').textContent = `‘‘ Hello Jarvis ’’ : ${wakeOn ? 'on' : 'off'}`;
+  $('wakeBtn').textContent = `‘‘ Hey Jarvis ’’ : ${wakeOn ? 'on' : 'off'}`;
   if (wakeOn) startWake(); else stopWake();
+});
+
+// Open conversation: keep listening so he can talk freely (no re-wake) within CONVO_WINDOW of each turn.
+$('convoBtn').addEventListener('click', () => {
+  openConvo = !openConvo;
+  $('convoBtn').classList.toggle('on', openConvo);
+  $('convoBtn').textContent = `💬 Open conversation: ${openConvo ? 'on' : 'off'}`;
+  if (openConvo) { lastConvo = Date.now(); if (!wakeOn) $('wakeBtn').click(); addMsg('j', 'Open conversation on — say “Hey Jarvis”, then just keep talking.'); }
 });
 
 $('voiceBtn').addEventListener('click', () => {
   speakOn = !speakOn; $('voiceBtn').classList.toggle('on', speakOn);
-  $('voiceBtn').textContent = speakOn ? '🔊 voice' : '🔇 muted';
+  $('voiceBtn').textContent = speakOn ? '🔊 Voice: on' : '🔇 Voice: off';
   if (!speakOn && 'speechSynthesis' in window) speechSynthesis.cancel();
 });
 $('voiceBtn').classList.add('on');
@@ -286,7 +331,21 @@ async function toggleRecord() {
   };
   mediaRec.start();
 }
-$('floorBtn').addEventListener('click', () => window.open(hqUrl, '_blank'));
+// floorBtn now opens the in-app Floor view (see floor.js) — no separate site.
+
+// ── settings: theme swatches (pick by mood) + open/close ─────────────────────
+function applyTheme(name) {
+  const ok = ['teal', 'mono', 'dark'].includes(name) ? name : 'teal';
+  document.documentElement.dataset.theme = ok;
+  document.querySelectorAll('.theme-swatch').forEach((s) => s.classList.toggle('on', s.dataset.theme === ok));
+  try { localStorage.setItem('jarvis-theme', ok); } catch { /* private mode */ }
+  if (window.Orb && window.Orb.refreshTheme) window.Orb.refreshTheme();
+}
+document.querySelectorAll('.theme-swatch').forEach((s) => s.addEventListener('click', () => applyTheme(s.dataset.theme)));
+applyTheme((() => { try { return localStorage.getItem('jarvis-theme') || 'teal'; } catch { return 'teal'; } })());
+$('settingsBtn').addEventListener('click', () => { $('settingsView').hidden = false; });
+$('settingsX').addEventListener('click', () => { $('settingsView').hidden = true; });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('settingsView').hidden) $('settingsView').hidden = true; });
 
 // ── boot ─────────────────────────────────────────────────────────────────────
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('load failed: ' + src)); document.head.appendChild(s); }); }
@@ -299,6 +358,8 @@ fetch('/api/info').then((r) => r.json()).then(async (i) => {
 }).catch(() => {});
 loadDash();
 setInterval(loadDash, 20000);
+updateHome();
+setInterval(updateHome, 45000);
 
 setState('idle', 'standby');
 setTimeout(() => { const g = "Online. Good to see you, Vinicio — what are we working on?"; addMsg('j', g); speak(g); }, 700);

@@ -17,7 +17,7 @@ const CLIENT_ID = env('GOOGLE_CLIENT_ID');
 const CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET');
 const PORT = 53682;
 const REDIRECT = `http://localhost:${PORT}`;
-const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly';
+const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly';
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
   console.error('Missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env. Create a "Desktop app" OAuth client first (see docs/google-setup.md).');

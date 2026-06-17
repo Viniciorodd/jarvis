@@ -52,4 +52,13 @@ async function calendarUpcoming({ days = 7, max = 10 } = {}) {
   return ((await r.json()).items || []).map((e) => ({ start: (e.start && (e.start.dateTime || e.start.date)) || '', summary: e.summary || '(busy)', location: e.location || '' }));
 }
 
-module.exports = { googleConfigured, gmailRecent, calendarUpcoming };
+// Open Google Tasks (incomplete only). Returns [{title, due, notes}]. Needs the tasks.readonly scope —
+// if this 403s, re-run scripts/google-auth.mjs once to grant Tasks access.
+async function tasksRecent({ max = 15 } = {}) {
+  const tok = await getAccessToken();
+  const r = await fetch(`https://tasks.googleapis.com/tasks/v1/lists/@default/tasks?showCompleted=false&maxResults=${max}`, { headers: { authorization: 'Bearer ' + tok } });
+  if (!r.ok) throw new Error('Tasks fetch failed (' + r.status + ') — re-run scripts/google-auth.mjs to grant Tasks access');
+  return ((await r.json()).items || []).filter((t) => t.title).map((t) => ({ title: t.title, due: t.due || '', notes: (t.notes || '').slice(0, 120) }));
+}
+
+module.exports = { googleConfigured, gmailRecent, calendarUpcoming, tasksRecent };

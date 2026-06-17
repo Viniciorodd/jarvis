@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>JARVIS</title>
+<meta name="theme-color" content="#04070f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JARVIS">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -14,18 +22,20 @@
       <div class="topbar">
         <div class="px brand">J A R V I S</div>
         <div class="state" id="state">standby</div>
-        <button class="t-btn" id="wakeBtn" title="Hands-free: say 'Jarvis ...'">‘‘ Hello Jarvis ’’ : off</button>
-        <button class="t-btn" id="voiceBtn" title="Toggle her speaking voice">🔊 voice</button>
-        <button class="t-btn" id="dashBtn" title="Toggle the dashboard">📊 dash</button>
         <button class="floor-btn" id="opsBtn" title="Operations cockpit — leads, opportunities, proposals, CRM">⛭ Operations</button>
-        <button class="floor-btn" id="floorBtn" title="Open the pod floor">▦ HQ</button>
+        <button class="floor-btn" id="mapBtn" title="Map — where the work is">▣ Map</button>
+        <button class="floor-btn" id="floorBtn" title="The floor — your agents, by room">▦ Floor</button>
+        <button class="t-btn" id="dashBtn" title="Toggle the dashboard">📊 Dashboard</button>
+        <button class="t-btn" id="settingsBtn" title="Settings — theme, voice, conversation">⚙ Settings</button>
       </div>
 
       <div class="stage" id="stage">
+        <div class="home-greet" id="homeGreet"></div>
         <canvas id="orb"></canvas>
         <div class="orb-center" id="orbCenter">
           <div class="hint" id="hint">tap the orb, type, or drag a file in</div>
         </div>
+        <div class="home-metrics" id="homeMetrics"></div>
         <!-- visual panel: maps / images / web she pulls up -->
         <div class="visual" id="visual" hidden>
           <div class="visual-bar">
@@ -104,11 +114,65 @@
     </div>
   </div>
 
+  <!-- MAP view (where the work is) -->
+  <div class="mapview" id="mapView" hidden>
+    <div class="ops-head">
+      <span class="px ops-brand">▣ MAP — PLACE OF PERFORMANCE</span>
+      <span class="map-stat" id="mapStat"></span>
+      <button class="ops-refresh" id="mapRefresh" title="Refresh">⟳</button>
+      <button class="ops-x" id="mapX" title="Close">✕</button>
+    </div>
+    <div class="map-wrap">
+      <div class="map-panel" id="mapPins"><div class="map-compass">N</div></div>
+      <div class="map-log" id="mapLog"><div class="ops-empty">loading…</div></div>
+    </div>
+  </div>
+
+  <!-- FLOOR view (the org as rooms, folded in — no separate site) -->
+  <div class="floorview" id="floorView" hidden>
+    <div class="ops-head">
+      <span class="px ops-brand">▦ THE FLOOR</span>
+      <span class="map-stat" id="floorStat">your agents, by room</span>
+      <a class="btn ghost" id="floorHqLink" target="_blank" rel="noreferrer" style="display:none; font-size:11px; padding:5px 11px;">full game floor ↗</a>
+      <button class="ops-refresh" id="floorRefresh" title="Refresh">⟳</button>
+      <button class="ops-x" id="floorX" title="Close">✕</button>
+    </div>
+    <div class="ops-body" id="floorBody"><div class="ops-empty">loading…</div></div>
+  </div>
+
+  <!-- SETTINGS view -->
+  <div class="settingsview" id="settingsView" hidden>
+    <div class="ops-head">
+      <span class="px ops-brand">⚙ SETTINGS</span>
+      <span class="map-stat">theme · voice · conversation</span>
+      <button class="ops-x" id="settingsX" title="Close">✕</button>
+    </div>
+    <div class="settings-body">
+      <div class="set-sec">
+        <div class="set-h">Theme — pick by mood</div>
+        <div class="theme-swatches">
+          <button class="theme-swatch" data-theme="teal"><span class="sw sw-teal"></span>Teal</button>
+          <button class="theme-swatch" data-theme="mono"><span class="sw sw-mono"></span>Mono</button>
+          <button class="theme-swatch" data-theme="dark"><span class="sw sw-dark"></span>Full dark</button>
+        </div>
+      </div>
+      <div class="set-sec">
+        <div class="set-h">Voice &amp; conversation</div>
+        <button class="t-btn set-toggle" id="voiceBtn" title="Toggle her speaking voice">🔊 Voice: on</button>
+        <button class="t-btn set-toggle" id="wakeBtn" title="Hands-free wake word">‘‘ Hey Jarvis ’’ : off</button>
+        <button class="t-btn set-toggle" id="convoBtn" title="Keep listening so you can talk freely">💬 Open conversation: off</button>
+        <p class="set-note">Turn on <b>Hey Jarvis</b> to wake her by voice. With <b>Open conversation</b> on, she keeps listening after you speak — talk freely, no clicking the mic. (Say “Hey Jarvis” or “Hello Jarvis”.)</p>
+      </div>
+    </div>
+  </div>
+
   <!-- drag-drop overlay -->
   <div class="dropmask" id="dropmask"><div class="dropmask-inner">⤓ Drop the file — Jarvis will read it</div></div>
 
   <script src="orb.js"></script>
   <script src="app.js"></script>
   <script src="ops.js"></script>
+  <script src="map.js"></script>
+  <script src="floor.js"></script>
 </body>
 </html>

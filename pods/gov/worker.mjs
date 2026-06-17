@@ -23,22 +23,44 @@ function simulatedFeed() {
     { noticeId: 'SIM-GSA-Scranton', title: 'Facilities Support — Federal Building, Scranton PA', naics: '561210', setAside: 'Small Disadvantaged Business', agency: 'GSA', deadline: '2026-07-18', place: 'Scranton, PA', url: 'https://sam.gov/opp/SIM-GSA', description: 'Combined custodial + minor building maintenance + trash removal for a 6-story federal building. SDB set-aside.' },
   ];
 }
-async function scout() {
+// Real SAM.gov query. Two bugs used to force the simulated fallback: an 8-day window (empty most weeks)
+// and passing all NAICS comma-joined (SAM returns 0 for a multi-NAICS ncode). Fix: query each NAICS
+// SEPARATELY over a configurable window with zero-padded MM/dd/yyyy dates, then merge + dedupe by noticeId.
+// Also captures the place-of-performance state so the map can drop a pin. Verified to surface 150+ real opps.
+export async function scout() {
   const key = env('SAM_API_KEY');
-  if (!key) return { source: 'simulated', opps: simulatedFeed() };
-  try {
-    const d = (x) => new Date(Date.now() - x * 864e5).toLocaleDateString('en-US');
-    const naics = ['561210', '561720', '561990', '561730'];
-    const url = `https://api.sam.gov/opportunities/v2/search?api_key=${key}&postedFrom=${encodeURIComponent(d(8))}&postedTo=${encodeURIComponent(d(0))}&ncode=${naics.join(',')}&limit=15&ptype=o,k,r,p`;
-    const r = await fetch(url);
-    if (!r.ok) return { source: 'simulated (SAM ' + r.status + ')', opps: simulatedFeed() };
-    const data = await r.json();
-    const opps = (data.opportunitiesData || []).map((o) => ({
-      noticeId: o.noticeId, title: o.title, naics: o.naicsCode, setAside: o.typeOfSetAside || o.typeOfSetAsideDescription || 'none',
-      agency: (o.fullParentPathName || '').split('.')[0] || o.organizationType || '', deadline: o.responseDeadLine || '', place: ((o.placeOfPerformance || {}).city || {}).name || '', url: o.uiLink || '', description: (o.description || '').slice(0, 600),
-    }));
-    return opps.length ? { source: 'SAM.gov', opps } : { source: 'simulated (SAM empty)', opps: simulatedFeed() };
-  } catch (e) { return { source: 'simulated (SAM error)', opps: simulatedFeed() }; }
+  if (!key) return { source: 'simulated (no SAM_API_KEY)', opps: simulatedFeed() };
+  const pad = (n) => String(n).padStart(2, '0');
+  const fmt = (dt) => `${pad(dt.getMonth() + 1)}/${pad(dt.getDate())}/${dt.getFullYear()}`;
+  const days = Math.max(1, Math.min(364, Number(env('SAM_LOOKBACK_DAYS', '30')) || 30));
+  const cap = Math.max(1, Number(env('SAM_MAX_OPPS', '50')) || 50);
+  const from = fmt(new Date(Date.now() - days * 864e5)), to = fmt(new Date());
+  const naics = ['561720', '561210', '561990', '561730'];
+  const seen = new Set(); const opps = []; let anyOk = false; let note = '';
+  for (const nc of naics) {
+    try {
+      const url = `https://api.sam.gov/opportunities/v2/search?api_key=${key}&postedFrom=${encodeURIComponent(from)}&postedTo=${encodeURIComponent(to)}&ncode=${nc}&limit=50`;
+      const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      if (!r.ok) { note = `SAM ${r.status}`; continue; }
+      anyOk = true;
+      const data = await r.json();
+      for (const o of (data.opportunitiesData || [])) {
+        if (!o.noticeId || seen.has(o.noticeId)) continue;
+        seen.add(o.noticeId);
+        const pop = o.placeOfPerformance || {};
+        opps.push({
+          noticeId: o.noticeId, title: o.title, naics: o.naicsCode,
+          setAside: o.typeOfSetAsideDescription || o.typeOfSetAside || 'none',
+          agency: (o.fullParentPathName || '').split('.')[0] || o.organizationType || '',
+          deadline: o.responseDeadLine || '', place: (pop.city || {}).name || '',
+          placeState: (pop.state || {}).code || (pop.state || {}).name || '',
+          url: o.uiLink || '', description: (o.description || '').slice(0, 600),
+        });
+      }
+    } catch (e) { note = 'SAM ' + e.message; }
+  }
+  if (opps.length) return { source: `SAM.gov (${opps.length} real, ${days}d)`, opps: opps.slice(0, cap) };
+  return { source: anyOk ? 'simulated (SAM empty)' : `simulated (${note || 'SAM error'})`, opps: simulatedFeed() };
 }
 
 // ── B. STRATEGIST — bid/no-bid score against the firm profile ───────────────────────────────────
@@ -78,7 +100,7 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
   for (const op of opps) {
     const sc = await score(op, prof); spend += sc._cost || 0;
     scored.push({ op, sc });
-    await emit({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'bid.score', cost_usd: sc._cost || 0, rationale: `${op.title} — ${sc.match_score}/100 (${sc.recommendation})`, payload: { noticeId: op.noticeId, score: sc.match_score, recommendation: sc.recommendation, set_aside_fit: sc.set_aside_fit, subcontractor_needed: sc.subcontractor_needed } });
+    await emit({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'bid.score', cost_usd: sc._cost || 0, rationale: `${op.title} — ${sc.match_score}/100 (${sc.recommendation})`, payload: { noticeId: op.noticeId, title: op.title, score: sc.match_score, recommendation: sc.recommendation, set_aside_fit: sc.set_aside_fit, setAside: op.setAside, subcontractor_needed: sc.subcontractor_needed, place: op.place, placeState: op.placeState, deadline: op.deadline, url: op.url, agency: op.agency } });
   }
   scored.sort((a, b) => (b.sc.match_score || 0) - (a.sc.match_score || 0));
 

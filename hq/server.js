@@ -227,8 +227,10 @@ const server = http.createServer(async (req, res) => {
       } else {
         logEvent({ s: `— Passed: ${a.title}`, kind: 'status' });
       }
+      // The callback points at the control-plane approval (CP_URL/approvals/:id). Send `decision` so the
+      // SAME executor the companion uses fires — i.e. approving ONLINE actually sends/creates, not just banks XP.
       notifyCallback(a.callback, {
-        id: a.id, action, pod: a.pod, title: a.title, amount: a.amount,
+        id: a.id, action, decision: action, pod: a.pod, title: a.title, amount: a.amount,
       });
       saveState();
       return json(res, 200, { ok: true, action, earned: state.earned, xp: state.xp });

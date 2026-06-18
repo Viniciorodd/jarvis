@@ -1,15 +1,38 @@
-/* Palette harmonized with the JARVIS AI companion (dark ink + glowing teal) so HQ and the
-   assistant read as ONE product. Semantic names kept; gold/mint now teal-family, alert = companion coral. */
-:root{
-  --ink:#04070f; --panel:#0a141b; --panel2:#0d1a22; --line:#163a39;
-  --teal:#39e0d0; --gold:#39e0d0; --mint:#6fece0; --alert:#ff9a7a; --cream:#dfeef0; --dim:#5d7480;
-  --glow:rgba(57,224,208,.45);
+/* Palette harmonized with the JARVIS AI companion (dark ink + glowing teal) so HQ and the assistant
+   read as ONE product. Same 3 themes as the companion (teal / mono / dark); pick via the HUD swatches.
+   Semantic names kept; gold/mint are teal-family, alert = coral (greys out in Mono). */
+:root, [data-theme="teal"]{ /* JARVIS teal — bright HUD (default) */
+  --ink:#04070f; --ink2:#07131a; --panel:#0a141b; --panel2:#0d1a22; --line:#163a39;
+  --teal:#39e0d0; --teal-rgb:57,224,208; --teal-dim:#1c6e69;
+  --gold:#39e0d0; --mint:#6fece0; --alert:#ff9a7a; --err:#ff5c7a; --cream:#dfeef0; --dim:#5d7480;
+  --glow:rgba(var(--teal-rgb),.45); --ink-on-accent:#04342c;
 }
+[data-theme="mono"]{ /* TRUE black & white — no other colors */
+  --ink:#040506; --ink2:#0b0d10; --panel:#0a0c0f; --panel2:#111418; --line:#2a2f33;
+  --teal:#e6edf2; --teal-rgb:210,222,230; --teal-dim:#5a646b;
+  --gold:#e6edf2; --mint:#cfd8de; --alert:#aab2b7; --err:#aab2b7; --cream:#eef2f5; --dim:#7c868d;
+  --glow:rgba(var(--teal-rgb),.32); --ink-on-accent:#0a0c0f;
+}
+[data-theme="dark"]{ /* full dark — pure black, calm muted teal */
+  --ink:#000000; --ink2:#06090b; --panel:#0a0e11; --panel2:#0c1216; --line:#143430;
+  --teal:#46c8bd; --teal-rgb:70,200,189; --teal-dim:#244b47;
+  --gold:#46c8bd; --mint:#79d6cc; --alert:#ff9a7a; --err:#ff5c7a; --cream:#cdd6d9; --dim:#5d7480;
+  --glow:rgba(var(--teal-rgb),.30); --ink-on-accent:#04140f;
+}
+/* theme picker (HUD swatches) */
+.theme-pick{ display:inline-flex; gap:6px; align-items:center; }
+.theme-pick .sw{ width:15px; height:15px; border-radius:99px; cursor:pointer; padding:0;
+  border:1px solid var(--line); transition:transform .15s ease, box-shadow .15s ease; }
+.theme-pick .sw:hover{ transform:scale(1.18); }
+.theme-pick .sw.on{ border-color:var(--teal); box-shadow:0 0 10px var(--glow); }
+.theme-pick .sw[data-theme="teal"]{ background:#39e0d0; }
+.theme-pick .sw[data-theme="mono"]{ background:linear-gradient(135deg,#eef2f5 50%,#0a0c0f 50%); }
+.theme-pick .sw[data-theme="dark"]{ background:#0a0e11; box-shadow:inset 0 0 0 2px #46c8bd; }
 *{ box-sizing:border-box; }
 body{
   margin:0; min-height:100vh; color:var(--cream);
   font-family:'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
-  background: radial-gradient(900px 600px at 50% 35%, #07131a 0%, transparent 70%), var(--ink);
+  background: radial-gradient(900px 600px at 50% 35%, var(--ink2) 0%, transparent 70%), var(--ink);
 }
 .wrap{ max-width:880px; margin:0 auto; padding:20px 16px 48px; }
 .px{ font-family:'Silkscreen', monospace; letter-spacing:.02em; }
@@ -31,9 +54,9 @@ h2{ font-size:12px; margin:0 0 4px; }
 
 .bars{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
 .row{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
-.barbg{ background:#06121a; border:1px solid var(--line); border-radius:99px; height:8px; margin-top:9px; overflow:hidden; }
+.barbg{ background:var(--ink2); border:1px solid var(--line); border-radius:99px; height:8px; margin-top:9px; overflow:hidden; }
 .fill{ height:100%; border-radius:99px; transition:width .6s ease; }
-.goldfill{ background:linear-gradient(90deg,#1c6e69,var(--teal)); box-shadow:0 0 12px var(--glow); }
+.goldfill{ background:linear-gradient(90deg,var(--teal-dim),var(--teal)); box-shadow:0 0 12px var(--glow); }
 .mintfill{ background:var(--mint); box-shadow:0 0 10px var(--glow); }
 
 .road-wrap{ margin-top:12px; overflow-x:auto; scrollbar-width:none; }
@@ -57,7 +80,7 @@ h2{ font-size:12px; margin:0 0 4px; }
 .approval .amt{ font-weight:700; white-space:nowrap; }
 .approval .acts{ display:flex; gap:8px; margin-top:12px; }
 .btn{ border-radius:10px; padding:7px 13px; font-size:13px; cursor:pointer; font-family:inherit; }
-.gold-btn{ background:var(--teal); color:#04070f; border:none; font-weight:700; box-shadow:0 0 18px var(--glow); }
+.gold-btn{ background:var(--teal); color:var(--ink-on-accent); border:none; font-weight:700; box-shadow:0 0 18px var(--glow); }
 .ghost-btn{ background:transparent; border:1px solid var(--line); color:var(--dim); }
 .ghost-btn:hover{ color:var(--cream); border-color:var(--dim); }
 .empty{ padding:16px; font-size:13px; }
@@ -73,14 +96,14 @@ h2{ font-size:12px; margin:0 0 4px; }
 .led-wrap{ position:relative; margin-top:5px; flex:none; }
 .led{ display:block; width:8px; height:8px; border-radius:99px; }
 .led-work{ background:var(--teal); box-shadow:0 0 8px var(--glow); animation:ledPulse 1.6s ease-in-out infinite; }
-.led-idle{ background:#2a4a4a; }
+.led-idle{ background:rgba(var(--teal-rgb),.28); }
 .led-need{ background:var(--alert); }
-.led-error{ background:#ff5c7a; animation:ledPulse .8s ease-in-out infinite; }
+.led-error{ background:var(--err); animation:ledPulse .8s ease-in-out infinite; }
 .ring{ position:absolute; inset:-4px; border-radius:99px; border:2px solid var(--alert); opacity:.7; animation:needPing 1.4s ease-out infinite; }
 .op .nm{ font-size:11px; }
 .op .txt{ font-size:12.5px; line-height:1.35; }
 .op .txt.need{ color:var(--alert); }
-.op .txt.error{ color:#FF5C7A; }
+.op .txt.error{ color:var(--err); }
 .dotty span{ display:inline-block; width:3px; height:3px; margin-left:3px; border-radius:99px; background:var(--mint); animation:ledPulse 1.2s ease-in-out infinite; }
 .dotty span:nth-child(2){ animation-delay:.2s } .dotty span:nth-child(3){ animation-delay:.4s }
 
@@ -95,7 +118,7 @@ h2{ font-size:12px; margin:0 0 4px; }
 .foot{ margin-top:26px; }
 
 .toasts{ position:fixed; bottom:28px; left:0; right:0; display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; z-index:60; }
-.toast{ background:var(--teal); color:#04070f; font-family:'Silkscreen',monospace; font-size:12px; font-weight:700;
+.toast{ background:var(--teal); color:var(--ink-on-accent); font-family:'Silkscreen',monospace; font-size:12px; font-weight:700;
   border-radius:10px; padding:7px 13px; box-shadow:0 6px 24px rgba(0,0,0,.45), 0 0 20px var(--glow); animation:floatUp 1.9s ease-out forwards; }
 
 .overlay{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(4,7,15,.9); }

@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('jarvis-theme')||'teal'}catch(e){}</script>
 </head>
 <body>
 <div class="wrap">
@@ -22,6 +23,11 @@
         <span class="px chip" id="rank-chip">—</span>
         <span class="dim small" id="streak">🔥 EOD streak · 0</span>
         <span class="dim small" id="mode-tag"></span>
+        <span class="theme-pick" id="theme-pick">
+          <button class="sw" data-theme="teal" title="Teal"></button>
+          <button class="sw" data-theme="mono" title="Mono · black & white"></button>
+          <button class="sw" data-theme="dark" title="Full dark"></button>
+        </span>
       </div>
     </div>
     <div class="bankroll">

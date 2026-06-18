@@ -95,6 +95,9 @@ services:
       RODGATE_GMAIL_APP_PASSWORD: ${RODGATE_GMAIL_APP_PASSWORD}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      # Notion "Company Brain" sync (opportunities / subs / daily log / lessons). Without this the
+      # gov worker scores fine but every Notion write silently skips ("no NOTION_API_KEY").
+      NOTION_API_KEY: ${NOTION_API_KEY}
       # CRM + awards live on a mounted volume so they persist + you can open them on the NAS
       GOV_DATA_DIR: /app/control-plane/data/gov-crm
     volumes:
@@ -102,16 +105,19 @@ services:
       - ./volumes/gov-drafts:/app/gov-drafts        # proposal + outreach drafts (HITL review)
       - ./volumes/fiverr-assets:/app/fiverr-assets   # produced deliverables
 
-  # Jarvis World — the game-like PWA window into the floor. Static build served by nginx, which
-  # proxies /hq and /cp to the services above. Reachable over Tailscale at http://<host>:8095.
-  jarvis-world:
-    build: ./jarvis-world
-    restart: unless-stopped
-    depends_on:
-      - hq
-      - control-plane
-    ports:
-      - "8095:80"
+  # ── RETIRED: jarvis-world ──────────────────────────────────────────────────────────────────────
+  # The standalone React/Vite "World" PWA is retired — its floor view is folded into the companion
+  # (companion/, the ONE app, which runs on the PC and reads the control-plane + HQ directly over LAN).
+  # Its Vite build HANGS on the NAS's slow HDD, so it must NOT be in the deploy/build path. Kept here
+  # commented for history; re-enable only if you ever want the NAS to serve a browser floor again.
+  # jarvis-world:
+  #   build: ./jarvis-world
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - hq
+  #     - control-plane
+  #   ports:
+  #     - "8095:80"
 
   # Conservative scheduler — same image as the control-plane, command overridden to run the cron loop.
   # Wakes agents only inside working hours; idle polls rest (zero tokens). Posts /command to the spine.

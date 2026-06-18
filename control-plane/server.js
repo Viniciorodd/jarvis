@@ -66,6 +66,9 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const decision = ['approve', 'edit', 'pass'].includes(b.decision) ? b.decision : null;
       if (!decision) return send(res, 400, { error: 'decision must be approve|edit|pass' });
+      // Idempotency: an approval can be acted on from BOTH the companion and HQ-online. If it was already
+      // decided, don't re-run the executor (never double-send / double-charge).
+      if (store.readEvents({ kind: 'approval.decision' }).some((e) => e.ref === id)) return send(res, 200, { duplicate: true, id });
       const rec = store.appendEvent({ kind: 'approval.decision', actor: 'operator', pod: b.pod || 'system', action: decision, ref: id, payload: { decision, note: b.note || '' } });
       // EXECUTOR: approving a gov email send IS the human gate firing (doctrine §9 rule 2 — irreversible,
       // behind explicit approval). Auto-send is opt-in via GOV_AUTO_SEND; with it off we dry-run (log +
@@ -146,6 +149,31 @@ const server = http.createServer(async (req, res) => {
       const period = ['day', 'week', 'month', 'quarter', 'year'].includes(q) ? q : 'week';
       return send(res, 200, reports.buildReport(period));
     }
+    // Maintenance jobs — deterministic, scheduler-driven, no LLM (the scheduler POSTs these directly).
+    // EOD daily log → the Notion "Company Brain" Daily DB (money in / AI spend / actions / needs-you).
+    if (req.method === 'POST' && p === '/maintenance/eod-log') {
+      const reports = await import('./reports.mjs');
+      const rep = reports.buildReport('day');
+      const today = new Date().toISOString().slice(0, 10);
+      let synced;
+      try {
+        const N = await import('../pods/notion.mjs');
+        const r = await N.logDaily({ day: today, date: new Date().toISOString(), summary: rep.text, moneyIn: rep.totals.revenue_usd, aiSpend: rep.totals.spend_usd, actions: rep.totals.actions, needsYou: rep.needs_you.length });
+        synced = r && (r.error || r.skip) ? { ok: false, reason: r.error || r.skip } : { ok: true };
+      } catch (e) { synced = { ok: false, reason: e.message }; }
+      store.appendEvent({ kind: 'action', actor: 'EXEC-01', pod: 'exec', action: 'daily.logged', status: synced.ok ? 'done' : 'error', rationale: `EOD log${synced.ok ? ' → Notion' : ' (Notion skip)'}: ${rep.text}`, payload: { day: today, synced, totals: rep.totals, needsYou: rep.needs_you.length } });
+      return send(res, 200, { ok: true, day: today, report: rep.text, synced });
+    }
+    // Deadline radar → remind before a pursued bid's response deadline closes (idempotent; reminder = event).
+    if (req.method === 'POST' && p === '/maintenance/deadline-check') {
+      const b = await readBody(req);
+      let result;
+      try {
+        const dl = await import('../pods/gov/deadlines.mjs');
+        result = await dl.runDeadlineRadar({ withinDays: Number(b.withinDays) || Number(process.env.DEADLINE_WINDOW_DAYS) || 7 });
+      } catch (e) { result = { ok: false, note: e.message }; }
+      return send(res, 200, result);
+    }
     // CRM — the subcontractor database (Operations view reads this).
     if (req.method === 'GET' && p === '/crm') {
       try { const conn = await import('../pods/gov/connector.mjs'); return send(res, 200, { subs: conn.loadSubs() }); }
@@ -161,6 +189,37 @@ const server = http.createServer(async (req, res) => {
       if (!name || /[\\/]|\.\./.test(name)) return send(res, 400, { error: 'bad name' });
       try { return send(res, 200, { name, content: fs.readFileSync(path.join(DRAFTS_DIR, name), 'utf8') }); }
       catch { return send(res, 404, { error: 'not found' }); }
+    }
+    // Write a draft (used by the redraft flow). Path-guarded to gov-drafts/, text formats only.
+    if (req.method === 'POST' && p.startsWith('/drafts/')) {
+      const name = decodeURIComponent(p.slice('/drafts/'.length));
+      if (!name || /[\\/]|\.\./.test(name) || !/\.(md|json|txt)$/.test(name)) return send(res, 400, { error: 'bad name' });
+      const b = await readBody(req);
+      if (typeof b.content !== 'string') return send(res, 400, { error: 'content (string) required' });
+      try {
+        fs.mkdirSync(DRAFTS_DIR, { recursive: true });
+        fs.writeFileSync(path.join(DRAFTS_DIR, name), b.content);
+        store.appendEvent({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'proposal.redraft', reversible: true, rationale: `Proposal revised: ${name}`, payload: { file: 'gov-drafts/' + name, bytes: b.content.length } });
+        return send(res, 200, { ok: true, name, bytes: b.content.length });
+      } catch (e) { return send(res, 500, { error: e.message }); }
+    }
+    // Pursue one opportunity → draft a proposal for it now (gated). Deterministic dispatch to the gov pod.
+    if (req.method === 'POST' && p === '/maintenance/pursue') {
+      const b = await readBody(req);
+      if (!b.noticeId && !(b.op && b.op.title)) return send(res, 400, { error: 'noticeId or op required' });
+      let result;
+      try { const w = await import('../pods/gov/worker.mjs'); result = await w.pursueOpportunity({ op: b.op || { noticeId: b.noticeId }, sc: b.sc || null }); }
+      catch (e) { result = { ok: false, error: e.message }; }
+      return send(res, 200, result);
+    }
+    // Reach out to one CRM prospect → enrich + draft a teaming intro + gated send.
+    if (req.method === 'POST' && p === '/maintenance/reach-sub') {
+      const b = await readBody(req);
+      if (!b.id) return send(res, 400, { error: 'id required' });
+      let result;
+      try { const c = await import('../pods/gov/connector.mjs'); result = await c.reachOutToSub({ id: b.id }); }
+      catch (e) { result = { ok: false, error: e.message }; }
+      return send(res, 200, result);
     }
 
     if (req.method === 'POST' && p === '/spend/check') {

@@ -21,6 +21,12 @@
       "command": "check the rodgate inbox for awards and replies" },
     { "id": "weekly-reflection", "person": "EXEC-01", "pod": "exec", "type": "reflect",
       "cadence_hours": 168, "at_hour": 18, "at_dow": 0, "tier": "reflect",
-      "command": "weekly strategy review: KPIs, human-edit rate, where to push or pull back" }
+      "command": "weekly strategy review: KPIs, human-edit rate, where to push or pull back" },
+    { "id": "deadline-radar", "person": "SAM-SCOUT", "pod": "gov", "type": "maintenance",
+      "cadence_hours": 24, "at_hour": 9, "endpoint": "/maintenance/deadline-check",
+      "command": "check bid response deadlines and remind before any close (deterministic, no LLM)" },
+    { "id": "eod-log", "person": "EXEC-01", "pod": "exec", "type": "maintenance",
+      "cadence_hours": 24, "at_hour": 20, "endpoint": "/maintenance/eod-log",
+      "command": "log the end-of-day summary to the Notion company brain (deterministic, no LLM)" }
   ]
 }

@@ -75,7 +75,9 @@ async function post(pathname, body) {
   catch (e) { console.error('scheduler post failed', pathname, e.message); }
 }
 const logRest = (job) => post('/events', { kind: 'trace', actor: job.person, pod: job.pod, action: 'rest', status: 'done', cost_usd: 0, rationale: 'idle — no new work; conserving tokens', payload: { job: job.id } });
-const fire = (job) => post('/command', { text: job.command, source: 'scheduler:' + job.id });
+// Most jobs wake a pod through the Chief-of-Staff router (/command). Deterministic "maintenance" jobs
+// (EOD log, deadline radar) instead POST their own control-plane endpoint directly — no LLM in the loop.
+const fire = (job) => job.endpoint ? post(job.endpoint, { source: 'scheduler:' + job.id }) : post('/command', { text: job.command, source: 'scheduler:' + job.id });
 
 export async function tick(now = new Date()) {
   const policy = loadPolicy();

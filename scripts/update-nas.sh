@@ -22,10 +22,13 @@ rm -rf /tmp/jarvis-main /tmp/jarvis.tar.gz
 
 echo "▸ rebuilding + restarting (docker may ask your password) …"
 cd "$DEST"
-sudo docker compose up -d --build control-plane scheduler jarvis-world hq
+# Rebuild ONLY the Node services. jarvis-world is RETIRED (folded into the companion Floor) and its
+# Vite build hangs this NAS — never add it back here. hq rarely changes; rebuild it manually if needed:
+#   sudo docker compose up -d --build hq
+sudo docker compose up -d --build control-plane scheduler
 
 HOST="$(hostname)"
 echo ""
-echo "✅ Updated. Reopen on your devices (hard-refresh once):"
-echo "   World : http://${HOST}:8095   (or http://192.168.6.121:8095 on home wifi)"
-echo "   HQ    : http://${HOST}:8099"
+echo "✅ Updated. The companion (the app) runs on your PC — just hard-refresh it."
+echo "   Control-plane : http://192.168.6.121:8787/health"
+echo "   HQ floor      : http://${HOST}:8099   (or http://192.168.6.121:8099 on home wifi)"

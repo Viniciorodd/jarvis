@@ -19,7 +19,16 @@ export function env(k, d = '') {
 }
 
 export async function emit(ev) {
-  try { await fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(ev) }); } catch { /* spine offline */ }
+  try { const r = await fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(ev) }); return await r.json().catch(() => ({})); } catch { return {}; }
+}
+// Create a GATED approval the right way: record it on the control-plane (system of record) AND surface it
+// on the HQ floor WITH a callback to that control-plane id — so approving ONLINE (HQ over Tailscale) fires
+// the very same executor the companion does, instead of being a dead end. Returns the control-plane record.
+export async function gateApproval(approvalEvent, hq = {}) {
+  const rec = await emit(approvalEvent);
+  const callback = rec && rec.id ? `${CP_URL}/approvals/${rec.id}` : undefined;
+  await hqApproval({ ...hq, callback });
+  return rec;
 }
 export async function mirror(agent, state, text, pod = 'system') {
   if (!HQ_URL) return;
@@ -32,6 +41,18 @@ export async function hqApproval(a) {
   const headers = { 'content-type': 'application/json' };
   if (env('HQ_TOKEN')) headers.authorization = 'Bearer ' + env('HQ_TOKEN');
   try { await fetch(HQ_URL + '/api/approval', { method: 'POST', headers, body: JSON.stringify(a) }); } catch { /* */ }
+}
+
+// Push a phone notification (best-effort) — used for time-sensitive alerts the operator must see off-screen.
+export function notifyTelegram(text) {
+  const token = env('TELEGRAM_BOT_TOKEN'); const chat = env('TELEGRAM_CHAT_ID');
+  if (!token || !chat) return;
+  fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text }) }).catch(() => { /* push is best-effort */ });
+}
+// Surface an alert on BOTH the HQ floor ("Needs you") and the operator's phone (Telegram). One call, two surfaces.
+export async function notify({ title, detail = '', pod = 'Operations', verb = 'Open', xp = 0 } = {}) {
+  await hqApproval({ pod, title, detail, verb, xp });
+  notifyTelegram(`${title}\n${detail}`);
 }
 
 // `agent` (a codename) routes the key request through the vault so least privilege is enforced in code

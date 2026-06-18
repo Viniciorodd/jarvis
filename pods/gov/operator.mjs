@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ROOT, DRAFTS, emit, mirror, hqApproval, claude, profile } from './lib.mjs';
+import { ROOT, DRAFTS, emit, mirror, hqApproval, gateApproval, claude, profile } from './lib.mjs';
 
 const SEED_DIR = path.dirname(fileURLToPath(import.meta.url));
 const AWARDS_FILE = path.join(process.env.GOV_DATA_DIR || SEED_DIR, 'awards.json');
@@ -49,8 +49,9 @@ export async function runOps({ awardId = null, source = 'manual' } = {}) {
     const file = path.join('gov-drafts', `cpars-${a.id}.md`);
     fs.writeFileSync(path.join(ROOT, file), `<!-- progress report · ${a.title} · COR ${a.cor} -->\n\n${d.md}\n`);
     await emit({ kind: 'action', actor: 'OPERATOR-01', pod: 'gov', action: 'progress.report.draft', cost_usd: d.cost || 0, reversible: true, rationale: `report drafted for ${a.title}`, payload: { awardId: a.id, file, overdue: overdue.length } });
-    await emit({ kind: 'approval.request', actor: 'OPERATOR-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Progress report for ${a.title} — review + send to COR.`, payload: { awardId: a.id, file } });
-    await hqApproval({ pod: 'Gov War Room', title: `Send progress report: ${a.title}`, detail: `${overdue.length ? '⚠ ' + overdue.length + ' overdue milestone(s) · ' : ''}draft ${file}`, xp: 30, verb: 'Review & send' });
+    await gateApproval(
+      { kind: 'approval.request', actor: 'OPERATOR-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Progress report for ${a.title} — review + send to COR.`, payload: { awardId: a.id, file } },
+      { pod: 'Gov War Room', title: `Send progress report: ${a.title}`, detail: `${overdue.length ? '⚠ ' + overdue.length + ' overdue milestone(s) · ' : ''}draft ${file}`, xp: 30, verb: 'Review & send' });
     reports.push({ awardId: a.id, file, overdue: overdue.length });
   }
   await mirror('OPERATOR-01', 'need', `${reports.length} progress report(s) ready for review`);

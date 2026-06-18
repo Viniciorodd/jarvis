@@ -2,7 +2,7 @@
 // Ticket → Claude drafts an accurate, friendly reply (and flags anything legal/refund/abuse for you
 // instead of promising it) → HITL "send reply?" gate. Nothing is sent without your review.
 
-import { emit, mirror, hqApproval, claude } from '../lib.mjs';
+import { emit, mirror, hqApproval, gateApproval, claude } from '../lib.mjs';
 
 const SYS = `You are the support lead for ReconTweaks, a Windows gaming-optimization tweak utility. Draft a concise, friendly, technically accurate reply to a customer support ticket.
 - If it's a how-to / config question: answer it directly and clearly.
@@ -19,8 +19,9 @@ export async function runTriage({ ticket, ticketId = 'tkt-' + Date.now() } = {})
   const sensitive = /\b(refund|chargeback|charge back|lawyer|legal|sue|gdpr|dmca)\b/i.test(String(ticket));
 
   await emit({ kind: 'action', actor: 'RECON-DEV', pod: 'saas', action: 'ticket.reply.draft', cost_usd: r.cost || 0, reversible: true, rationale: `reply drafted for ${ticketId}${sensitive ? ' (flagged sensitive)' : ''}`, payload: { ticketId, sensitive, reply: reply.slice(0, 600) } });
-  await emit({ kind: 'approval.request', actor: 'RECON-DEV', pod: 'saas', action: 'reply', status: 'pending', reversible: false, rationale: `Support reply drafted for: ${String(ticket).slice(0, 60)}${sensitive ? ' — SENSITIVE, review carefully' : ''}`, payload: { ticketId, reply } });
-  await hqApproval({ pod: 'Software Lab', title: `${sensitive ? '⚠ ' : ''}Reply to ticket: ${String(ticket).slice(0, 42)}`, detail: reply.slice(0, 160), xp: 10, verb: 'Review & send' });
+  await gateApproval(
+    { kind: 'approval.request', actor: 'RECON-DEV', pod: 'saas', action: 'reply', status: 'pending', reversible: false, rationale: `Support reply drafted for: ${String(ticket).slice(0, 60)}${sensitive ? ' — SENSITIVE, review carefully' : ''}`, payload: { ticketId, reply } },
+    { pod: 'Software Lab', title: `${sensitive ? '⚠ ' : ''}Reply to ticket: ${String(ticket).slice(0, 42)}`, detail: reply.slice(0, 160), xp: 10, verb: 'Review & send' });
   await mirror('RECON-DEV', 'need', `Reply drafted — review & send`, 'saas');
   return { ticketId, reply, sensitive, ok: !!r.text };
 }

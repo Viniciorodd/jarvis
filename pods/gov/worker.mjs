@@ -11,9 +11,10 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, DRAFTS, env, profile, emit, mirror, hqApproval, claude } from './lib.mjs';
+import { ROOT, DRAFTS, env, profile, emit, mirror, hqApproval, gateApproval, claude } from './lib.mjs';
 import { maybeConnect } from './connector.mjs';
 import { procurementPath } from './replies.mjs';
+import { checkCompliance } from './compliance.mjs';
 
 // ── A. SCOUT — find opportunities (real SAM.gov, fallback to a realistic simulated feed) ────────
 function simulatedFeed() {
@@ -121,9 +122,14 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     const file = path.join('gov-drafts', `${slug}.md`);
     fs.writeFileSync(path.join(ROOT, file), `<!-- ${op.title} · ${op.url} · deadline ${op.deadline} -->\n\n${d.md}\n`);
     await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'proposal.draft', cost_usd: d.cost || 0, reversible: true, rationale: `drafted ${op.title}`, payload: { noticeId: op.noticeId, file } });
+    // VERIFY before the gate: compliance pre-check so a non-compliant bid never looks ready (doctrine §0).
+    const comp = await checkCompliance({ op, draft: d.md }); spend += comp._cost || 0;
+    await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.check', reversible: true, status: comp.verdict === 'FAIL' ? 'error' : 'done', rationale: `Compliance ${comp.verdict}: ${comp.summary}`, payload: { noticeId: op.noticeId, verdict: comp.verdict, needs_sub_past_performance: !!comp.needs_sub_past_performance } });
+    if (comp.verdict === 'FAIL') await mirror('GOV-ANALYST', 'need', `⚠ Compliance risk on ${op.title}: ${comp.summary}`);
     // HITL gate — never auto-submit (doctrine §9 rule 2 + entity rule: Vinicio signs everything)
-    await emit({ kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: `Proposal drafted for ${op.title} (score ${sc.match_score}). Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: sc.subcontractor_needed } });
-    await hqApproval({ pod: 'Gov War Room', title: `Review & submit: ${op.title}`, detail: `Score ${sc.match_score}/100 · deadline ${op.deadline} · draft saved to ${file}${sc.subcontractor_needed ? ' · needs a local subcontractor' : ''}`, xp: 50, verb: 'Open draft' });
+    await gateApproval(
+      { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: `Proposal drafted for ${op.title} (score ${sc.match_score}). Compliance: ${comp.verdict}. Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: sc.subcontractor_needed, compliance: comp.verdict } },
+      { pod: 'Gov War Room', title: `Review & submit: ${op.title}`, detail: `Score ${sc.match_score}/100 · 🛡 ${comp.verdict}${comp.summary ? ' (' + comp.summary + ')' : ''} · deadline ${op.deadline} · ${file}${sc.subcontractor_needed ? ' · needs a local subcontractor' : ''}`, xp: 50, verb: 'Open draft' });
     // Connector (Hector): if this bid needs subcontracted labor, draft the outreach now (you send it).
     if (sc.subcontractor_needed) { try { await maybeConnect({ op, sc }); } catch { /* connector best-effort */ } }
     drafted.push({ op, sc, file });
@@ -139,6 +145,35 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     drafts: drafted.map((d) => d.file),
     summary: `Scanned ${opps.length} (${feed}); ${scored.filter((s) => s.sc.recommendation === 'bid').length} bid-worthy; drafted ${drafted.length}. Top: ${top ? top.op.title + ' (' + top.sc.match_score + ')' : 'none'}.`,
   };
+}
+
+// PURSUE one opportunity on demand (the operator tapped "Pursue this"): draft a proposal for it now and
+// raise the same gated submit approval, plus kick off sub outreach if it needs labor. `op` is the known
+// opportunity (from the cockpit); `sc` is optional (reconstructed from the score if absent).
+export async function pursueOpportunity({ op = {}, sc = null } = {}) {
+  if (!op || !op.title) return { ok: false, error: 'opportunity required' };
+  const prof = profile();
+  const scoreObj = sc || {
+    match_score: Number(op.score != null ? op.score : 70) || 70,
+    recommendation: op.recommendation || 'bid',
+    subcontractor_needed: op.subNeeded != null ? op.subNeeded : true,
+    set_aside_fit: op.set_aside_fit || 'eligible',
+  };
+  await mirror('GOV-ANALYST', 'work', `Pursuing — drafting proposal: ${op.title}`);
+  const d = await draft(op, scoreObj, prof);
+  fs.mkdirSync(DRAFTS, { recursive: true });
+  const slug = (op.noticeId || op.title).replace(/[^\w]+/g, '-').slice(0, 50);
+  const file = path.join('gov-drafts', `${slug}.md`);
+  fs.writeFileSync(path.join(ROOT, file), `<!-- ${op.title} · ${op.url || ''} · deadline ${op.deadline || ''} -->\n\n${d.md}\n`);
+  await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'proposal.draft', cost_usd: d.cost || 0, reversible: true, rationale: `drafted ${op.title} (you pursued it)`, payload: { noticeId: op.noticeId, file } });
+  const comp = await checkCompliance({ op, draft: d.md });
+  await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.check', reversible: true, status: comp.verdict === 'FAIL' ? 'error' : 'done', rationale: `Compliance ${comp.verdict}: ${comp.summary}`, payload: { noticeId: op.noticeId, verdict: comp.verdict } });
+  await gateApproval(
+    { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: `Proposal drafted for ${op.title} (you pursued it). Compliance: ${comp.verdict}. Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: scoreObj.subcontractor_needed, compliance: comp.verdict } },
+    { pod: 'Gov War Room', title: `Review & submit: ${op.title}`, detail: `Pursued by you · 🛡 ${comp.verdict}${comp.summary ? ' (' + comp.summary + ')' : ''} · draft ${file}`, xp: 50, verb: 'Open draft' });
+  if (scoreObj.subcontractor_needed) { try { await maybeConnect({ op, sc: scoreObj }); } catch { /* connector best-effort */ } }
+  await mirror('GOV-ANALYST', 'need', `Proposal drafted (pursued): ${op.title} — review & submit`);
+  return { ok: true, file, noticeId: op.noticeId };
 }
 
 if (process.argv[1] && process.argv[1].endsWith('worker.mjs')) {

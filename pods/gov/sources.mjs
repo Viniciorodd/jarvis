@@ -4,7 +4,7 @@
 // the control-plane executor emails it via the Rodgate mailbox (with GOV_AUTO_SEND on).
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, DRAFTS, profile, emit, mirror, hqApproval, claude } from './lib.mjs';
+import { ROOT, DRAFTS, profile, emit, mirror, hqApproval, gateApproval, claude } from './lib.mjs';
 import { scout } from './worker.mjs';
 
 export const isSourcesSought = (op = {}) =>
@@ -26,8 +26,9 @@ export async function respondToSourcesSought({ op }) {
     : '<!-- no CO email captured for this notice — add a "To:" line before sending -->\n';
   fs.writeFileSync(path.join(ROOT, file), `<!-- sources-sought response · ${op.title} -->\n${header}\n${body}\n`);
   await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'sources_sought.draft', cost_usd: r.cost || 0, reversible: true, rationale: `Capability response drafted for sources-sought: ${op.title}`, payload: { noticeId: op.noticeId, file } });
-  await emit({ kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send sources-sought capability response: ${op.title}${to ? ` to ${to}` : ' (add the CO email first)'}.`, payload: { noticeId: op.noticeId, file } });
-  await hqApproval({ pod: 'Gov War Room', title: `Send sources-sought response: ${op.title}`, detail: `${to || 'add CO email'} · capability statement · ${file}`, xp: 15, verb: 'Review & send' });
+  await gateApproval(
+    { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send sources-sought capability response: ${op.title}${to ? ` to ${to}` : ' (add the CO email first)'}.`, payload: { noticeId: op.noticeId, file } },
+    { pod: 'Gov War Room', title: `Send sources-sought response: ${op.title}`, detail: `${to || 'add CO email'} · capability statement · ${file}`, xp: 15, verb: 'Review & send' });
   await mirror('GOV-ANALYST', 'need', `Sources-sought response ready — ${op.title} (one tap to send)`);
   return { ok: true, file, to };
 }

@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { ROOT, env, emit, hqApproval, mirror as gmirror } from '../lib.mjs';
+import { ROOT, env, emit, hqApproval, gateApproval, mirror as gmirror } from '../lib.mjs';
 import { getSecret } from '../../control-plane/vault.mjs';
 
 const DRAFTS = path.join(ROOT, 'finance-drafts');
@@ -110,8 +110,9 @@ export async function draftInvoice({ amountUsd, customerEmail = '', customerName
   fs.writeFileSync(path.join(ROOT, file), JSON.stringify(spec, null, 2));
 
   await emit({ kind: 'action', actor: 'LEDGER-01', pod: 'exec', action: 'invoice.draft', reversible: true, rationale: `Drafted a $${v.amountUsd.toFixed(2)} ${v.currency.toUpperCase()} payment link for ${who} — ${v.description}`, payload: { file, cents: spec.cents } });
-  await emit({ kind: 'approval.request', actor: 'LEDGER-01', pod: 'exec', action: 'invoice', status: 'pending', reversible: false, rationale: `Create a Stripe payment link: $${v.amountUsd.toFixed(2)} ${v.currency.toUpperCase()} — ${v.description}${customerName ? ' (' + customerName + ')' : ''}.`, payload: { spec, file } });
-  await hqApproval({ pod: 'Executive', title: `Approve payment link: $${v.amountUsd.toFixed(2)} — ${v.description}`, detail: `${who} · ${v.currency.toUpperCase()} · created in Stripe on approval (test mode unless STRIPE_ALLOW_LIVE=1)`, xp: 15, verb: 'Approve & create' });
+  await gateApproval(
+    { kind: 'approval.request', actor: 'LEDGER-01', pod: 'exec', action: 'invoice', status: 'pending', reversible: false, rationale: `Create a Stripe payment link: $${v.amountUsd.toFixed(2)} ${v.currency.toUpperCase()} — ${v.description}${customerName ? ' (' + customerName + ')' : ''}.`, payload: { spec, file } },
+    { pod: 'Executive', title: `Approve payment link: $${v.amountUsd.toFixed(2)} — ${v.description}`, detail: `${who} · ${v.currency.toUpperCase()} · created in Stripe on approval (test mode unless STRIPE_ALLOW_LIVE=1)`, xp: 15, verb: 'Approve & create' });
   await mirror('LEDGER-01', 'need', `Payment link ready — $${v.amountUsd.toFixed(2)} for ${who} (needs your approval)`);
   return { ok: true, spec, file };
 }

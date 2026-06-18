@@ -65,6 +65,12 @@ let DEEPGRAM_KEY = process.env.DEEPGRAM_API_KEY || '';
 if (!DEEPGRAM_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^DEEPGRAM_API_KEY=(.+)$/m); if (m) DEEPGRAM_KEY = m[1].trim(); } catch { /* */ } }
 let STRIPE_KEY = process.env.STRIPE_API_KEY || '';
 if (!STRIPE_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^STRIPE_API_KEY=(.+)$/m); if (m) STRIPE_KEY = m[1].trim(); } catch { /* */ } }
+// SAM.gov key — used to pull the real solicitation documents (RFP/attachments) for an opportunity on demand.
+let SAM_KEY = process.env.SAM_API_KEY || '';
+if (!SAM_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^SAM_API_KEY=(.+)$/m); if (m) SAM_KEY = m[1].trim(); } catch { /* */ } }
+// Google Places key — used to pull a subcontractor's rating + reviews into the CRM detail.
+let PLACES_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
+if (!PLACES_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^GOOGLE_PLACES_API_KEY=(.+)$/m); if (m) PLACES_KEY = m[1].trim(); } catch { /* */ } }
 // Stripe money-in (READ-ONLY): available + pending balance and recently collected. Test or live by the key.
 async function stripeMoney() {
   if (!STRIPE_KEY) return null;
@@ -673,25 +679,45 @@ const server = http.createServer(async (req, res) => {
       ]);
       const leads = (Array.isArray(pending) ? pending : []).map((a) => ({
         id: a.id, pod: a.pod, action: a.action, rationale: a.rationale,
-        file: a.payload && a.payload.file, ts: a.ts,
+        file: a.payload && a.payload.file, noticeId: a.payload && a.payload.noticeId, ts: a.ts,
       }));
       const ev = Array.isArray(govEvents) ? govEvents : [];
+      // proposals first, so an opportunity can link to its drafted proposal (and vice-versa)
+      const propMap = new Map();
+      for (const e of ev.filter((x) => x.action === 'proposal.draft' && x.payload && x.payload.file)) {
+        propMap.set(e.payload.file, { file: e.payload.file, noticeId: e.payload.noticeId, rationale: e.rationale, ts: e.ts });
+      }
+      const proposals = [...propMap.values()].reverse();
+      // link each proposal to its pending submit-approval id, so the Proposals tab can show an Approve button
+      const submitByFile = {};
+      for (const a of leads) if (/submit/i.test(a.action || '') && a.file) submitByFile[a.file] = a.id;
+      for (const p of proposals) p.approvalId = submitByFile[p.file] || null;
+      const propByNotice = {};
+      for (const p of proposals) if (p.noticeId) propByNotice[p.noticeId] = p.file;
       const oppMap = new Map();
       for (const e of ev.filter((x) => x.action === 'bid.score')) {
         const pl = e.payload || {};
-        oppMap.set(pl.noticeId || e.id, {
-          noticeId: pl.noticeId, title: pl.title || (e.rationale || '').split(' — ')[0], score: pl.score,
+        const noticeId = pl.noticeId;
+        oppMap.set(noticeId || e.id, {
+          noticeId, title: pl.title || (e.rationale || '').split(' — ')[0], score: pl.score,
           recommendation: pl.recommendation, setAside: pl.setAside || pl.set_aside_fit, place: pl.place,
           placeState: pl.placeState, deadline: pl.deadline, url: pl.url, agency: pl.agency, subNeeded: pl.subcontractor_needed,
+          proposalFile: noticeId ? (propByNotice[noticeId] || null) : null,
         });
       }
       const opportunities = [...oppMap.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
-      const propMap = new Map();
-      for (const e of ev.filter((x) => x.action === 'proposal.draft' && x.payload && x.payload.file)) {
-        propMap.set(e.payload.file, { file: e.payload.file, rationale: e.rationale, ts: e.ts });
+      // CRM = NAS subs + the local (PC) discovered/seed subs, deduped by name, placeholder rows dropped —
+      // so real subcontractors show even before the NAS CRM volume is refreshed.
+      const isEx = (s) => /^SUB-EXAMPLE/i.test((s && s.id) || '') || /^\s*\[example\]/i.test((s && s.name) || '');
+      let localSubs = [];
+      try { localSubs = (JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'pods', 'gov', 'subs.json'), 'utf8')).subs) || []; } catch { /* none */ }
+      const subs = []; const seen = new Set();
+      for (const s of [...((crm && crm.subs) || []), ...localSubs]) {
+        if (isEx(s)) continue;
+        const k = String(s.name || '').toLowerCase().trim();
+        if (!k || seen.has(k)) continue; seen.add(k); subs.push(s);
       }
-      const proposals = [...propMap.values()].reverse();
-      return send(res, 200, JSON.stringify({ leads, opportunities, proposals, crm: (crm && crm.subs) || [] }));
+      return send(res, 200, JSON.stringify({ leads, opportunities, proposals, crm: subs }));
     } catch (e) { return send(res, 200, JSON.stringify({ error: e.message, leads: [], opportunities: [], proposals: [], crm: [] })); }
   }
   if (req.method === 'POST' && url.pathname === '/api/approve') {
@@ -726,12 +752,184 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ rooms: Object.values(rooms), feed: (hqR.feed || []).slice(0, 12), hqUrl: HQ_URL }));
     } catch (e) { return send(res, 200, JSON.stringify({ error: e.message, rooms: [] })); }
   }
+  // ── ACTIVITY: the whole-org activity log (drill-in + calendar + archive). Archiving is an append-only
+  // event (action 'activity.archived', ref=id) so it persists and works across devices. ──
+  if (req.method === 'GET' && url.pathname === '/api/activity') {
+    try {
+      const evs = await fetch(`${CP_URL}/events`, { signal: AbortSignal.timeout(5000) }).then((r) => r.json()).catch(() => []);
+      const list = Array.isArray(evs) ? evs : [];
+      const archived = new Set();
+      for (const e of list) if (e.action === 'activity.archived' && e.ref) archived.add(e.ref);
+      const withArchived = url.searchParams.get('archived') === '1';
+      const KINDS = new Set(['action', 'approval.request', 'approval.decision', 'command', 'money']);
+      const items = list
+        .filter((e) => KINDS.has(e.kind) && e.action !== 'activity.archived' && e.action !== 'spend.check' && (withArchived || !archived.has(e.id)))
+        .map((e) => ({ id: e.id, ts: e.ts, pod: e.pod || 'system', actor: e.actor, action: e.action, kind: e.kind, rationale: e.rationale || '', status: e.status || '', file: (e.payload && e.payload.file) || null, noticeId: (e.payload && e.payload.noticeId) || null, cost: e.cost_usd || 0, archived: archived.has(e.id) }))
+        .reverse();
+      const byDay = {};
+      for (const it of items) { const day = (it.ts || '').slice(0, 10); if (day) byDay[day] = (byDay[day] || 0) + 1; }
+      return send(res, 200, JSON.stringify({ items: items.slice(0, 300), byDay, archivedCount: archived.size }));
+    } catch (e) { return send(res, 200, JSON.stringify({ items: [], byDay: {}, error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/activity/archive') {
+    try {
+      const { id, all } = await readBody(req);
+      const ids = all && Array.isArray(all) ? all : (id ? [id] : []);
+      if (!ids.length) return send(res, 400, JSON.stringify({ error: 'id required' }));
+      for (const x of ids) await fetch(`${CP_URL}/events`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'meta', actor: 'operator', pod: 'system', action: 'activity.archived', ref: x, rationale: 'archived from the activity log' }) }).catch(() => {});
+      return send(res, 200, JSON.stringify({ ok: true, archived: ids.length }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── POD EVENTS: recent meaningful activity for one pod (drill-in from the Floor) ──
+  if (req.method === 'GET' && url.pathname === '/api/pod-events') {
+    const pod = url.searchParams.get('pod');
+    if (!pod) return send(res, 400, JSON.stringify({ error: 'pod required' }));
+    try {
+      const evs = await fetch(CP_URL + '/events?pod=' + encodeURIComponent(pod), { signal: AbortSignal.timeout(4500) }).then((r) => r.json()).catch(() => []);
+      const list = (Array.isArray(evs) ? evs : [])
+        .filter((e) => !(e.kind === 'trace' && e.action === 'rest')) // drop the idle "rest" noise
+        .slice(-40).reverse()
+        .map((e) => ({ ts: e.ts, actor: e.actor, action: e.action, rationale: e.rationale, status: e.status }))
+        .slice(0, 25);
+      return send(res, 200, JSON.stringify({ pod, events: list }));
+    } catch (e) { return send(res, 200, JSON.stringify({ pod, events: [], error: e.message })); }
+  }
   if (req.method === 'GET' && url.pathname === '/api/proposal') {
     try {
       const base = (url.searchParams.get('file') || '').split(/[\\/]/).pop();
       if (!base) return send(res, 400, JSON.stringify({ error: 'file required' }));
       const r = await fetch(`${CP_URL}/drafts/${encodeURIComponent(base)}`, { signal: AbortSignal.timeout(5000) });
       return send(res, r.ok ? 200 : 404, JSON.stringify(await r.json()));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── OPP DOCS: pull the REAL solicitation/RFP documents + description + CO contact for one notice ──
+  // (so you can verify Rodgate meets everything the government is asking for before submitting).
+  if (req.method === 'GET' && url.pathname === '/api/opp-docs') {
+    const noticeId = url.searchParams.get('noticeId');
+    if (!noticeId) return send(res, 400, JSON.stringify({ error: 'noticeId required' }));
+    if (!SAM_KEY) return send(res, 200, JSON.stringify({ noticeId, documents: [], contact: [], error: 'no SAM_API_KEY in .env — add it to pull RFP documents' }));
+    try {
+      const f = (d) => `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
+      const to = new Date(), from = new Date(Date.now() - 360 * 864e5); // SAM caps the search window at 1 year
+      const u = `https://api.sam.gov/opportunities/v2/search?api_key=${SAM_KEY}&noticeid=${encodeURIComponent(noticeId)}&postedFrom=${f(from)}&postedTo=${f(to)}&limit=1`;
+      const o = await fetch(u, { signal: AbortSignal.timeout(20000) }).then((r) => r.json()).then((d) => (d.opportunitiesData || [])[0]).catch(() => null);
+      if (!o) return send(res, 200, JSON.stringify({ noticeId, documents: [], contact: [], error: 'not found on SAM (older than a year or withdrawn) — use the SAM.gov link' }));
+      let description = '';
+      if (typeof o.description === 'string' && /^https?:/.test(o.description)) {
+        try { const dr = await fetch(o.description + (o.description.includes('?') ? '&' : '?') + 'api_key=' + SAM_KEY, { signal: AbortSignal.timeout(15000) }).then((r) => r.json()); description = String(dr.description || dr.body || ''); } catch { /* optional */ }
+      } else if (typeof o.description === 'string') description = o.description;
+      description = description.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 6000);
+      const documents = (o.resourceLinks || []).map((link, i) => ({ name: `Solicitation document ${i + 1}`, url: link }));
+      const contact = (o.pointOfContact || []).map((c) => ({ name: c.fullName, email: c.email, phone: c.phone, title: c.title }));
+      return send(res, 200, JSON.stringify({
+        noticeId, title: o.title, agency: o.fullParentPathName || o.organizationType || '', type: o.type,
+        setAside: o.typeOfSetAsideDescription || o.typeOfSetAside, deadline: o.responseDeadLine,
+        url: o.uiLink, naics: o.naicsCode, description, documents, contact,
+      }));
+    } catch (e) { return send(res, 200, JSON.stringify({ noticeId, documents: [], contact: [], error: e.message })); }
+  }
+  // ── COMPLIANCE CHECK: read the RFP requirements + the proposal and flag anything that could DISQUALIFY us
+  // BEFORE we submit (set-aside mismatch, missing certs/clauses, unaddressed scope, passed deadline, etc.). ──
+  if (req.method === 'POST' && url.pathname === '/api/compliance-check') {
+    try {
+      const { noticeId, file } = await readBody(req);
+      if (!API_KEY) return send(res, 500, JSON.stringify({ error: 'No ANTHROPIC_API_KEY.' }));
+      let rfp = {};
+      if (noticeId) { try { rfp = await fetch(`http://127.0.0.1:${PORT}/api/opp-docs?noticeId=${encodeURIComponent(noticeId)}`, { signal: AbortSignal.timeout(25000) }).then((r) => r.json()); } catch { /* */ } }
+      let draft = '';
+      if (file) { try { const base = String(file).split(/[\\/]/).pop(); const d = await fetch(`${CP_URL}/drafts/${encodeURIComponent(base)}`, { signal: AbortSignal.timeout(5000) }).then((r) => r.json()); draft = String(d.content || '').slice(0, 6000); } catch { /* */ } }
+      if (!draft) return send(res, 200, JSON.stringify({ verdict: 'FAIL', summary: 'No proposal draft to check yet.', items: [], gaps: ['No proposal drafted — pursue/draft it first.'] }));
+      const sys = 'You are the GovCon COMPLIANCE REVIEWER for Rodgate, LLC — an SDB/Minority/Hispanic-owned SMALL business that holds Small/Micro-business, Self-Certified Small Disadvantaged, Minority-Owned and Hispanic-American-Owned status; it does NOT hold 8(a)/HUBZone/SDVOSB/WOSB; it is a NEW prime with limited federal past performance; it subcontracts labor and must respect FAR 52.219-14 (50% limit on subcontracting). Compare OUR PROPOSAL against the RFP REQUIREMENTS and flag anything that could DISQUALIFY us. Return ONLY minified JSON: {"verdict":"PASS|RISK|FAIL","summary":"<=160 chars","items":[{"req":"...","ok":true|false,"note":"..."}],"gaps":["..."],"needs_sub_past_performance":true|false}. Be strict and honest: check set-aside eligibility match, required certifications/clauses, whether every stated scope item is addressed, the response deadline (not passed), page/format limits if stated, and past-performance requirements (we are new — if past performance is required, flag it and whether a subcontractor must supply it).';
+      const usr = `RFP REQUIREMENTS\nTitle: ${rfp.title || '(unknown)'}\nSet-aside: ${rfp.setAside || '(unknown)'}\nNAICS: ${rfp.naics || '(unknown)'}\nResponse deadline: ${rfp.deadline || '(unknown)'}\nAttached documents: ${(rfp.documents || []).length} file(s)\nDescription:\n${String(rfp.description || '(no description retrieved — judge from the proposal + metadata)').slice(0, 4500)}\n\nOUR PROPOSAL:\n${draft}`;
+      const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1100, system: sys, messages: [{ role: 'user', content: usr }] }) });
+      const d = await r.json(); const txt = (d.content || []).map((c) => c.text || '').join('');
+      let parsed = null; const mm = txt.match(/\{[\s\S]*\}/); if (mm) { try { parsed = JSON.parse(mm[0]); } catch { /* */ } }
+      if (!parsed) return send(res, 200, JSON.stringify({ verdict: 'RISK', summary: 'Could not parse the review — read it manually.', items: [], gaps: [txt.slice(0, 300) || (d.error && d.error.message) || 'no output'] }));
+      return send(res, 200, JSON.stringify(parsed));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── AGENT CHAT: discuss ONE proposal/opportunity with the bid analyst (Patricia). Context = the draft +
+  // our CRM subs. She points out what's missing (sub past-perf, quote, certs) and tells you which button acts.
+  if (req.method === 'POST' && url.pathname === '/api/agent-chat') {
+    try {
+      const { file, history } = await readBody(req);
+      if (!API_KEY) return send(res, 500, JSON.stringify({ error: 'No ANTHROPIC_API_KEY.' }));
+      let draft = '';
+      if (file) { try { const base = String(file).split(/[\\/]/).pop(); const d = await fetch(`${CP_URL}/drafts/${encodeURIComponent(base)}`, { signal: AbortSignal.timeout(5000) }).then((r) => r.json()); draft = String(d.content || '').slice(0, 6000); } catch { /* */ } }
+      let subs = []; try { const c = await fetch(`${CP_URL}/crm`, { signal: AbortSignal.timeout(4000) }).then((r) => r.json()); subs = (c.subs || []).filter((s) => !/^\s*\[example\]/i.test(s.name || '')).slice(0, 12); } catch { /* */ }
+      const sys = `You are Patricia, the GovCon Bid Analyst for Rodgate, LLC — an SDB/Minority/Hispanic-owned small business (NAICS 561210/561720/561990; PA/NJ/FL; a PRIME that subcontracts labor and respects the 50% limit-on-subcontracting; Vinicio signs & submits everything). You are discussing ONE opportunity/proposal with Vinicio (the owner). Be concrete, honest, brief (under ~150 words). If anything needed for a compliant, winning proposal is missing — a subcontractor's PAST PERFORMANCE or QUOTE, the sub's contact info, a required certification, or an unmet RFP clause — say so plainly, and tell him he can: tap "Apply redraft" to have you revise the proposal with his feedback, or use the CRM "reach out" button to have a sub fill in the missing info. Never claim set-asides we don't hold.${draft ? `\n\nCURRENT PROPOSAL DRAFT:\n${draft}` : '\n\n(No proposal drafted yet for this one.)'}${subs.length ? `\n\nOUR SUBCONTRACTOR CRM:\n${subs.map((s) => `- ${s.name} (${s.trade || '?'}, ${s.location || '?'}) ${s.contact_email ? '✉ ' + s.contact_email : 'no email yet'} · past-perf ${s.past_performance || 0}`).join('\n')}` : ''}`;
+      const msgs = (Array.isArray(history) ? history : []).slice(-12).map((m) => ({ role: m.role === 'agent' || m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content || '') }));
+      if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return send(res, 400, JSON.stringify({ error: 'last message must be from you' }));
+      const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 700, system: sys, messages: msgs }) });
+      const d = await r.json(); const reply = (d.content || []).map((c) => c.text || '').join('') || (d.error && d.error.message) || '(no reply)';
+      return send(res, 200, JSON.stringify({ reply }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── REDRAFT: revise a proposal with the operator's feedback and save it back (gated review stays). ──
+  if (req.method === 'POST' && url.pathname === '/api/redraft') {
+    try {
+      const { file, feedback } = await readBody(req);
+      if (!API_KEY) return send(res, 500, JSON.stringify({ error: 'No ANTHROPIC_API_KEY.' }));
+      const base = String(file || '').split(/[\\/]/).pop();
+      if (!base) return send(res, 400, JSON.stringify({ error: 'file required' }));
+      const cur = await fetch(`${CP_URL}/drafts/${encodeURIComponent(base)}`, { signal: AbortSignal.timeout(5000) }).then((r) => r.json());
+      if (!cur || !cur.content) return send(res, 404, JSON.stringify({ error: 'draft not found' }));
+      const sys = 'You are Patricia, the GovCon Bid Analyst for Rodgate, LLC. Revise the proposal below to incorporate the operator\'s feedback. Keep it compliant and concise, preserve correct structure, do NOT invent past performance or set-asides we don\'t hold, and keep the final line "[HUMAN REVIEW REQUIRED — Vinicio signs & submits]". Return ONLY the revised proposal in Markdown — no preamble.';
+      const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2200, system: sys, messages: [{ role: 'user', content: `FEEDBACK:\n${feedback || '(tighten + improve compliance)'}\n\nCURRENT PROPOSAL:\n${cur.content}` }] }) });
+      const d = await r.json(); const revised = (d.content || []).map((c) => c.text || '').join('');
+      if (!revised) return send(res, 502, JSON.stringify({ error: (d.error && d.error.message) || 'model returned nothing' }));
+      const w = await fetch(`${CP_URL}/drafts/${encodeURIComponent(base)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: revised }) });
+      const wd = await w.json().catch(() => ({}));
+      return send(res, w.ok ? 200 : 502, JSON.stringify({ ok: w.ok, saved: !!(wd && wd.ok), bytes: revised.length, error: wd && wd.error }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── PURSUE: tell the gov pod you want this opportunity → it drafts a proposal for it (gated). ──
+  if (req.method === 'POST' && url.pathname === '/api/pursue') {
+    try {
+      const { noticeId, op } = await readBody(req);
+      if (!noticeId && !(op && op.title)) return send(res, 400, JSON.stringify({ error: 'noticeId or op required' }));
+      const r = await fetch(`${CP_URL}/maintenance/pursue`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ noticeId, op }), signal: AbortSignal.timeout(60000) });
+      return send(res, 200, JSON.stringify(await r.json().catch(() => ({ ok: false }))));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── SUB INFO: full profile + Google rating/reviews + an honest fit verdict for one CRM prospect. ──
+  if (req.method === 'GET' && url.pathname === '/api/sub-info') {
+    try {
+      const id = url.searchParams.get('id');
+      if (!id) return send(res, 400, JSON.stringify({ error: 'id required' }));
+      let subs = [];
+      try { const c = await fetch(`${CP_URL}/crm`, { signal: AbortSignal.timeout(4000) }).then((r) => r.json()); subs = c.subs || []; } catch { /* */ }
+      try { subs = subs.concat(JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'pods', 'gov', 'subs.json'), 'utf8')).subs || []); } catch { /* */ }
+      const sub = subs.find((s) => s.id === id);
+      if (!sub) return send(res, 404, JSON.stringify({ error: 'sub not found' }));
+      let places = null;
+      if (PLACES_KEY) {
+        try {
+          const pr = await fetch('https://places.googleapis.com/v1/places:searchText', { method: 'POST', headers: { 'content-type': 'application/json', 'X-Goog-Api-Key': PLACES_KEY, 'X-Goog-FieldMask': 'places.displayName,places.rating,places.userRatingCount,places.reviews' }, body: JSON.stringify({ textQuery: `${sub.name} ${sub.location || ''}`.trim(), maxResultCount: 1 }), signal: AbortSignal.timeout(8000) });
+          const pd = await pr.json(); const pp = (pd.places || [])[0];
+          if (pp) places = { rating: pp.rating || null, total: pp.userRatingCount || 0, reviews: (pp.reviews || []).slice(0, 3).map((rv) => ({ text: (rv.text && rv.text.text) || '', rating: rv.rating || null, author: (rv.authorAttribution && rv.authorAttribution.displayName) || '' })) };
+        } catch { /* places optional */ }
+      }
+      let fit = null;
+      if (API_KEY) {
+        try {
+          const sys = 'You are Hector, Rodgate\'s procurement lead (Rodgate is a PA-based SDB/minority janitorial/facilities GovCon prime that subcontracts labor). In <=70 words, give a FIT VERDICT for teaming with this local subcontractor on our federal/SLED janitorial-facilities subcontracts. Begin with EXACTLY one of: GREAT FIT, GOOD FIT, RISKY FIT, POOR FIT. Then 1-2 honest sentences (weigh: locality to PA, their Google rating/volume, whether we have a contact email, stated capabilities). No fluff.';
+          const usr = `SUB: ${JSON.stringify({ name: sub.name, trade: sub.trade, location: sub.location, email: sub.contact_email, phone: sub.phone, website: sub.website, past_performance: sub.past_performance, capabilities: sub.capabilities })}\nGOOGLE: ${places && places.rating ? `${places.rating}★ (${places.total} reviews)` : 'no rating found'}`;
+          const fr = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 160, system: sys, messages: [{ role: 'user', content: usr }] }) });
+          const fd = await fr.json(); const t = (fd.content || []).map((c) => c.text || '').join('').trim();
+          if (t) fit = { verdict: ((t.match(/^(GREAT|GOOD|RISKY|POOR) FIT/i) || [])[0] || '').toUpperCase(), why: t };
+        } catch { /* fit optional */ }
+      }
+      return send(res, 200, JSON.stringify({ sub, places, fit }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── SUB REACH-OUT: have Hector enrich (find email) + draft a teaming email + raise a gated send. ──
+  if (req.method === 'POST' && url.pathname === '/api/sub-reach') {
+    try {
+      const { id } = await readBody(req);
+      if (!id) return send(res, 400, JSON.stringify({ error: 'id required' }));
+      const r = await fetch(`${CP_URL}/maintenance/reach-sub`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }), signal: AbortSignal.timeout(60000) });
+      return send(res, 200, JSON.stringify(await r.json().catch(() => ({ ok: false }))));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 

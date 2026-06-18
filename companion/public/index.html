@@ -25,6 +25,7 @@
         <button class="floor-btn" id="opsBtn" title="Operations cockpit — leads, opportunities, proposals, CRM">⛭ Operations</button>
         <button class="floor-btn" id="mapBtn" title="Map — where the work is">▣ Map</button>
         <button class="floor-btn" id="floorBtn" title="The floor — your agents, by room">▦ Floor</button>
+        <button class="floor-btn" id="activityBtn" title="Activity log — calendar + what was done each day">📋 Activity</button>
         <button class="t-btn" id="dashBtn" title="Toggle the dashboard">📊 Dashboard</button>
         <button class="t-btn" id="settingsBtn" title="Settings — theme, voice, conversation">⚙ Settings</button>
       </div>
@@ -97,20 +98,32 @@
   <div class="ops" id="ops" hidden>
     <div class="ops-head">
       <span class="px ops-brand">⛭ OPERATIONS</span>
-      <nav class="ops-tabs">
-        <button class="ops-tab on" data-tab="leads">⚑ Leads<span class="ops-c" id="cLeads"></span></button>
-        <button class="ops-tab" data-tab="opps">◎ Opportunities<span class="ops-c" id="cOpps"></span></button>
-        <button class="ops-tab" data-tab="props">▤ Proposals<span class="ops-c" id="cProps"></span></button>
-        <button class="ops-tab" data-tab="crm">⚇ CRM<span class="ops-c" id="cCrm"></span></button>
-      </nav>
+      <nav class="ops-biz" id="opsBiz"></nav>
       <button class="ops-refresh" id="opsRefresh" title="Refresh">⟳</button>
       <button class="ops-x" id="opsX" title="Close">✕</button>
     </div>
+    <nav class="ops-tabs" id="opsTabs"></nav>
     <div class="ops-body" id="opsBody"><div class="ops-empty">loading…</div></div>
     <!-- proposal reader -->
     <div class="ops-reader" id="opsReader" hidden>
       <div class="ops-reader-bar"><span class="ops-reader-cap px" id="opsReaderCap"></span><button class="ops-x" id="opsReaderX">✕</button></div>
       <pre class="ops-reader-body" id="opsReaderBody"></pre>
+    </div>
+    <!-- opportunity / RFP detail (real solicitation documents from SAM) -->
+    <div class="ops-reader" id="oppDetail" hidden>
+      <div class="ops-reader-bar"><span class="ops-reader-cap px" id="oppDetailCap">Opportunity</span><button class="ops-x" id="oppDetailX">✕</button></div>
+      <div class="ops-detail-body" id="oppDetailBody"></div>
+    </div>
+    <!-- approve confirmation: shows EXACTLY what will happen before you approve -->
+    <div class="ops-confirm" id="opsConfirm" hidden>
+      <div class="ops-confirm-card">
+        <div class="ops-confirm-h px" id="opsConfirmH">If you approve — here's what happens next</div>
+        <div class="ops-confirm-body" id="opsConfirmBody"></div>
+        <div class="ops-confirm-acts">
+          <button class="btn ghost" id="opsConfirmCancel">Cancel</button>
+          <button class="btn go" id="opsConfirmGo">Approve &amp; do it →</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -119,6 +132,13 @@
     <div class="ops-head">
       <span class="px ops-brand">▣ MAP — PLACE OF PERFORMANCE</span>
       <span class="map-stat" id="mapStat"></span>
+      <label class="map-filter"><input type="checkbox" id="mapHideClosed" checked> hide closed</label>
+      <select class="map-filter" id="mapDays" title="Filter by days to deadline">
+        <option value="0">all open</option>
+        <option value="7">≤ 7 days</option>
+        <option value="14">≤ 14 days</option>
+        <option value="30">≤ 30 days</option>
+      </select>
       <button class="ops-refresh" id="mapRefresh" title="Refresh">⟳</button>
       <button class="ops-x" id="mapX" title="Close">✕</button>
     </div>
@@ -138,6 +158,30 @@
       <button class="ops-x" id="floorX" title="Close">✕</button>
     </div>
     <div class="ops-body" id="floorBody"><div class="ops-empty">loading…</div></div>
+    <!-- pod drill-in (team + recent activity) -->
+    <div class="ops-reader" id="podDetail" hidden>
+      <div class="ops-reader-bar"><span class="ops-reader-cap px" id="podDetailCap"></span><button class="ops-x" id="podDetailX">✕</button></div>
+      <div class="ops-detail-body" id="podDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- ACTIVITY view (calendar + log + drill-in + archive) -->
+  <div class="activityview" id="activityView" hidden>
+    <div class="ops-head">
+      <span class="px ops-brand">📋 ACTIVITY</span>
+      <span class="map-stat" id="activityStat"></span>
+      <label class="map-filter"><input type="checkbox" id="actShowArchived"> show archived</label>
+      <button class="ops-refresh" id="activityRefresh" title="Refresh">⟳</button>
+      <button class="ops-x" id="activityX" title="Close">✕</button>
+    </div>
+    <div class="activity-wrap">
+      <div class="activity-cal" id="activityCal"></div>
+      <div class="activity-log" id="activityLog"><div class="ops-empty">loading…</div></div>
+    </div>
+    <div class="ops-reader" id="actDetail" hidden>
+      <div class="ops-reader-bar"><span class="ops-reader-cap px" id="actDetailCap"></span><button class="ops-x" id="actDetailX">✕</button></div>
+      <div class="ops-detail-body" id="actDetailBody"></div>
+    </div>
   </div>
 
   <!-- SETTINGS view -->
@@ -174,5 +218,6 @@
   <script src="ops.js"></script>
   <script src="map.js"></script>
   <script src="floor.js"></script>
+  <script src="activity.js"></script>
 </body>
 </html>

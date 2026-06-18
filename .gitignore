@@ -45,3 +45,6 @@ desktop/dist/
 # encrypted secrets vault (never commit)
 control-plane/vault.enc
 Biography/
+
+# personal reference media (not code)
+jarvis video ideas/

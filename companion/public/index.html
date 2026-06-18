@@ -22,6 +22,7 @@
       <div class="topbar">
         <div class="px brand">J A R V I S</div>
         <div class="state" id="state">standby</div>
+        <button class="floor-btn" id="commandBtn" title="Command Center — the cinematic wall display">⬢ Command</button>
         <button class="floor-btn" id="opsBtn" title="Operations cockpit — leads, opportunities, proposals, CRM">⛭ Operations</button>
         <button class="floor-btn" id="mapBtn" title="Map — where the work is">▣ Map</button>
         <button class="floor-btn" id="floorBtn" title="The floor — your agents, by room">▦ Floor</button>
@@ -165,6 +166,29 @@
     </div>
   </div>
 
+  <!-- COMMAND CENTER (cinematic wall display) -->
+  <div class="commandview" id="commandView" hidden>
+    <div class="cmd-head">
+      <div class="cmd-title"><span class="px">RODGATE COMMAND</span><span class="cmd-sub">JARVIS · one-person enterprise OS</span></div>
+      <span class="cmd-clock" id="cmdClock"></span>
+      <button class="floor-btn" id="cmdBrief" title="Speak the briefing">🔊 Briefing</button>
+      <button class="ops-refresh" id="commandRefresh" title="Refresh">⟳</button>
+      <button class="ops-x" id="commandX" title="Close">✕</button>
+    </div>
+    <div class="cmd-body">
+      <div class="cmd-col cmd-left" id="cmdKpis"></div>
+      <div class="cmd-center">
+        <canvas id="cmdCore"></canvas>
+        <div class="cmd-core-label"><div class="px">CORE</div><div class="cmd-dim" id="cmdBriefText">reasoning online</div></div>
+      </div>
+      <div class="cmd-col cmd-right">
+        <div class="cmd-panel" id="cmdRoster"></div>
+        <div class="cmd-panel" id="cmdConnectors"></div>
+      </div>
+    </div>
+    <div class="cmd-ticker" id="cmdFeed"></div>
+  </div>
+
   <!-- ACTIVITY view (calendar + log + drill-in + archive) -->
   <div class="activityview" id="activityView" hidden>
     <div class="ops-head">
@@ -219,5 +243,6 @@
   <script src="map.js"></script>
   <script src="floor.js"></script>
   <script src="activity.js"></script>
+  <script src="command.js"></script>
 </body>
 </html>

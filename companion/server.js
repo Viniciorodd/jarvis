@@ -780,6 +780,24 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, archived: ids.length }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // ── CONNECTORS: which integrations are actually wired (for the Command Center panel) ──
+  if (req.method === 'GET' && url.pathname === '/api/connectors') {
+    let envtxt = ''; try { envtxt = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8'); } catch { /* */ }
+    const has = (k, v) => !!(v || new RegExp('^' + k + '=.+', 'm').test(envtxt));
+    const connectors = [
+      { id: 'claude', name: 'Claude', on: has('ANTHROPIC_API_KEY', API_KEY) },
+      { id: 'sam', name: 'SAM.gov', on: has('SAM_API_KEY', SAM_KEY) },
+      { id: 'notion', name: 'Notion', on: has('NOTION_API_KEY', NOTION_KEY) },
+      { id: 'stripe', name: 'Stripe', on: has('STRIPE_API_KEY', STRIPE_KEY) },
+      { id: 'gmail', name: 'Gmail + Calendar', on: has('GOOGLE_REFRESH_TOKEN') },
+      { id: 'places', name: 'Google Places', on: has('GOOGLE_PLACES_API_KEY', PLACES_KEY) },
+      { id: 'voice', name: 'Voice', on: has('ELEVENLABS_API_KEY', ELEVEN_KEY) || has('DEEPGRAM_API_KEY', DEEPGRAM_KEY) },
+      { id: 'image', name: 'Image gen', on: has('CLOUDFLARE_API_TOKEN') || has('FAL_KEY') },
+      { id: 'telegram', name: 'Telegram', on: has('TELEGRAM_BOT_TOKEN') },
+      { id: 'rodgate', name: 'Rodgate mail', on: has('RODGATE_GMAIL_APP_PASSWORD') },
+    ];
+    return send(res, 200, JSON.stringify({ connectors }));
+  }
   // ── POD EVENTS: recent meaningful activity for one pod (drill-in from the Floor) ──
   if (req.method === 'GET' && url.pathname === '/api/pod-events') {
     const pod = url.searchParams.get('pod');

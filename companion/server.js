@@ -15,6 +15,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
+const dgram = require('node:dgram');
 const google = require('./google');
 
 const PORT = Number(process.env.COMPANION_PORT || process.env.PORT || 8095);
@@ -224,6 +225,10 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { query: { type: 'string', description: 'a topic; omit for top headlines' } } } },
   { name: 'web_read', description: 'Fetch a web page by URL and return its readable text, so you can summarize an article/page the user points to or that web_search/news surfaced.',
     input_schema: { type: 'object', properties: { url: { type: 'string', description: 'a full http(s) URL' } }, required: ['url'] } },
+  { name: 'discover_tvs', description: 'Scan the local network for smart TVs (Samsung, LG, Roku) using SSDP. Returns found TVs with their IP and brand. Call this before cast_to_tv.',
+    input_schema: { type: 'object', properties: {} } },
+  { name: 'cast_to_tv', description: 'Cast a URL to a smart TV on the local network. Use for "show Jarvis on the TV", "put the Command Center on the TV", "cast to the screen". Call discover_tvs first to get the tv object.',
+    input_schema: { type: 'object', properties: { tv: { type: 'object', description: 'TV from discover_tvs — must include ip and brand', properties: { ip: { type: 'string' }, brand: { type: 'string' } } }, url: { type: 'string', description: 'URL to open on the TV — use the serverUrl from discover_tvs for the companion home page' } }, required: ['tv', 'url'] } },
 ];
 
 // resolve a path safely: absolute (inside any allowed root) or relative (inside the primary root)
@@ -231,6 +236,108 @@ function safe(p) {
   const abs = path.isAbsolute(p || '') ? path.resolve(p) : path.resolve(PRIMARY, p || '.');
   if (!ROOTS.some((r) => isInside(r, abs))) throw new Error("path is outside Jarvis's allowed areas");
   return abs;
+}
+
+// ── TV discovery (SSDP) + cast (Samsung WS · LG WebOS · Roku ECP) ────────────────────────────────
+function localServerUrl() {
+  const ifaces = os.networkInterfaces();
+  for (const list of Object.values(ifaces)) {
+    for (const iface of (list || [])) {
+      if (iface.family === 'IPv4' && !iface.internal) return `http://${iface.address}:${PORT}`;
+    }
+  }
+  return `http://localhost:${PORT}`;
+}
+
+function discoverTVs(timeoutMs) {
+  timeoutMs = timeoutMs || 3500;
+  return new Promise((resolve) => {
+    const found = new Map();
+    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    const MCAST = '239.255.255.250', SPORT = 1900;
+    sock.on('error', () => { try { sock.close(); } catch { /* */ } resolve([...found.values()]); });
+    sock.on('message', (msg) => {
+      const text = msg.toString();
+      const loc = (text.match(/LOCATION:\s*([^\r\n]+)/i) || [])[1];
+      if (!loc) return;
+      const locT = loc.trim();
+      if (found.has(locT)) return;
+      const server = ((text.match(/SERVER:\s*([^\r\n]+)/i) || [])[1] || '').trim();
+      const usn = ((text.match(/USN:\s*([^\r\n]+)/i) || [])[1] || '').trim();
+      const ip = (locT.match(/https?:\/\/([^:/]+)/) || [])[1] || '';
+      const raw = (server + ' ' + usn).toLowerCase();
+      const brand = /samsung/.test(raw) ? 'samsung' : /lg|webos/.test(raw) ? 'lg' : /roku/.test(raw) ? 'roku' : 'unknown';
+      found.set(locT, { ip, brand, location: locT });
+    });
+    sock.bind(0, () => {
+      try { sock.addMembership(MCAST); } catch { /* */ }
+      const sts = ['ssdp:all', 'urn:samsung.com:device:RemoteControlReceiver:1', 'urn:dial-multiscreen-org:service:dial:1', 'urn:roku-com:device:player:1-0'];
+      for (const st of sts) {
+        const buf = Buffer.from(`M-SEARCH * HTTP/1.1\r\nHOST: ${MCAST}:${SPORT}\r\nMAN: "ssdp:discover"\r\nMX: 2\r\nST: ${st}\r\n\r\n`);
+        sock.send(buf, 0, buf.length, SPORT, MCAST, () => { /* */ });
+      }
+      setTimeout(() => { try { sock.close(); } catch { /* */ } resolve([...found.values()]); }, timeoutMs);
+    });
+  });
+}
+
+async function castToTV(tv, castUrl) {
+  const ip = tv.ip, brand = tv.brand || 'unknown';
+  if (!ip) throw new Error('TV has no IP address — call discover_tvs first');
+
+  if (brand === 'samsung') {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(`ws://${ip}:8001/api/v2/`);
+      let done = false;
+      const t = setTimeout(() => { done = true; try { ws.close(); } catch { /* */ } reject(new Error('Samsung TV timeout')); }, 8000);
+      ws.addEventListener('open', () => {
+        ws.send(JSON.stringify({ method: 'ms.channel.connect', params: { name: 'JARVIS', id: 'jarvis-companion' } }));
+      });
+      ws.addEventListener('message', (e) => {
+        if (done) return;
+        const d = JSON.parse(String(e.data || '{}'));
+        if (d.event === 'ms.channel.connect') {
+          done = true; clearTimeout(t);
+          ws.send(JSON.stringify({ method: 'ms.webapps.invoke', params: { id: '3201612006963', action_type: 'NATIVE_LAUNCH', metaTag: castUrl } }));
+          setTimeout(() => { try { ws.close(); } catch { /* */ } resolve({ brand: 'samsung', ip }); }, 400);
+        } else if (/error/i.test(d.event || '')) {
+          done = true; clearTimeout(t); try { ws.close(); } catch { /* */ }
+          reject(new Error('Samsung TV rejected connection'));
+        }
+      });
+      ws.addEventListener('error', () => { if (!done) { done = true; clearTimeout(t); reject(new Error('Samsung WS error')); } });
+    });
+  }
+
+  if (brand === 'lg') {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(`ws://${ip}:3000/`);
+      let done = false;
+      const t = setTimeout(() => { done = true; try { ws.close(); } catch { /* */ } reject(new Error('LG TV timeout')); }, 8000);
+      ws.addEventListener('open', () => {
+        ws.send(JSON.stringify({ type: 'register', id: 'register_0', payload: { client_key: '' } }));
+      });
+      ws.addEventListener('message', (e) => {
+        if (done) return;
+        const d = JSON.parse(String(e.data || '{}'));
+        if (d.type === 'registered' || d.type === 'response') {
+          done = true; clearTimeout(t);
+          ws.send(JSON.stringify({ type: 'request', id: 'open_0', uri: 'ssap://system.launcher/open', payload: { target: castUrl } }));
+          setTimeout(() => { try { ws.close(); } catch { /* */ } resolve({ brand: 'lg', ip }); }, 400);
+        }
+      });
+      ws.addEventListener('error', () => { if (!done) { done = true; clearTimeout(t); reject(new Error('LG TV WS error')); } });
+    });
+  }
+
+  if (brand === 'roku') {
+    const enc = encodeURIComponent(castUrl);
+    await fetch(`http://${ip}:8060/launch/2285`, { method: 'POST', body: `url=${enc}`, headers: { 'content-type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(5000) }).catch(() => { /* channel may not be installed */ });
+    return { brand: 'roku', ip };
+  }
+
+  // unknown brand: try Samsung then LG
+  return castToTV({ ip, brand: 'samsung' }, castUrl).catch(() => castToTV({ ip, brand: 'lg' }, castUrl));
 }
 
 // --- OS open: launch a file/folder/app/URL in its default program (Vinicio's "open X") ---
@@ -376,6 +483,18 @@ async function runTool(name, input) {
     html = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<nav[\s\S]*?<\/nav>/gi, ' ').replace(/<footer[\s\S]*?<\/footer>/gi, ' ');
     const text = stripTags(html).replace(/\s+/g, ' ').trim();
     return text.slice(0, 8000) || '(no readable text found)';
+  }
+  if (name === 'discover_tvs') {
+    const tvs = await discoverTVs(3500);
+    const sUrl = localServerUrl();
+    if (!tvs.length) return 'No TVs found on this network. Make sure the TV is on and connected to the same WiFi, then try again.';
+    return `Found ${tvs.length} TV(s):\n` + tvs.map((t, i) => `${i + 1}. ${t.brand.toUpperCase()} at ${t.ip}`).join('\n') + `\n\nCompanion URL for casting: ${sUrl}\nSay "cast to TV 1" to open Jarvis on it.`;
+  }
+  if (name === 'cast_to_tv') {
+    if (!input.tv || !input.tv.ip) throw new Error('tv with ip required — call discover_tvs first');
+    const castUrl = String(input.url || localServerUrl());
+    const result = await castToTV(input.tv, castUrl);
+    return `Casting to ${result.brand} TV at ${result.ip} — opening ${castUrl}`;
   }
   if (name === 'list_dir') {
     const dir = safe(rel);
@@ -1095,6 +1214,21 @@ const server = http.createServer(async (req, res) => {
       const body = coverLine + prop.content + footer;
       const submitViaPortal = opp && opp.description && /sam\.gov|ebuy|seaport|submit.*portal|electronic.*submission/i.test(opp.description);
       return send(res, 200, JSON.stringify({ ok: true, to, toName, subject, body, title, file: base, submitViaPortal: !!submitViaPortal }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/tv/discover') {
+    try {
+      const tvs = await discoverTVs(3500);
+      return send(res, 200, JSON.stringify({ ok: true, tvs, serverUrl: localServerUrl() }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/tv/cast') {
+    try {
+      const { tv, url: castUrl } = await readBody(req);
+      if (!tv || !castUrl) return send(res, 400, JSON.stringify({ error: 'tv and url required' }));
+      const result = await castToTV(tv, String(castUrl));
+      return send(res, 200, JSON.stringify({ ok: true, ...result }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 

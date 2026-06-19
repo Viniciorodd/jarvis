@@ -53,13 +53,71 @@ function pickVoice() {
 }
 if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 let curAudio = null;
+
+// ── Web Audio: read the REAL audio envelope so the orb reacts to her voice and yours ──
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function ac() { try { if (!audioCtx && AudioCtx) audioCtx = new AudioCtx(); if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch {} return audioCtx; }
+function runMeter(analyser, who, done) {
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  if (window.Orb) Orb.setVoice(who);
+  (function tick() {
+    if (done()) { if (window.Orb) { Orb.setLevel(0); Orb.setVoice(null); } return; }
+    analyser.getByteFrequencyData(data);
+    let s = 0; for (let i = 0; i < data.length; i++) s += data[i];
+    if (window.Orb) Orb.setLevel(Math.min(1, (s / data.length) / 100));
+    requestAnimationFrame(tick);
+  })();
+}
+function meterAudioEl(el) {                 // HER ElevenLabs voice → reactive orb
+  const ctx = ac(); if (!ctx) return;
+  try {
+    const src = ctx.createMediaElementSource(el);
+    const an = ctx.createAnalyser(); an.fftSize = 256; an.smoothingTimeConstant = 0.6;
+    src.connect(an); an.connect(ctx.destination);
+    runMeter(an, 'jarvis', () => el.paused || el.ended);
+  } catch { /* best-effort; audio still plays */ }
+}
+let micMeterStop = null;
+function meterMicStream(stream) {            // YOUR voice → reactive orb + barge-in
+  const ctx = ac(); if (!ctx) return null;
+  try {
+    const src = ctx.createMediaStreamSource(stream);
+    const an = ctx.createAnalyser(); an.fftSize = 256; an.smoothingTimeConstant = 0.5;
+    src.connect(an);                         // NOT to destination — that would echo the mic
+    const data = new Uint8Array(an.frequencyBinCount); let stopped = false;
+    if (window.Orb) Orb.setVoice('user');
+    (function tick() {
+      if (stopped) return;
+      an.getByteFrequencyData(data);
+      let s = 0; for (let i = 0; i < data.length; i++) s += data[i];
+      const lvl = Math.min(1, (s / data.length) / 85);
+      if (window.Orb) Orb.setLevel(lvl);
+      if (lvl > 0.17 && curAudio && !curAudio.paused && !curAudio.ended) stopSpeaking(); // talk over her
+      requestAnimationFrame(tick);
+    })();
+    return () => { stopped = true; if (window.Orb) { Orb.setLevel(0); Orb.setVoice(null); } };
+  } catch { return null; }
+}
+// cut her off mid-sentence — for "let me talk over you" and on every new turn
+function stopSpeaking() {
+  try { if (curAudio && !curAudio.paused) curAudio.pause(); } catch {}
+  try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch {}
+  if (window.Orb) Orb.setLevel(0);
+}
+
 function afterSpeak() { if (!busy) setState(wakeOn ? 'listening' : 'idle', wakeOn ? 'listening' : 'standby'); }
 function browserSpeak(text) {
   if (!('speechSynthesis' in window)) { afterSpeak(); return; }
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   if (preferredVoice) u.voice = preferredVoice;
-  u.rate = 1.04; u.pitch = 1.0; u.onend = afterSpeak;
+  u.rate = 1.04; u.pitch = 1.0;
+  // browser TTS exposes no audio node — drive a gentle speaking pulse so the orb still reacts
+  if (window.Orb) Orb.setVoice('jarvis');
+  const osc = setInterval(() => { if (window.Orb) Orb.setLevel(0.28 + Math.random() * 0.4); }, 95);
+  const stop = () => { clearInterval(osc); if (window.Orb) { Orb.setLevel(0); Orb.setVoice(null); } afterSpeak(); };
+  u.onend = stop; u.onerror = stop;
   speechSynthesis.speak(u);
 }
 async function speak(text) {
@@ -69,9 +127,10 @@ async function speak(text) {
       const r = await fetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
       if (r.ok) {
         const url = URL.createObjectURL(await r.blob());
-        if (curAudio) { curAudio.pause(); }
+        if (curAudio) { try { curAudio.pause(); } catch {} }
         curAudio = new Audio(url);
-        curAudio.onended = () => { URL.revokeObjectURL(url); afterSpeak(); };
+        curAudio.onended = () => { URL.revokeObjectURL(url); if (window.Orb) { Orb.setLevel(0); Orb.setVoice(null); } afterSpeak(); };
+        meterAudioEl(curAudio);
         await curAudio.play(); return;
       }
     } catch { /* fall through to browser voice */ }
@@ -82,6 +141,7 @@ async function speak(text) {
 // ── the brain ────────────────────────────────────────────────────────────
 async function sendToJarvis(text) {
   if (busy || !text.trim()) return;
+  stopSpeaking();                       // a new turn silences whatever she was saying
   busy = true; lastConvo = Date.now(); if (hint) hint.style.display = 'none';
   addMsg('you', text); history.push({ role: 'user', content: text });
   setState('thinking', 'thinking…'); const typing = addTyping();
@@ -101,7 +161,7 @@ async function sendToJarvis(text) {
 }
 
 $('composer').addEventListener('submit', (e) => { e.preventDefault(); const v = input.value; input.value = ''; sendToJarvis(v); });
-$('orb').addEventListener('click', () => { input.focus(); if (!busy && !hasStt) startListen(false); });
+$('orb').addEventListener('click', () => { stopSpeaking(); input.focus(); if (!busy && !hasStt) startListen(false); });
 
 // ── visual panel ───────────────────────────────────────────────────────────
 function showVisual(v) {
@@ -167,13 +227,13 @@ async function updateHome() {
     ]);
     const collected = (dash.money && typeof dash.money.collected === 'number') ? dash.money.collected : ((dash.hq && dash.hq.earned) || 0);
     const rows = [
-      ['Opportunities', String((ops.opportunities || []).length)],
-      ['Needs you', String((ops.leads || []).length)],
-      ['Collected', money(collected)],
-      ['AI spend', dash.spend ? money(dash.spend.total) : '$0.00'],
+      ['Opportunities', String((ops.opportunities || []).length), 'opsBtn'],
+      ['Needs you', String((ops.leads || []).length), 'opsBtn'],
+      ['Collected', money(collected), 'commandBtn'],
+      ['AI spend', dash.spend ? money(dash.spend.total) : '$0.00', 'dashBtn'],
     ];
     const el = $('homeMetrics');
-    if (el) el.innerHTML = rows.map(([k, v]) => `<div class="hm"><div class="hm-v">${esc(v)}</div><div class="hm-k">${esc(k)}</div></div>`).join('');
+    if (el) el.innerHTML = rows.map(([k, v, go]) => `<div class="hm clickable" data-go="${go}" title="Open"><div class="hm-v">${esc(v)}</div><div class="hm-k">${esc(k)}</div></div>`).join('');
   } catch { /* leave last values */ }
 }
 
@@ -226,6 +286,7 @@ function startListen(continuous) {
 }
 
 $('mic').addEventListener('click', () => {
+  stopSpeaking();                           // grabbing the mic interrupts her
   if (hasStt) return toggleRecord();        // Deepgram push-to-talk (works in Electron)
   if (!SR) return startListen(false);
   if (listening && !wakeOn) rec.stop(); else startListen(false);
@@ -328,9 +389,10 @@ async function toggleRecord() {
   catch { addMsg('err', 'Mic blocked — allow microphone access.'); return; }
   mediaRec = new MediaRecorder(stream, MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : {});
   recChunks = []; recording = true; setState('listening', 'listening · tap mic to send');
+  micMeterStop = meterMicStream(stream);    // orb reacts to your voice + lets you talk over her
   mediaRec.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
   mediaRec.onstop = async () => {
-    recording = false; stream.getTracks().forEach((t) => t.stop());
+    recording = false; if (micMeterStop) { micMeterStop(); micMeterStop = null; } stream.getTracks().forEach((t) => t.stop());
     setState('thinking', 'transcribing…');
     try {
       const blob = new Blob(recChunks, { type: 'audio/webm' });
@@ -345,7 +407,7 @@ async function toggleRecord() {
 
 // ── settings: theme swatches (pick by mood) + open/close ─────────────────────
 function applyTheme(name) {
-  const ok = ['teal', 'mono', 'dark'].includes(name) ? name : 'teal';
+  const ok = ['teal', 'mono', 'dark', 'arc'].includes(name) ? name : 'teal';
   document.documentElement.dataset.theme = ok;
   document.querySelectorAll('.theme-swatch').forEach((s) => s.classList.toggle('on', s.dataset.theme === ok));
   try { localStorage.setItem('jarvis-theme', ok); } catch { /* private mode */ }
@@ -356,6 +418,23 @@ applyTheme((() => { try { return localStorage.getItem('jarvis-theme') || 'teal';
 $('settingsBtn').addEventListener('click', () => { $('settingsView').hidden = false; });
 $('settingsX').addEventListener('click', () => { $('settingsView').hidden = true; });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('settingsView').hidden) $('settingsView').hidden = true; });
+
+// ── JARVIS HQ as an in-app tab — opens inside this window, not a separate app ──
+function openHQ() { const f = $('hqFrame'); if (f && !f.getAttribute('src')) f.src = hqUrl; const pop = $('hqPop'); if (pop) pop.href = hqUrl; $('hqView').hidden = false; }
+function closeHQ() { $('hqView').hidden = true; }
+window.JarvisHQ = { open: openHQ, close: closeHQ };
+$('hqBtn').addEventListener('click', openHQ);
+$('hqX').addEventListener('click', closeHQ);
+$('hqRefresh').addEventListener('click', () => { const f = $('hqFrame'); if (f) f.src = hqUrl + (hqUrl.includes('?') ? '&' : '?') + 't=' + Date.now(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('hqView').hidden) closeHQ(); });
+
+// ── everything clickable: the dashboard rail + home headline jump to the right view ──
+function tap(btnId) { const b = $(btnId); if (b) b.click(); }
+['urgentList', 'emailList', 'taskList'].forEach((id) => $(id).addEventListener('click', (e) => { if (!e.target.closest('.ds-empty')) tap('opsBtn'); }));
+$('opsList').addEventListener('click', (e) => { if (!e.target.closest('.ds-empty')) tap('floorBtn'); });
+$('feedList').addEventListener('click', (e) => { if (!e.target.closest('.ds-empty')) tap('activityBtn'); });
+$('homeMetrics').addEventListener('click', (e) => { const hm = e.target.closest('[data-go]'); if (hm) tap(hm.getAttribute('data-go')); });
+document.querySelector('.dash-grid').addEventListener('click', () => tap('commandBtn'));
 
 // ── boot ─────────────────────────────────────────────────────────────────────
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('load failed: ' + src)); document.head.appendChild(s); }); }
@@ -372,4 +451,9 @@ updateHome();
 setInterval(updateHome, 45000);
 
 setState('idle', 'standby');
-setTimeout(() => { const g = "Online. Good to see you, Vinicio — what are we working on?"; addMsg('j', g); speak(g); }, 700);
+// Greet once per calendar day — not on every toggle/reopen of the Electron window
+const _todayKey = new Date().toISOString().slice(0, 10);
+if (localStorage.getItem('jarvis-last-greet') !== _todayKey) {
+  localStorage.setItem('jarvis-last-greet', _todayKey);
+  setTimeout(() => { const g = "Online. Good to see you, Vinicio — what are we working on?"; addMsg('j', g); speak(g); }, 700);
+}

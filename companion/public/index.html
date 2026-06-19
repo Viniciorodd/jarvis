@@ -26,6 +26,7 @@
         <button class="floor-btn" id="opsBtn" title="Operations cockpit — leads, opportunities, proposals, CRM">⛭ Operations</button>
         <button class="floor-btn" id="mapBtn" title="Map — where the work is">▣ Map</button>
         <button class="floor-btn" id="floorBtn" title="The floor — your agents, by room">▦ Floor</button>
+        <button class="floor-btn" id="hqBtn" title="JARVIS HQ — the game floor, embedded in this window">⬢ HQ</button>
         <button class="floor-btn" id="activityBtn" title="Activity log — calendar + what was done each day">📋 Activity</button>
         <button class="t-btn" id="dashBtn" title="Toggle the dashboard">📊 Dashboard</button>
         <button class="t-btn" id="settingsBtn" title="Settings — theme, voice, conversation">⚙ Settings</button>
@@ -115,6 +116,11 @@
       <div class="ops-reader-bar"><span class="ops-reader-cap px" id="oppDetailCap">Opportunity</span><button class="ops-x" id="oppDetailX">✕</button></div>
       <div class="ops-detail-body" id="oppDetailBody"></div>
     </div>
+    <!-- email composition panel -->
+    <div class="ops-reader" id="emailPanel" hidden>
+      <div class="ops-reader-bar"><span class="ops-reader-cap px" id="emailPanelCap">Prepare email</span><button class="ops-x" id="emailPanelX">✕</button></div>
+      <div class="email-compose" id="emailCompose"></div>
+    </div>
     <!-- approve confirmation: shows EXACTLY what will happen before you approve -->
     <div class="ops-confirm" id="opsConfirm" hidden>
       <div class="ops-confirm-card">
@@ -173,6 +179,7 @@
       <span class="cmd-clock" id="cmdClock"></span>
       <button class="floor-btn" id="cmdBrief" title="Speak the briefing">🔊 Briefing</button>
       <button class="floor-btn" id="cmdFull" title="Full screen — cast to a TV">⛶ Full screen</button>
+      <button class="floor-btn" id="cmdCast" title="Cast Command Center to a TV on your network">📺 Cast</button>
       <button class="ops-refresh" id="commandRefresh" title="Refresh">⟳</button>
       <button class="ops-x" id="commandX" title="Close">✕</button>
     </div>
@@ -209,6 +216,18 @@
     </div>
   </div>
 
+  <!-- JARVIS HQ (in-app tab — the game floor, embedded here instead of a separate window) -->
+  <div class="hqview" id="hqView" hidden>
+    <div class="ops-head">
+      <span class="px ops-brand">⬢ JARVIS HQ</span>
+      <span class="map-stat" id="hqStat">the game floor — live</span>
+      <a class="btn ghost" id="hqPop" target="_blank" rel="noreferrer" style="font-size:11px; padding:5px 11px;">open in browser ↗</a>
+      <button class="ops-refresh" id="hqRefresh" title="Refresh">⟳</button>
+      <button class="ops-x" id="hqX" title="Close">✕</button>
+    </div>
+    <iframe class="hq-frame" id="hqFrame" title="JARVIS HQ" referrerpolicy="no-referrer"></iframe>
+  </div>
+
   <!-- SETTINGS view -->
   <div class="settingsview" id="settingsView" hidden>
     <div class="ops-head">
@@ -220,10 +239,16 @@
       <div class="set-sec">
         <div class="set-h">Theme — pick by mood</div>
         <div class="theme-swatches">
+          <button class="theme-swatch" data-theme="arc"><span class="sw sw-arc"></span>Arc · obsidian glass <span class="sw-new">NEW</span></button>
           <button class="theme-swatch" data-theme="teal"><span class="sw sw-teal"></span>Teal</button>
           <button class="theme-swatch" data-theme="mono"><span class="sw sw-mono"></span>Mono</button>
           <button class="theme-swatch" data-theme="dark"><span class="sw sw-dark"></span>Full dark</button>
         </div>
+      </div>
+      <div class="set-sec">
+        <div class="set-h">Display</div>
+        <button class="t-btn set-toggle" id="clockBtn" title="12-hour or 24-hour clock">🕛 Clock: 12-hour</button>
+        <p class="set-note">Switches the Command Center clock between 12-hour (3:40 PM) and 24-hour (15:40).</p>
       </div>
       <div class="set-sec">
         <div class="set-h">Voice &amp; conversation</div>

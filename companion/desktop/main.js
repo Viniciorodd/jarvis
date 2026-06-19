@@ -28,6 +28,7 @@ function createWindow() {
     width: 900, height: 760, minWidth: 420, minHeight: 520,
     frame: false, backgroundColor: '#04070f', show: false,
     title: 'JARVIS', alwaysOnTop: false,
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: { contextIsolation: true },
   });
   win.removeMenu();
@@ -46,10 +47,13 @@ function toggle() {
 }
 
 function makeTray() {
-  // 1x1 transparent fallback so Tray never crashes if no icon asset is present
-  const img = nativeImage.createFromDataURL(
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
-  );
+  let img = nativeImage.createFromPath(path.join(__dirname, 'tray.png'));
+  if (img.isEmpty()) {
+    // 1x1 transparent fallback if icon file is missing
+    img = nativeImage.createFromDataURL(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+    );
+  }
   try {
     tray = new Tray(img);
     tray.setToolTip('JARVIS');

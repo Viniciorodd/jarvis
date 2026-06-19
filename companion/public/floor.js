@@ -83,7 +83,7 @@
     el('floorStat').textContent = `${rooms.length} decks · ${rooms.reduce((n, r) => n + r.people.length, 0)} agents · ${active} active`;
     body.innerHTML = `<div class="cutaway-wrap">${cutaway(rooms)}</div>`;
     const link = el('floorHqLink');
-    if (link && d.hqUrl) { link.href = d.hqUrl; link.style.display = ''; }
+    if (link) { link.style.display = ''; link.textContent = '⬢ open HQ'; link.onclick = (e) => { e.preventDefault(); if (window.JarvisHQ) window.JarvisHQ.open(); }; }
   }
 
   function open() { el('floorView').hidden = false; load(); }

@@ -62,10 +62,11 @@
   }
   function stopCore() { if (raf) cancelAnimationFrame(raf); raf = null; }
 
+  function clock12() { try { return localStorage.getItem('jarvis-clock') !== '24'; } catch { return true; } } // default 12-hour
   function clock() {
     const c = el('cmdClock'); if (!c) return;
     const d = new Date();
-    c.textContent = d.toLocaleTimeString('en-US', { hour12: false }) + '  ·  ' + d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    c.textContent = d.toLocaleTimeString('en-US', { hour12: clock12() }) + '  ·  ' + d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
   async function load() {
@@ -132,9 +133,37 @@
   el('commandX').addEventListener('click', close);
   el('commandRefresh').addEventListener('click', load);
   el('cmdBrief').addEventListener('click', brief);
-  // K4: cast to a wall TV — full-screen the command center
+  // K4: full-screen the command center (for casting via browser)
   const full = el('cmdFull');
   if (full) full.addEventListener('click', () => { const v = el('commandView'); if (!document.fullscreenElement) { (v.requestFullscreen || v.webkitRequestFullscreen || function () {}).call(v); } else { (document.exitFullscreen || function () {}).call(document); } });
+
+  // K5: TV cast — discover LAN TVs and open the companion on the first one found
+  const castBtn = el('cmdCast');
+  if (castBtn) {
+    castBtn.addEventListener('click', async () => {
+      castBtn.textContent = '📡 Scanning...'; castBtn.disabled = true;
+      try {
+        const d = await fetch('/api/tv/discover').then((r) => r.json());
+        if (!d.tvs || !d.tvs.length) {
+          castBtn.textContent = '📺 No TV found';
+          setTimeout(() => { castBtn.textContent = '📺 Cast'; castBtn.disabled = false; }, 3500);
+          return;
+        }
+        const tv = d.tvs[0];
+        castBtn.textContent = `📡 Casting to ${tv.brand}...`;
+        const castUrl = (d.serverUrl || window.location.origin) + '/';
+        const r = await fetch('/api/tv/cast', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tv, url: castUrl }) }).then((r) => r.json());
+        if (r.ok) { castBtn.textContent = `📺 Live on ${(tv.brand || '').toUpperCase()}`; }
+        else { castBtn.textContent = '📺 Cast failed'; }
+        setTimeout(() => { castBtn.textContent = '📺 Cast'; castBtn.disabled = false; }, 5000);
+      } catch {
+        castBtn.textContent = '📺 Cast failed';
+        setTimeout(() => { castBtn.textContent = '📺 Cast'; castBtn.disabled = false; }, 3500);
+      }
+    });
+  }
+  // Auto-open Command Center when URL contains ?cmd=1 (e.g. when cast from TV)
+  if (/[?&]cmd=1/.test(window.location.search)) open();
   // exposed so the wake word ("Hey Jarvis, wake up") can open the center + speak the brief
   window.JarvisCommand = { open, close, brief };
   // K2: scheduled spoken brief — while the app is open, speak it once at the chosen hour (default 8am),
@@ -156,5 +185,9 @@
   const baBtn = el('briefAutoBtn');
   function paintBA() { if (baBtn) baBtn.textContent = '🔊 Morning briefing: ' + (localStorage.getItem('jarvis-brief-off') === '1' ? 'off' : 'on'); }
   if (baBtn) { paintBA(); baBtn.addEventListener('click', () => { try { localStorage.setItem('jarvis-brief-off', localStorage.getItem('jarvis-brief-off') === '1' ? '0' : '1'); } catch { /* */ } paintBA(); }); }
+  // Settings: 12-hour vs 24-hour clock (Command Center)
+  const clkBtn = el('clockBtn');
+  function paintClock() { if (clkBtn) clkBtn.textContent = '🕛 Clock: ' + (clock12() ? '12-hour' : '24-hour'); }
+  if (clkBtn) { paintClock(); clkBtn.addEventListener('click', () => { try { localStorage.setItem('jarvis-clock', clock12() ? '24' : '12'); } catch { /* */ } paintClock(); clock(); }); }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el('commandView').hidden && !document.fullscreenElement) close(); });
 })();

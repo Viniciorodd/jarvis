@@ -241,12 +241,20 @@ function safe(p) {
 // ── TV discovery (SSDP) + cast (Samsung WS · LG WebOS · Roku ECP) ────────────────────────────────
 function localServerUrl() {
   const ifaces = os.networkInterfaces();
+  const candidates = [];
   for (const list of Object.values(ifaces)) {
     for (const iface of (list || [])) {
-      if (iface.family === 'IPv4' && !iface.internal) return `http://${iface.address}:${PORT}`;
+      if (iface.family !== 'IPv4' || iface.internal) continue;
+      const a = iface.address;
+      // prefer RFC-1918 LAN IPs over Tailscale/VPN ranges (100.x.x.x)
+      const lan = /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a);
+      candidates.push({ address: a, lan });
     }
   }
-  return `http://localhost:${PORT}`;
+  const lan = candidates.find((c) => c.lan);
+  const any = candidates[0];
+  const addr = (lan || any || {}).address;
+  return addr ? `http://${addr}:${PORT}` : `http://localhost:${PORT}`;
 }
 
 function discoverTVs(timeoutMs) {

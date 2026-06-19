@@ -22,7 +22,8 @@ _Updated 2026-06-19. Everything is committed to git + saved to memory. Resume fr
   shadow). Studio UI has a type switcher + per-type previews + natural-size PNG export. Worker routes
   cover/logo too. Routes `/api/studio/{thumbnail,cover,logo}` + `/api/studio/product`.
 - **Portfolio = master gallery `fiverr/portfolio/index.html`** (real PNGs + Download buttons that work from a
-  plain file open): 4 thumbnails, 2 covers, 3 logos, 1 product. Folders: `thumbnails/ covers/ logos/ products/`.
+  plain file open), niche spread (real estate / business / trading / crypto / finance / fitness / …):
+  8 thumbnails, 5 covers, 6 logos, 1 product. Folders: `thumbnails/ covers/ logos/ products/`.
 - ⏭ Next for Fiverr: a couple more product samples; publish the actual gigs; land the first paid order.
 
 ### 🆕 2026-06-16 — shipped

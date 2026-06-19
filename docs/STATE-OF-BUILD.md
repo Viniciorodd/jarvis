@@ -89,8 +89,9 @@ The real `operating-doctrine.md` (now canonical) asks for more than the 5 direct
    contact shadow). Studio UI has a type selector (Thumbnail/Cover/Logo/Product), per-type previews (YouTube
    card / book mock / logo on dark+light / before-after), and natural-size PNG export. Routes:
    `/api/studio/{thumbnail,cover,logo}` + `/api/studio/product` (data-URI upload). Worker routes cover/logo too.
-   Portfolio = one master gallery `fiverr/portfolio/index.html` (real PNG samples, Download buttons): 4
-   thumbnails, 2 covers, 3 logos, 1 product. All verified in-browser. Next: more product samples + first paid order.
+   Portfolio = one master gallery `fiverr/portfolio/index.html` (real PNG samples, Download buttons) spanning
+   niches (real estate / business / trading / crypto / finance / fitness / etc.): 8 thumbnails, 5 covers,
+   6 logos, 1 product. All verified in-browser. Next: more product samples + first paid order.
 5. 🟡 **Chief of Staff router + email triage at L0→L1** — ✅ ROUTER BUILT & persona-aware (`pods/org.mjs`
    full chain of command: CEO/CFO/Elle + business pods + Real Estate/Legal/Personal, each with nickname +
    codename + reports-to + model tier). Resolves "ask the CFO" → person; has `scan now` + `full report`

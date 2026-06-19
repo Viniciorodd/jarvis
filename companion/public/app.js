@@ -253,7 +253,7 @@ async function dgWakeSegment() {
         if (/\bjarvis\b/i.test(said)) {                       // "Hey/Hello Jarvis ..." wake
           const cmd = said.replace(/^.*?\bjarvis\b[\s,:.!-]*/i, '').trim();
           lastConvo = now;
-          if (cmd.length > 1) sendToJarvis(cmd); else { addMsg('j', 'Yes?'); speak('Yes?'); }
+          wakeCommand(cmd);
         } else if (openConvo && (now - lastConvo) < CONVO_WINDOW && said.length > 1) {
           sendToJarvis(said);                                  // open conversation: no wake needed
         }
@@ -264,10 +264,20 @@ async function dgWakeSegment() {
   dgRec.start();
   setTimeout(() => { try { dgRec && dgRec.state === 'recording' && dgRec.stop(); } catch {} }, 5000);
 }
+// "Hey Jarvis …" → if he says wake up / brief me / command, open the Command Center and speak the brief;
+// otherwise it's a normal command.
+function wakeCommand(cmd) {
+  const c = String(cmd || '').toLowerCase().trim();
+  if (!c || c.length <= 1) { addMsg('j', 'Yes?'); speak('Yes?'); return; }
+  if (/^(wake up|wake|good morning|brief( me)?|briefing|command( center)?|status report|sitrep|dashboard)\b/.test(c) && window.JarvisCommand) {
+    window.JarvisCommand.open(); window.JarvisCommand.brief(); return;
+  }
+  sendToJarvis(cmd);
+}
 function startWake() {
   if (hasVosk && window.VoskWake) {                 // best: 100% offline, private, always-on
     usingVoskWake = true;
-    window.VoskWake.start((cmd) => sendToJarvis(cmd), (st, label) => {
+    window.VoskWake.start((cmd) => wakeCommand(cmd), (st, label) => {
       if (st === 'error') addMsg('err', 'wake: ' + label);
       if (!busy) setState('listening', label || 'listening');
     });

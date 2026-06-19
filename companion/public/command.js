@@ -11,6 +11,7 @@
 
   // ── the animated CORE (particle sphere) ──────────────────────────────────────────────
   function teal() { const v = getComputedStyle(document.documentElement).getPropertyValue('--teal-rgb').trim(); return v || '57,224,208'; }
+  function coreStyle() { try { return localStorage.getItem('jarvis-core') || 'sphere'; } catch { return 'sphere'; } }
   function startCore() {
     const cv = el('cmdCore'); if (!cv) return;
     const ctx = cv.getContext('2d');
@@ -20,24 +21,40 @@
     const N = 520, pts = [];
     for (let i = 0; i < N; i++) { const y = 1 - (i / (N - 1)) * 2; const rad = Math.sqrt(1 - y * y); const th = i * 2.399963; pts.push([Math.cos(th) * rad, y, Math.sin(th) * rad]); }
     let a = 0;
-    function frame() {
-      const rgb = teal(); a += 0.0042; const t = Date.now() / 1000;
-      ctx.clearRect(0, 0, W, H);
+    // calm teal particle sphere (default, theme-tinted)
+    function sphere(rgb, t) {
       const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.36;
-      const pulse = 1 + Math.sin(t * 1.4) * 0.04;
-      const cos = Math.cos(a), sin = Math.sin(a);
-      // core glow
+      const pulse = 1 + Math.sin(t * 1.4) * 0.04, cos = Math.cos(a), sin = Math.sin(a);
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.5);
       g.addColorStop(0, `rgba(${rgb},0.34)`); g.addColorStop(0.4, `rgba(${rgb},0.10)`); g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.5, 0, 7); ctx.fill();
       for (const p of pts) {
         const x = p[0] * cos - p[2] * sin, z = p[0] * sin + p[2] * cos, y = p[1];
-        const depth = (z + 1) / 2; const px = cx + x * R * pulse, py = cy + y * R * pulse;
-        const r = (0.6 + depth * 1.9) * DPR; const al = 0.18 + depth * 0.72;
+        const depth = (z + 1) / 2, px = cx + x * R * pulse, py = cy + y * R * pulse, r = (0.6 + depth * 1.9) * DPR, al = 0.18 + depth * 0.72;
         ctx.beginPath(); ctx.fillStyle = `rgba(${rgb},${al.toFixed(3)})`; ctx.arc(px, py, r, 0, 7); ctx.fill();
       }
-      // bright center
       ctx.beginPath(); ctx.fillStyle = `rgba(${rgb},${(0.5 + Math.sin(t * 2) * 0.12).toFixed(3)})`; ctx.arc(cx, cy, 3 * DPR * pulse, 0, 7); ctx.fill();
+    }
+    // colorful neural burst (Z.E.R.O. style): hue-cycling lightning bolts from a hot center
+    function burst(t) {
+      const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.42, bolts = 18;
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < bolts; i++) {
+        const ang = (i / bolts) * Math.PI * 2 + t * 0.12, hue = (i * 20 + t * 45) % 360;
+        ctx.strokeStyle = `hsla(${hue},92%,62%,0.65)`; ctx.lineWidth = 1.4 * DPR; ctx.shadowBlur = 14 * DPR; ctx.shadowColor = `hsl(${hue},92%,60%)`;
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        const segs = 9, len = R * (0.55 + 0.45 * Math.abs(Math.sin(t * 1.6 + i)));
+        for (let s = 1; s <= segs; s++) { const f = s / segs, aa = ang + Math.sin(t * 8 + i * 3 + s) * 0.17; ctx.lineTo(cx + Math.cos(aa) * len * f, cy + Math.sin(aa) * len * f); }
+        ctx.stroke();
+      }
+      ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over';
+      const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.55);
+      cg.addColorStop(0, `hsla(${(t * 60) % 360},92%,78%,0.9)`); cg.addColorStop(0.5, `hsla(${(t * 60 + 140) % 360},92%,62%,0.22)`); cg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(cx, cy, R * 0.55, 0, 7); ctx.fill();
+    }
+    function frame() {
+      const t = Date.now() / 1000; ctx.clearRect(0, 0, W, H);
+      if (coreStyle() === 'burst') burst(t); else { a += 0.0042; sphere(teal(), t); }
       raf = requestAnimationFrame(frame);
     }
     window.addEventListener('resize', size);
@@ -91,7 +108,8 @@
     return bids ? '~' + money(bids * 40000) : '$0';
   }
 
-  function brief() {
+  async function brief() {
+    if (!data.ops) { try { await load(); } catch { /* */ } }
     const dash = data.dash || {}, ops = data.ops || {};
     const h = new Date().getHours();
     const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
@@ -114,5 +132,29 @@
   el('commandX').addEventListener('click', close);
   el('commandRefresh').addEventListener('click', load);
   el('cmdBrief').addEventListener('click', brief);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el('commandView').hidden) close(); });
+  // K4: cast to a wall TV — full-screen the command center
+  const full = el('cmdFull');
+  if (full) full.addEventListener('click', () => { const v = el('commandView'); if (!document.fullscreenElement) { (v.requestFullscreen || v.webkitRequestFullscreen || function () {}).call(v); } else { (document.exitFullscreen || function () {}).call(document); } });
+  // exposed so the wake word ("Hey Jarvis, wake up") can open the center + speak the brief
+  window.JarvisCommand = { open, close, brief };
+  // K2: scheduled spoken brief — while the app is open, speak it once at the chosen hour (default 8am),
+  // and a weekly note on Mondays. Off via Settings.
+  setInterval(() => {
+    try {
+      if (localStorage.getItem('jarvis-brief-off') === '1') return;
+      const hr = Number(localStorage.getItem('jarvis-brief-hour')); const want = isNaN(hr) ? 8 : hr;
+      const now = new Date(), key = now.toISOString().slice(0, 10);
+      if (now.getHours() === want && localStorage.getItem('jarvis-last-brief') !== key) {
+        localStorage.setItem('jarvis-last-brief', key); open(); brief();
+      }
+    } catch { /* */ }
+  }, 60000);
+  // Settings toggles (core style + auto-briefing) — wired here since Command owns them
+  const coreBtn = el('coreStyleBtn');
+  function paintCore() { if (coreBtn) coreBtn.textContent = '◉ Core: ' + (coreStyle() === 'burst' ? 'neural burst' : 'sphere'); }
+  if (coreBtn) { paintCore(); coreBtn.addEventListener('click', () => { try { localStorage.setItem('jarvis-core', coreStyle() === 'burst' ? 'sphere' : 'burst'); } catch { /* */ } paintCore(); }); }
+  const baBtn = el('briefAutoBtn');
+  function paintBA() { if (baBtn) baBtn.textContent = '🔊 Morning briefing: ' + (localStorage.getItem('jarvis-brief-off') === '1' ? 'off' : 'on'); }
+  if (baBtn) { paintBA(); baBtn.addEventListener('click', () => { try { localStorage.setItem('jarvis-brief-off', localStorage.getItem('jarvis-brief-off') === '1' ? '0' : '1'); } catch { /* */ } paintBA(); }); }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el('commandView').hidden && !document.fullscreenElement) close(); });
 })();

@@ -147,6 +147,8 @@ OPENING THINGS ON HIS PC: use open_path to actually OPEN a file, folder, app, or
 
 SHOWING VISUALS: use show_visual to put something on his screen inside the Jarvis window — a MAP (type "map", give a place/address as query), an IMAGE (type "image", give an image URL), or a WEBPAGE (type "web", give a URL). When he says "show me a map of X" or "pull up an image of Y", call show_visual. Say one line about what you're showing.
 
+PERSONAL LIFE — just as important as the businesses: you're his life copilot, not only a work tool. Help with personal requests, comfort, planning, errands, learning, and plain curiosity. For ANYTHING current or beyond your training, USE THE WEB: web_search (look something up / "who is" / "what is" / find facts / compare options), news (recent events + headlines on a topic — "what's the news on X", "latest on Y"), web_read (open a page or article and summarize it). Pull the info, then give him the short answer out loud (offer to show_visual or open_path the source if useful). He can also tell you to open apps or sites — YouTube, Spotify, Steam, a game, Discord, OBS, any website — just open_path it. Treat his time, comfort, and family (his mother, father, and Ana) with genuine care.
+
 DROPPED FILES: when he drags a document onto you, you'll get a system note with its saved path under _dropbox/. Read it and help — summarize, edit, answer questions about it.
 
 MAKING IMAGES (Fiverr pod): use generate_image to actually CREATE real raster art (FLUX via fal.ai) — thumbnails, book covers, product shots, logos. Use it when he asks you to "make/design/generate" an image. It displays in your window. Tell him it's a draft to QC before delivering to any client, and that a per-image cost cap is enforced in code. If it errors about a missing key, tell him to add FAL_KEY to .env.
@@ -216,6 +218,12 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
   { name: 'notion_read', description: 'Read the text content of a Notion page by its ID (from notion_search).',
     input_schema: { type: 'object', properties: { page_id: { type: 'string' } }, required: ['page_id'] } },
+  { name: 'web_search', description: 'Search the WEB for current info (personal or work). Use for "look up / search / find / who is / what is / pull up info on …" — anything beyond your training or that needs to be current. Returns top results with snippets + URLs.',
+    input_schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
+  { name: 'news', description: 'Get RECENT NEWS / current events on a topic (or top headlines if no topic). Use for "what\'s the news on …", "latest on …", "recent events", "what\'s happening with …". Returns fresh headlines with source + date.',
+    input_schema: { type: 'object', properties: { query: { type: 'string', description: 'a topic; omit for top headlines' } } } },
+  { name: 'web_read', description: 'Fetch a web page by URL and return its readable text, so you can summarize an article/page the user points to or that web_search/news surfaced.',
+    input_schema: { type: 'object', properties: { url: { type: 'string', description: 'a full http(s) URL' } }, required: ['url'] } },
 ];
 
 // resolve a path safely: absolute (inside any allowed root) or relative (inside the primary root)
@@ -335,8 +343,40 @@ async function scanTree(dir, maxDepth) {
   return lines.join('\n') || '(empty)';
 }
 
+const stripTags = (s) => String(s || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+const decodeDDG = (u) => { try { const m = String(u).match(/[?&]uddg=([^&]+)/); return m ? decodeURIComponent(m[1]) : (u.startsWith('//') ? 'https:' + u : u); } catch { return u; } };
+
 async function runTool(name, input) {
   const rel = input.path || '';
+  // ── personal life: web search, news, read-a-page (no API key needed) ──
+  if (name === 'web_search') {
+    const q = String(input.query || '').trim(); if (!q) throw new Error('query required');
+    const html = await (await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q), { headers: { 'user-agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) })).text();
+    const out = []; const re = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g; let m;
+    while ((m = re.exec(html)) && out.length < 8) { const title = stripTags(m[2]); if (title) out.push({ title, url: decodeDDG(m[1]) }); }
+    const snips = [...html.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g)].map((s) => stripTags(s[1]));
+    out.forEach((o, i) => { o.snippet = snips[i] || ''; });
+    if (!out.length) return 'No web results (try rephrasing).';
+    return out.map((o, i) => `${i + 1}. ${o.title}\n   ${o.snippet}\n   ${o.url}`).join('\n\n');
+  }
+  if (name === 'news') {
+    const q = String(input.query || input.topic || '').trim();
+    const url = q ? 'https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=en-US&gl=US&ceid=US:en' : 'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en';
+    const xml = await (await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) })).text();
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 8).map((it) => {
+      const b = it[1];
+      return { title: stripTags((b.match(/<title>([\s\S]*?)<\/title>/) || [])[1]), src: stripTags((b.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1]), date: ((b.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || '').replace(/\s*\+0000/, '').trim() };
+    });
+    if (!items.length) return 'No news found.';
+    return items.map((n, i) => `${i + 1}. ${n.title}${n.src ? ' — ' + n.src : ''}${n.date ? ' (' + n.date + ')' : ''}`).join('\n');
+  }
+  if (name === 'web_read') {
+    const u = String(input.url || '').trim(); if (!/^https?:\/\//.test(u)) throw new Error('a full http(s) URL is required');
+    let html = await (await fetch(u, { headers: { 'user-agent': 'Mozilla/5.0' }, redirect: 'follow', signal: AbortSignal.timeout(15000) })).text();
+    html = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<nav[\s\S]*?<\/nav>/gi, ' ').replace(/<footer[\s\S]*?<\/footer>/gi, ' ');
+    const text = stripTags(html).replace(/\s+/g, ' ').trim();
+    return text.slice(0, 8000) || '(no readable text found)';
+  }
   if (name === 'list_dir') {
     const dir = safe(rel);
     const items = await fsp.readdir(dir, { withFileTypes: true });

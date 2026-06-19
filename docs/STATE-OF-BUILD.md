@@ -35,7 +35,8 @@ and formal **autonomy ladder with promotion rules** (workflows are human-gated b
 2. Chief of Staff + email triage L0→L1 — 🟡 (morning brief + EOD + email-triage workflow + gated send exist; autonomy levels not formalized)
 3. Eval harness + tracing — ❌
 4. Gov scout + bid analyst (drafting only) — ✅ **strong** (scout→analyst→producer→gated send; **first proposal sent to West Point CO**)
-5. One cash-flow pod (Fiverr) — 🟡 (producer + revision prompts + portfolio exist; **not earning; image output quality is poor — see below**)
+5. One cash-flow pod (Fiverr) — 🟢 (producer + revision prompts + portfolio exist; **thumbnail quality SOLVED**
+   — hybrid engine now ships real, clickable YouTube thumbnails via a live Studio + voice path; not yet earning)
 6. Research-&-Risk desk (monitor + journal only) — ❌ (not built)
 
 ## Built beyond the original plan (real, but off the critical path)
@@ -73,9 +74,23 @@ The real `operating-doctrine.md` (now canonical) asks for more than the 5 direct
 3. ✅ **Code-enforced money/caps** — BUILT + tested (`control-plane/spend.mjs`).
 4. ✅ **Real media for the Fiverr cash pod** — provider-aware engine (`scripts/gen-image.mjs`, Cloudflare
    FLUX-schnell FREE default + fal.ai paid backup, $10 code cap) + companion `generate_image` tool wired.
-   **TESTED & WORKING** — generated sample thumbnail (shocked entrepreneur, blue rim lighting, bold text).
-   Note: FLUX-schnell text-rendering is imperfect; for production, either avoid fine text or post-edit with
-   Photoroom / remove.bg. Next: wire into gig-producer flow + add product-edit step (bg removal, relight).
+   ✅ **THUMBNAIL QUALITY SOLVED (2026-06-19) via a HYBRID engine** (`scripts/make-thumbnail.mjs`): Claude
+   designs the spec → FLUX paints the photoreal SUBJECT (free) → CODE composites the bold, legible headline
+   on top → one self-contained 1280×720 SVG. This is how real designers work, and it sidesteps FLUX's mangled
+   text. Surfaced as a **live Studio** (Companion → Operations → 🎨 Fiverr Studio → 🎨 Studio): type a client
+   scenario → see it rendered in a real YouTube in-feed card → **Download PNG** (client-side canvas, untainted).
+   The Fiverr **worker** routes `thumbnail` briefs through this engine (voice/chat: "have Remy make a thumbnail
+   for X"), still behind the deliver gate.
+   ✅ **FULL STUDIO (2026-06-19): 4 deliverable types.** Shared lib `scripts/studio-lib.mjs` + four engines:
+   `make-thumbnail.mjs` (MrBeast-style: extreme expression, hyper-saturated color-grade, huge minimal text),
+   `make-cover.mjs` (hybrid book/eBook cover, KDP 1600×2400, genre-aware type), `make-logo.mjs` (clean VECTOR
+   logo — Claude designs spec, code composes monogram + wordmark; no FLUX so it's always crisp), and
+   `edit-product.mjs` (fal.ai BiRefNet bg-removal via the STUDIO-01-scoped FAL_KEY → clean studio backdrop +
+   contact shadow). Studio UI has a type selector (Thumbnail/Cover/Logo/Product), per-type previews (YouTube
+   card / book mock / logo on dark+light / before-after), and natural-size PNG export. Routes:
+   `/api/studio/{thumbnail,cover,logo}` + `/api/studio/product` (data-URI upload). Worker routes cover/logo too.
+   Portfolio = one master gallery `fiverr/portfolio/index.html` (real PNG samples, Download buttons): 4
+   thumbnails, 2 covers, 3 logos, 1 product. All verified in-browser. Next: more product samples + first paid order.
 5. 🟡 **Chief of Staff router + email triage at L0→L1** — ✅ ROUTER BUILT & persona-aware (`pods/org.mjs`
    full chain of command: CEO/CFO/Elle + business pods + Real Estate/Legal/Personal, each with nickname +
    codename + reports-to + model tier). Resolves "ask the CFO" → person; has `scan now` + `full report`
@@ -91,16 +106,17 @@ The real `operating-doctrine.md` (now canonical) asks for more than the 5 direct
    preferred wake path. Only the live mic test is on the user.
 9. **Refactor HQ + Companion to be control-plane clients**; deploy Langfuse + move event store to NAS Postgres.
 
-## The image/video quality problem (why the mockups look bad)
-The Fiverr samples are **SVG vector illustrations drawn in code** — fine for diagrams, wrong for what a
-paying client expects (polished raster art / photoreal edits). Claude cannot generate images. To deliver
-"Photoshop-pro" work the Producer must call a real media model:
-- **Thumbnails / text-in-image:** Ideogram or Google Gemini 2.5 Flash Image ("Nano-Banana") — strong legible text.
-- **General art / covers:** FLUX.1 (via fal.ai or Replicate) or OpenAI `gpt-image-1`.
-- **Product-photo edits (bg removal, relight):** Photoroom / remove.bg + FLUX-Kontext for compositing.
+## The image/video quality problem — ✅ SOLVED for thumbnails (2026-06-19)
+**Thumbnails are done** via the hybrid engine (photo subject + code-composited text — see build #4 above).
+The original problem (Claude-SVG draws people as crude silhouettes; FLUX mangles text) is sidestepped by
+letting each do what it's good at. Remaining gig types still want the same playbook:
+- **Thumbnails / text-in-image:** ✅ hybrid FLUX-subject + composited headline (`scripts/make-thumbnail.mjs`).
+  Optional upgrade: Ideogram / Gemini 2.5 Flash Image ("Nano-Banana") for in-image text if ever needed.
+- **General art / covers:** hybrid is portable here next (FLUX subject + composited title); FLUX.1 via fal.ai/Replicate.
+- **Product-photo edits (bg removal, relight):** Photoroom / remove.bg + FLUX-Kontext for compositing (not built).
 - **Video:** Google Veo 3.1, Kling, or Runway Gen-4 (pricier; phase later).
-This needs **one image-API key + a small per-image budget** (~$0.003–0.04/image) and stays behind the
-human-QC gate. Provider + budget is an owner decision (credentials + money → ask first).
+Image gen stays behind the human-QC gate with the $10/mo code-enforced cap. Cloudflare FLUX is free (no card);
+fal.ai is the paid backup. Provider/budget changes remain an owner decision (credentials + money → ask first).
 
 **DECIDED 2026-06-14:** provider = **fal.ai (FLUX)** — switched from OpenAI after the OpenAI account hit
 `billing_hard_limit`. Cap = **$10/mo, code-enforced**. Engine `scripts/gen-image.mjs` is **provider-aware**

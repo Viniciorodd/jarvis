@@ -17,7 +17,7 @@ const os = require('node:os');
 const { spawn } = require('node:child_process');
 const google = require('./google');
 
-const PORT = Number(process.env.COMPANION_PORT || 8095);
+const PORT = Number(process.env.COMPANION_PORT || process.env.PORT || 8095);
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const VOSK_MODEL = path.join(PUBLIC_DIR, 'models', 'vosk-model-small-en-us-0.15.tar.gz'); // offline wake model (run scripts/get-vosk-model.mjs)
 // Areas Jarvis may touch. Default: a safe workspace. WIDEN by setting JARVIS_ROOTS to a
@@ -708,6 +708,47 @@ const server = http.createServer(async (req, res) => {
     try { const p = await weeklyPL(); return send(res, 200, JSON.stringify({ ...p, text: plText(p) })); }
     catch (e) { return send(res, 200, JSON.stringify({ error: e.message })); }
   }
+  // ── FIVERR STUDIO: produce a real client deliverable on demand (thumbnail / cover / logo).
+  // Hybrid engines (scripts/make-*.mjs): Claude designs the spec → FLUX paints the art (free) → code
+  // composites the text. Returns a self-contained SVG the UI renders + exports to PNG. Still a DRAFT —
+  // the operator QCs before any client sees it. Back-compat: /api/studio/thumbnail still works.
+  {
+    const studioMatch = url.pathname.match(/^\/api\/studio\/(thumbnail|cover|logo)$/);
+    if (req.method === 'POST' && studioMatch) {
+      if (!API_KEY) return send(res, 500, JSON.stringify({ error: 'No ANTHROPIC_API_KEY (env or ../.env).' }));
+      try {
+        const kind = studioMatch[1];
+        const { brief } = await readBody(req);
+        if (!brief || !String(brief).trim()) return send(res, 400, JSON.stringify({ error: 'Describe what the client wants.' }));
+        const mod = { thumbnail: 'make-thumbnail.mjs', cover: 'make-cover.mjs', logo: 'make-logo.mjs' }[kind];
+        const fn = { thumbnail: 'makeThumbnail', cover: 'makeCover', logo: 'makeLogo' }[kind];
+        const modUrl = require('node:url').pathToFileURL(path.join(__dirname, '..', 'scripts', mod)).href;
+        const make = (await import(modUrl))[fn];
+        const id = kind + '-' + Date.now();
+        const r = await make({ brief: String(brief).slice(0, 600), out: 'fiverr-assets/' + id + '.svg' });
+        return send(res, 200, JSON.stringify({ ok: true, kind, id, svg: r.svg, spec: r.spec, subjectOk: r.subjectOk !== false && r.artOk !== false }));
+      } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+    }
+  }
+  // Product-photo edit: client uploads a messy product photo (sent as a data URI) → fal.ai removes the
+  // background → code composites a clean studio backdrop + contact shadow. Returns before/after + the SVG.
+  if (req.method === 'POST' && url.pathname === '/api/studio/product') {
+    try {
+      const chunks = []; let n = 0;
+      await new Promise((resolve, reject) => {
+        req.on('data', (c) => { n += c.length; if (n > 12e6) { req.destroy(); reject(new Error('image too large (max ~9MB — the UI downscales for you)')); } chunks.push(c); });
+        req.on('end', resolve); req.on('error', reject);
+      });
+      const body = chunks.length ? JSON.parse(Buffer.concat(chunks)) : {};
+      if (!body.imageDataUri) return send(res, 400, JSON.stringify({ error: 'Drop a product photo first.' }));
+      const modUrl = require('node:url').pathToFileURL(path.join(__dirname, '..', 'scripts', 'edit-product.mjs')).href;
+      const { editProduct } = await import(modUrl);
+      const id = 'product-' + Date.now();
+      const r = await editProduct({ inputDataUri: body.imageDataUri, style: body.style === 'white' ? 'white' : 'studio', out: 'fiverr-assets/' + id + '.svg' });
+      if (!r.ok) return send(res, 200, JSON.stringify({ ok: false, error: r.error, before: r.before }));
+      return send(res, 200, JSON.stringify({ ok: true, id, svg: r.svg, before: r.before, cutout: r.cutout, style: r.style }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
   // ── OPERATIONS: one cockpit feed aggregated from the control-plane (leads/opps/proposals/CRM) ──
   if (req.method === 'GET' && url.pathname === '/api/operations') {
     try {
@@ -743,6 +784,7 @@ const server = http.createServer(async (req, res) => {
           recommendation: pl.recommendation, setAside: pl.setAside || pl.set_aside_fit, place: pl.place,
           placeState: pl.placeState, deadline: pl.deadline, url: pl.url, agency: pl.agency, subNeeded: pl.subcontractor_needed,
           proposalFile: noticeId ? (propByNotice[noticeId] || null) : null,
+          estimatedValue: pl.estimatedValue || pl.estimated_value || pl.award_amount || pl.contractValue || pl.contract_value || pl.base_value || pl.totalValue || pl.total_value || pl.valueRange || null,
         });
       }
       const opportunities = [...oppMap.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -879,10 +921,11 @@ const server = http.createServer(async (req, res) => {
       description = description.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 6000);
       const documents = (o.resourceLinks || []).map((link, i) => ({ name: `Solicitation document ${i + 1}`, url: link }));
       const contact = (o.pointOfContact || []).map((c) => ({ name: c.fullName, email: c.email, phone: c.phone, title: c.title }));
+      const estimatedValue = (o.award && (o.award.amount || o.award.totalAwardCost || o.award.baseAndAllOptionsValue)) || o.estimatedTotalValue || o.baseAndAllOptionsValue || null;
       return send(res, 200, JSON.stringify({
         noticeId, title: o.title, agency: o.fullParentPathName || o.organizationType || '', type: o.type,
         setAside: o.typeOfSetAsideDescription || o.typeOfSetAside, deadline: o.responseDeadLine,
-        url: o.uiLink, naics: o.naicsCode, description, documents, contact,
+        url: o.uiLink, naics: o.naicsCode, description, documents, contact, estimatedValue,
       }));
     } catch (e) { return send(res, 200, JSON.stringify({ noticeId, documents: [], contact: [], error: e.message })); }
   }
@@ -897,12 +940,26 @@ const server = http.createServer(async (req, res) => {
       let draft = '';
       if (file) { try { const base = String(file).split(/[\\/]/).pop(); const d = await fetch(`${CP_URL}/drafts/${encodeURIComponent(base)}`, { signal: AbortSignal.timeout(5000) }).then((r) => r.json()); draft = String(d.content || '').slice(0, 6000); } catch { /* */ } }
       if (!draft) return send(res, 200, JSON.stringify({ verdict: 'FAIL', summary: 'No proposal draft to check yet.', items: [], gaps: ['No proposal drafted — pursue/draft it first.'] }));
-      const sys = 'You are the GovCon COMPLIANCE REVIEWER for Rodgate, LLC — an SDB/Minority/Hispanic-owned SMALL business that holds Small/Micro-business, Self-Certified Small Disadvantaged, Minority-Owned and Hispanic-American-Owned status; it does NOT hold 8(a)/HUBZone/SDVOSB/WOSB; it is a NEW prime with limited federal past performance; it subcontracts labor and must respect FAR 52.219-14 (50% limit on subcontracting). Compare OUR PROPOSAL against the RFP REQUIREMENTS and flag anything that could DISQUALIFY us. Return ONLY minified JSON: {"verdict":"PASS|RISK|FAIL","summary":"<=160 chars","items":[{"req":"...","ok":true|false,"note":"..."}],"gaps":["..."],"needs_sub_past_performance":true|false}. Be strict and honest: check set-aside eligibility match, required certifications/clauses, whether every stated scope item is addressed, the response deadline (not passed), page/format limits if stated, and past-performance requirements (we are new — if past performance is required, flag it and whether a subcontractor must supply it).';
-      const usr = `RFP REQUIREMENTS\nTitle: ${rfp.title || '(unknown)'}\nSet-aside: ${rfp.setAside || '(unknown)'}\nNAICS: ${rfp.naics || '(unknown)'}\nResponse deadline: ${rfp.deadline || '(unknown)'}\nAttached documents: ${(rfp.documents || []).length} file(s)\nDescription:\n${String(rfp.description || '(no description retrieved — judge from the proposal + metadata)').slice(0, 4500)}\n\nOUR PROPOSAL:\n${draft}`;
-      const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1100, system: sys, messages: [{ role: 'user', content: usr }] }) });
+      const sys = 'You are the GovCon COMPLIANCE REVIEWER for Rodgate, LLC — an SDB/Minority/Hispanic-owned SMALL business that holds Small/Micro-business, Self-Certified Small Disadvantaged, Minority-Owned and Hispanic-American-Owned status; it does NOT hold 8(a)/HUBZone/SDVOSB/WOSB; it is a NEW prime with limited federal past performance; it subcontracts labor and must respect FAR 52.219-14 (50% limit on subcontracting). Compare OUR PROPOSAL against the RFP REQUIREMENTS and flag anything that could DISQUALIFY us. CRITICAL: Return ONLY raw minified JSON with NO markdown, NO code fences, NO explanation — just the JSON object: {"verdict":"PASS|RISK|FAIL","summary":"<=160 chars","items":[{"req":"...","ok":true|false,"note":"..."}],"gaps":["..."],"needs_sub_past_performance":true|false}. Be strict: check set-aside eligibility, required certs/clauses, whether scope is addressed, deadline status, and past-performance requirements.';
+      const descTrunc = String(rfp.description || '(no description retrieved — judge from the proposal + metadata)').slice(0, 3000);
+      const draftTrunc = draft.slice(0, 4000);
+      const usr = `RFP REQUIREMENTS\nTitle: ${rfp.title || '(unknown)'}\nSet-aside: ${rfp.setAside || '(unknown)'}\nNAICS: ${rfp.naics || '(unknown)'}\nDeadline: ${rfp.deadline || '(unknown)'}\nDocuments: ${(rfp.documents || []).length} file(s)\nDescription:\n${descTrunc}\n\nOUR PROPOSAL:\n${draftTrunc}`;
+      const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, system: sys, messages: [{ role: 'user', content: usr }] }) });
       const d = await r.json(); const txt = (d.content || []).map((c) => c.text || '').join('');
-      let parsed = null; const mm = txt.match(/\{[\s\S]*\}/); if (mm) { try { parsed = JSON.parse(mm[0]); } catch { /* */ } }
-      if (!parsed) return send(res, 200, JSON.stringify({ verdict: 'RISK', summary: 'Could not parse the review — read it manually.', items: [], gaps: [txt.slice(0, 300) || (d.error && d.error.message) || 'no output'] }));
+      // extract JSON — model should return raw JSON but may wrap in code fences
+      let parsed = null;
+      const fenceMatch = txt.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const rawJson = fenceMatch ? fenceMatch[1].trim() : txt.trim();
+      const objMatch = rawJson.match(/\{[\s\S]*\}/);
+      if (objMatch) { try { parsed = JSON.parse(objMatch[0]); } catch { /* truncated */ } }
+      // if truncated, try clamping to valid JSON by closing open arrays/objects
+      if (!parsed && objMatch) {
+        let attempt = objMatch[0];
+        for (const closer of [']}', ']}', '}', '}}'] ) {
+          try { const t = attempt.replace(/,\s*$/, '') + closer; parsed = JSON.parse(t); if (parsed) { parsed._truncated = true; break; } } catch { /* */ }
+        }
+      }
+      if (!parsed) return send(res, 200, JSON.stringify({ verdict: 'RISK', summary: 'Response could not be parsed — shown below for manual review.', items: [], gaps: [txt.slice(0, 500) || (d.error && d.error.message) || 'no output'] }));
       return send(res, 200, JSON.stringify(parsed));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
@@ -988,6 +1045,56 @@ const server = http.createServer(async (req, res) => {
       if (!id) return send(res, 400, JSON.stringify({ error: 'id required' }));
       const r = await fetch(`${CP_URL}/maintenance/reach-sub`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }), signal: AbortSignal.timeout(60000) });
       return send(res, 200, JSON.stringify(await r.json().catch(() => ({ ok: false }))));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+
+  // ── SUB REACH PREVIEW: generate outreach email without creating a lead yet ──
+  if (req.method === 'GET' && url.pathname === '/api/sub-reach-preview') {
+    try {
+      const id = url.searchParams.get('id');
+      if (!id) return send(res, 400, JSON.stringify({ error: 'id required' }));
+      if (!API_KEY) return send(res, 500, JSON.stringify({ error: 'No ANTHROPIC_API_KEY.' }));
+      const crm = await fetch(`${CP_URL}/crm`, { signal: AbortSignal.timeout(5000) }).then((r) => r.json()).catch(() => ({ subs: [] }));
+      let localSubs2 = []; try { localSubs2 = (JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'pods', 'gov', 'subs.json'), 'utf8')).subs) || []; } catch { /* */ }
+      const allSubs2 = [...(crm.subs || []), ...localSubs2];
+      const sub = allSubs2.find((s) => String(s.id) === String(id) || String(s.name || '').toLowerCase() === String(id).toLowerCase());
+      if (!sub) return send(res, 404, JSON.stringify({ error: 'Sub not found in CRM. Say "Hey Jarvis, add [name] to the CRM" first.' }));
+      const to = sub.contact_email || '';
+      const toName = sub.contact_name || sub.name;
+      const sys = 'You are Hector, business development lead for Rodgate LLC (SDB/Minority/Hispanic-owned, janitorial & facility maintenance, PA/NJ/FL). Write a short, warm 3-4 sentence outreach email to a subcontractor we want to invite to quote on federal contracts with us. Be specific about what Rodgate does, ask for a capability statement or quick call. Sign as: Hector Reyes | Business Development | Rodgate LLC | RodGateGroup@gmail.com. Return ONLY the email body — no subject line, no preamble.';
+      const usr = `Sub name: ${sub.name}\nTrade/specialty: ${sub.trade || 'general'}\nLocation: ${sub.location || 'unknown'}\nNotes: ${sub.notes || 'none'}`;
+      const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 400, system: sys, messages: [{ role: 'user', content: usr }] }) });
+      const d = await r.json();
+      const body = (d.content || []).map((c) => c.text || '').join('') || 'Could not generate draft.';
+      return send(res, 200, JSON.stringify({ ok: true, sub: { id: sub.id, name: sub.name, trade: sub.trade, location: sub.location }, to, toName, subject: 'Subcontracting Partnership Opportunity — Rodgate LLC', body }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+
+  // ── EMAIL PROPOSAL: compose a formatted email draft for the user to copy/send ──
+  if (req.method === 'GET' && url.pathname === '/api/email-proposal') {
+    try {
+      const file = url.searchParams.get('file');
+      const noticeId = url.searchParams.get('noticeId');
+      if (!file) return send(res, 400, JSON.stringify({ error: 'file required' }));
+      const base = String(file).split(/[\\/]/).pop();
+      const propRes = await fetch(`${CP_URL}/drafts/${encodeURIComponent(base)}`, { signal: AbortSignal.timeout(5000) });
+      if (!propRes.ok) return send(res, 404, JSON.stringify({ error: `Draft not found on the control-plane (${propRes.status}). The proposal may not have been created yet — go to Opportunities, open one, and tap "🎯 Pursue" to draft it first.` }));
+      const prop = await propRes.json().catch(() => null);
+      if (!prop || !prop.content) return send(res, 404, JSON.stringify({ error: 'Draft file is empty or unreadable on the control-plane.' }));
+      let opp = null;
+      if (noticeId) {
+        try { opp = await fetch(`http://127.0.0.1:${PORT}/api/opp-docs?noticeId=${encodeURIComponent(noticeId)}`, { signal: AbortSignal.timeout(15000) }).then((r) => r.json()); } catch { /* */ }
+      }
+      const title = (opp && opp.title) || base.replace(/[-_]/g, ' ').replace(/\.md$/i, '');
+      const co = opp && opp.contact && opp.contact[0];
+      const to = (co && co.email) || '';
+      const toName = (co && co.name) || 'Contracting Officer';
+      const subject = `Proposal Submission — ${title} — Rodgate LLC`;
+      const coverLine = `Dear ${toName},\n\nPlease find below our proposal for the solicitation referenced above. We appreciate the opportunity and look forward to supporting your mission.\n\n${'-'.repeat(60)}\n\n`;
+      const footer = `\n\n${'-'.repeat(60)}\n\n[HUMAN REVIEW REQUIRED — Vinicio Rodriguez signs & submits]\n\nRodgate LLC · SDB / Minority / Hispanic-American Owned\nVinicio Rodriguez, Principal · RodGateGroup@gmail.com`;
+      const body = coverLine + prop.content + footer;
+      const submitViaPortal = opp && opp.description && /sam\.gov|ebuy|seaport|submit.*portal|electronic.*submission/i.test(opp.description);
+      return send(res, 200, JSON.stringify({ ok: true, to, toName, subject, body, title, file: base, submitViaPortal: !!submitViaPortal }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 

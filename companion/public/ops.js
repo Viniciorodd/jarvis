@@ -16,10 +16,10 @@
   // central exec/finance/system approvals so money gates stay visible). `tabs` = the views it shows.
   const BUSINESSES = [
     { id: 'gov', label: '🏛 Gov Contracting', pods: ['gov', 'exec', 'chief-of-staff', 'system'], tabs: ['leads', 'opps', 'props', 'crm'] },
-    { id: 'fiverr', label: '🎨 Fiverr Studio', pods: ['fiverr'], tabs: ['activity', 'leads'] },
+    { id: 'fiverr', label: '🎨 Fiverr Studio', pods: ['fiverr'], tabs: ['studio', 'activity', 'leads'] },
     { id: 'saas', label: '🖥 SaaS / Recon', pods: ['saas'], tabs: ['activity', 'leads'] },
   ];
-  const TAB_LABELS = { leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity' };
+  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity' };
   let biz = 'gov', tab = 'leads';
   const curBiz = () => BUSINESSES.find((b) => b.id === biz) || BUSINESSES[0];
 
@@ -27,7 +27,7 @@
   const scoreClass = (n) => (n >= 75 ? 'go' : n >= 50 ? 'mid' : 'no');
   const daysUntil = (d) => { if (!d) return null; const t = new Date(d); if (isNaN(t)) return null; return Math.ceil((t - Date.now()) / 864e5); };
   const dueChip = (d) => { const du = daysUntil(d); if (du == null) return ''; const c = du <= 7 ? 'var(--warn)' : 'var(--dim)'; return `<span style="color:${c}">⏳ ${du < 0 ? 'closed' : 'due in ' + du + 'd'}</span>`; };
-  const when = (t) => new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const when = (t) => { if (!t) return '—'; const d = new Date(t); return isNaN(d) ? '—' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
   const leadsFor = (b) => (data.leads || []).filter((l) => b.pods.includes((l.pod || 'system')));
 
   async function load() {
@@ -65,6 +65,7 @@
   }
 
   function render() {
+    if (tab === 'studio') return renderStudio();
     if (tab === 'leads') return renderLeads();
     if (tab === 'opps') return renderOpps();
     if (tab === 'props') return renderProps();
@@ -74,8 +75,20 @@
 
   function renderLeads() {
     const items = leadsFor(curBiz());
-    if (!items.length) { body.innerHTML = '<div class="ops-empty">No approvals waiting for this business. When an agent needs you, it lands here.</div>'; return; }
-    body.innerHTML = items.map((l) => {
+    if (!items.length) {
+      body.innerHTML = `<div class="ops-explain">
+        <b>⚑ Leads — Needs You</b><br>
+        When Jarvis or any agent needs your go-ahead, it shows up here.
+        <b>Review</b> the draft first, then <b>Approve</b> to execute or <b>Pass</b> to skip.
+        Nothing runs without your approval.
+      </div>
+      <div class="ops-empty">Nothing waiting for you right now — check back after the next agent run.</div>`;
+      return;
+    }
+    body.innerHTML = `<div class="ops-explain">
+      <b>⚑ Needs you (${items.length})</b> — Review each item, then Approve to run it or Pass to skip.
+      Approving sends the action to the executor. Nothing is sent, submitted, or spent without your go-ahead.
+    </div>` + items.map((l) => {
       const canReview = !!(l.file || l.noticeId);
       return `
       <div class="ops-card lead" data-id="${esc(l.id)}">
@@ -97,12 +110,29 @@
 
   function renderOpps() {
     const items = data.opportunities || [];
-    if (!items.length) { body.innerHTML = '<div class="ops-empty">No scored opportunities yet. Tell Jarvis "scan SAM.gov for janitorial work."</div>'; return; }
-    body.innerHTML = items.map((o) => `
+    if (!items.length) {
+      body.innerHTML = `<div class="ops-explain">
+        <b>◎ Opportunities</b> — These are government contracts (RFPs) that Jarvis has scored for us on SAM.gov.<br>
+        <b>Score</b> = how well it fits Rodgate (0-100). Click any opportunity to see the full RFP, documents, and CO contact.
+        If it looks good, hit <b>🎯 Pursue</b> to have Patricia draft the proposal.<br>
+        To find new ones: say <em>"Hey Jarvis, scan SAM.gov for janitorial contracts in Pennsylvania."</em>
+      </div>
+      <div class="ops-empty">No scored opportunities yet. Tell Jarvis "scan SAM.gov for janitorial work."</div>`;
+      return;
+    }
+    const fmtVal = (v) => v ? '$' + Math.round(Number(v)).toLocaleString('en-US') : null;
+    body.innerHTML = `<div class="ops-explain">
+      <b>◎ ${items.length} Opportunities scored</b> — sorted by fit. Click any card to read the full RFP.
+      BID = pursue it. WATCH = monitor. NO = skip.
+      Look for the 💰 to see the contract value before deciding.
+    </div>` + items.map((o) => {
+      const val = fmtVal(o.estimatedValue);
+      return `
       <div class="ops-card opp${o.noticeId ? ' clickable' : ''}" ${o.noticeId ? `data-opp="${esc(o.noticeId)}"` : ''}>
         <div class="ops-row">
           <span class="score ${scoreClass(o.score)}">${o.score != null ? esc(o.score) : '—'}<small>/100</small></span>
           <span class="rec ${recClass(o.recommendation)}">${esc((o.recommendation || '').toUpperCase() || 'SCORED')}</span>
+          ${val ? `<span class="tag tag-val">💰 ${esc(val)}</span>` : ''}
           ${o.subNeeded ? '<span class="tag tag-act">needs a sub</span>' : ''}
           ${o.proposalFile ? '<span class="tag tag-act">📝 drafted</span>' : ''}
         </div>
@@ -117,28 +147,60 @@
           ${o.noticeId ? `<button class="btn go" data-opp-btn="${esc(o.noticeId)}">Details &amp; RFP →</button>` : ''}
           ${o.url ? `<a class="btn ghost" href="${esc(o.url)}" target="_blank" rel="noreferrer">SAM.gov ↗</a>` : ''}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function renderProps() {
     const items = data.proposals || [];
-    if (!items.length) { body.innerHTML = '<div class="ops-empty">No proposals drafted yet. Bid-worthy opportunities get a draft here.</div>'; return; }
-    body.innerHTML = items.map((p) => `
+    if (!items.length) {
+      body.innerHTML = `<div class="ops-explain">
+        <b>▤ Proposals</b> — When you click "🎯 Pursue" on an opportunity, Patricia drafts a proposal here.<br>
+        <b>Workflow (A → B → C):</b><br>
+        A. Open the proposal and read it.<br>
+        B. Click "📎 RFP &amp; files" → "🛡 Compliance check" to verify we meet all requirements.<br>
+        C. Click "📧 Email" to prepare the submission email, or submit directly on SAM.gov if the RFP requires portal submission.
+      </div>
+      <div class="ops-empty">No proposals drafted yet. Go to Opportunities, open one, then tap "🎯 Pursue".</div>`;
+      return;
+    }
+    const fmtVal = (v) => v ? '$' + Math.round(Number(v)).toLocaleString('en-US') : null;
+    body.innerHTML = `<div class="ops-explain">
+      <b>▤ ${items.length} Proposal${items.length > 1 ? 's' : ''} drafted</b> —
+      Read each one, run the compliance check, then email or submit.<br>
+      💰 = estimated contract value. Always confirm submission method in the RFP (email vs SAM.gov portal).
+    </div>` + items.map((p) => {
+      const opp = p.noticeId ? oppByNotice[p.noticeId] : null;
+      const val = fmtVal(opp && opp.estimatedValue);
+      return `
       <div class="ops-card">
+        <div class="ops-row">
+          ${val ? `<span class="tag tag-val">💰 ${esc(val)}</span>` : ''}
+          ${p.noticeId ? `<span class="tag tag-act">RFP linked</span>` : ''}
+        </div>
         <div class="ops-title">${esc(p.rationale || p.file)}</div>
         <div class="ops-sub">📄 ${esc(p.file)}</div>
         <div class="ops-actions">
           <button class="btn go" data-open="${esc(p.file)}">Open &amp; read →</button>
           ${p.noticeId ? `<button class="btn" data-docs="${esc(p.noticeId)}">📎 RFP &amp; files</button>` : ''}
+          <button class="btn" data-email-prop="${esc(p.file)}" data-email-notice="${esc(p.noticeId || '')}">📧 Email</button>
           ${p.approvalId ? `<button class="btn" data-approve="${esc(p.approvalId)}">✓ Approve</button><span class="ops-result" id="res-${esc(p.approvalId)}"></span>` : ''}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function renderCrm() {
     const items = data.crm || [];
-    if (!items.length) { body.innerHTML = '<div class="ops-empty">CRM empty. Tell Jarvis "find janitorial subs near Wilkes-Barre."</div>'; return; }
-    body.innerHTML = items.map((s) => `
+    const banner = `<div class="ops-explain">
+      <b>⚇ Subcontractor CRM</b> — Companies we can team with on government contracts. Rodgate is the prime; subs provide the labor (must stay under the 50% subcontracting limit).<br>
+      <b>A.</b> Open a sub to see their Google reviews, fit verdict, and contact info.<br>
+      <b>B.</b> Click <b>Preview &amp; send outreach</b> — review Hector's email draft before anything goes out.<br>
+      <b>C.</b> Confirm → lead appears in ⚑ Leads for your approval. You approve → email sends.<br>
+      <em>Say "Hey Jarvis, find janitorial subs near Wilkes-Barre" to add more prospects.</em>
+    </div>`;
+    if (!items.length) { body.innerHTML = banner + '<div class="ops-empty">CRM empty — tell Jarvis to find subs, or add one manually.</div>'; return; }
+    body.innerHTML = banner + items.map((s) => `
       <div class="ops-card opp clickable" data-sub="${esc(s.id || '')}">
         <div class="ops-row">
           <span class="ops-title-sm">${esc(s.name || 'unnamed')}</span>
@@ -173,7 +235,7 @@
       </div>
       <div class="ops-actions">
         ${s.website ? `<a class="btn ghost" href="${esc(s.website)}" target="_blank" rel="noreferrer">Website ↗</a>` : ''}
-        <button class="btn go" data-reach="${esc(s.id)}">📧 Have Hector reach out</button>
+        <button class="btn go" data-reach="${esc(s.id)}">📧 Preview &amp; send outreach</button>
         <span class="od-act-result" id="odActResult"></span>
       </div>
       <div class="od-sec"><div class="od-sec-h">Contact</div>
@@ -200,12 +262,243 @@
     } catch (e) { box.innerHTML = `<div class="ops-empty">error: ${esc(e.message)}</div>`; }
   }
   async function reachSub(id) {
-    const r = el('odActResult'); if (r) r.textContent = 'Hector is finding an email + drafting the intro…';
+    const r = el('odActResult'); if (r) r.textContent = 'Hector is drafting the outreach email…';
     try {
-      const res = await fetch('/api/sub-reach', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) });
-      const d = await res.json();
-      if (r) r.textContent = d.ok ? (d.email ? `✅ drafted to ${d.email} — review & send in Leads` : '✅ drafted, but no email found — add one, then send') : 'couldn’t draft: ' + (d.error || 'try again');
+      const prev = await (await fetch('/api/sub-reach-preview?' + new URLSearchParams({ id }))).json();
+      if (!prev.ok) {
+        if (r) r.innerHTML = prev.error === 'not found' || /not found/i.test(prev.error || '')
+          ? '⚠ Sub not in CRM yet — say <em>Hey Jarvis, add [company name] to the CRM</em> then try again.'
+          : 'could not draft: ' + esc(prev.error || 'try again');
+        return;
+      }
+      // show preview in the email panel
+      el('emailPanelCap').textContent = 'Outreach to ' + (prev.sub && prev.sub.name ? prev.sub.name : 'sub');
+      const toLine = prev.to ? `<b>To:</b> ${esc(prev.toName)} &lt;${esc(prev.to)}&gt;` : '<b>To:</b> <em>no email on file — add one in CRM then retry</em>';
+      el('emailCompose').innerHTML = `
+        <div class="ec-note" style="background:rgba(var(--teal-rgb),.06);border:1px solid rgba(var(--teal-rgb),.18);border-radius:8px;padding:11px 14px;font-size:12px;color:var(--cream);line-height:1.6">
+          <b>Review before sending to Leads</b><br>This email will go to Leads for your approval — nothing is sent until you tap Approve there.
+        </div>
+        <div class="ec-field"><span class="ec-lbl">To</span><span class="ec-val">${toLine}</span></div>
+        <div class="ec-field"><span class="ec-lbl">Subject</span><span class="ec-val">${esc(prev.subject)}</span></div>
+        <div class="ec-body"><pre style="white-space:pre-wrap;font-size:12.5px;font-family:inherit;margin:0">${esc(prev.body)}</pre></div>
+        <div class="ec-actions">
+          <button class="btn go" id="reachConfirmBtn">✅ Send to Leads for approval</button>
+          <button class="btn ghost" id="reachCopyBtn">📋 Copy</button>
+          <span id="reachResult" style="font-size:12px;color:var(--teal)"></span>
+        </div>`;
+      el('emailPanel').hidden = false;
+      if (r) r.textContent = '';
+      el('reachCopyBtn').addEventListener('click', () => {
+        const doCopy = () => { el('reachResult').textContent = '✓ copied'; setTimeout(() => { if (el('reachResult')) el('reachResult').textContent = ''; }, 2000); };
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(prev.body).then(doCopy).catch(() => { el('reachResult').textContent = 'Select text above and copy manually'; });
+        } else { el('reachResult').textContent = 'Select text above and copy manually'; }
+      });
+      el('reachConfirmBtn').addEventListener('click', async () => {
+        el('reachConfirmBtn').disabled = true; el('reachResult').textContent = 'sending to Leads…';
+        try {
+          const cr = await (await fetch('/api/sub-reach', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })).json();
+          if (cr.ok) {
+            el('reachResult').innerHTML = `✅ In Leads — <button class="btn go" style="padding:3px 10px;font-size:11px" id="goLeadsBtn2">Review &amp; approve →</button>`;
+            const gb = el('goLeadsBtn2');
+            if (gb) gb.addEventListener('click', () => { el('emailPanel').hidden = true; el('oppDetail').hidden = true; biz = 'gov'; tab = 'leads'; renderBizBar(); renderTabs(); load(); });
+          } else {
+            el('reachResult').textContent = 'could not send: ' + (cr.error || 'try again');
+            el('reachConfirmBtn').disabled = false;
+          }
+        } catch (e) { el('reachResult').textContent = 'error: ' + e.message; el('reachConfirmBtn').disabled = false; }
+      });
     } catch (e) { if (r) r.textContent = 'error: ' + e.message; }
+  }
+
+  async function openEmail(file, noticeId) {
+    el('emailPanelCap').textContent = 'Prepare email — ' + file;
+    el('emailCompose').innerHTML = '<div class="ops-empty">composing email…</div>';
+    el('emailPanel').hidden = false;
+    try {
+      const params = new URLSearchParams({ file }); if (noticeId) params.set('noticeId', noticeId);
+      const d = await (await fetch('/api/email-proposal?' + params)).json();
+      if (d.error) { el('emailCompose').innerHTML = `<div class="ops-empty">${esc(d.error)}</div>`; return; }
+      const submitNote = d.submitViaPortal
+        ? `<div class="ec-warn">⚠ This RFP may require submission through the SAM.gov portal (not email). Verify in the RFP document before sending an email.</div>`
+        : `<div class="ec-note">If the RFP says "submit via SAM.gov portal," use that instead. Otherwise email this directly to the CO.</div>`;
+      el('emailCompose').innerHTML = `
+        ${submitNote}
+        <div class="ec-field"><span class="ec-lbl">To</span>
+          ${d.to
+            ? `<span class="ec-val teal">${esc(d.to)}</span>`
+            : `<span class="ec-val warn">⚠ No email found — look up the contracting officer's email in the RFP documents or on SAM.gov, then add it here before sending.</span>`}
+        </div>
+        <div class="ec-field"><span class="ec-lbl">Subject</span><span class="ec-val">${esc(d.subject)}</span></div>
+        <div class="ec-body" id="ecBody"><pre>${esc(d.body)}</pre></div>
+        <div class="ec-actions">
+          <button class="btn go" id="ecCopy">📋 Copy to clipboard</button>
+          ${d.to ? `<a class="btn" href="mailto:${esc(d.to)}?subject=${encodeURIComponent(d.subject)}&body=${encodeURIComponent(d.body.slice(0, 1800))}" target="_blank">📧 Open in email client</a>` : ''}
+          <span class="ec-result" id="ecResult"></span>
+        </div>`;
+      const copyBtn = el('ecCopy');
+      if (copyBtn) copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(`To: ${d.to || '(add recipient)'}\nSubject: ${d.subject}\n\n${d.body}`);
+          el('ecResult').textContent = '✅ Copied — paste into Gmail or your email client';
+          setTimeout(() => { const r = el('ecResult'); if (r) r.textContent = ''; }, 3500);
+        } catch { el('ecResult').textContent = 'Select the text above and copy manually'; }
+      });
+    } catch (e) { el('emailCompose').innerHTML = `<div class="ops-empty">error: ${esc(e.message)}</div>`; }
+  }
+
+  // ── 🎨 FIVERR STUDIO — bring a client brief, get a real deliverable (thumbnail / cover / logo / product) ──
+  let lastStudio = null;        // { kind, svg, spec, before? }
+  let studioKind = 'thumbnail';
+  let productStyle = 'studio';
+  const STUDIO_KINDS = [
+    { id: 'thumbnail', label: '▶ Thumbnail' }, { id: 'cover', label: '📕 Book cover' },
+    { id: 'logo', label: '✦ Logo' }, { id: 'product', label: '📦 Product edit' },
+  ];
+  const STUDIO_EG = {
+    thumbnail: ['I survived 50 hours in the ocean — extreme survival challenge, fear', 'How I made $100,000 in 30 days — shocked reaction, cash everywhere', 'I got shredded in 90 days — body transformation, flexing'],
+    cover: ['a thriller novel "The Last Signal" about a lighthouse keeper who hears the dead', 'a nonfiction book "The Quiet Compound" on building wealth slowly', 'a fantasy epic "Emberfall" about a lone warrior and a dying flame'],
+    logo: ['Northwind Coffee Roasters — warm, artisanal, small-batch', 'Apex Legal — corporate law firm, trustworthy and modern', 'Pixel Forge — indie game studio, playful and techy'],
+  };
+  const PLACEHOLDER = {
+    thumbnail: "e.g. 'I survived 50 hours in the ocean — extreme survival challenge, fear'",
+    cover: "e.g. 'a thriller novel called The Last Signal about a lighthouse keeper who hears the dead'",
+    logo: "e.g. 'a logo for Northwind Coffee Roasters — warm, artisanal, small-batch'",
+  };
+  const VERB = { thumbnail: 'thumbnail', cover: 'cover', logo: 'logo', product: 'product image' };
+  const svgUrl = (svg) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+  function renderStudio() {
+    const tabs = STUDIO_KINDS.map((k) => `<button class="studio-kind${k.id === studioKind ? ' on' : ''}" data-kind="${k.id}">${k.label}</button>`).join('');
+    const isProduct = studioKind === 'product';
+    const input = isProduct
+      ? `<div class="studio-drop" id="stDrop"><input type="file" id="stFile" accept="image/*" hidden>
+           <div class="studio-drop-in">📦 <b>Drop a product photo</b> (or click to choose). Jarvis removes the background and drops it on a clean studio backdrop.</div></div>
+         <div class="studio-row"><span class="studio-egs">Backdrop:
+           <button class="studio-chip${productStyle === 'studio' ? ' on' : ''}" data-style="studio">Studio + soft shadow</button>
+           <button class="studio-chip${productStyle === 'white' ? ' on' : ''}" data-style="white">Pure white (Amazon)</button></span></div>`
+      : `<textarea id="stBrief" rows="2" placeholder="${esc(PLACEHOLDER[studioKind])}"></textarea>
+         <div class="studio-row">
+           <button class="btn go" id="stGo">✨ Design ${VERB[studioKind]}</button>
+           <span class="studio-egs">${(STUDIO_EG[studioKind] || []).map((e, i) => `<button class="studio-chip" data-eg="${i}">${esc(e.split('—')[0].split(' about ')[0].replace(/^a(n)? /i, '').trim().slice(0, 28))}…</button>`).join('')}</span>
+         </div>`;
+    const emptyMsg = isProduct ? 'Drop a product photo to clean it up.' : `Describe it (or tap an example) and hit “Design ${VERB[studioKind]}”.`;
+    body.innerHTML = `<div class="studio-wrap">
+      <div class="ops-explain"><b>🎨 Fiverr Studio</b> — Pick a deliverable, describe what the client wants, and Jarvis builds it. Review, then <b>Download PNG</b>. You QC everything before it ships.</div>
+      <div class="studio-kinds">${tabs}</div>
+      <div class="studio-in">${input}</div>
+      <div id="stResult" class="studio-result">${lastStudio && lastStudio.kind === studioKind ? '' : `<div class="ops-empty">${emptyMsg}</div>`}</div></div>`;
+    body.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', () => { studioKind = b.getAttribute('data-kind'); renderStudio(); }));
+    if (isProduct) wireProduct();
+    else {
+      el('stGo').addEventListener('click', runStudio);
+      el('stBrief').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runStudio(); } });
+      body.querySelectorAll('[data-eg]').forEach((b) => b.addEventListener('click', () => { el('stBrief').value = STUDIO_EG[studioKind][+b.getAttribute('data-eg')]; el('stBrief').focus(); }));
+    }
+    if (lastStudio && lastStudio.kind === studioKind) renderStudioResult(lastStudio);
+  }
+
+  async function runStudio() {
+    const brief = (el('stBrief').value || '').trim();
+    if (!brief) return el('stBrief').focus();
+    const out = el('stResult'), go = el('stGo'); go.disabled = true; const old = go.textContent; go.textContent = '🎨 Designing…';
+    out.innerHTML = `<div class="studio-load"><div class="spin"></div><div>Designing your ${VERB[studioKind]}… <span class="dim">(usually 10–25s)</span></div></div>`;
+    try {
+      const r = await fetch('/api/studio/' + studioKind, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brief }) });
+      const d = await r.json();
+      if (!d.ok) { out.innerHTML = `<div class="ops-empty">Couldn't design it: ${esc(d.error || 'try again')}</div>`; return; }
+      lastStudio = { kind: studioKind, svg: d.svg, spec: d.spec || {}, subjectOk: d.subjectOk };
+      renderStudioResult(lastStudio);
+    } catch (e) { out.innerHTML = `<div class="ops-empty">error: ${esc(e.message)}</div>`; }
+    finally { go.disabled = false; go.textContent = old; }
+  }
+
+  // ── product edit: read file → downscale client-side → POST data URI → before/after ──
+  function wireProduct() {
+    const drop = el('stDrop'), file = el('stFile');
+    drop.addEventListener('click', () => file.click());
+    file.addEventListener('change', () => { if (file.files[0]) handleProduct(file.files[0]); });
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) handleProduct(f); });
+    body.querySelectorAll('[data-style]').forEach((b) => b.addEventListener('click', () => { productStyle = b.getAttribute('data-style'); body.querySelectorAll('[data-style]').forEach((x) => x.classList.toggle('on', x === b)); }));
+  }
+  function downscale(file, max = 1600) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => { const im = new Image(); im.onload = () => { let w = im.naturalWidth, h = im.naturalHeight; if (w > max || h > max) { const s = max / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); } const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(im, 0, 0, w, h); resolve(c.toDataURL('image/jpeg', 0.9)); }; im.onerror = reject; im.src = fr.result; };
+      fr.onerror = reject; fr.readAsDataURL(file);
+    });
+  }
+  async function handleProduct(file) {
+    const out = el('stResult'); out.innerHTML = `<div class="studio-load"><div class="spin"></div><div>Removing background + relighting… <span class="dim">(usually 5–15s)</span></div></div>`;
+    try {
+      const imageDataUri = await downscale(file);
+      const r = await fetch('/api/studio/product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ imageDataUri, style: productStyle }) });
+      const d = await r.json();
+      if (!d.ok) { out.innerHTML = `<div class="ops-empty">Couldn't process it: ${esc(d.error || 'try again')}</div>`; return; }
+      lastStudio = { kind: 'product', svg: d.svg, before: d.before || imageDataUri };
+      renderStudioResult(lastStudio);
+    } catch (e) { out.innerHTML = `<div class="ops-empty">error: ${esc(e.message)}</div>`; }
+  }
+
+  function actionsHtml(kind) {
+    return `<div class="studio-actions"><button class="btn go" id="stDl">⬇ Download PNG</button>${kind !== 'product' ? '<button class="btn" id="stVar">↻ Variation</button>' : ''}<span class="studio-result-msg" id="stMsg"></span></div>`;
+  }
+  function dlName(s) {
+    const base = s.kind === 'thumbnail' ? (s.spec && s.spec.videoTitle) : s.kind === 'cover' ? (s.spec && [].concat(s.spec.title || []).join(' ')) : s.kind === 'logo' ? (s.spec && s.spec.brand) : 'product-image';
+    return (String(base || s.kind).replace(/[^\w]+/g, '-').slice(0, 40).toLowerCase() || s.kind) + '.png';
+  }
+
+  function renderStudioResult(s) {
+    const out = el('stResult'); if (!out) return;
+    const url = svgUrl(s.svg), sp = s.spec || {};
+    if (s.kind === 'thumbnail') {
+      const views = (Math.floor(Math.random() * 900) + 60) + 'K';
+      const note = s.subjectOk === false ? '<div class="studio-warn">⚠ The photo model was busy — used a styled background. Hit “Variation” to retry.</div>' : '';
+      out.innerHTML = `${note}<div class="studio-grid">
+        <div><div class="studio-cap">As it looks in the YouTube feed</div>
+          <div class="yt-card"><div class="yt-thumb"><img src="${url}"><span class="yt-dur">12:0${Math.floor(Math.random() * 9)}</span></div>
+          <div class="yt-meta"><div class="yt-av"></div><div><div class="yt-title">${esc(sp.videoTitle || 'Your video title')}</div><div class="yt-ch">${esc(sp.channel || 'Your Channel')} · ${views} views · 2 days ago</div></div></div></div></div>
+        <div><div class="studio-cap">Full deliverable — 1280×720</div><div class="studio-raw"><img src="${url}"></div>${actionsHtml('thumbnail')}</div></div>`;
+    } else if (s.kind === 'cover') {
+      out.innerHTML = `<div class="studio-grid">
+        <div><div class="studio-cap">Cover preview</div><div class="cover-mock"><img src="${url}"></div></div>
+        <div><div class="studio-cap">Deliverable — 1600×2400 (KDP-ready)</div>${actionsHtml('cover')}
+          <div class="studio-spec">${esc(sp.title ? [].concat(sp.title).join(' ') : '')}${sp.author ? ' — ' + esc(sp.author) : ''}</div></div></div>`;
+    } else if (s.kind === 'logo') {
+      out.innerHTML = `<div class="studio-grid">
+        <div><div class="studio-cap">Logo</div><div class="logo-mock"><img src="${url}"></div></div>
+        <div><div class="studio-cap">On dark &amp; light</div>
+          <div class="logo-swatches"><div class="sw dark"><img src="${url}"></div><div class="sw light"><img src="${url}"></div></div>
+          ${actionsHtml('logo')}</div></div>`;
+    } else {
+      out.innerHTML = `<div class="studio-grid">
+        <div><div class="studio-cap">Before</div><div class="prod-mock"><img src="${esc(s.before)}"></div></div>
+        <div><div class="studio-cap">After — clean studio image</div><div class="prod-mock"><img src="${url}"></div>${actionsHtml('product')}</div></div>`;
+    }
+    const dl = el('stDl'); if (dl) dl.addEventListener('click', () => downloadPng(s.svg, dlName(s)));
+    const v = el('stVar'); if (v) v.addEventListener('click', runStudio);
+  }
+
+  function downloadPng(svg, name) {
+    const msg = el('stMsg'); if (msg) msg.textContent = 'rendering PNG…';
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth || 1280, h = img.naturalHeight || 720;
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      try {
+        c.toBlob((b) => {
+          if (!b) { if (msg) msg.textContent = 'render failed — right-click the image to save'; return; }
+          const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+          if (msg) msg.textContent = '✅ saved ' + name;
+        }, 'image/png');
+      } catch (e) { if (msg) msg.textContent = 'export blocked: ' + e.message; }
+    };
+    img.onerror = () => { if (msg) msg.textContent = 'could not rasterize — right-click the image → Save image as'; };
+    img.src = svgUrl(svg);
   }
 
   async function renderActivity(pod) {
@@ -243,13 +536,13 @@
     } else if (/send|email|outreach/.test(act)) {
       let to = null;
       if (l.file) { try { const d = await (await fetch('/api/proposal?file=' + encodeURIComponent(l.file))).json(); to = ((d.content || '').match(/^To:\s*(.+)$/m) || [])[1] || null; } catch { /* */ } }
-      if (to) html = `<p>✉ <b>Emails this outreach</b> from the Rodgate mailbox to:</p><p class="ocf-to">${esc(to)}</p><p class="ocf-tip">It only actually sends if auto-send is on (GOV_AUTO_SEND); otherwise you’ll get a preview of what would go out.</p>`;
-      else html = `<p>⚠ <b>This won’t send anything yet.</b></p><p>There’s <b>no recipient email</b> for this subcontractor on file, so approving can’t email it. First ask Hector to find the email (say <i>“find emails for the subs”</i>), then approve.</p>`;
+      if (to) html = `<p>✉ <b>Emails this outreach</b> from the Rodgate mailbox to:</p><p class="ocf-to">${esc(to)}</p><p class="ocf-tip">It only actually sends if auto-send is on (GOV_AUTO_SEND); otherwise you'll get a preview of what would go out.</p>`;
+      else html = `<p>⚠ <b>This won't send anything yet.</b></p><p>There's <b>no recipient email</b> for this subcontractor on file, so approving can't email it. First ask Hector to find the email (say <i>“find emails for the subs”</i>), then approve.</p>`;
     } else if (/invoice|payment|charge|bill/.test(act) || moneyIn(l.rationale)) {
       const amt = moneyIn(l.rationale);
-      html = `<p>💲 <b>Creates a Stripe payment link${amt ? ' for $' + esc(amt) : ''}</b> and writes a ready-to-send invoice email.</p><p class="ocf-tip">Only creates a real link if auto-create is on (FINANCE_AUTO_INVOICE); otherwise you’ll see a preview.</p>`;
+      html = `<p>💲 <b>Creates a Stripe payment link${amt ? ' for $' + esc(amt) : ''}</b> and writes a ready-to-send invoice email.</p><p class="ocf-tip">Only creates a real link if auto-create is on (FINANCE_AUTO_INVOICE); otherwise you'll see a preview.</p>`;
     } else {
-      html = `<p>Approving runs this action through the gated executor and logs the result. You’ll see exactly what happened right after.</p>`;
+      html = `<p>Approving runs this action through the gated executor and logs the result. You'll see exactly what happened right after.</p>`;
     }
     bodyEl.innerHTML = `<div class="ocf-what">${esc(l.rationale || l.action || 'this action')}</div>${html}`;
   }
@@ -293,12 +586,17 @@
   // ── opportunity / RFP detail ──
   function renderOppDetail(d) {
     const k = oppByNotice[d.noticeId] || {};
+    // cache SAM.gov estimatedValue back into the local map so Proposals tab can show it
+    if (d.estimatedValue && d.noticeId && oppByNotice[d.noticeId]) oppByNotice[d.noticeId].estimatedValue = d.estimatedValue;
     const title = d.title || k.title || 'Opportunity';
     const deadline = d.deadline || k.deadline, setAside = d.setAside || k.setAside, agency = d.agency || k.agency, samUrl = d.url || k.url;
+    const val = d.estimatedValue || k.estimatedValue;
+    const fmtVal = (v) => v ? '💰 $' + Math.round(Number(v)).toLocaleString('en-US') : null;
     let h = `<div class="od-title">${esc(title)}</div>
       <div class="ops-meta">
         ${k.score != null ? `<span class="score ${scoreClass(k.score)}">${esc(k.score)}<small>/100</small></span>` : ''}
         ${k.recommendation ? `<span class="rec ${recClass(k.recommendation)}">${esc(k.recommendation.toUpperCase())}</span>` : ''}
+        ${val ? `<span class="tag tag-val" style="font-size:13px; padding:3px 9px">${fmtVal(val)}</span>` : ''}
         ${agency ? `<span>🏛 ${esc(agency)}</span>` : ''}
         ${setAside ? `<span>🏷 ${esc(setAside)}</span>` : ''}
         ${(k.place || k.placeState) ? `<span>📍 ${esc([k.place, k.placeState].filter(Boolean).join(', '))}</span>` : ''}
@@ -334,7 +632,7 @@
     const t = el('agThread'); if (!t) return;
     t.innerHTML = agentChat.length
       ? agentChat.map((m) => `<div class="ag-msg ag-${m.role === 'agent' ? 'a' : 'u'}">${esc(m.content)}</div>`).join('')
-      : '<div class="ag-empty">Start a conversation — e.g. “does this need a sub, and do we have one?” or “the sub’s past performance is missing.”</div>';
+      : '<div class=”ag-empty”>Start a conversation — e.g. &quot;does this need a sub?&quot; or &quot;the sub\'s past performance is missing.&quot;</div>';
     t.scrollTop = t.scrollHeight;
   }
   async function sendChat() {
@@ -354,7 +652,7 @@
     try {
       const res = await fetch('/api/pursue', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ noticeId, op: oppByNotice[noticeId] || null }) });
       const d = await res.json();
-      if (r) r.textContent = d.ok ? '✅ drafted — find it in Proposals (review & submit)' : 'couldn’t draft: ' + (d.error || 'try again');
+      if (r) r.textContent = d.ok ? '✅ drafted — find it in Proposals (review & submit)' : 'could not draft: ' + (d.error || 'try again');
     } catch (e) { if (r) r.textContent = 'error: ' + e.message; }
   }
   async function applyRedraft(file) {
@@ -391,6 +689,7 @@
     const so = e.target.closest('[data-sub-open]'); if (so) return openSubDetail(so.getAttribute('data-sub-open'));
     const sub = e.target.closest('.ops-card[data-sub]'); if (sub) return openSubDetail(sub.getAttribute('data-sub'));
     const card = e.target.closest('.opp.clickable[data-opp]'); if (card) return openOppDetail(card.getAttribute('data-opp'));
+    const ep = e.target.closest('[data-email-prop]'); if (ep) return openEmail(ep.getAttribute('data-email-prop'), ep.getAttribute('data-email-notice') || '');
   });
   el('oppDetailBody').addEventListener('click', (e) => {
     const o = e.target.closest('[data-open]'); if (o) return openProposal(o.getAttribute('data-open'));
@@ -430,11 +729,13 @@
   el('opsRefresh').addEventListener('click', load);
   el('opsReaderX').addEventListener('click', () => { el('opsReader').hidden = true; });
   el('oppDetailX').addEventListener('click', () => { el('oppDetail').hidden = true; });
+  el('emailPanelX').addEventListener('click', () => { el('emailPanel').hidden = true; el('emailCompose').innerHTML = ''; });
   el('opsConfirmCancel').addEventListener('click', () => { el('opsConfirm').hidden = true; pendingApproveId = null; });
   el('opsConfirmGo').addEventListener('click', () => { const id = pendingApproveId; el('opsConfirm').hidden = true; pendingApproveId = null; if (id) decide(id, 'approve'); });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || ops.hidden) return;
     if (!el('opsConfirm').hidden) { el('opsConfirm').hidden = true; pendingApproveId = null; }
+    else if (!el('emailPanel').hidden) el('emailPanel').hidden = true;
     else if (!el('opsReader').hidden) el('opsReader').hidden = true;
     else if (!el('oppDetail').hidden) el('oppDetail').hidden = true;
     else close();

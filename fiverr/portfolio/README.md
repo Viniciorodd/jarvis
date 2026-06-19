@@ -1,26 +1,24 @@
 # Fiverr gig gallery — sample deliverables
 
-Open `index.html` in a browser. Each card is a ready-made portfolio sample sized for its platform.
+## ⭐ Open `index.html`
+That's the master gallery — **real PNG samples across all four core gigs**, each with a **Download** button:
 
-## How to post to your gigs
-1. Open the page, full-screen your browser (zoom to 100% or 125% for crisp output).
-2. Screenshot the **image** part of any card (Win+Shift+S → drag the box around just the artwork).
-   - YouTube thumbnails are already 1280×720.
-   - Book covers are KDP 1600×2400 proportion.
-   - Short-form cards are 9:16.
-3. Upload to the gallery of the matching Fiverr gig.
+- **YouTube thumbnails** (1280×720) — MrBeast-style, in `thumbnails/`
+- **Book / eBook covers** (1600×2400) — in `covers/`
+- **Logos** (vector, crisp at any size) — in `logos/`
+- **Product-photo edits** (background removal + clean studio) — in `products/`
 
-## What's here
-- **2× YouTube thumbnails** — finance/challenge + tech/tutorial styles
-- **2× book covers** — nonfiction/finance + thriller/fiction
-- **1× product photo edit** — before/after background cleanup
-- **1× landing page hero** — SaaS conversion layout
-- **2× short-form** — animated-caption reel + SEO blog article card
+### How to post to a gig
+1. Open `index.html` (just double-click it).
+2. Click **Download** under any sample → it saves a real PNG to your Downloads folder.
+3. Upload that PNG to the matching Fiverr gig's gallery.
 
-## Before publishing
-These are **samples to show range**, not client work. Swap the placeholder faces/products for your
-own renders or stock you have rights to, and tweak copy to match each gig. Per the gig pod rules:
-only deliver work you hold rights to — no trademarked logos/characters, no copied artist identity.
+(You can also grab the files straight from the `thumbnails/`, `covers/`, `logos/`, `products/` folders.)
 
-> Want more variants (different niches, your real brand colors, or actual full-res PNG exports)?
-> Tell Jarvis which gig and she'll generate a fresh set.
+### Make new samples / client work
+Companion → **Operations → 🎨 Fiverr Studio → 🎨 Studio**. Pick the deliverable type
+(Thumbnail / Cover / Logo / Product edit), describe what the client wants, then **Download PNG**.
+Voice/chat works too: *"have Remy make a YouTube thumbnail / book cover / logo for &lt;X&gt;."*
+
+> Rights: these are samples to show range. Only publish work you hold rights to — no trademarked
+> characters/logos, no copied artist identity, no real person's likeness.

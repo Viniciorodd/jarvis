@@ -1,6 +1,29 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-06-14. Everything is committed to git + saved to memory. Resume from here._
+_Updated 2026-06-19. Everything is committed to git + saved to memory. Resume from here._
+
+### 🆕 2026-06-19 — shipped: Fiverr Studio is LIVE (real clickable thumbnails)
+- **Hybrid thumbnail engine** (`scripts/make-thumbnail.mjs`): Claude designs a spec → FLUX paints the
+  photoreal SUBJECT (free, Cloudflare) → CODE composites the bold legible headline + accent badge → one
+  self-contained 1280×720 SVG (embedded raster + system-font text). This is how real designers work, and it
+  fixes the old gap (Claude-SVG drew crude silhouettes + truncated; FLUX mangles text). Never a silhouette,
+  never truncated. The deterministic composition lives in code (doctrine #1).
+- **Live Studio surface** in the ONE app: Companion → **Operations → 🎨 Fiverr Studio → 🎨 Studio**. Type a
+  client scenario → it renders in a faithful **YouTube in-feed card** (so you see it as a viewer would) →
+  **Download PNG (1280×720)** via a client-side canvas (untainted because the subject is embedded as a data
+  URI). New route `POST /api/studio/thumbnail` in `companion/server.js`; UI in `companion/public/ops.js`
+  (+ `style.css`). Verified end-to-end in-browser across finance/fitness/tutorial/gaming.
+- **Worker wired**: `pods/fiverr/worker.mjs` routes `thumbnail` briefs through the hybrid engine (vault-scoped
+  to STUDIO-01), still behind the HITL deliver gate. Voice/chat works: *"have Remy make a thumbnail for X."*
+- **Full Studio — 4 deliverable types.** Shared `scripts/studio-lib.mjs` + `make-thumbnail.mjs` (now
+  **MrBeast-style**: extreme expression, hyper-saturated color grade, huge minimal text), `make-cover.mjs`
+  (hybrid book/eBook cover, KDP 1600×2400, genre-aware type), `make-logo.mjs` (clean **vector** monogram +
+  wordmark — no FLUX, always crisp), `edit-product.mjs` (fal.ai BiRefNet bg-removal → clean studio backdrop +
+  shadow). Studio UI has a type switcher + per-type previews + natural-size PNG export. Worker routes
+  cover/logo too. Routes `/api/studio/{thumbnail,cover,logo}` + `/api/studio/product`.
+- **Portfolio = master gallery `fiverr/portfolio/index.html`** (real PNGs + Download buttons that work from a
+  plain file open): 4 thumbnails, 2 covers, 3 logos, 1 product. Folders: `thumbnails/ covers/ logos/ products/`.
+- ⏭ Next for Fiverr: a couple more product samples; publish the actual gigs; land the first paid order.
 
 ### 🆕 2026-06-16 — shipped
 - **Email-finder enrichment** (`pods/gov/enrich.mjs`): discovery gave subs a website but no email; this

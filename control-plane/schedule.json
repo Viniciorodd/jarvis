@@ -12,7 +12,7 @@
       "command": "scan SAM.gov and state portals for new janitorial opportunities; score bid/no-bid" },
     { "id": "fiverr-order-poll", "person": "STUDIO-01", "pod": "fiverr", "type": "poll",
       "cadence_hours": 4, "tier": "cheap",
-      "command": "a new Fiverr order came in — produce and prepare it for delivery" },
+      "command": "check the fiverr inbox for new gigs and prepare drafts" },
     { "id": "saas-support-poll", "person": "RECON-DEV", "pod": "saas", "type": "poll",
       "cadence_hours": 6, "tier": "cheap",
       "command": "new support tickets came in — triage and draft replies" },

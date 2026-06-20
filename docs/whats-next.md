@@ -24,7 +24,16 @@ _Updated 2026-06-19. Everything is committed to git + saved to memory. Resume fr
 - **Portfolio = master gallery `fiverr/portfolio/index.html`** (real PNGs + Download buttons that work from a
   plain file open), niche spread (real estate / business / trading / crypto / finance / fitness / …):
   8 thumbnails, 5 covers, 6 logos, 1 product. Folders: `thumbnails/ covers/ logos/ products/`.
-- ⏭ Next for Fiverr: a couple more product samples; publish the actual gigs; land the first paid order.
+- **Order watcher — 24/7 (NO Fiverr API exists).** `pods/fiverr/inbox.mjs`: reads the RodGate agent mailbox
+  (the email Fiverr notifies) via IMAP, detects new orders, extracts the buyer brief, auto-drafts with the
+  Studio, and alerts (HQ + Telegram). NEVER delivers — delivery stays HITL (gig rule). Idempotent ledger
+  `fiverr-assets/.orders.json`. Pure parsers eval-pinned (`evals/fiverr-orders.eval.mjs`, 113/113 green).
+  Wired into the CoS router (poll/"check orders" → watcher, not the literal sentence; "order" no longer
+  gates the poll) + the conservative scheduler (`fiverr-order-poll`, every 4h, working hours).
+  → **SETUP THE OPERATOR STILL OWES:** point Fiverr's notification email at **RodGateGroup@gmail.com**
+    (Fiverr → Settings → change account/notification email, or forward Fiverr mail there) — Fiverr currently
+    emails his personal inbox, so the watcher sees 0 until that's switched. Then orders flow in automatically.
+- ⏭ Next for Fiverr: switch the Fiverr notification email; publish the gigs; land the first paid order.
 
 ### 🆕 2026-06-16 — shipped
 - **Email-finder enrichment** (`pods/gov/enrich.mjs`): discovery gave subs a website but no email; this

@@ -143,6 +143,10 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
   if (c.pod === 'exec' && /\b(invoice|payment link|bill\b|charge)\b/i.test(String(text))) {
     c.reversible = true; c.action_kind = 'draft'; if (['pay', 'other', 'charge'].includes(c.intent)) c.intent = 'invoice_draft';
   }
+  // Fiverr order poll/watch is a READ of the agent mailbox (the gate is on DELIVERING, not on checking).
+  // Don't let the word "order" gate the poll itself; the produced draft still raises its own deliver gate.
+  const FIVERR_POLL_RE = /\b(check (?:fiverr )?orders?|new fiverr order came in|any new (?:fiverr )?(?:gig|order)s?|fiverr inbox|prepare it for delivery|scan .*fiverr)\b/i;
+  if (c.pod === 'fiverr' && FIVERR_POLL_RE.test(String(text))) { c.reversible = true; c.action_kind = 'scan'; c.intent = 'fiverr_poll'; }
   const gate = decideGate(c);
   const actor = c.person ? c.person.codename : 'chief-of-staff';
 
@@ -179,7 +183,12 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
   }
   // Fiverr/SaaS workers execute too — spawn async on a clear "do work" command (not on a question).
   const txt = String(text || '');
-  if (c.pod === 'fiverr' && !gate.gate && /\b(make|generate|create|produce|design|thumbnail|cover|logo|art|image|gig|order|banner|poster)\b/i.test(txt)) {
+  // Fiverr ORDER POLL/WATCH: read the agent mailbox for real Fiverr orders (the scheduled poll + "check
+  // orders" verbs). Checked BEFORE the make-branch so the generic poll sentence reads the inbox instead of
+  // designing a thumbnail of the sentence itself.
+  if (c.pod === 'fiverr' && !gate.gate && FIVERR_POLL_RE.test(txt)) {
+    import('../fiverr/inbox.mjs').then((m) => m.watchFiverrOrders({})).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'STUDIO-01', pod: 'fiverr', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+  } else if (c.pod === 'fiverr' && !gate.gate && /\b(make|generate|create|produce|design|thumbnail|cover|logo|art|image|gig|order|banner|poster)\b/i.test(txt)) {
     import('../fiverr/worker.mjs').then((m) => m.runOrder({ brief: txt })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'STUDIO-01', pod: 'fiverr', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
   }
   if (c.pod === 'saas' && !gate.gate && /\b(ticket|support|bug|reply|respond|triage|customer|crash|error|issue)\b/i.test(txt)) {

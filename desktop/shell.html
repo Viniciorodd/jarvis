@@ -4,21 +4,26 @@
 <meta charset="utf-8" />
 <title>Jarvis</title>
 <style>
-  :root{ --ink:#04070f; --panel:#0a141b; --line:#163a39; --teal:#39e0d0; --cream:#dfeef0; --dim:#5d7480; }
+  :root{ --ink:#04070f; --panel:#0a141b; --line:#163a39; --teal:#39e0d0; --cream:#dfeef0; --dim:#5d7480; --warn:#f59e0b; }
   *{ box-sizing:border-box; margin:0; }
   html,body{ height:100%; background:var(--ink); color:var(--cream); font-family:'Space Grotesk',system-ui,sans-serif; }
   body{ display:flex; flex-direction:column; }
   .nav{ display:flex; align-items:center; gap:10px; padding:9px 14px; background:linear-gradient(180deg,#07131a,#04070f); border-bottom:1px solid var(--line); }
   .brand{ font-family:'Silkscreen',monospace; letter-spacing:.3em; color:var(--teal); font-size:13px; text-shadow:0 0 12px rgba(57,224,208,.5); }
-  .tab{ background:transparent; border:1px solid var(--line); color:var(--dim); border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer; font-family:inherit; }
+  .tab{ background:transparent; border:1px solid var(--line); color:var(--dim); border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer; font-family:inherit; transition:all .15s; }
   .tab:hover{ color:var(--cream); }
   .tab.on{ color:#04070f; background:var(--teal); border-color:var(--teal); font-weight:600; }
   .spacer{ flex:1; }
-  .host{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--dim); }
-  .host input{ width:130px; background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:6px; color:var(--cream); padding:4px 7px; font-size:11px; outline:none; }
-  .host input:focus{ border-color:var(--teal); }
+  .net-btns{ display:flex; align-items:center; gap:6px; }
+  .net-btn{ background:transparent; border:1px solid var(--line); color:var(--dim); border-radius:6px; padding:4px 9px; font-size:11px; cursor:pointer; font-family:inherit; transition:all .15s; }
+  .net-btn:hover{ color:var(--cream); border-color:var(--teal); }
+  .net-btn.active{ color:#04070f; background:var(--teal); border-color:var(--teal); }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--dim); flex-shrink:0; transition:background .3s; }
+  .dot.ok{ background:var(--teal); box-shadow:0 0 8px var(--teal); }
+  .dot.err{ background:#ef4444; }
+  .dot.checking{ background:var(--warn); animation:pulse 1s infinite; }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
   webview{ flex:1; border:0; }
-  .dot{ width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal); }
 </style>
 </head>
 <body>
@@ -27,21 +32,81 @@
     <button class="tab on" data-surface="world">World</button>
     <button class="tab" data-surface="hq">HQ</button>
     <span class="spacer"></span>
-    <span class="host">host <input id="host" spellcheck="false" /> <span class="dot" title="point at your NAS over Tailscale, or localhost"></span></span>
+    <div class="net-btns">
+      <button class="net-btn active" id="btnLan" title="Home — LAN (192.168.6.121)">🏠 Home</button>
+      <button class="net-btn" id="btnVpn" title="Away — Tailscale VPN">📡 Away</button>
+      <span class="dot checking" id="dot" title="checking connection…"></span>
+    </div>
   </div>
   <webview id="view" allowpopups></webview>
 <script>
-  const PORTS = { world: 8095, hq: 8099 };
-  const view = document.getElementById('view');
-  const hostInput = document.getElementById('host');
-  let host = localStorage.getItem('jarvis-host') || '192.168.6.121';
-  let surface = 'world';
-  hostInput.value = host;
-  const url = (s) => `http://${host}:${PORTS[s]}/`;
-  function go(s){ surface = s; view.src = url(s); document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.surface === s)); }
-  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => go(t.dataset.surface)));
-  hostInput.addEventListener('change', () => { host = hostInput.value.trim() || 'localhost'; localStorage.setItem('jarvis-host', host); go(surface); });
+  // World (companion) always runs locally on this PC.
+  // HQ runs on the NAS — reachable via LAN when home, Tailscale when away.
+  const WORLD_URL  = 'http://localhost:8095/';
+  const LAN_HOST   = localStorage.getItem('jarvis-lan-host')  || '192.168.6.121';
+  const VPN_HOST   = localStorage.getItem('jarvis-vpn-host')  || '100.64.130.81';
+  const HQ_PORT    = 8099;
+
+  const view    = document.getElementById('view');
+  const dot     = document.getElementById('dot');
+  const btnLan  = document.getElementById('btnLan');
+  const btnVpn  = document.getElementById('btnVpn');
+
+  let surface  = 'world';
+  let hqHost   = localStorage.getItem('jarvis-hq-host') || LAN_HOST;
+
+  function hqUrl(host){ return `http://${host}:${HQ_PORT}/`; }
+
+  function go(s){
+    surface = s;
+    const url = s === 'world' ? WORLD_URL : hqUrl(hqHost);
+    view.src = url;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.surface === s));
+  }
+
+  function setHost(host, btn){
+    hqHost = host;
+    localStorage.setItem('jarvis-hq-host', host);
+    btnLan.classList.toggle('active', btn === btnLan);
+    btnVpn.classList.toggle('active', btn === btnVpn);
+    if (surface === 'hq') go('hq');
+    probe();
+  }
+
+  btnLan.addEventListener('click', () => setHost(LAN_HOST, btnLan));
+  btnVpn.addEventListener('click', () => setHost(VPN_HOST, btnVpn));
+
+  // Sync active button to current hqHost
+  btnLan.classList.toggle('active', hqHost === LAN_HOST);
+  btnVpn.classList.toggle('active', hqHost !== LAN_HOST);
+
+  document.querySelectorAll('.tab').forEach(t =>
+    t.addEventListener('click', () => go(t.dataset.surface))
+  );
+
+  // Auto-detect: race LAN vs VPN, switch to whichever responds first.
+  // Runs once on startup, then again every 30 s to notice network changes.
+  async function probe(){
+    dot.className = 'dot checking';
+    dot.title = 'checking connection…';
+    const check = (host) => fetch(hqUrl(host) + 'api/state', { cache:'no-store', signal: AbortSignal.timeout(3000) })
+      .then(r => r.ok ? host : Promise.reject())
+      .catch(() => null);
+    const [lan, vpn] = await Promise.all([check(LAN_HOST), check(VPN_HOST)]);
+    if (lan){
+      dot.className = 'dot ok'; dot.title = `HQ reachable on LAN (${LAN_HOST})`;
+      if (hqHost !== LAN_HOST){ setHost(LAN_HOST, btnLan); }
+    } else if (vpn){
+      dot.className = 'dot ok'; dot.title = `HQ reachable via VPN (${VPN_HOST})`;
+      if (hqHost !== VPN_HOST){ setHost(VPN_HOST, btnVpn); }
+    } else {
+      dot.className = 'dot err'; dot.title = 'HQ unreachable — NAS offline or not on network';
+    }
+  }
+
   go('world');
+  probe();
+  setInterval(probe, 30_000);
 </script>
 </body>
 </html>

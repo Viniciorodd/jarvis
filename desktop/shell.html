@@ -104,7 +104,17 @@
     }
   }
 
-  go('world');
+  // Retry World until companion server is up (it takes ~1s to spawn)
+  function goWorld(){
+    go('world');
+    if (surface !== 'world') return;
+    const check = () => fetch('http://localhost:8095/', { cache: 'no-store', signal: AbortSignal.timeout(800) })
+      .then(() => { if (surface === 'world') view.src = WORLD_URL; })
+      .catch(() => setTimeout(check, 1000));
+    check();
+  }
+
+  goWorld();
   probe();
   setInterval(probe, 30_000);
 </script>

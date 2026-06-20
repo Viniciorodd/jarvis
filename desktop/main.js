@@ -1,23 +1,38 @@
-// JARVIS — unified desktop shell (Electron). One window onto the whole system: switch between
-// Jarvis World and HQ, pointed at your NAS over Tailscale (or localhost in dev). Stays in the tray;
-// summon with Ctrl/Cmd+Shift+J. Package installers with `npm run dist` (per-platform).
+// JARVIS — unified desktop shell (Electron). Boots the companion server locally,
+// then switches between Jarvis World (localhost:8095) and HQ (NAS). Stays in tray;
+// summon with Ctrl/Cmd+Shift+J.
 'use strict';
 const { app, BrowserWindow, globalShortcut, Tray, Menu, nativeImage, shell } = require('electron');
+const { spawn } = require('node:child_process');
 const path = require('node:path');
+const fs = require('node:fs');
 
-let win = null, tray = null;
+const PORT = 8095;
+// companion/server.js lives two levels up from desktop/
+const SERVER = path.join(__dirname, '..', 'companion', 'server.js');
+
+let win = null, tray = null, server = null;
 app.isQuitting = false;
+
+function startCompanion() {
+  if (!fs.existsSync(SERVER)) return; // skip if running outside the repo
+  server = spawn(process.execPath, [SERVER], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', COMPANION_PORT: String(PORT) },
+    stdio: 'inherit',
+  });
+  server.on('exit', (code) => { if (!app.isQuitting) console.error('companion exited', code); });
+}
 
 function createWindow() {
   win = new BrowserWindow({
     width: 1180, height: 860, minWidth: 480, minHeight: 600,
     backgroundColor: '#04070f', title: 'Jarvis', show: false, autoHideMenuBar: true,
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: { webviewTag: true, contextIsolation: true },
   });
   win.loadFile(path.join(__dirname, 'shell.html'));
   win.once('ready-to-show', () => win.show());
   win.on('close', (e) => { if (!app.isQuitting) { e.preventDefault(); win.hide(); } });
-  // open external links (real sam.gov, etc.) in the system browser, not inside the app
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 }
 
@@ -27,10 +42,11 @@ function toggle() {
 }
 
 function makeTray() {
-  const img = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
+  let img = nativeImage.createFromPath(path.join(__dirname, 'icon.png'));
+  if (img.isEmpty()) img = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
   try {
     tray = new Tray(img);
-    tray.setToolTip('Jarvis');
+    tray.setToolTip('JARVIS');
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Show / hide Jarvis', click: toggle },
       { type: 'separator' },
@@ -41,10 +57,11 @@ function makeTray() {
 }
 
 app.whenReady().then(() => {
+  startCompanion();
   createWindow();
   makeTray();
   globalShortcut.register('CommandOrControl+Shift+J', toggle);
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
-app.on('window-all-closed', () => { /* keep running in the tray */ });
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('window-all-closed', () => { /* keep running in tray */ });
+app.on('will-quit', () => { globalShortcut.unregisterAll(); if (server) server.kill(); });

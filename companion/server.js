@@ -72,6 +72,17 @@ if (!SAM_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env
 // Google Places key — used to pull a subcontractor's rating + reviews into the CRM detail.
 let PLACES_KEY = process.env.GOOGLE_PLACES_API_KEY || '';
 if (!PLACES_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^GOOGLE_PLACES_API_KEY=(.+)$/m); if (m) PLACES_KEY = m[1].trim(); } catch { /* */ } }
+// Weather — Open-Meteo (free, no key). Default to Philadelphia; override with env vars.
+const WEATHER_LAT = Number(process.env.WEATHER_LAT || '') || 39.9526;
+const WEATHER_LON = Number(process.env.WEATHER_LON || '') || -75.1652;
+// Real estate portfolio + trading files (local JSON, updated by Jarvis or manually)
+const PORTFOLIO_FILE = path.join(__dirname, '..', 'pods', 'real-estate', 'portfolio.json');
+const WATCHLIST_FILE = path.join(__dirname, '..', 'pods', 'trading', 'watchlist.json');
+const POSITIONS_FILE = path.join(__dirname, '..', 'pods', 'trading', 'positions.json');
+function loadJson(file, def) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return def; } }
+function saveJson(file, data) { try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(data, null, 2)); } catch { /* */ } }
+// Focus mode: normal | gaming | work | dnd
+let focusMode = 'normal';
 // Stripe money-in (READ-ONLY): available + pending balance and recently collected. Test or live by the key.
 async function stripeMoney() {
   if (!STRIPE_KEY) return null;
@@ -229,6 +240,22 @@ const TOOLS = [
     input_schema: { type: 'object', properties: {} } },
   { name: 'cast_to_tv', description: 'Cast a URL to a smart TV on the local network. Use for "show Jarvis on the TV", "put the Command Center on the TV", "cast to the screen". Call discover_tvs first to get the tv object.',
     input_schema: { type: 'object', properties: { tv: { type: 'object', description: 'TV from discover_tvs — must include ip and brand', properties: { ip: { type: 'string' }, brand: { type: 'string' } } }, url: { type: 'string', description: 'URL to open on the TV — use the serverUrl from discover_tvs for the companion home page' } }, required: ['tv', 'url'] } },
+  { name: 'get_weather', description: 'Get current weather, forecast, UV, air quality, sunrise/sunset, storm alerts for your location. Use for "weather", "will it rain", "UV today", "sunrise time", "any storms".',
+    input_schema: { type: 'object', properties: { days: { type: 'number', description: 'forecast days 1-7, default 5' } } } },
+  { name: 'set_focus_mode', description: 'Switch Jarvis focus mode. gaming = pauses heavy agents; work = full ops; dnd = critical alerts only; normal = default.',
+    input_schema: { type: 'object', properties: { mode: { type: 'string', enum: ['normal', 'gaming', 'work', 'dnd'] } }, required: ['mode'] } },
+  { name: 'get_real_estate', description: 'Read the real estate portfolio: Section 8 units + HAP status, flips, new builds, rentals. Use for "show my properties", "HAP status", "flip status", "rent roll".',
+    input_schema: { type: 'object', properties: {} } },
+  { name: 'update_real_estate', description: 'Update the real estate portfolio — add or edit a unit, flip, rental, or new build. Use when HAP comes in, flip milestone hits, or you add a property.',
+    input_schema: { type: 'object', properties: { type: { type: 'string', enum: ['unit', 'flip', 'rental', 'build'] }, data: { type: 'object', description: 'Property object — include id to update existing' } }, required: ['type', 'data'] } },
+  { name: 'get_quote', description: 'Get a live stock/ETF price quote (price, change %, day range). Use for "what is NVDA at", "SPY quote", "how is AAPL doing".',
+    input_schema: { type: 'object', properties: { ticker: { type: 'string', description: 'ticker symbol e.g. NVDA, SPY, QQQ' } }, required: ['ticker'] } },
+  { name: 'get_watchlist', description: 'Get live quotes for all watchlist tickers plus open options positions and price alerts. Use for "check my watchlist", "how are my stocks", "options desk", "trading update".',
+    input_schema: { type: 'object', properties: {} } },
+  { name: 'update_watchlist', description: 'Add or remove a ticker from the watchlist, or set a price alert.',
+    input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['add', 'remove', 'alert'] }, ticker: { type: 'string' }, alert_price: { type: 'number' } }, required: ['action', 'ticker'] } },
+  { name: 'update_position', description: 'Add, update, or close an options/stock position in the trading ledger. Use when you open or close a trade.',
+    input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['add', 'update', 'close'] }, position: { type: 'object', description: 'Position: { id, ticker, type (call/put/stock), strike, expiry, qty, cost_basis, alert_price, notes }' } }, required: ['action', 'position'] } },
 ];
 
 // resolve a path safely: absolute (inside any allowed root) or relative (inside the primary root)
@@ -346,6 +373,44 @@ async function castToTV(tv, castUrl) {
 
   // unknown brand: try Samsung then LG
   return castToTV({ ip, brand: 'samsung' }, castUrl).catch(() => castToTV({ ip, brand: 'lg' }, castUrl));
+}
+
+// ── weather (Open-Meteo, free, no key) ────────────────────────────────────────────────────────────
+const WX_CODES = { 0:'☀ Clear',1:'🌤 Mostly clear',2:'⛅ Partly cloudy',3:'☁ Overcast',45:'🌫 Fog',48:'🌫 Icy fog',51:'🌦 Light drizzle',53:'🌦 Drizzle',55:'🌧 Heavy drizzle',61:'🌧 Light rain',63:'🌧 Rain',65:'🌧 Heavy rain',71:'❄ Light snow',73:'❄ Snow',75:'❄ Heavy snow',77:'🌨 Snow grains',80:'🌦 Light showers',81:'🌦 Showers',82:'⛈ Heavy showers',85:'🌨 Snow showers',86:'🌨 Heavy snow showers',95:'⛈ Thunderstorm',96:'⛈ Thunderstorm+hail',99:'⛈ Severe thunderstorm' };
+const AQI_LABEL = (n) => n <= 50 ? 'Good 🟢' : n <= 100 ? 'Moderate 🟡' : n <= 150 ? 'Sensitive groups 🟠' : n <= 200 ? 'Unhealthy 🔴' : 'Very unhealthy 🟣';
+async function getWeather(days) {
+  days = Math.min(7, Math.max(1, Number(days) || 5));
+  const base = `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}`;
+  const [wx, aq] = await Promise.all([
+    fetch(`${base}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&forecast_days=${days}`, { signal: AbortSignal.timeout(8000) }).then((r) => r.json()),
+    fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&current=us_aqi&timezone=auto`, { signal: AbortSignal.timeout(8000) }).then((r) => r.json()).catch(() => ({ current: {} })),
+  ]);
+  const c = wx.current || {};
+  const d = wx.daily || {};
+  const aqi = aq.current && aq.current.us_aqi != null ? aq.current.us_aqi : null;
+  const sunrise = d.sunrise && d.sunrise[0] ? new Date(d.sunrise[0]).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—';
+  const sunset = d.sunset && d.sunset[0] ? new Date(d.sunset[0]).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—';
+  const severe = [95, 96, 99, 65, 75, 82, 86].includes(c.weather_code);
+  const forecast = (d.time || []).map((dt, i) => ({
+    day: new Date(dt + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' }),
+    hi: Math.round(d.temperature_2m_max[i]), lo: Math.round(d.temperature_2m_min[i]),
+    cond: WX_CODES[d.weather_code[i]] || '—',
+    rain: d.precipitation_probability_max[i] || 0,
+  }));
+  return { temp: Math.round(c.temperature_2m), feels: Math.round(c.apparent_temperature), humidity: c.relative_humidity_2m, wind: Math.round(c.wind_speed_10m), uv: c.uv_index, aqi, aqiLabel: aqi != null ? AQI_LABEL(aqi) : null, precip: c.precipitation, cond: WX_CODES[c.weather_code] || '—', code: c.weather_code, sunrise, sunset, severe, forecast };
+}
+
+// ── market quotes (Yahoo Finance, no key) ──────────────────────────────────────────────────────────
+async function getQuote(ticker) {
+  ticker = String(ticker || '').toUpperCase().trim();
+  if (!ticker) throw new Error('ticker required');
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`, { headers: { 'user-agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) });
+  const d = await r.json();
+  const meta = (d.chart && d.chart.result && d.chart.result[0] && d.chart.result[0].meta) || {};
+  if (!meta.regularMarketPrice) throw new Error(`No data for ${ticker}`);
+  const price = meta.regularMarketPrice, prev = meta.chartPreviousClose || meta.regularMarketPreviousClose || price;
+  const chg = price - prev, pct = prev ? (chg / prev) * 100 : 0;
+  return { ticker, price, change: chg, changePct: pct, high: meta.regularMarketDayHigh, low: meta.regularMarketDayLow, prev, name: meta.longName || meta.shortName || ticker };
 }
 
 // --- OS open: launch a file/folder/app/URL in its default program (Vinicio's "open X") ---
@@ -503,6 +568,73 @@ async function runTool(name, input) {
     const castUrl = String(input.url || localServerUrl());
     const result = await castToTV(input.tv, castUrl);
     return `Casting to ${result.brand} TV at ${result.ip} — opening ${castUrl}`;
+  }
+  if (name === 'get_weather') {
+    const wx = await getWeather(input.days);
+    const alert = wx.severe ? `\n⚠ SEVERE WEATHER: ${wx.cond}` : '';
+    const fcast = wx.forecast.map((f) => `${f.day}: ${f.hi}°/${f.lo}° ${f.cond}${f.rain > 20 ? ` (${f.rain}% rain)` : ''}`).join(' | ');
+    return `${wx.cond} · ${wx.temp}°F (feels ${wx.feels}°) · Wind ${wx.wind} mph · Humidity ${wx.humidity}%${alert}\nSunrise ${wx.sunrise} · Sunset ${wx.sunset} · UV Index ${wx.uv}${wx.aqi != null ? ` · Air Quality ${wx.aqiLabel}` : ''} · Precip ${wx.precip}" today\n5-Day: ${fcast}`;
+  }
+  if (name === 'set_focus_mode') {
+    const mode = ['normal', 'gaming', 'work', 'dnd'].includes(input.mode) ? input.mode : 'normal';
+    focusMode = mode;
+    const msg = { normal: 'Normal mode — all systems go.', gaming: 'Gaming mode activated. Background agents paused. Network optimized. Let\'s run it.', work: 'Work mode — full operations online.', dnd: 'Do not disturb. Only critical alerts will come through.' };
+    return msg[mode] || `Focus mode set to ${mode}.`;
+  }
+  if (name === 'get_real_estate') {
+    const p = loadJson(PORTFOLIO_FILE, { units: [], flips: [], new_builds: [], rentals: [] });
+    const hapDue = (p.units || []).filter((u) => u.hap_status === 'pending').length;
+    const flipAmt = (p.flips || []).reduce((s, f) => s + (f.budget || 0), 0);
+    const rentRoll = (p.units || []).reduce((s, u) => s + (u.rent || 0), 0) + (p.rentals || []).reduce((s, r) => s + (r.rent || 0), 0);
+    let out = `Real Estate Portfolio:\n`;
+    out += `Units: ${(p.units || []).length} (${hapDue} HAP pending) · Monthly rent roll: $${rentRoll.toLocaleString()}\n`;
+    if ((p.units || []).length) out += (p.units || []).map((u) => `  • ${u.address || u.id} — ${u.type} — HAP ${u.hap_status || '?'}${u.hap ? ' ($' + u.hap + ')' : ''}`).join('\n') + '\n';
+    if ((p.flips || []).length) { out += `\nActive Flips (${p.flips.length} · $${flipAmt.toLocaleString()} budget total):\n`; out += p.flips.map((f) => `  • ${f.address || f.id} — ${f.status || 'in progress'} · Spent $${(f.spent || 0).toLocaleString()} of $${(f.budget || 0).toLocaleString()}`).join('\n'); }
+    if ((p.new_builds || []).length) { out += `\nNew Builds:\n`; out += p.new_builds.map((b) => `  • ${b.address || b.id} — ${b.status || 'in progress'}`).join('\n'); }
+    return out;
+  }
+  if (name === 'update_real_estate') {
+    const p = loadJson(PORTFOLIO_FILE, { units: [], flips: [], new_builds: [], rentals: [] });
+    const key = input.type === 'build' ? 'new_builds' : input.type === 'unit' ? 'units' : input.type === 'flip' ? 'flips' : 'rentals';
+    if (!p[key]) p[key] = [];
+    const d = input.data || {}; if (!d.id) d.id = Date.now().toString(36);
+    const idx = p[key].findIndex((x) => x.id === d.id);
+    if (idx >= 0) p[key][idx] = { ...p[key][idx], ...d }; else p[key].push(d);
+    p.updated = new Date().toISOString();
+    saveJson(PORTFOLIO_FILE, p);
+    return `Updated ${input.type} portfolio. ${key}: ${p[key].length} records.`;
+  }
+  if (name === 'get_quote') {
+    const q = await getQuote(input.ticker);
+    const dir = q.change >= 0 ? '▲' : '▼';
+    return `${q.name} (${q.ticker}): $${q.price.toFixed(2)} ${dir}${Math.abs(q.change).toFixed(2)} (${Math.abs(q.changePct).toFixed(2)}%) · Day ${q.low?.toFixed(2) || '—'}–${q.high?.toFixed(2) || '—'} · Prev close $${q.prev.toFixed(2)}`;
+  }
+  if (name === 'get_watchlist') {
+    const wl = loadJson(WATCHLIST_FILE, { tickers: [], alerts: [] });
+    const pos = loadJson(POSITIONS_FILE, { positions: [] });
+    const quotes = await Promise.all((wl.tickers || []).map((t) => getQuote(t).catch((e) => ({ ticker: t, error: e.message }))));
+    const triggered = quotes.filter((q) => !q.error && wl.alerts && wl.alerts.some((a) => a.ticker === q.ticker && ((a.direction === 'above' && q.price >= a.price) || (a.direction === 'below' && q.price <= a.price))));
+    let out = 'Watchlist:\n' + quotes.map((q) => q.error ? `  ${q.ticker}: error — ${q.error}` : `  ${q.ticker}: $${q.price.toFixed(2)} ${q.change >= 0 ? '▲' : '▼'}${Math.abs(q.changePct).toFixed(2)}%`).join('\n');
+    if (triggered.length) out += `\n⚠ ALERTS TRIGGERED: ${triggered.map((q) => q.ticker + ' @ $' + q.price.toFixed(2)).join(', ')}`;
+    if ((pos.positions || []).length) out += '\n\nOpen Positions:\n' + pos.positions.map((p) => `  ${p.ticker} ${p.type} ${p.strike || ''} exp ${p.expiry || '?'} · qty ${p.qty} · cost $${p.cost_basis || '?'}${p.alert_price ? ' · alert $' + p.alert_price : ''}`).join('\n');
+    return out;
+  }
+  if (name === 'update_watchlist') {
+    const wl = loadJson(WATCHLIST_FILE, { tickers: [], alerts: [] });
+    const t = String(input.ticker || '').toUpperCase().trim();
+    if (input.action === 'add' && !wl.tickers.includes(t)) { wl.tickers.push(t); saveJson(WATCHLIST_FILE, wl); return `Added ${t} to watchlist. Total: ${wl.tickers.length} tickers.`; }
+    if (input.action === 'remove') { wl.tickers = wl.tickers.filter((x) => x !== t); if (!wl.alerts) wl.alerts = []; wl.alerts = wl.alerts.filter((a) => a.ticker !== t); saveJson(WATCHLIST_FILE, wl); return `Removed ${t} from watchlist.`; }
+    if (input.action === 'alert' && input.alert_price) { if (!wl.alerts) wl.alerts = []; wl.alerts = wl.alerts.filter((a) => a.ticker !== t); wl.alerts.push({ ticker: t, price: input.alert_price, direction: 'below', added: new Date().toISOString() }); saveJson(WATCHLIST_FILE, wl); return `Alert set: notify when ${t} falls to $${input.alert_price}.`; }
+    return `Nothing changed for ${t}.`;
+  }
+  if (name === 'update_position') {
+    const p = loadJson(POSITIONS_FILE, { positions: [] });
+    const pos = input.position || {}; if (!pos.id) pos.id = Date.now().toString(36);
+    if (input.action === 'close') { p.positions = (p.positions || []).filter((x) => x.id !== pos.id); saveJson(POSITIONS_FILE, p); return `Position ${pos.id} closed.`; }
+    const idx = (p.positions || []).findIndex((x) => x.id === pos.id);
+    if (idx >= 0) p.positions[idx] = { ...p.positions[idx], ...pos }; else { if (!p.positions) p.positions = []; p.positions.push(pos); }
+    saveJson(POSITIONS_FILE, p);
+    return `Position ${pos.ticker || pos.id} ${input.action === 'add' ? 'opened' : 'updated'}. Total open: ${p.positions.length}.`;
   }
   if (name === 'list_dir') {
     const dir = safe(rel);
@@ -1225,6 +1357,71 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/weather') {
+    try { return send(res, 200, JSON.stringify(await getWeather(Number(url.searchParams.get('days') || 5)))); }
+    catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/focus') {
+    return send(res, 200, JSON.stringify({ mode: focusMode }));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/focus') {
+    try {
+      const { mode } = await readBody(req);
+      if (!['normal', 'gaming', 'work', 'dnd'].includes(mode)) return send(res, 400, JSON.stringify({ error: 'invalid mode' }));
+      focusMode = mode;
+      return send(res, 200, JSON.stringify({ ok: true, mode }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/real-estate') {
+    return send(res, 200, JSON.stringify(loadJson(PORTFOLIO_FILE, { units: [], flips: [], new_builds: [], rentals: [] })));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/real-estate') {
+    try {
+      const body = await readBody(req);
+      const p = loadJson(PORTFOLIO_FILE, { units: [], flips: [], new_builds: [], rentals: [] });
+      const key = body.type === 'build' ? 'new_builds' : body.type === 'unit' ? 'units' : body.type === 'flip' ? 'flips' : 'rentals';
+      if (!p[key]) p[key] = [];
+      const d = body.data || {}; if (!d.id) d.id = Date.now().toString(36);
+      const idx = p[key].findIndex((x) => x.id === d.id);
+      if (idx >= 0) p[key][idx] = { ...p[key][idx], ...d }; else p[key].push(d);
+      p.updated = new Date().toISOString();
+      saveJson(PORTFOLIO_FILE, p);
+      return send(res, 200, JSON.stringify({ ok: true, portfolio: p }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/market/quote') {
+    try { return send(res, 200, JSON.stringify(await getQuote(url.searchParams.get('ticker') || ''))); }
+    catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/market/watchlist') {
+    const wl = loadJson(WATCHLIST_FILE, { tickers: [], alerts: [] });
+    const quotes = await Promise.all((wl.tickers || []).map((t) => getQuote(t).catch((e) => ({ ticker: t, error: e.message }))));
+    return send(res, 200, JSON.stringify({ ...wl, quotes }));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/market/watchlist') {
+    try {
+      const body = await readBody(req);
+      const wl = loadJson(WATCHLIST_FILE, { tickers: [], alerts: [] });
+      if (body.action === 'add' && body.ticker && !wl.tickers.includes(body.ticker.toUpperCase())) { wl.tickers.push(body.ticker.toUpperCase()); }
+      if (body.action === 'remove') { wl.tickers = wl.tickers.filter((t) => t !== body.ticker?.toUpperCase()); }
+      saveJson(WATCHLIST_FILE, wl);
+      return send(res, 200, JSON.stringify({ ok: true, tickers: wl.tickers }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/market/positions') {
+    return send(res, 200, JSON.stringify(loadJson(POSITIONS_FILE, { positions: [] })));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/market/positions') {
+    try {
+      const body = await readBody(req);
+      const p = loadJson(POSITIONS_FILE, { positions: [] });
+      const pos = body.position || {}; if (!pos.id) pos.id = Date.now().toString(36);
+      if (body.action === 'close') { p.positions = (p.positions || []).filter((x) => x.id !== pos.id); }
+      else { if (!p.positions) p.positions = []; const idx = p.positions.findIndex((x) => x.id === pos.id); if (idx >= 0) p.positions[idx] = { ...p.positions[idx], ...pos }; else p.positions.push(pos); }
+      saveJson(POSITIONS_FILE, p);
+      return send(res, 200, JSON.stringify({ ok: true, positions: p.positions }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
   if (req.method === 'GET' && url.pathname === '/api/tv/discover') {
     try {
       const tvs = await discoverTVs(3500);

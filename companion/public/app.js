@@ -436,6 +436,61 @@ $('feedList').addEventListener('click', (e) => { if (!e.target.closest('.ds-empt
 $('homeMetrics').addEventListener('click', (e) => { const hm = e.target.closest('[data-go]'); if (hm) tap(hm.getAttribute('data-go')); });
 document.querySelector('.dash-grid').addEventListener('click', () => tap('commandBtn'));
 
+// ── weather widget ───────────────────────────────────────────────────────────
+let wxExpanded = false;
+const WX_COND_COLOR = (code) => [95,96,99,65,82,86].includes(code) ? 'var(--err)' : [71,73,75,77,85].includes(code) ? '#8bb8ff' : 'var(--teal)';
+async function loadWeather() {
+  const bar = $('wxBar'); if (!bar) return;
+  try {
+    const wx = await fetch('/api/weather?days=5').then((r) => r.json());
+    if (wx.error) { bar.hidden = true; return; }
+    const alertStyle = wx.severe ? `color:var(--err);font-weight:600;` : '';
+    const color = WX_COND_COLOR(wx.code);
+    const fcastHtml = (wx.forecast || []).map((f) => {
+      const rain = f.rain > 20 ? `<span class="wx-rain">${f.rain}%🌧</span>` : '';
+      return `<div class="wx-day"><div class="wx-day-name">${esc(f.day)}</div><div class="wx-day-hi" style="color:${WX_COND_COLOR(0)};">${f.hi}°</div><div class="wx-day-lo">${f.lo}°</div>${rain}</div>`;
+    }).join('');
+    const expanded = `<div class="wx-full">
+      <div class="wx-main-row">
+        <span class="wx-cond" style="${alertStyle}color:${color}">${esc(wx.cond)}</span>
+        <span class="wx-temp-big">${wx.temp}°F</span>
+        <span class="wx-feels">feels ${wx.feels}°</span>
+      </div>
+      <div class="wx-detail-row">
+        <span>🌅 ${esc(wx.sunrise)}</span><span>🌇 ${esc(wx.sunset)}</span>
+        <span title="UV Index" style="${wx.uv >= 8 ? 'color:var(--err)' : wx.uv >= 6 ? 'color:var(--warn)' : ''}">☀ UV ${wx.uv}</span>
+        ${wx.aqiLabel ? `<span>🍃 ${esc(wx.aqiLabel)}</span>` : ''}
+        <span>💧 ${wx.humidity}%</span><span>💨 ${wx.wind} mph</span>
+      </div>
+      <div class="wx-forecast">${fcastHtml}</div>
+      ${wx.severe ? `<div class="wx-alert">⚠ SEVERE WEATHER — ${esc(wx.cond)}</div>` : ''}
+    </div>`;
+    const compact = `<span class="wx-compact" style="color:${color}">${esc(wx.cond)} ${wx.temp}°F</span><span class="wx-compact-sub"> · UV ${wx.uv} · ${esc(wx.sunrise)} / ${esc(wx.sunset)}</span>`;
+    bar.innerHTML = `<div class="wx-toggle" id="wxToggle">${wxExpanded ? expanded : compact}<button class="wx-chevron" title="Toggle weather details">${wxExpanded ? '▲' : '▼'}</button></div>`;
+    bar.hidden = false;
+    $('wxToggle') && $('wxToggle').addEventListener('click', () => { wxExpanded = !wxExpanded; loadWeather(); });
+  } catch { if ($('wxBar')) $('wxBar').hidden = true; }
+}
+
+// ── focus mode ────────────────────────────────────────────────────────────────
+const FOCUS_MODES = ['normal', 'gaming', 'work', 'dnd'];
+const FOCUS_LABELS = { normal: '◉ normal', gaming: '🎮 gaming', work: '⚙ work', dnd: '🔕 dnd' };
+const FOCUS_COLORS = { normal: '', gaming: '#a78bfa', work: 'var(--teal)', dnd: 'var(--warn)' };
+let curFocus = 'normal';
+async function setFocus(mode) {
+  await fetch('/api/focus', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode }) }).catch(() => {});
+  curFocus = mode;
+  const pill = $('focusPill'); if (!pill) return;
+  pill.textContent = FOCUS_LABELS[mode] || mode;
+  pill.style.borderColor = FOCUS_COLORS[mode] || '';
+  pill.style.color = FOCUS_COLORS[mode] || '';
+  if (mode === 'gaming') addMsg('j', 'Gaming mode active. Background agents paused — go get those dubs.');
+}
+$('focusPill') && $('focusPill').addEventListener('click', () => {
+  const next = FOCUS_MODES[(FOCUS_MODES.indexOf(curFocus) + 1) % FOCUS_MODES.length];
+  setFocus(next);
+});
+
 // ── boot ─────────────────────────────────────────────────────────────────────
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('load failed: ' + src)); document.head.appendChild(s); }); }
 fetch('/api/info').then((r) => r.json()).then(async (i) => {
@@ -449,6 +504,9 @@ loadDash();
 setInterval(loadDash, 20000);
 updateHome();
 setInterval(updateHome, 45000);
+loadWeather();
+setInterval(loadWeather, 30 * 60 * 1000); // refresh every 30 min
+fetch('/api/focus').then((r) => r.json()).then((d) => { if (d.mode) setFocus(d.mode); }).catch(() => {});
 
 setState('idle', 'standby');
 // Greet once per calendar day — not on every toggle/reopen of the Electron window

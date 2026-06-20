@@ -1,0 +1,4 @@
+{
+  "positions": [],
+  "notes": "Add your open options positions here. Each entry: { id, ticker, type (call/put/stock), strike, expiry, qty, cost_basis, alert_price, notes }"
+}

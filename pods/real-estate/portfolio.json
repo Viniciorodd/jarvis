@@ -1,0 +1,13 @@
+{
+  "units": [
+    {
+      "id": "u1", "address": "Add your first unit address here", "type": "section8",
+      "tenant": "", "rent": 0, "hap": 0,
+      "hap_status": "pending", "hap_date": null, "notes": "Update with real data"
+    }
+  ],
+  "flips": [],
+  "new_builds": [],
+  "rentals": [],
+  "updated": null
+}

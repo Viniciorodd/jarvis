@@ -16,10 +16,12 @@
   // central exec/finance/system approvals so money gates stay visible). `tabs` = the views it shows.
   const BUSINESSES = [
     { id: 'gov', label: '🏛 Gov Contracting', pods: ['gov', 'exec', 'chief-of-staff', 'system'], tabs: ['leads', 'opps', 'props', 'crm'] },
+    { id: 'realestate', label: '🏢 Real Estate', pods: ['real-estate'], tabs: ['units', 'flips', 'builds', 'rentals'] },
+    { id: 'trading', label: '📈 Trading', pods: ['trading'], tabs: ['watchlist', 'positions'] },
     { id: 'fiverr', label: '🎨 Fiverr Studio', pods: ['fiverr'], tabs: ['studio', 'activity', 'leads'] },
     { id: 'saas', label: '🖥 SaaS / Recon', pods: ['saas'], tabs: ['activity', 'leads'] },
   ];
-  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity' };
+  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions' };
   let biz = 'gov', tab = 'leads';
   const curBiz = () => BUSINESSES.find((b) => b.id === biz) || BUSINESSES[0];
 
@@ -71,6 +73,148 @@
     if (tab === 'props') return renderProps();
     if (tab === 'crm') return renderCrm();
     if (tab === 'activity') return renderActivity(curBiz().pods[0]);
+    if (tab === 'units') return renderUnits();
+    if (tab === 'flips') return renderFlips();
+    if (tab === 'builds') return renderBuilds();
+    if (tab === 'rentals') return renderRentals();
+    if (tab === 'watchlist') return renderWatchlist();
+    if (tab === 'positions') return renderPositions();
+  }
+
+  // ── REAL ESTATE ─────────────────────────────────────────────────────────────
+  let reData = null;
+  async function loadRE() {
+    if (biz !== 'realestate') return;
+    body.innerHTML = '<div class="ops-empty">loading portfolio…</div>';
+    try { reData = await fetch('/api/real-estate').then((r) => r.json()); render(); }
+    catch (e) { body.innerHTML = `<div class="ops-empty">portfolio offline — ${esc(e.message)}</div>`; }
+  }
+
+  function renderUnits() {
+    if (!reData) { loadRE(); return; }
+    const units = reData.units || [];
+    if (!units.length) {
+      body.innerHTML = `<div class="ops-explain"><b>🏠 Section 8 Units & Rentals</b><br>No units in your portfolio yet.<br>Tell Jarvis: <i>"Add unit at 123 Main St, Section 8, rent $1200, HAP $900"</i></div>`; return;
+    }
+    const hapReceived = units.filter((u) => u.hap_status === 'received').length;
+    const total = units.reduce((s, u) => s + (u.rent || 0), 0);
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🏠 Section 8 Units</b> — ${units.length} units · HAP: ${hapReceived}/${units.length} received · Monthly rent roll: <b style="color:var(--teal)">$${total.toLocaleString()}</b></div>` +
+      units.map((u) => {
+        const hapClass = u.hap_status === 'received' ? 're-hap-ok' : 're-hap-pend';
+        return `<div class="re-card">
+          <div class="re-card-head"><div class="re-card-addr">${esc(u.address || u.id)}</div><div class="re-card-type">${esc(u.type || 'unit')}</div></div>
+          <div class="re-row">Rent <span>$${(u.rent || 0).toLocaleString()}/mo</span></div>
+          <div class="re-row">HAP <span class="${hapClass}">${esc(u.hap_status || '?')}${u.hap ? ' · $' + u.hap : ''}</span></div>
+          ${u.hap_date ? `<div class="re-row">HAP date <span>${esc(u.hap_date)}</span></div>` : ''}
+          ${u.tenant ? `<div class="re-row">Tenant <span>${esc(u.tenant)}</span></div>` : ''}
+          ${u.notes ? `<div class="re-row">Notes <span>${esc(u.notes)}</span></div>` : ''}
+        </div>`;
+      }).join('');
+  }
+
+  function renderFlips() {
+    if (!reData) { loadRE(); return; }
+    const flips = reData.flips || [];
+    if (!flips.length) {
+      body.innerHTML = `<div class="ops-explain"><b>🔨 Active Flips</b><br>No active flips tracked yet.<br>Tell Jarvis: <i>"Add flip at 456 Oak Ave, budget $85k, framing complete"</i></div>`; return;
+    }
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🔨 Active Flips</b> — ${flips.length} properties · Total budget: <b style="color:var(--teal)">$${flips.reduce((s, f) => s + (f.budget || 0), 0).toLocaleString()}</b></div>` +
+      flips.map((f) => {
+        const pct = f.budget ? Math.min(100, Math.round(((f.spent || 0) / f.budget) * 100)) : 0;
+        return `<div class="re-card">
+          <div class="re-card-head"><div class="re-card-addr">${esc(f.address || f.id)}</div><div class="re-card-type">${esc(f.status || 'in progress')}</div></div>
+          <div class="re-row">Budget <span>$${(f.budget || 0).toLocaleString()}</span></div>
+          <div class="re-row">Spent <span>$${(f.spent || 0).toLocaleString()}</span></div>
+          <div class="re-progress"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--dim)"><span>Progress</span><span>${pct}%</span></div><div class="re-prog-bar"><div class="re-prog-fill" style="width:${pct}%"></div></div></div>
+          ${f.notes ? `<div class="re-row" style="margin-top:6px">Notes <span>${esc(f.notes)}</span></div>` : ''}
+        </div>`;
+      }).join('');
+  }
+
+  function renderBuilds() {
+    if (!reData) { loadRE(); return; }
+    const builds = reData.new_builds || [];
+    if (!builds.length) {
+      body.innerHTML = `<div class="ops-explain"><b>🏗 New Builds</b><br>No new builds tracked yet.<br>Tell Jarvis: <i>"Add new build at Lot 4, permits filed, $250k budget"</i></div>`; return;
+    }
+    body.innerHTML = builds.map((b) => `<div class="re-card">
+      <div class="re-card-head"><div class="re-card-addr">${esc(b.address || b.id)}</div><div class="re-card-type">${esc(b.status || 'planning')}</div></div>
+      ${b.budget ? `<div class="re-row">Budget <span>$${(b.budget || 0).toLocaleString()}</span></div>` : ''}
+      ${b.notes ? `<div class="re-row">Notes <span>${esc(b.notes)}</span></div>` : ''}
+    </div>`).join('');
+  }
+
+  function renderRentals() {
+    if (!reData) { loadRE(); return; }
+    const rentals = reData.rentals || [];
+    if (!rentals.length) {
+      body.innerHTML = `<div class="ops-explain"><b>🔑 Market Rentals</b><br>No market-rate rentals tracked yet.<br>Tell Jarvis: <i>"Add rental at 789 Pine St, rent $1500/mo, tenant John"</i></div>`; return;
+    }
+    const total = rentals.reduce((s, r) => s + (r.rent || 0), 0);
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🔑 Market Rentals</b> — ${rentals.length} units · Monthly: <b style="color:var(--teal)">$${total.toLocaleString()}</b></div>` +
+      rentals.map((r) => `<div class="re-card">
+        <div class="re-card-head"><div class="re-card-addr">${esc(r.address || r.id)}</div><div class="re-card-type">rental</div></div>
+        <div class="re-row">Rent <span>$${(r.rent || 0).toLocaleString()}/mo</span></div>
+        ${r.tenant ? `<div class="re-row">Tenant <span>${esc(r.tenant)}</span></div>` : ''}
+        ${r.notes ? `<div class="re-row">Notes <span>${esc(r.notes)}</span></div>` : ''}
+      </div>`).join('');
+  }
+
+  // ── TRADING ──────────────────────────────────────────────────────────────────
+  let tradeData = null;
+  async function loadTrading() {
+    if (biz !== 'trading') return;
+    body.innerHTML = '<div class="ops-empty">fetching live quotes…</div>';
+    try {
+      const [wl, pos] = await Promise.all([
+        fetch('/api/market/watchlist').then((r) => r.json()),
+        fetch('/api/market/positions').then((r) => r.json()),
+      ]);
+      tradeData = { wl, pos };
+      render();
+    } catch (e) { body.innerHTML = `<div class="ops-empty">market data offline — ${esc(e.message)}</div>`; }
+  }
+
+  function renderWatchlist() {
+    if (!tradeData) { loadTrading(); return; }
+    const { wl } = tradeData;
+    const quotes = wl.quotes || [];
+    if (!quotes.length) {
+      body.innerHTML = `<div class="ops-explain"><b>📊 Watchlist</b><br>No tickers on your watchlist yet.<br>Tell Jarvis: <i>"Add NVDA to my watchlist"</i> or <i>"Set an alert when SPY drops to $520"</i></div>`; return;
+    }
+    const alerts = wl.alerts || [];
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>📊 Live Watchlist</b> — ${quotes.length} tickers${alerts.length ? ` · ${alerts.length} alerts set` : ''}</div>` +
+      quotes.map((q) => {
+        if (q.error) return `<div class="trade-card"><div class="trade-ticker">${esc(q.ticker)}</div><div style="color:var(--err);font-size:12px">${esc(q.error)}</div></div>`;
+        const up = q.change >= 0;
+        const al = alerts.find((a) => a.ticker === q.ticker);
+        const alTriggered = al && ((al.direction === 'below' && q.price <= al.price) || (al.direction === 'above' && q.price >= al.price));
+        return `<div class="trade-card${alTriggered ? '" style="border-color:var(--warn)' : ''}">
+          <div><div class="trade-ticker">${esc(q.ticker)}</div><div class="trade-meta">${esc(q.name || '')}</div></div>
+          <div><div class="trade-price">$${q.price.toFixed(2)}</div><div class="trade-chg ${up ? 'up' : 'dn'}">${up ? '▲' : '▼'}${Math.abs(q.change).toFixed(2)} (${Math.abs(q.changePct).toFixed(2)}%)</div><div class="trade-meta">Range ${(q.low||0).toFixed(2)}–${(q.high||0).toFixed(2)}</div></div>
+          <div class="trade-actions">
+            ${al ? `<span style="font-size:11px;color:${alTriggered?'var(--warn)':'var(--dim)'}">🔔 $${al.price}</span>` : ''}
+            <button class="btn ghost" style="font-size:11px;padding:4px 9px" data-rm-ticker="${esc(q.ticker)}" title="Remove from watchlist">✕</button>
+          </div>
+        </div>`;
+      }).join('');
+  }
+
+  function renderPositions() {
+    if (!tradeData) { loadTrading(); return; }
+    const positions = (tradeData.pos && tradeData.pos.positions) || [];
+    if (!positions.length) {
+      body.innerHTML = `<div class="ops-explain"><b>📋 Options Positions</b><br>No open positions tracked yet.<br>Tell Jarvis: <i>"I opened a NVDA call $130 strike expiring July 18, 2 contracts at $3.50"</i></div>`; return;
+    }
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>📋 Open Positions</b> — ${positions.length} trades</div>` +
+      positions.map((p) => `<div class="pos-card">
+        <div class="pos-head"><div class="pos-ticker">${esc(p.ticker)}</div><div class="pos-type pos-${esc(p.type || 'stock')}">${esc((p.type || 'stock').toUpperCase())}</div>${p.strike ? `<span style="font-size:12px;color:var(--dim)">$${p.strike} strike</span>` : ''}</div>
+        ${p.expiry ? `<div class="pos-row">Expiry: <b>${esc(p.expiry)}</b></div>` : ''}
+        <div class="pos-row">Qty: ${p.qty || '?'} · Cost basis: ${p.cost_basis ? '$' + p.cost_basis : '?'}/contract</div>
+        ${p.alert_price ? `<div class="pos-row" style="color:var(--warn)">Alert at: $${p.alert_price}</div>` : ''}
+        ${p.notes ? `<div class="pos-row" style="color:var(--dim)">${esc(p.notes)}</div>` : ''}
+        <div style="margin-top:8px"><button class="btn ghost" style="font-size:11px;padding:4px 9px" data-close-pos="${esc(p.id)}">Close position</button></div>
+      </div>`).join('');
   }
 
   function renderLeads() {
@@ -690,6 +834,22 @@
     const sub = e.target.closest('.ops-card[data-sub]'); if (sub) return openSubDetail(sub.getAttribute('data-sub'));
     const card = e.target.closest('.opp.clickable[data-opp]'); if (card) return openOppDetail(card.getAttribute('data-opp'));
     const ep = e.target.closest('[data-email-prop]'); if (ep) return openEmail(ep.getAttribute('data-email-prop'), ep.getAttribute('data-email-notice') || '');
+    const rmTicker = e.target.closest('[data-rm-ticker]');
+    if (rmTicker) {
+      const ticker = rmTicker.getAttribute('data-rm-ticker');
+      if (!confirm(`Remove ${ticker} from watchlist?`)) return;
+      fetch('/api/market/watchlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove', ticker }) })
+        .then((r) => r.json()).then(() => { tradeData = null; renderWatchlist(); }).catch(() => {});
+      return;
+    }
+    const closePos = e.target.closest('[data-close-pos]');
+    if (closePos) {
+      const id = closePos.getAttribute('data-close-pos');
+      if (!confirm('Mark this position as closed?')) return;
+      fetch('/api/market/positions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'close', position: { id } }) })
+        .then((r) => r.json()).then(() => { tradeData = null; renderPositions(); }).catch(() => {});
+      return;
+    }
   });
   el('oppDetailBody').addEventListener('click', (e) => {
     const o = e.target.closest('[data-open]'); if (o) return openProposal(o.getAttribute('data-open'));

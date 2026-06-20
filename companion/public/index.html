@@ -30,6 +30,7 @@
         <button class="floor-btn" id="activityBtn" title="Activity log — calendar + what was done each day">📋 Activity</button>
         <button class="t-btn" id="dashBtn" title="Toggle the dashboard">📊 Dashboard</button>
         <button class="t-btn" id="settingsBtn" title="Settings — theme, voice, conversation">⚙ Settings</button>
+        <button class="focus-pill" id="focusPill" title="Focus mode: click to cycle normal → gaming → work → dnd">◉ normal</button>
       </div>
 
       <div class="stage" id="stage">
@@ -39,6 +40,8 @@
           <div class="hint" id="hint">tap the orb, type, or drag a file in</div>
         </div>
         <div class="home-metrics" id="homeMetrics"></div>
+        <!-- weather widget — auto-loads, collapses to one line when minimized -->
+        <div class="wx-bar" id="wxBar" hidden></div>
         <!-- visual panel: maps / images / web she pulls up -->
         <div class="visual" id="visual" hidden>
           <div class="visual-bar">

@@ -214,6 +214,10 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { text: { type: 'string' }, when: { type: 'string', description: 'optional plain-text date/time, e.g. "2026-07-01", "every Friday", "birthday Aug 3"' } }, required: ['text'] } },
   { name: 'list_reminders', description: 'List saved reminders, important dates, birthdays, and notes.',
     input_schema: { type: 'object', properties: {} } },
+  { name: 'remember', description: 'Permanently remember a fact, preference, or instruction about the operator — e.g. "call me sir", "I prefer bullet points", "my wife\'s name is Maria". Injected into every future conversation automatically.',
+    input_schema: { type: 'object', properties: { fact: { type: 'string', description: 'The fact or preference to remember, written as a clear statement.' } }, required: ['fact'] } },
+  { name: 'update_operator_profile', description: 'Append new information to the operator profile — use when the operator shares important personal, business, or preference info that should be part of your permanent identity/instructions.',
+    input_schema: { type: 'object', properties: { addition: { type: 'string', description: 'Text to append to the operator profile.' } }, required: ['addition'] } },
   { name: 'read_email', description: 'Read / summarize recent Gmail (READ-ONLY). Use for "read me my email", "what is in my inbox", "any important emails". Defaults to unread.',
     input_schema: { type: 'object', properties: { query: { type: 'string', description: 'optional Gmail search, e.g. "is:unread", "from:client", "newer_than:2d"' }, max: { type: 'number', description: 'default 8' } } } },
   { name: 'read_calendar', description: 'Read upcoming Google Calendar events (READ-ONLY). Use for "what is on my calendar", "my agenda", "am I free this week".',
@@ -761,6 +765,22 @@ async function runTool(name, input) {
     const list = loadReminders();
     return list.length ? list.map((r, i) => `${i + 1}. ${r.text}${r.when ? ` — ${r.when}` : ''}`).join('\n') : 'No reminders saved yet.';
   }
+  if (name === 'remember') {
+    const mem = loadMemory();
+    mem.push(String(input.fact));
+    saveMemory(mem);
+    return `Remembered: "${input.fact}". I now carry ${mem.length} memory item(s) into every conversation.`;
+  }
+  if (name === 'update_operator_profile') {
+    const addition = String(input.addition || '').trim();
+    if (!addition) return 'Nothing to add.';
+    try {
+      const existing = (() => { try { return fs.readFileSync(OPERATOR_PROFILE_FILE, 'utf8'); } catch { return ''; } })();
+      fs.mkdirSync(path.dirname(OPERATOR_PROFILE_FILE), { recursive: true });
+      fs.writeFileSync(OPERATOR_PROFILE_FILE, existing + (existing && !existing.endsWith('\n') ? '\n' : '') + '\n' + addition + '\n');
+      return `Operator profile updated. Change takes effect immediately — I now know: "${addition}"`;
+    } catch (e) { return `Could not write profile: ${e.message}`; }
+  }
   if (name === 'read_email') {
     if (!google.googleConfigured()) return "Google isn't connected yet — run  node scripts/google-auth.mjs  once (see docs/google-setup.md), then I can read your inbox.";
     const mails = await google.gmailRecent({ max: input.max || 8, query: input.query || 'is:unread in:inbox' });
@@ -799,16 +819,38 @@ function actionLabel(name, input, result, ok) {
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
 
-// Inject the Operator Profile (who she works for) ahead of her persona, if present.
-let OPERATOR = '';
-try { OPERATOR = fs.readFileSync(path.join(__dirname, '..', 'prompts', 'operator-profile.md'), 'utf8'); } catch { /* not written yet */ }
-const FULL_SYSTEM = (OPERATOR ? `# WHO YOU WORK FOR — your operator's profile (know this cold)\n${OPERATOR}\n\n---\n\n` : '') + SYSTEM;
+const OPERATOR_PROFILE_FILE = path.join(__dirname, '..', 'prompts', 'operator-profile.md');
+const MEMORY_FILE = path.join(__dirname, '.memory.json');
+function loadMemory() { try { return JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8')); } catch { return []; } }
+function saveMemory(m) { try { fs.writeFileSync(MEMORY_FILE, JSON.stringify(m, null, 2)); } catch { /* */ } }
+
+// Re-read profile + memory on every call so updates take effect immediately without restart.
+function buildSystem() {
+  let op = '';
+  try { op = fs.readFileSync(OPERATOR_PROFILE_FILE, 'utf8'); } catch { /* not yet */ }
+  const base = (op ? `# WHO YOU WORK FOR\n${op}\n\n---\n\n` : '') + SYSTEM;
+  const mem = loadMemory();
+  const rem = loadReminders();
+  const extras = [];
+  if (mem.length) extras.push(`## MEMORY — things you have been told to remember\n${mem.map((m, i) => `${i + 1}. ${m}`).join('\n')}`);
+  if (rem.length) extras.push(`## REMINDERS & DATES\n${rem.map((r) => `- ${r.text}${r.when ? ` (${r.when})` : ''}`).join('\n')}`);
+  return extras.length ? base + '\n\n' + extras.join('\n\n') : base;
+}
+
+// Haiku for short conversational turns (4-5x cheaper); Sonnet for drafts / analysis.
+const SONNET_TRIGGERS = /\b(write|draft|proposal|analy[sz]e|summari[sz]e|explain|report|compare|review|research|plan|strategy|proofread|translate|contract|letter)\b/i;
+function pickModel(messages) {
+  const last = messages.filter((m) => m.role === 'user').slice(-1)[0];
+  const text = Array.isArray(last?.content) ? last.content.map((c) => c.text || '').join(' ') : (last?.content || '');
+  return (text.length > 300 || SONNET_TRIGGERS.test(text)) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5';
+}
 
 async function callClaude(messages) {
+  const model = pickModel(messages);
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1200, system: FULL_SYSTEM, tools: TOOLS, messages }),
+    body: JSON.stringify({ model, max_tokens: 1200, system: buildSystem(), tools: TOOLS, messages }),
   });
   if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text()).slice(0, 300)}`);
   return r.json();

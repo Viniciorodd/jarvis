@@ -20,8 +20,9 @@
     { id: 'trading', label: '📈 Trading', pods: ['trading'], tabs: ['watchlist', 'positions'] },
     { id: 'fiverr', label: '🎨 Fiverr Studio', pods: ['fiverr'], tabs: ['studio', 'activity', 'leads'] },
     { id: 'saas', label: '🖥 SaaS / Recon', pods: ['saas'], tabs: ['activity', 'leads'] },
+    { id: 'webstudio', label: '🌐 Web Studio', pods: ['webstudio'], tabs: ['projects', 'sites', 'clients', 'pipeline'] },
   ];
-  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions' };
+  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline' };
   let biz = 'gov', tab = 'leads';
   const curBiz = () => BUSINESSES.find((b) => b.id === biz) || BUSINESSES[0];
 
@@ -79,6 +80,10 @@
     if (tab === 'rentals') return renderRentals();
     if (tab === 'watchlist') return renderWatchlist();
     if (tab === 'positions') return renderPositions();
+    if (tab === 'projects') return renderWSProjects();
+    if (tab === 'sites') return renderWSSites();
+    if (tab === 'clients') return renderWSClients();
+    if (tab === 'pipeline') return renderWSPipeline();
   }
 
   // ── REAL ESTATE ─────────────────────────────────────────────────────────────
@@ -850,7 +855,102 @@
         .then((r) => r.json()).then(() => { tradeData = null; renderPositions(); }).catch(() => {});
       return;
     }
+    const wsBtn = e.target.closest('[data-ws-status]');
+    if (wsBtn) {
+      const [id, status] = wsBtn.getAttribute('data-ws-status').split(':');
+      fetch('/api/web-studio/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
+        .then((r) => r.json()).then(() => { wsData = null; render(); }).catch(() => {});
+      return;
+    }
   });
+  // ── WEB STUDIO (Lovable + Vercel client projects) ────────────────────────────
+  const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const WS_STATUS_COLOR = { scoping: 'mid', building: 'mid', review: 'warn', deployed: 'go', invoiced: 'warn', paid: 'go' };
+  const WS_STATUS_LABEL = { scoping: 'Scoping', building: 'Building', review: 'Review', deployed: 'Live', invoiced: 'Invoiced', paid: 'Paid ✓' };
+  let wsData = null;
+  async function loadWS() {
+    if (biz !== 'webstudio') return;
+    body.innerHTML = '<div class="ops-empty">loading web studio…</div>';
+    try { wsData = await fetch('/api/web-studio').then((r) => r.json()); render(); }
+    catch (e) { body.innerHTML = `<div class="ops-empty">web studio offline — ${esc(e.message)}</div>`; }
+  }
+  function wsCard(p) {
+    const sc = WS_STATUS_COLOR[p.status] || 'mid';
+    const sl = WS_STATUS_LABEL[p.status] || p.status;
+    const links = [
+      p.lovableUrl ? `<a href="${esc(p.lovableUrl)}" target="_blank" class="ops-link">Lovable ↗</a>` : '',
+      p.githubRepo ? `<a href="${esc(p.githubRepo)}" target="_blank" class="ops-link">GitHub ↗</a>` : '',
+      p.vercelUrl  ? `<a href="${esc(p.vercelUrl)}"  target="_blank" class="ops-link">Vercel ↗</a>`  : '',
+      p.customDomain ? `<a href="https://${esc(p.customDomain)}" target="_blank" class="ops-link">${esc(p.customDomain)} ↗</a>` : '',
+    ].filter(Boolean).join(' ');
+    const nextBtn = p.status === 'scoping'   ? `<button class="btn sm go" data-ws-status="${p.id}:building">Start Build</button>` :
+                    p.status === 'building'  ? `<button class="btn sm go" data-ws-status="${p.id}:review">Send for Review</button>` :
+                    p.status === 'review'    ? `<button class="btn sm go" data-ws-status="${p.id}:deployed">Mark Live</button>` :
+                    p.status === 'deployed'  ? `<button class="btn sm go" data-ws-status="${p.id}:invoiced">Send Invoice</button>` :
+                    p.status === 'invoiced'  ? `<button class="btn sm go" data-ws-status="${p.id}:paid">Mark Paid</button>` : '';
+    return `<div class="re-card">
+      <div class="re-card-head">
+        <div class="re-card-addr">${esc(p.client)}</div>
+        <div class="re-card-type"><span class="re-hap-${sc === 'go' ? 'ok' : 'pend'}">${sl}</span></div>
+      </div>
+      <div class="re-row">Type <span>${esc(p.type || '—')}</span></div>
+      <div class="re-row">Price <span style="color:var(--teal);font-weight:600">${money(p.price || 0)}</span></div>
+      ${p.deadline ? `<div class="re-row">Deadline <span>${esc(p.deadline)}</span></div>` : ''}
+      ${links ? `<div class="re-row" style="gap:8px;flex-wrap:wrap">${links}</div>` : ''}
+      ${p.notes ? `<div class="re-row">Notes <span style="color:var(--dim)">${esc(p.notes)}</span></div>` : ''}
+      ${nextBtn ? `<div style="margin-top:10px">${nextBtn}</div>` : ''}
+    </div>`;
+  }
+  function renderWSProjects() {
+    if (!wsData) { loadWS(); return; }
+    const active = (wsData.projects || []).filter((p) => !['paid'].includes(p.status));
+    if (!active.length) {
+      body.innerHTML = `<div class="ops-explain"><b>🌐 Web Studio</b><br>No active projects yet.<br>Tell Jarvis: <i>"New web project for [Client], [type], $[price]"</i></div>`; return;
+    }
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🌐 Web Studio</b> — ${active.length} active project${active.length !== 1 ? 's' : ''}</div>` + active.map(wsCard).join('');
+  }
+  function renderWSSites() {
+    if (!wsData) { loadWS(); return; }
+    const sites = (wsData.projects || []).filter((p) => ['deployed', 'invoiced', 'paid'].includes(p.status));
+    if (!sites.length) { body.innerHTML = `<div class="ops-explain"><b>🌐 Live Sites</b><br>No deployed sites yet — move a project to Live to see it here.</div>`; return; }
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🌐 Live Sites</b> — ${sites.length} site${sites.length !== 1 ? 's' : ''}</div>` + sites.map(wsCard).join('');
+  }
+  function renderWSClients() {
+    if (!wsData) { loadWS(); return; }
+    const projects = wsData.projects || [];
+    const map = {};
+    projects.forEach((p) => {
+      if (!map[p.client]) map[p.client] = { name: p.client, projects: [], total: 0, paid: 0 };
+      map[p.client].projects.push(p);
+      map[p.client].total += (p.price || 0);
+      if (p.status === 'paid') map[p.client].paid += (p.price || 0);
+    });
+    const clients = Object.values(map);
+    if (!clients.length) { body.innerHTML = `<div class="ops-explain"><b>👥 Clients</b><br>No clients yet.</div>`; return; }
+    body.innerHTML = clients.map((c) => `<div class="re-card">
+      <div class="re-card-head"><div class="re-card-addr">${esc(c.name)}</div><div class="re-card-type">${c.projects.length} project${c.projects.length !== 1 ? 's' : ''}</div></div>
+      <div class="re-row">Total billed <span style="color:var(--teal);font-weight:600">${money(c.total)}</span></div>
+      <div class="re-row">Collected <span style="color:var(--teal)">${money(c.paid)}</span></div>
+      <div class="re-row" style="gap:6px;flex-wrap:wrap">${c.projects.map((p) => `<span class="re-hap-${['go'].includes(WS_STATUS_COLOR[p.status]) ? 'ok' : 'pend'}">${esc(p.type || p.status)}</span>`).join('')}</div>
+    </div>`).join('');
+  }
+  function renderWSPipeline() {
+    if (!wsData) { loadWS(); return; }
+    const ps = wsData.projects || [];
+    const total      = ps.reduce((s, p) => s + (p.price || 0), 0);
+    const collected  = ps.filter((p) => p.status === 'paid').reduce((s, p) => s + (p.price || 0), 0);
+    const outstanding = ps.filter((p) => p.status === 'invoiced').reduce((s, p) => s + (p.price || 0), 0);
+    const inProgress = ps.filter((p) => ['scoping', 'building', 'review', 'deployed'].includes(p.status)).reduce((s, p) => s + (p.price || 0), 0);
+    body.innerHTML = `<div class="re-card">
+      <div class="re-card-head"><div class="re-card-addr">💰 Revenue Pipeline</div></div>
+      <div class="re-row">Total billed <span style="color:var(--teal);font-weight:600">${money(total)}</span></div>
+      <div class="re-row">Collected <span style="color:var(--teal)">${money(collected)}</span></div>
+      <div class="re-row">Outstanding <span style="color:var(--warn)">${money(outstanding)}</span></div>
+      <div class="re-row">In progress <span>${money(inProgress)}</span></div>
+    </div>` + (ps.length ? `<div class="re-card"><div class="re-card-head"><div class="re-card-addr">All Projects</div></div>` +
+      ps.map((p) => `<div class="re-row"><span class="re-hap-${WS_STATUS_COLOR[p.status] === 'go' ? 'ok' : 'pend'}">${WS_STATUS_LABEL[p.status] || p.status}</span><span style="flex:1;margin:0 8px">${esc(p.client)} · ${esc(p.type || '')}</span><b style="color:var(--teal)">${money(p.price || 0)}</b></div>`).join('') + `</div>` : '');
+  }
+
   el('oppDetailBody').addEventListener('click', (e) => {
     const o = e.target.closest('[data-open]'); if (o) return openProposal(o.getAttribute('data-open'));
     const pu = e.target.closest('[data-pursue]'); if (pu) return pursueOpp(pu.getAttribute('data-pursue'));

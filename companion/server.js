@@ -76,10 +76,13 @@ if (!PLACES_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.
 const WEATHER_LAT = Number(process.env.WEATHER_LAT || '') || 39.9526;
 const WEATHER_LON = Number(process.env.WEATHER_LON || '') || -75.1652;
 // Real estate portfolio + trading files (local JSON, updated by Jarvis or manually)
-const PORTFOLIO_FILE = path.join(__dirname, '..', 'pods', 'real-estate', 'portfolio.json');
-const WATCHLIST_FILE = path.join(__dirname, '..', 'pods', 'trading', 'watchlist.json');
-const POSITIONS_FILE = path.join(__dirname, '..', 'pods', 'trading', 'positions.json');
+const PORTFOLIO_FILE  = path.join(__dirname, '..', 'pods', 'real-estate', 'portfolio.json');
+const WATCHLIST_FILE  = path.join(__dirname, '..', 'pods', 'trading', 'watchlist.json');
+const POSITIONS_FILE  = path.join(__dirname, '..', 'pods', 'trading', 'positions.json');
+const WEB_STUDIO_FILE = path.join(__dirname, '.web-studio.json');
 function loadJson(file, def) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return def; } }
+function loadWS() { return loadJson(WEB_STUDIO_FILE, { projects: [] }); }
+function saveWS(d) { try { fs.writeFileSync(WEB_STUDIO_FILE, JSON.stringify(d, null, 2)); } catch { /* */ } }
 function saveJson(file, data) { try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(data, null, 2)); } catch { /* */ } }
 // Focus mode: normal | gaming | work | dnd
 let focusMode = 'normal';
@@ -260,6 +263,12 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['add', 'remove', 'alert'] }, ticker: { type: 'string' }, alert_price: { type: 'number' } }, required: ['action', 'ticker'] } },
   { name: 'update_position', description: 'Add, update, or close an options/stock position in the trading ledger. Use when you open or close a trade.',
     input_schema: { type: 'object', properties: { action: { type: 'string', enum: ['add', 'update', 'close'] }, position: { type: 'object', description: 'Position: { id, ticker, type (call/put/stock), strike, expiry, qty, cost_basis, alert_price, notes }' } }, required: ['action', 'position'] } },
+  { name: 'create_web_project', description: 'Log a new Web Studio client project (Lovable/Vercel). Use for "new web project for [client]", "add website job", "log a new site build". Creates a scoping entry in the Web Studio pod.',
+    input_schema: { type: 'object', properties: { client: { type: 'string', description: 'Client name' }, type: { type: 'string', description: 'e.g. landing-page, web-app, portfolio, capability-statement, e-commerce' }, price: { type: 'number', description: 'Agreed price in USD' }, deadline: { type: 'string', description: 'Due date e.g. 2026-07-01' }, notes: { type: 'string' }, lovableUrl: { type: 'string' }, githubRepo: { type: 'string' }, vercelUrl: { type: 'string' }, customDomain: { type: 'string' } }, required: ['client', 'type'] } },
+  { name: 'update_web_project', description: 'Update an existing Web Studio project — change status, add links, notes, or mark paid. Use for "mark [client] site live", "add Vercel link for [client]", "project is deployed", "mark [client] paid".',
+    input_schema: { type: 'object', properties: { client: { type: 'string', description: 'Client name to match (case-insensitive partial ok)' }, status: { type: 'string', enum: ['scoping', 'building', 'review', 'deployed', 'invoiced', 'paid'] }, lovableUrl: { type: 'string' }, githubRepo: { type: 'string' }, vercelUrl: { type: 'string' }, customDomain: { type: 'string' }, notes: { type: 'string' }, price: { type: 'number' } } } },
+  { name: 'list_web_projects', description: 'Show all Web Studio projects and revenue pipeline. Use for "web studio status", "how many sites am I building", "what\'s the web pipeline", "client projects".',
+    input_schema: { type: 'object', properties: {} } },
 ];
 
 // resolve a path safely: absolute (inside any allowed root) or relative (inside the primary root)
@@ -639,6 +648,42 @@ async function runTool(name, input) {
     if (idx >= 0) p.positions[idx] = { ...p.positions[idx], ...pos }; else { if (!p.positions) p.positions = []; p.positions.push(pos); }
     saveJson(POSITIONS_FILE, p);
     return `Position ${pos.ticker || pos.id} ${input.action === 'add' ? 'opened' : 'updated'}. Total open: ${p.positions.length}.`;
+  }
+  if (name === 'create_web_project') {
+    const ws = loadWS();
+    const project = { id: Date.now().toString(36), client: String(input.client || '').trim(), type: String(input.type || 'website').trim(),
+      price: Number(input.price) || 0, status: 'scoping', deadline: input.deadline || '', notes: input.notes || '',
+      lovableUrl: input.lovableUrl || '', githubRepo: input.githubRepo || '', vercelUrl: input.vercelUrl || '', customDomain: input.customDomain || '',
+      createdAt: new Date().toISOString() };
+    ws.projects.push(project);
+    saveWS(ws);
+    return `Web Studio project created for **${project.client}** (${project.type}, $${project.price.toLocaleString()}). Status: scoping. Total projects: ${ws.projects.length}. Open the Web Studio pod in Operations to track it.`;
+  }
+  if (name === 'update_web_project') {
+    const ws = loadWS();
+    const q = String(input.client || '').toLowerCase();
+    const idx = ws.projects.findIndex((p) => p.client.toLowerCase().includes(q));
+    if (idx < 0) return `No project found matching "${input.client}". Use list_web_projects to see all.`;
+    const p = ws.projects[idx];
+    if (input.status) p.status = input.status;
+    if (input.lovableUrl) p.lovableUrl = input.lovableUrl;
+    if (input.githubRepo) p.githubRepo = input.githubRepo;
+    if (input.vercelUrl) p.vercelUrl = input.vercelUrl;
+    if (input.customDomain) p.customDomain = input.customDomain;
+    if (input.notes) p.notes = input.notes;
+    if (input.price) p.price = Number(input.price);
+    if (input.status === 'deployed') p.deliveredAt = new Date().toISOString();
+    ws.projects[idx] = p;
+    saveWS(ws);
+    return `Updated **${p.client}**: status=${p.status}${p.vercelUrl ? `, live at ${p.vercelUrl}` : ''}. Refresh the Web Studio pod to see changes.`;
+  }
+  if (name === 'list_web_projects') {
+    const ws = loadWS();
+    if (!ws.projects.length) return 'No Web Studio projects yet. Say "new web project for [client]" to log one.';
+    const total = ws.projects.reduce((s, p) => s + (p.price || 0), 0);
+    const paid  = ws.projects.filter((p) => p.status === 'paid').reduce((s, p) => s + (p.price || 0), 0);
+    const lines = ws.projects.map((p) => `• ${p.client} — ${p.type} — $${(p.price || 0).toLocaleString()} — ${p.status}${p.vercelUrl ? ` — ${p.vercelUrl}` : ''}`);
+    return `**Web Studio** — ${ws.projects.length} project(s), $${total.toLocaleString()} total, $${paid.toLocaleString()} collected:\n${lines.join('\n')}`;
   }
   if (name === 'list_dir') {
     const dir = safe(rel);
@@ -1124,7 +1169,7 @@ const server = http.createServer(async (req, res) => {
       if (!Array.isArray(ops)) ops = [];
       const liveBy = {};
       for (const o of ops) { const k = String((o && (o.agent || o.codename || o.name)) || '').toUpperCase(); if (k) liveBy[k] = { state: o.state, text: o.text }; }
-      const LABEL = { gov: 'Gov War Room', fiverr: 'Fiverr Studio', saas: 'SaaS / Recon', exec: 'Executive', 'chief-of-staff': 'Chief of Staff', 'research-risk': 'Research & Risk', vault: 'Vault', re: 'Real Estate', legal: 'Legal', personal: 'Personal', system: 'Core' };
+      const LABEL = { gov: 'Gov War Room', fiverr: 'Fiverr Studio', saas: 'SaaS / Recon', webstudio: 'Web Studio', exec: 'Executive', 'chief-of-staff': 'Chief of Staff', 'research-risk': 'Research & Risk', vault: 'Vault', re: 'Real Estate', legal: 'Legal', personal: 'Personal', system: 'Core' };
       const rooms = {};
       for (const p of roster) {
         const pod = p.pod || 'system';
@@ -1134,6 +1179,29 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 200, JSON.stringify({ rooms: Object.values(rooms), feed: (hqR.feed || []).slice(0, 12), hqUrl: HQ_URL }));
     } catch (e) { return send(res, 200, JSON.stringify({ error: e.message, rooms: [] })); }
+  }
+  // ── WEB STUDIO: Lovable + Vercel project tracker ─────────────────────────────
+  if (req.method === 'GET' && url.pathname === '/api/web-studio') {
+    return send(res, 200, JSON.stringify(loadWS()));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/web-studio/project') {
+    try {
+      const body = await readBody(req);
+      const ws = loadWS();
+      if (body.id) {
+        const idx = ws.projects.findIndex((p) => p.id === body.id);
+        if (idx >= 0) {
+          if (body.status) ws.projects[idx].status = body.status;
+          if (body.status === 'deployed') ws.projects[idx].deliveredAt = new Date().toISOString();
+          Object.keys(body).filter((k) => !['id'].includes(k)).forEach((k) => { if (body[k] !== undefined) ws.projects[idx][k] = body[k]; });
+        }
+      } else {
+        const p = { id: Date.now().toString(36), createdAt: new Date().toISOString(), status: 'scoping', ...body };
+        ws.projects.push(p);
+      }
+      saveWS(ws);
+      return send(res, 200, JSON.stringify({ ok: true }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   // ── ACTIVITY: the whole-org activity log (drill-in + calendar + archive). Archiving is an append-only
   // event (action 'activity.archived', ref=id) so it persists and works across devices. ──

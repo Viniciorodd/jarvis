@@ -407,14 +407,14 @@ async function toggleRecord() {
 
 // ── settings: theme swatches (pick by mood) + open/close ─────────────────────
 function applyTheme(name) {
-  const ok = ['teal', 'mono', 'dark', 'arc'].includes(name) ? name : 'teal';
+  const ok = ['teal', 'mono', 'dark', 'arc'].includes(name) ? name : 'mono';
   document.documentElement.dataset.theme = ok;
   document.querySelectorAll('.theme-swatch').forEach((s) => s.classList.toggle('on', s.dataset.theme === ok));
   try { localStorage.setItem('jarvis-theme', ok); } catch { /* private mode */ }
   if (window.Orb && window.Orb.refreshTheme) window.Orb.refreshTheme();
 }
 document.querySelectorAll('.theme-swatch').forEach((s) => s.addEventListener('click', () => applyTheme(s.dataset.theme)));
-applyTheme((() => { try { return localStorage.getItem('jarvis-theme') || 'teal'; } catch { return 'teal'; } })());
+applyTheme((() => { try { return localStorage.getItem('jarvis-theme') || 'mono'; } catch { return 'mono'; } })());
 $('settingsBtn').addEventListener('click', () => { $('settingsView').hidden = false; });
 $('settingsX').addEventListener('click', () => { $('settingsView').hidden = true; });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('settingsView').hidden) $('settingsView').hidden = true; });

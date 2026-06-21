@@ -271,13 +271,13 @@ $('approvals').addEventListener('click', (ev) => {
 
 // ── theme picker (same 3 themes as the companion: teal / mono / dark) ───────────────────────────
 function applyTheme(name) {
-  const ok = ['teal', 'mono', 'dark'].includes(name) ? name : 'teal';
+  const ok = ['teal', 'mono', 'dark'].includes(name) ? name : 'mono';
   document.documentElement.dataset.theme = ok;
   document.querySelectorAll('#theme-pick .sw').forEach((b) => b.classList.toggle('on', b.dataset.theme === ok));
   try { localStorage.setItem('jarvis-theme', ok); } catch { /* private mode */ }
 }
 document.querySelectorAll('#theme-pick .sw').forEach((b) => b.addEventListener('click', () => applyTheme(b.dataset.theme)));
-applyTheme(document.documentElement.dataset.theme || 'teal');
+applyTheme(document.documentElement.dataset.theme || 'mono');
 
 adapter = DEMO ? demoAdapter : liveAdapter;
 adapter.start();

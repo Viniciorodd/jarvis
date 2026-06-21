@@ -4,23 +4,23 @@
 <meta charset="utf-8" />
 <title>Jarvis</title>
 <style>
-  :root{ --ink:#04070f; --panel:#0a141b; --line:#163a39; --teal:#39e0d0; --cream:#dfeef0; --dim:#5d7480; --warn:#f59e0b; }
+  :root{ --ink:#000000; --panel:#111111; --line:#2a2a2a; --teal:#ffffff; --cream:#e8e8e8; --dim:#666666; --warn:#aaaaaa; }
   *{ box-sizing:border-box; margin:0; }
   html,body{ height:100%; background:var(--ink); color:var(--cream); font-family:'Space Grotesk',system-ui,sans-serif; }
   body{ display:flex; flex-direction:column; }
-  .nav{ display:flex; align-items:center; gap:10px; padding:9px 14px; background:linear-gradient(180deg,#07131a,#04070f); border-bottom:1px solid var(--line); }
-  .brand{ font-family:'Silkscreen',monospace; letter-spacing:.3em; color:var(--teal); font-size:13px; text-shadow:0 0 12px rgba(57,224,208,.5); }
+  .nav{ display:flex; align-items:center; gap:10px; padding:9px 14px; background:#0a0a0a; border-bottom:1px solid var(--line); }
+  .brand{ font-family:'Silkscreen',monospace; letter-spacing:.3em; color:var(--teal); font-size:13px; }
   .tab{ background:transparent; border:1px solid var(--line); color:var(--dim); border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer; font-family:inherit; transition:all .15s; }
-  .tab:hover{ color:var(--cream); }
-  .tab.on{ color:#04070f; background:var(--teal); border-color:var(--teal); font-weight:600; }
+  .tab:hover{ color:var(--cream); border-color:#555; }
+  .tab.on{ color:#000000; background:var(--teal); border-color:var(--teal); font-weight:600; }
   .spacer{ flex:1; }
   .net-btns{ display:flex; align-items:center; gap:6px; }
   .net-btn{ background:transparent; border:1px solid var(--line); color:var(--dim); border-radius:6px; padding:4px 9px; font-size:11px; cursor:pointer; font-family:inherit; transition:all .15s; }
-  .net-btn:hover{ color:var(--cream); border-color:var(--teal); }
-  .net-btn.active{ color:#04070f; background:var(--teal); border-color:var(--teal); }
+  .net-btn:hover{ color:var(--cream); border-color:#555; }
+  .net-btn.active{ color:#000000; background:var(--teal); border-color:var(--teal); }
   .dot{ width:7px; height:7px; border-radius:50%; background:var(--dim); flex-shrink:0; transition:background .3s; }
-  .dot.ok{ background:var(--teal); box-shadow:0 0 8px var(--teal); }
-  .dot.err{ background:#ef4444; }
+  .dot.ok{ background:#ffffff; box-shadow:0 0 6px #ffffff; }
+  .dot.err{ background:#888888; }
   .dot.checking{ background:var(--warn); animation:pulse 1s infinite; }
   @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
   webview{ flex:1; border:0; }

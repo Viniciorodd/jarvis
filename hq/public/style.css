@@ -7,11 +7,11 @@
   --gold:#39e0d0; --mint:#6fece0; --alert:#ff9a7a; --err:#ff5c7a; --cream:#dfeef0; --dim:#5d7480;
   --glow:rgba(var(--teal-rgb),.45); --ink-on-accent:#04342c;
 }
-[data-theme="mono"]{ /* TRUE black & white — no other colors */
-  --ink:#040506; --ink2:#0b0d10; --panel:#0a0c0f; --panel2:#111418; --line:#2a2f33;
-  --teal:#e6edf2; --teal-rgb:210,222,230; --teal-dim:#5a646b;
-  --gold:#e6edf2; --mint:#cfd8de; --alert:#aab2b7; --err:#aab2b7; --cream:#eef2f5; --dim:#7c868d;
-  --glow:rgba(var(--teal-rgb),.32); --ink-on-accent:#0a0c0f;
+[data-theme="mono"]{ /* TRUE black & white — pure, no color at all */
+  --ink:#000000; --ink2:#0a0a0a; --panel:#111111; --panel2:#181818; --line:#2a2a2a;
+  --teal:#ffffff; --teal-rgb:255,255,255; --teal-dim:#555555;
+  --gold:#ffffff; --mint:#cccccc; --alert:#888888; --err:#888888; --cream:#e8e8e8; --dim:#666666;
+  --glow:rgba(255,255,255,.18); --ink-on-accent:#000000;
 }
 [data-theme="dark"]{ /* full dark — pure black, calm muted teal */
   --ink:#000000; --ink2:#06090b; --panel:#0a0e11; --panel2:#0c1216; --line:#143430;

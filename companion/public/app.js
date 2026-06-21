@@ -412,6 +412,8 @@ function applyTheme(name) {
   document.querySelectorAll('.theme-swatch').forEach((s) => s.classList.toggle('on', s.dataset.theme === ok));
   try { localStorage.setItem('jarvis-theme', ok); } catch { /* private mode */ }
   if (window.Orb && window.Orb.refreshTheme) window.Orb.refreshTheme();
+  // sync theme into the HQ iframe by reloading with ?theme= param
+  const f = $('hqFrame'); if (f && f.getAttribute('src')) { const u = new URL(hqUrl); u.searchParams.set('theme', ok); f.src = u.toString(); }
 }
 document.querySelectorAll('.theme-swatch').forEach((s) => s.addEventListener('click', () => applyTheme(s.dataset.theme)));
 applyTheme((() => { try { return localStorage.getItem('jarvis-theme') || 'mono'; } catch { return 'mono'; } })());
@@ -420,7 +422,16 @@ $('settingsX').addEventListener('click', () => { $('settingsView').hidden = true
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('settingsView').hidden) $('settingsView').hidden = true; });
 
 // ── JARVIS HQ as an in-app tab — opens inside this window, not a separate app ──
-function openHQ() { const f = $('hqFrame'); if (f && !f.getAttribute('src')) f.src = hqUrl; const pop = $('hqPop'); if (pop) pop.href = hqUrl; $('hqView').hidden = false; }
+function openHQ() {
+  const f = $('hqFrame');
+  if (f) {
+    const theme = document.documentElement.dataset.theme || 'mono';
+    const u = new URL(hqUrl); u.searchParams.set('theme', theme);
+    if (!f.getAttribute('src')) f.src = u.toString();
+  }
+  const pop = $('hqPop'); if (pop) pop.href = hqUrl;
+  $('hqView').hidden = false;
+}
 function closeHQ() { $('hqView').hidden = true; }
 window.JarvisHQ = { open: openHQ, close: closeHQ };
 $('hqBtn').addEventListener('click', openHQ);

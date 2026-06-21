@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem('jarvis-theme')||'mono'}catch(e){}</script>
+<script>try{const _tp=new URLSearchParams(location.search).get('theme');document.documentElement.dataset.theme=_tp||localStorage.getItem('jarvis-theme')||'mono'}catch(e){}</script>
 </head>
 <body>
 <div class="wrap">

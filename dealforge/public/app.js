@@ -82,8 +82,15 @@ const TYPE_LABELS = { flip: "Fix & Flip / BRRRR", rental: "Rental / Hold", whole
 async function boot() {
   state.brand = await API.brand().catch(() => ({ productName: "DealForge", logoText: "DF", accent: "#5b8cff" }));
   document.documentElement.style.setProperty("--accent", state.brand.accent || "#5b8cff");
-  const savedTheme = localStorage.getItem("dealforge.theme");
+  // Theme: ?theme= (used when embedded in JARVIS) wins over saved pref; light vs dark.
+  const urlTheme = new URLSearchParams(location.search).get("theme");
+  const savedTheme = (urlTheme === "light" || urlTheme === "dark")
+    ? urlTheme
+    : localStorage.getItem("dealforge.theme");
   if (savedTheme) document.documentElement.setAttribute("data-theme", savedTheme);
+  if (new URLSearchParams(location.search).get("embed") === "1") {
+    document.documentElement.setAttribute("data-embed", "1");
+  }
   document.title = state.brand.productName || "DealForge";
 
   if (token) {

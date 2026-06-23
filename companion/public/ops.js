@@ -16,13 +16,13 @@
   // central exec/finance/system approvals so money gates stay visible). `tabs` = the views it shows.
   const BUSINESSES = [
     { id: 'gov', label: '🏛 Gov Contracting', pods: ['gov', 'exec', 'chief-of-staff', 'system'], tabs: ['leads', 'opps', 'props', 'crm'] },
-    { id: 'realestate', label: '🏢 Real Estate', pods: ['real-estate'], tabs: ['units', 'flips', 'builds', 'rentals'] },
+    { id: 'realestate', label: '🏢 Real Estate', pods: ['real-estate'], tabs: ['analyzer', 'units', 'flips', 'builds', 'rentals'] },
     { id: 'trading', label: '📈 Trading', pods: ['trading'], tabs: ['watchlist', 'positions'] },
     { id: 'fiverr', label: '🎨 Fiverr Studio', pods: ['fiverr'], tabs: ['studio', 'activity', 'leads'] },
     { id: 'saas', label: '🖥 SaaS / Recon', pods: ['saas'], tabs: ['activity', 'leads'] },
     { id: 'webstudio', label: '🌐 Web Studio', pods: ['webstudio'], tabs: ['projects', 'sites', 'clients', 'pipeline'] },
   ];
-  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline' };
+  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', analyzer: '📊 Deal Analyzer', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline' };
   let biz = 'gov', tab = 'leads';
   const curBiz = () => BUSINESSES.find((b) => b.id === biz) || BUSINESSES[0];
 
@@ -74,6 +74,7 @@
     if (tab === 'props') return renderProps();
     if (tab === 'crm') return renderCrm();
     if (tab === 'activity') return renderActivity(curBiz().pods[0]);
+    if (tab === 'analyzer') return renderAnalyzer();
     if (tab === 'units') return renderUnits();
     if (tab === 'flips') return renderFlips();
     if (tab === 'builds') return renderBuilds();
@@ -84,6 +85,30 @@
     if (tab === 'sites') return renderWSSites();
     if (tab === 'clients') return renderWSClients();
     if (tab === 'pipeline') return renderWSPipeline();
+  }
+
+  // ── DEAL ANALYZER (embeds the DealForge app) ────────────────────────────────
+  // DealForge runs as its own dependency-free server (default localhost:8096; override with
+  // localStorage 'dealforge-url' to point at the NAS). We pass the current theme + embed flag.
+  function dealforgeUrl() {
+    let base = 'http://localhost:8096';
+    try { base = localStorage.getItem('dealforge-url') || base; } catch { /* private mode */ }
+    const theme = document.documentElement.dataset.theme === 'arc' ? 'light' : 'dark';
+    return `${base.replace(/\/$/, '')}/?embed=1&theme=${theme}`;
+  }
+  function renderAnalyzer() {
+    const url = dealforgeUrl();
+    body.innerHTML = `
+      <div class="df-embed">
+        <div class="df-embed-bar">
+          <span class="df-embed-title">📊 DealForge — flip · BRRRR · rental · wholesale</span>
+          <a class="btn ghost" href="${esc(url)}" target="_blank" rel="noreferrer" style="font-size:11px; padding:5px 11px;">open in browser ↗</a>
+        </div>
+        <iframe class="df-frame" src="${esc(url)}" title="DealForge" referrerpolicy="no-referrer"
+          style="width:100%; height:calc(100vh - 190px); min-height:520px; border:0; border-radius:14px; background:var(--card, #0e1117);"
+          onerror="this.parentElement.querySelector('.df-fallback')?.removeAttribute('hidden')"></iframe>
+        <div class="df-fallback ops-empty" hidden>DealForge isn't reachable at ${esc(url)} — start it with <code>node dealforge/server.js</code>.</div>
+      </div>`;
   }
 
   // ── REAL ESTATE ─────────────────────────────────────────────────────────────

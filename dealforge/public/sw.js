@@ -1,7 +1,7 @@
 // DealForge service worker — minimal app-shell cache for offline launch + installability.
 // Data (deals/lenders/expenses) always goes to the network so cloud sync stays authoritative;
 // only static shell assets are cached.
-const CACHE = "dealforge-shell-v1";
+const CACHE = "dealforge-shell-v2";
 const SHELL = ["/", "/index.html", "/style.css", "/app.js", "/icon.svg", "/manifest.webmanifest",
   "/engine/index.js", "/engine/flip-brrrr.js", "/engine/rental.js", "/engine/wholesale.js",
   "/engine/rehab.js", "/engine/defaults.js"];
@@ -12,16 +12,16 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
+// Network-first for the app shell: always load the freshest code when online, fall back to the
+// cached shell only when offline. (Cache-first would pin stale JS/HTML after every deploy.)
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== "GET" || url.pathname.startsWith("/api/")) return; // never cache API/data
+  if (e.request.method !== "GET" || url.pathname.startsWith("/api/")) return; // never touch API/data
+  if (url.origin !== location.origin) return;
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
-      if (res.ok && url.origin === location.origin) {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy));
-      }
+    fetch(e.request).then((res) => {
+      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
       return res;
-    }).catch(() => caches.match("/index.html")))
+    }).catch(() => caches.match(e.request).then((hit) => hit || caches.match("/index.html")))
   );
 });

@@ -5,11 +5,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { store, newId } from "./store.js";
+import { store, newId, DATA_DIR } from "./store.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SECRET_FILE = path.join(__dirname, "..", "data", ".secret");
+const SECRET_FILE = path.join(DATA_DIR, ".secret");
 
 function getSecret() {
   if (process.env.DEALFORGE_SECRET) return process.env.DEALFORGE_SECRET;

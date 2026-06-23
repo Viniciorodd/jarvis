@@ -1,0 +1,30 @@
+{
+  "name": "dealforge-desktop",
+  "version": "0.1.0",
+  "description": "DealForge — desktop app (Windows & macOS) for real-estate deal analysis.",
+  "author": "Rodgate",
+  "main": "main.js",
+  "scripts": {
+    "icons": "node make-icons.mjs",
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.rodgate.dealforge",
+    "productName": "DealForge",
+    "files": ["main.js", "icon.png", "tray.png"],
+    "extraResources": [
+      { "from": "..", "to": "app", "filter": ["server.js", "engine/**", "db/**", "public/**", "config/**", "package.json"] }
+    ],
+    "publish": null,
+    "win": { "target": "nsis", "icon": "icon.png" },
+    "mac": { "target": "dmg", "category": "public.app-category.finance", "icon": "icon.png" },
+    "linux": { "target": "AppImage", "icon": "icon.png" }
+  }
+}

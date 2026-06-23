@@ -8,7 +8,9 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, "..", "data");
+// DEALFORGE_DATA_DIR lets the packaged desktop app point at a writable user-data location
+// (the app bundle itself is read-only). Defaults to ../data for local/dev/NAS runs.
+export const DATA_DIR = process.env.DEALFORGE_DATA_DIR || path.join(__dirname, "..", "data");
 const COLLECTIONS_DIR = path.join(DATA_DIR, "collections");
 export const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 

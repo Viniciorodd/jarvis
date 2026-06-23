@@ -1,0 +1,23 @@
+{
+  "productName": "DealForge",
+  "tagline": "Underwrite. Track. Close.",
+  "logoText": "DF",
+  "supportEmail": "support@dealforge.app",
+  "accent": "#5b8cff",
+  "theme": "dark",
+  "mode": "single-tenant",
+  "featureFlags": {
+    "flip": true,
+    "rental": true,
+    "wholesale": true,
+    "crm": true,
+    "expenses": true,
+    "market": false,
+    "imageAttachments": true,
+    "archive": true
+  },
+  "billing": {
+    "enabled": false,
+    "plans": ["monthly", "quarterly", "yearly", "lifetime"]
+  }
+}

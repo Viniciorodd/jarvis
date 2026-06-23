@@ -1,0 +1,5 @@
+# Local data + secrets — never commit user deals, uploads, or the signing secret.
+data/
+node_modules/
+desktop/dist/
+*.log

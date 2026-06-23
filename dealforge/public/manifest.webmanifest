@@ -1,0 +1,12 @@
+{
+  "name": "DealForge",
+  "short_name": "DealForge",
+  "description": "Real-estate deal analysis — flip, BRRRR, rental, wholesale.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1117",
+  "theme_color": "#0e1117",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

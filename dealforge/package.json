@@ -1,0 +1,14 @@
+{
+  "name": "dealforge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DealForge — real-estate deal analysis app (flip / BRRRR / rental / wholesale). Dependency-free Node core; runs on Windows, NAS, web, and (Phase 2) Electron/PWA.",
+  "author": "Rodgate",
+  "license": "UNLICENSED",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "evals": "node evals/run.js"
+  }
+}

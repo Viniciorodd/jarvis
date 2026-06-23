@@ -333,6 +333,7 @@ function wakeCommand(cmd) {
   const c = String(cmd || '').toLowerCase().trim();
   if (!c || c.length <= 1) { addMsg('j', 'Yes?'); speak('Yes?'); return; }
   if (/^(wake up|wake|good morning|brief( me)?|briefing|command( center)?|status report|sitrep|dashboard)\b/.test(c) && window.JarvisCommand) {
+    if (window.JarvisCinematic && window.JarvisCinematic.enabled && /^(wake up|wake|good morning)\b/.test(c)) window.JarvisCinematic.boot();
     window.JarvisCommand.open(); window.JarvisCommand.brief(); return;
   }
   sendToJarvis(cmd);

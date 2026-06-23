@@ -22,6 +22,13 @@
       "unit": "2nd Floor",
       "rent": 1200,
       "id": "mqqwrnlw"
+    },
+    {
+      "address": "2135 Brick Ave",
+      "status": "rented",
+      "program": "section-8",
+      "monthly_rent": 1850,
+      "id": "mqqxo4am"
     }
   ],
   "flips": [],
@@ -43,5 +50,5 @@
       "id": "mqqwq6dr"
     }
   ],
-  "updated": "2026-06-23T17:28:49.303Z"
+  "updated": "2026-06-23T17:43:44.062Z"
 }

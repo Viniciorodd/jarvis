@@ -17,13 +17,13 @@
   const BUSINESSES = [
     { id: 'gov', label: '🏛 Gov Contracting', pods: ['gov', 'exec', 'chief-of-staff', 'system'], tabs: ['leads', 'opps', 'props', 'crm'] },
     { id: 'realestate', label: '🏢 Real Estate', pods: ['real-estate'], tabs: ['analyzer', 'units', 'flips', 'builds', 'rentals'] },
-    { id: 'trading', label: '📈 Trading', pods: ['trading'], tabs: ['watchlist', 'positions'] },
+    { id: 'trading', label: '📈 Trading', pods: ['trading'], tabs: ['watchlist', 'positions', 'predictions', 'paper'] },
     { id: 'fiverr', label: '🎨 Fiverr Studio', pods: ['fiverr'], tabs: ['studio', 'activity', 'leads'] },
     { id: 'saas', label: '🖥 SaaS / Recon', pods: ['saas'], tabs: ['activity', 'leads'] },
     { id: 'webstudio', label: '🌐 Web Studio', pods: ['webstudio'], tabs: ['projects', 'sites', 'clients', 'pipeline'] },
     { id: 'agents', label: '🤖 Agents', pods: ['chief-of-staff', 'exec'], tabs: ['assistant', 'busops', 'queue'] },
   ];
-  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', analyzer: '📊 Deal Analyzer', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline', assistant: '🧠 Assistant', busops: '⚙ Business Ops', queue: '✋ Review queue' };
+  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', analyzer: '📊 Deal Analyzer', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', predictions: '🔮 Predictions', paper: '🧪 Paper P&L', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline', assistant: '🧠 Assistant', busops: '⚙ Business Ops', queue: '✋ Review queue' };
   let biz = 'gov', tab = 'leads';
   const curBiz = () => BUSINESSES.find((b) => b.id === biz) || BUSINESSES[0];
 
@@ -82,6 +82,8 @@
     if (tab === 'rentals') return renderRentals();
     if (tab === 'watchlist') return renderWatchlist();
     if (tab === 'positions') return renderPositions();
+    if (tab === 'predictions') return renderPredictions();
+    if (tab === 'paper') return renderPaper();
     if (tab === 'projects') return renderWSProjects();
     if (tab === 'sites') return renderWSSites();
     if (tab === 'clients') return renderWSClients();
@@ -348,6 +350,57 @@
         ${p.notes ? `<div class="pos-row" style="color:var(--dim)">${esc(p.notes)}</div>` : ''}
         <div style="margin-top:8px"><button class="btn ghost" style="font-size:11px;padding:4px 9px" data-close-pos="${esc(p.id)}">Close position</button></div>
       </div>`).join('');
+  }
+
+  // ── PAPER TRADING (simulation only — no real money, not financial advice) ──
+  let paperData = null;
+  async function loadPaper() {
+    body.innerHTML = '<div class="ops-empty">loading paper sandbox…</div>';
+    try { paperData = await fetch('/api/market/paper').then((r) => r.json()); render(); }
+    catch (e) { body.innerHTML = `<div class="ops-empty">paper offline — ${esc(e.message)}</div>`; }
+  }
+  function renderPredictions() {
+    if (!paperData) { loadPaper(); return; }
+    const preds = paperData.predictions || [];
+    const head = `<div class="ops-explain" style="margin-bottom:12px"><b>🔮 Predictions</b> — the bot's calls on your watchlist. <b>Simulation only, not financial advice.</b>
+      <div style="margin-top:8px"><button class="btn sm go" data-predict-all="1">Predict watchlist →</button></div></div>`;
+    if (!preds.length) { body.innerHTML = head + `<div class="ops-empty">No predictions yet — add tickers to your Watchlist, then tap “Predict watchlist”.</div>`; return; }
+    body.innerHTML = head + preds.map((p) => {
+      const up = p.direction === 'up';
+      return `<div class="trade-card">
+        <div><div class="trade-ticker">${esc(p.ticker)}</div><div class="trade-meta">@ $${(p.price||0).toFixed(2)} · ${esc(p.horizon||'')}</div></div>
+        <div><div class="trade-chg ${up ? 'up' : 'dn'}">${up ? '▲ UP' : '▼ DOWN'}</div><div class="trade-meta">conf ${Math.round(p.confidence||0)}%</div></div>
+        <div style="flex:1;font-size:12px;color:var(--dim);min-width:0">${esc(p.rationale || '')}</div>
+        <div class="trade-actions"><button class="btn sm" data-paper-from="${esc(p.id)}:${esc(p.ticker)}:${up ? 'long' : 'short'}">Paper ${up ? 'buy' : 'short'}</button></div>
+      </div>`;
+    }).join('');
+  }
+  function renderPaper() {
+    if (!paperData) { loadPaper(); return; }
+    const s = paperData.summary || {};
+    const money = (n) => (n < 0 ? '-$' : '$') + Math.abs(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const pnlCls = (s.totalPnl || 0) >= 0 ? 'up' : 'dn';
+    const open = paperData.open || [], closed = paperData.closed || [];
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🧪 Paper P&amp;L</b> — simulated account, no real money. Real trades stay disabled.</div>
+      <div class="re-card"><div class="dash-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div class="trade-meta">Equity</div><div class="trade-price">${money(s.equity)}</div></div>
+        <div><div class="trade-meta">Total P&amp;L</div><div class="trade-price trade-chg ${pnlCls}">${money(s.totalPnl)}</div></div>
+        <div><div class="trade-meta">Cash</div><div class="trade-meta" style="font-size:14px;color:var(--cream)">${money(s.cash)}</div></div>
+        <div><div class="trade-meta">Realized / Unreal.</div><div class="trade-meta" style="font-size:13px;color:var(--cream)">${money(s.realized)} / ${money(s.unrealized)}</div></div>
+      </div></div>
+      <div class="ag-task-title" style="margin:14px 0 8px">Open (${open.length})</div>
+      ${open.length ? open.map((t) => {
+        const up = (t.unrealized || 0) >= 0;
+        return `<div class="trade-card">
+          <div><div class="trade-ticker">${esc(t.ticker)}</div><div class="trade-meta">${esc(t.side)} ${t.qty} @ $${t.entry.toFixed(2)}${t.cur != null ? ' → $' + t.cur.toFixed(2) : ''}</div></div>
+          <div><div class="trade-chg ${up ? 'up' : 'dn'}">${money(t.unrealized)}</div></div>
+          <div class="trade-actions"><button class="btn sm" data-paper-close="${esc(t.id)}">Close</button></div>
+        </div>`;
+      }).join('') : '<div class="ops-empty">No open paper trades.</div>'}
+      ${closed.length ? `<div class="ag-task-title" style="margin:14px 0 8px">Closed (${closed.length})</div>` + closed.map((t) => {
+        const up = (t.realized || 0) >= 0;
+        return `<div class="trade-card"><div><div class="trade-ticker">${esc(t.ticker)}</div><div class="trade-meta">${esc(t.side)} ${t.qty} · $${t.entry.toFixed(2)}→$${(t.exit||0).toFixed(2)}</div></div><div><div class="trade-chg ${up ? 'up' : 'dn'}">${money(t.realized)}</div></div></div>`;
+      }).join('') : ''}`;
   }
 
   function renderLeads() {
@@ -1021,6 +1074,29 @@
     if (dDiscard) {
       fetch('/api/agent/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: dDiscard.getAttribute('data-draft-discard'), action: 'discard' }) })
         .then((r) => r.json()).then(() => renderAgentQueue()).catch(() => {});
+      return;
+    }
+    // ── paper trading: predict / open / close (simulation only) ──
+    const predAll = e.target.closest('[data-predict-all]');
+    if (predAll) {
+      predAll.disabled = true; predAll.textContent = 'predicting…';
+      fetch('/api/market/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) })
+        .then((r) => r.json()).then(() => { paperData = null; loadPaper(); }).catch(() => { predAll.disabled = false; predAll.textContent = 'Predict watchlist →'; });
+      return;
+    }
+    const pFrom = e.target.closest('[data-paper-from]');
+    if (pFrom) {
+      const [, ticker, side] = pFrom.getAttribute('data-paper-from').split(':');
+      pFrom.disabled = true;
+      fetch('/api/market/paper/trade', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ticker, side, qty: 10 }) })
+        .then((r) => r.json()).then(() => { tab = 'paper'; renderTabs(); paperData = null; loadPaper(); }).catch(() => { pFrom.disabled = false; });
+      return;
+    }
+    const pClose = e.target.closest('[data-paper-close]');
+    if (pClose) {
+      pClose.disabled = true;
+      fetch('/api/market/paper/close', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: pClose.getAttribute('data-paper-close') }) })
+        .then((r) => r.json()).then(() => { paperData = null; loadPaper(); }).catch(() => { pClose.disabled = false; });
       return;
     }
   });

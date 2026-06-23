@@ -583,6 +583,30 @@ async function runAgent(agent, task, input) {
   return { output: out.text };
 }
 
+// ── Trading: self-contained PAPER simulator + prediction engine ──────────────
+// Simulation only — no real money, no broker. Real trades stay hard-gated/out of
+// scope (doctrine §7). Outputs are a paper sandbox, NOT financial advice.
+const PAPER_FILE = path.join(__dirname, '.paper.json');
+function loadPaper() { return loadJson(PAPER_FILE, { cash: 100000, startCash: 100000, predictions: [], trades: [] }); }
+function savePaper(p) { saveJson(PAPER_FILE, p); }
+const pnlOf = (t, cur) => (cur - t.entry) * t.qty * (t.side === 'short' ? -1 : 1);
+
+async function predictTicker(ticker) {
+  const q = await getQuote(ticker);
+  const base = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ticker: q.ticker, at: new Date().toISOString(), price: q.price };
+  if (!API_KEY) {
+    const direction = (q.changePct || 0) >= 0 ? 'up' : 'down';
+    return { ...base, direction, confidence: Math.min(80, 50 + Math.abs(q.changePct || 0) * 5), horizon: '1w', rationale: 'momentum (no-LLM fallback)' };
+  }
+  const sys = 'You are a market PREDICTION MODEL for a PAPER (simulated, no real money) trading sandbox. This is NOT financial advice. Given a ticker and its quote, output ONLY JSON: {"direction":"up|down","confidence":0-100,"horizon":"1d|1w|1m","rationale":"<=18 words"}.';
+  const usr = `${q.ticker} $${q.price} | day change ${(q.changePct || 0).toFixed(2)}% | day ${q.low}-${q.high} | prev close ${q.prev}`;
+  const out = await agentComplete(sys, usr, 'claude-haiku-4-5', 200);
+  try {
+    const j = JSON.parse((out.text.match(/\{[\s\S]*\}/) || ['{}'])[0]);
+    return { ...base, direction: j.direction === 'down' ? 'down' : 'up', confidence: Math.max(0, Math.min(100, +j.confidence || 50)), horizon: j.horizon || '1w', rationale: j.rationale || '' };
+  } catch { const direction = (q.changePct || 0) >= 0 ? 'up' : 'down'; return { ...base, direction, confidence: 50, horizon: '1w', rationale: 'fallback' }; }
+}
+
 // Decide what a target is and open it. Files/folders must live inside an allowed root.
 function openTarget(raw) {
   const t = String(raw || '').trim();
@@ -1635,6 +1659,66 @@ const server = http.createServer(async (req, res) => {
       else { if (!p.positions) p.positions = []; const idx = p.positions.findIndex((x) => x.id === pos.id); if (idx >= 0) p.positions[idx] = { ...p.positions[idx], ...pos }; else p.positions.push(pos); }
       saveJson(POSITIONS_FILE, p);
       return send(res, 200, JSON.stringify({ ok: true, positions: p.positions }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // PAPER TRADING — predictions + simulated ledger (no real money; not financial advice)
+  if (req.method === 'POST' && url.pathname === '/api/market/predict') {
+    try {
+      const { ticker, all } = await readBody(req);
+      const paper = loadPaper();
+      let tickers = [];
+      if (all) { const wl = loadJson(WATCHLIST_FILE, { tickers: [] }); tickers = wl.tickers || []; }
+      else if (ticker) tickers = [String(ticker).toUpperCase()];
+      if (!tickers.length) return send(res, 400, JSON.stringify({ error: 'ticker or all:true required (watchlist empty?)' }));
+      const made = [];
+      for (const t of tickers) { try { const p = await predictTicker(t); paper.predictions.unshift(p); made.push(p); } catch { /* skip a bad ticker */ } }
+      paper.predictions = paper.predictions.slice(0, 100);
+      savePaper(paper);
+      return send(res, 200, JSON.stringify({ ok: true, predictions: made }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/market/paper/trade') {
+    try {
+      const { ticker, side, qty, predictionId } = await readBody(req);
+      if (!ticker || !qty) return send(res, 400, JSON.stringify({ error: 'ticker and qty required' }));
+      const q = await getQuote(String(ticker).toUpperCase());
+      const paper = loadPaper();
+      const cost = q.price * Number(qty);
+      const trade = { id: Date.now().toString(36), ticker: q.ticker, side: side === 'short' ? 'short' : 'long', qty: Number(qty), entry: q.price, openedAt: new Date().toISOString(), status: 'open', predictionId: predictionId || null };
+      paper.cash -= cost;                    // reserve notional (consistent on close)
+      paper.trades.unshift(trade);
+      savePaper(paper);
+      return send(res, 200, JSON.stringify({ ok: true, trade, note: 'PAPER fill — simulated, no real money.' }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/market/paper/close') {
+    try {
+      const { id } = await readBody(req);
+      const paper = loadPaper();
+      const t = paper.trades.find((x) => x.id === id && x.status === 'open');
+      if (!t) return send(res, 404, JSON.stringify({ error: 'open paper trade not found' }));
+      const q = await getQuote(t.ticker);
+      const realized = pnlOf(t, q.price);
+      t.status = 'closed'; t.exit = q.price; t.closedAt = new Date().toISOString(); t.realized = realized;
+      paper.cash += t.entry * t.qty + realized;   // return reserve + realized P&L
+      savePaper(paper);
+      return send(res, 200, JSON.stringify({ ok: true, realized }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/market/paper') {
+    try {
+      const paper = loadPaper();
+      const open = paper.trades.filter((t) => t.status === 'open');
+      const closed = paper.trades.filter((t) => t.status === 'closed');
+      // mark open trades at live quotes
+      const marks = {};
+      await Promise.all([...new Set(open.map((t) => t.ticker))].map(async (tk) => { try { marks[tk] = (await getQuote(tk)).price; } catch { marks[tk] = null; } }));
+      let unrealized = 0, openNotional = 0;
+      const openMarked = open.map((t) => { const cur = marks[t.ticker]; const u = cur != null ? pnlOf(t, cur) : 0; unrealized += u; openNotional += t.entry * t.qty; return { ...t, cur, unrealized: u }; });
+      const realized = closed.reduce((s, t) => s + (t.realized || 0), 0);
+      const equity = paper.cash + openNotional + unrealized;
+      const summary = { cash: paper.cash, startCash: paper.startCash, equity, realized, unrealized, totalPnl: realized + unrealized, openCount: open.length, closedCount: closed.length };
+      return send(res, 200, JSON.stringify({ summary, open: openMarked, closed: closed.slice(0, 30), predictions: paper.predictions.slice(0, 30) }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   // ── PERSONAL OS: knowledge base (notes, journal, voice, todos, people, search) ──────────────────

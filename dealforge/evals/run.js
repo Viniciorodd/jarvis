@@ -10,6 +10,9 @@ import { computeRental } from "../engine/rental.js";
 import { computeWholesale } from "../engine/wholesale.js";
 import { computeCosts } from "../engine/costs.js";
 import { computeMarket } from "../engine/market.js";
+import { entitlementFor } from "../engine/entitlements.js";
+import { periodEnd, planById } from "../engine/plans.js";
+import { generateLicenseKey, validateLicenseKey } from "../db/licenses.js";
 
 let passed = 0;
 let failed = 0;
@@ -143,6 +146,40 @@ function eq(actual, expected, label) {
   eq(r.rows[0].status, "pass", "market lte KPI well under target => pass");
   eq(r.rows[1].status, "warn", "market gte KPI just under target => warn");
   approx(r.rows[1].perfPct, 99.1, 0.3, "market perf-to-target ≈ 99%");
+}
+
+// ───────────────────────── ENTITLEMENTS (license gate) ─────────────────────────
+{
+  const now = Date.parse("2026-06-23T00:00:00Z");
+  const fresh = { createdAt: "2026-06-20T00:00:00Z" }; // 3 days old
+  const old = { createdAt: "2026-01-01T00:00:00Z" };   // well past trial
+
+  // single-tenant (owner's instance) always unlocked, regardless of billing
+  eq(entitlementFor(fresh, { mode: "single-tenant", billing: { enabled: true } }, now).reason, "owner", "entitlement: single-tenant => owner unlock");
+  // billing disabled => unlocked
+  eq(entitlementFor(old, { mode: "multi-tenant", billing: { enabled: false } }, now).entitled, true, "entitlement: billing disabled => unlocked");
+  // fresh account within trial => trialing
+  eq(entitlementFor(fresh, { mode: "multi-tenant", billing: { enabled: true, trialDays: 14 } }, now).reason, "trial", "entitlement: fresh account => trial");
+  // expired trial, no subscription => locked
+  eq(entitlementFor(old, { mode: "multi-tenant", billing: { enabled: true, trialDays: 14 } }, now).entitled, false, "entitlement: expired trial => locked");
+  // active lifetime => unlocked
+  eq(entitlementFor({ ...old, entitlement: { plan: "lifetime", status: "active" } }, { mode: "multi-tenant", billing: { enabled: true } }, now).reason, "lifetime", "entitlement: active lifetime => unlocked");
+  // active monthly within period => unlocked
+  const pe = periodEnd(planById("monthly"), new Date(now));
+  eq(entitlementFor({ ...old, entitlement: { plan: "monthly", status: "active", currentPeriodEnd: pe } }, { mode: "multi-tenant", billing: { enabled: true } }, now).reason, "active", "entitlement: active monthly => unlocked");
+}
+
+// ───────────────────────── LICENSE KEYS ─────────────────────────
+{
+  const key = generateLicenseKey({ plan: "lifetime", email: "buyer@example.com" });
+  const v = validateLicenseKey(key);
+  eq(v.valid, true, "license: generated key validates");
+  eq(v.plan, "lifetime", "license: plan round-trips");
+  eq(v.email, "buyer@example.com", "license: email round-trips");
+  // tamper a payload character (index 8 is inside the token body, past "DF-")
+  const tampered = key.slice(0, 8) + (key[8] === "A" ? "B" : "A") + key.slice(9);
+  eq(validateLicenseKey(tampered).valid, false, "license: tampered key rejected");
+  eq(validateLicenseKey("DF-XXXXX-XXXXX").valid, false, "license: garbage key rejected");
 }
 
 // ───────────────────────── report ─────────────────────────

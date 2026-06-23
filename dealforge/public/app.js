@@ -33,6 +33,8 @@ const API = {
   register: (b) => api("/auth/register", { method: "POST", body: b }),
   login: (b) => api("/auth/login", { method: "POST", body: b }),
   me: () => api("/auth/me"),
+  checkout: (plan) => api("/billing/checkout", { method: "POST", body: { plan } }),
+  activate: (key) => api("/billing/activate", { method: "POST", body: { key } }),
   brand: () => fetch("/api/brand").then((r) => r.json()),
   list: (col, q = "") => api(`/${col}${q}`),
   create: (col, b) => api(`/${col}`, { method: "POST", body: b }),
@@ -96,10 +98,11 @@ async function boot() {
   }
   document.title = state.brand.productName || "DealForge";
 
+  state.billing = await fetch("/api/billing/config").then((r) => r.json()).catch(() => ({ enabled: false }));
   if (token) {
     try {
-      const { user } = await API.me();
-      state.user = user;
+      const { user, entitlement } = await API.me();
+      state.user = user; state.entitlement = entitlement;
       await loadAll();
     } catch {
       token = null; localStorage.removeItem(TOKEN_KEY);
@@ -171,6 +174,10 @@ function render() {
   app().querySelectorAll('[data-action="logout"]').forEach((el) => el.onclick = logout);
 
   const view = $("#view");
+  if (route === "upgrade") return renderUpgrade(view);
+  // Paywall: only bites when billing is enabled AND the user isn't entitled. The owner's
+  // single-tenant instance reports entitled=true, so this never gates personal use.
+  if (isLocked() && route !== "settings") return renderUpgrade(view, true);
   if (route === "deal") return renderDealEditor(view, rest[0]);
   if (route === "lenders") return renderLenders(view);
   if (route === "pipeline") return renderPipeline(view);
@@ -927,6 +934,83 @@ function expenseModal(existing) {
 }
 const labeled = (label, inner) => `<div class="field">${label ? `<label>${esc(label)}</label>` : ""}${inner}</div>`;
 
+// ───────────────────────── Membership / paywall ─────────────────────────
+function isLocked() {
+  const b = state.billing || {};
+  if (!b.enabled) return false; // owner instance / billing off
+  return !(state.entitlement && state.entitlement.entitled);
+}
+
+function renderUpgrade(view, gated) {
+  const b = state.billing || {};
+  const plans = b.plans || [];
+  const ent = state.entitlement || {};
+  view.innerHTML = `
+    <div class="page-head"><div>
+      <h1>${gated ? "Your trial has ended" : "Membership"}</h1>
+      <div class="sub">${gated ? "Choose a plan to keep analyzing deals." : "Pick the plan that fits how you work."}</div>
+    </div></div>
+    ${ent.reason === "trial" ? `<div class="panel" style="margin-bottom:18px"><div class="stat-hero"><div class="label">Free trial</div><div class="num" style="font-size:24px">${ent.trialDaysLeft} days left</div></div></div>` : ""}
+    ${!b.configured ? `<div class="err" style="margin-bottom:18px">Checkout isn't connected yet (no Stripe keys configured). Plans shown for preview.</div>` : ""}
+    <div class="grid deals-grid">
+      ${plans.map((p) => `
+        <div class="card" style="padding:22px; ${p.highlight ? "border-color:var(--accent)" : ""}">
+          ${p.highlight ? `<span class="badge good" style="margin-bottom:10px">Best value</span>` : ""}
+          <div style="font-size:17px;font-weight:700">${esc(p.label)}</div>
+          <div style="font-size:34px;font-weight:800;margin:8px 0">$${p.price}<span style="font-size:14px;color:var(--text-faint);font-weight:500">${p.interval === "lifetime" ? " once" : p.interval === "year" ? "/yr" : p.intervalCount > 1 ? "/" + p.intervalCount + "mo" : "/mo"}</span></div>
+          <div class="sub" style="color:var(--text-faint);min-height:34px">${esc(p.blurb || "")}</div>
+          <button class="btn primary" style="width:100%;justify-content:center;margin-top:12px" data-buy="${p.id}">Choose ${esc(p.label)}</button>
+        </div>`).join("")}
+    </div>
+    <div class="panel" style="max-width:560px;margin-top:18px">
+      <h3><span class="dot"></span>Have a license key?</h3>
+      <div class="row2" style="align-items:end">
+        <div class="field" style="margin-bottom:0"><label>License key</label><input id="lic-key" placeholder="DF-XXXXX-XXXXX-…"></div>
+        <button class="btn" id="lic-go" style="height:42px">Activate</button>
+      </div>
+      <div id="lic-msg" style="margin-top:10px"></div>
+    </div>`;
+
+  view.querySelectorAll("[data-buy]").forEach((el) => el.onclick = async () => {
+    try {
+      const { url } = await API.checkout(el.dataset.buy);
+      if (url) location.href = url;
+    } catch (e) {
+      toast(e.message.includes("not configured") ? "Checkout isn't connected yet." : e.message);
+    }
+  });
+  $("#lic-go").onclick = async () => {
+    const key = $("#lic-key").value.trim();
+    if (!key) return;
+    try {
+      const { entitlement } = await API.activate(key);
+      state.entitlement = entitlement;
+      $("#lic-msg").innerHTML = `<div style="color:var(--good)">✓ Activated — ${esc(entitlement.plan)} plan. Reloading…</div>`;
+      setTimeout(() => { location.hash = "#/deals"; render(); }, 900);
+    } catch (e) {
+      $("#lic-msg").innerHTML = `<div class="err">${esc(e.message)}</div>`;
+    }
+  };
+}
+
+function membershipPanel() {
+  const b = state.billing || {};
+  const ent = state.entitlement || {};
+  const label = ent.reason === "owner" ? "Owner — all features"
+    : ent.reason === "disabled" ? "Free (billing off)"
+    : ent.reason === "trial" ? `Trial — ${ent.trialDaysLeft} days left`
+    : ent.reason === "lifetime" ? "Lifetime — active"
+    : ent.entitled ? `${ent.plan} — active` : "Expired";
+  return `
+    <div class="panel" style="max-width:560px">
+      <h3><span class="dot"></span>Membership</h3>
+      ${statRow("Status", esc(label))}
+      ${ent.plan ? statRow("Plan", esc(ent.plan)) : ""}
+      ${b.enabled ? `<button class="btn primary" id="set-upgrade" style="margin-top:14px">${ent.entitled && ent.reason !== "trial" ? "Manage plan" : "Upgrade"}</button>`
+        : `<div class="sub" style="color:var(--text-faint);margin-top:10px">This is your owner instance — every feature is unlocked. Turn on billing in <code>config/brand.json</code> to sell.</div>`}
+    </div>`;
+}
+
 // ───────────────────────── Settings ─────────────────────────
 function renderSettings(view) {
   const theme = document.documentElement.getAttribute("data-theme") || "dark";
@@ -940,11 +1024,11 @@ function renderSettings(view) {
           <button data-th="light" class="${theme === "light" ? "on" : ""}">Light</button>
         </div></div>
     </div>
+    ${membershipPanel()}
     <div class="panel" style="max-width:560px">
       <h3><span class="dot"></span>Account</h3>
       ${statRow("Name", esc(state.user.name || "—"))}
       ${statRow("Email", esc(state.user.email))}
-      ${statRow("Plan", esc(state.user.plan || "owner"))}
       <button class="btn danger" id="set-logout" style="margin-top:14px">Sign out</button>
     </div>
     <div class="panel" style="max-width:560px">
@@ -957,6 +1041,7 @@ function renderSettings(view) {
     renderSettings(view);
   });
   $("#set-logout").onclick = logout;
+  if ($("#set-upgrade")) $("#set-upgrade").onclick = () => { location.hash = "#/upgrade"; };
 }
 
 // ───────────────────────── Markets ─────────────────────────

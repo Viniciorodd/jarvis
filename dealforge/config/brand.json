@@ -19,6 +19,7 @@
   },
   "billing": {
     "enabled": false,
-    "plans": ["monthly", "quarterly", "yearly", "lifetime"]
+    "trialDays": 14,
+    "note": "Set enabled:true + mode:multi-tenant and provide STRIPE_* env vars to sell. Disabled = owner instance, all features unlocked."
   }
 }

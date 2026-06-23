@@ -21,6 +21,15 @@ import { store, UPLOADS_DIR, newId } from "./db/store.js";
 import {
   registerUser, loginUser, publicUser, verifyToken
 } from "./db/auth.js";
+import { entitlementFor } from "./engine/entitlements.js";
+import { PLANS } from "./engine/plans.js";
+import {
+  stripeConfigured, createCheckoutSession, verifyWebhook, applyWebhookEvent, activateLicense
+} from "./db/billing.js";
+import { validateLicenseKey } from "./db/licenses.js";
+
+let BRAND = {};
+try { BRAND = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "config", "brand.json"), "utf8")); } catch {}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.DEALFORGE_PORT || process.env.PORT || 8096;
@@ -83,6 +92,15 @@ function readBody(req, limitBytes = 12 * 1024 * 1024) {
   });
 }
 
+function readRawBody(req, limitBytes = 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0; const chunks = [];
+    req.on("data", (c) => { size += c.length; if (size > limitBytes) { reject(new Error("Payload too large")); req.destroy(); return; } chunks.push(c); });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
 function authUser(req) {
   const h = req.headers["authorization"] || "";
   const token = h.startsWith("Bearer ") ? h.slice(7) : null;
@@ -122,12 +140,59 @@ const server = http.createServer(async (req, res) => {
         return r.error ? send(res, 401, r) : send(res, 200, r);
       }
 
+      // Public: pricing/plan catalog for the upgrade screen.
+      if (pathname === "/api/billing/config" && method === "GET") {
+        const billing = BRAND.billing || {};
+        return send(res, 200, {
+          enabled: billing.enabled === true,
+          configured: stripeConfigured(),
+          mode: BRAND.mode || "single-tenant",
+          trialDays: billing.trialDays ?? 14,
+          plans: PLANS.map(({ id, label, price, interval, intervalCount, blurb, highlight }) =>
+            ({ id, label, price, interval, intervalCount, blurb, highlight: !!highlight }))
+        });
+      }
+
+      // Stripe webhook — raw body, signature-verified, no bearer auth.
+      if (pathname === "/api/billing/webhook" && method === "POST") {
+        const raw = await readRawBody(req);
+        const event = verifyWebhook(raw, req.headers["stripe-signature"]);
+        if (!event) return send(res, 400, { error: "Invalid signature" });
+        applyWebhookEvent(event);
+        return send(res, 200, { received: true });
+      }
+
       // everything below requires auth
       const user = authUser(req);
       if (!user) return send(res, 401, { error: "Unauthorized" });
 
       if (pathname === "/api/auth/me" && method === "GET") {
-        return send(res, 200, { user: publicUser(user) });
+        return send(res, 200, { user: publicUser(user), entitlement: entitlementFor(user, BRAND) });
+      }
+
+      if (pathname === "/api/billing/status" && method === "GET") {
+        return send(res, 200, { entitlement: entitlementFor(user, BRAND), configured: stripeConfigured() });
+      }
+
+      // Start a Stripe Checkout Session. 503 if billing isn't configured (no money can move).
+      if (pathname === "/api/billing/checkout" && method === "POST") {
+        const body = await readBody(req);
+        try {
+          const origin = `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`;
+          const out = await createCheckoutSession({ planId: body.plan, user, origin });
+          return send(res, 200, out);
+        } catch (e) {
+          return send(res, e.code || 500, { error: e.message });
+        }
+      }
+
+      // Activate an offline license key (lifetime / air-gapped).
+      if (pathname === "/api/billing/activate" && method === "POST") {
+        const body = await readBody(req);
+        const v = validateLicenseKey(body.key);
+        if (!v.valid) return send(res, 400, { error: v.error || "Invalid license key" });
+        const ent = activateLicense(user, v);
+        return send(res, 200, { entitlement: ent });
       }
 
       if (pathname === "/api/uploads" && method === "POST") {

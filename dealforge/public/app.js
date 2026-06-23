@@ -5,6 +5,8 @@
 import { computeFlip } from "/engine/flip-brrrr.js";
 import { computeRental } from "/engine/rental.js";
 import { computeWholesale } from "/engine/wholesale.js";
+import { computeCosts, REHAB_LINE_ITEMS } from "/engine/costs.js";
+import { computeMarket, MARKET_KPI_TEMPLATE } from "/engine/market.js";
 import { rehabEstimate } from "/engine/rehab.js";
 import { CRM_STAGES } from "/engine/defaults.js";
 
@@ -46,6 +48,7 @@ const state = {
   deals: [],
   lenders: [],
   expenses: [],
+  markets: [],
   route: "deals"
 };
 
@@ -76,7 +79,7 @@ function fileToDataUrl(file) {
   });
 }
 
-const TYPE_LABELS = { flip: "Fix & Flip / BRRRR", rental: "Rental / Hold", wholesale: "Wholesale" };
+const TYPE_LABELS = { flip: "Fix & Flip / BRRRR", rental: "Rental / Hold", wholesale: "Wholesale", costs: "Total Costs" };
 
 // ───────────────────────── Boot ─────────────────────────
 async function boot() {
@@ -111,10 +114,10 @@ async function boot() {
 }
 
 async function loadAll() {
-  const [d, l, e] = await Promise.all([
-    API.list("deals"), API.list("lenders"), API.list("expenses")
+  const [d, l, e, m] = await Promise.all([
+    API.list("deals"), API.list("lenders"), API.list("expenses"), API.list("markets")
   ]);
-  state.deals = d.items; state.lenders = l.items; state.expenses = e.items;
+  state.deals = d.items; state.lenders = l.items; state.expenses = e.items; state.markets = m.items;
 }
 
 function logout() {
@@ -128,14 +131,16 @@ function render() {
   const hash = location.hash.replace(/^#\/?/, "");
   const [route, ...rest] = hash.split("/");
   state.route = route || "deals";
+  const ff = state.brand.featureFlags || {};
   const NAV = [
     ["deals", "🏠", "Deals"],
     ["lenders", "🏦", "Lenders"],
     ["pipeline", "📊", "Pipeline"],
+    ff.market !== false ? ["markets", "📍", "Markets"] : null,
     ["expenses", "🧾", "Expenses"],
     ["archive", "📦", "Archive"],
     ["settings", "⚙️", "Settings"]
-  ];
+  ].filter(Boolean);
   const b = state.brand;
   const initials = (state.user.name || state.user.email || "?").slice(0, 2).toUpperCase();
 
@@ -169,6 +174,7 @@ function render() {
   if (route === "deal") return renderDealEditor(view, rest[0]);
   if (route === "lenders") return renderLenders(view);
   if (route === "pipeline") return renderPipeline(view);
+  if (route === "markets") return renderMarkets(view, rest[0]);
   if (route === "expenses") return renderExpenses(view);
   if (route === "archive") return renderDeals(view, true);
   if (route === "settings") return renderSettings(view);
@@ -240,8 +246,10 @@ function dealCard(d) {
   if (d.type === "flip") { metric = money(snap.netProfit); label = "Net Profit"; }
   else if (d.type === "rental") { metric = money2(snap.cashFlowMonthly || 0) + "/mo"; label = "Cash Flow"; }
   else if (d.type === "wholesale") { metric = money(snap.maxAllowableOffer); label = "Max Offer"; }
+  else if (d.type === "costs") { metric = money(snap.netProceeds); label = "Net Proceeds"; }
   const img = (d.images && d.images[0]) || null;
-  const metricCls = (d.type === "flip" && snap.netProfit < 0) || (d.type === "rental" && (snap.cashFlowMonthly || 0) < 0) ? "neg" : "";
+  const negMetric = (d.type === "flip" && snap.netProfit < 0) || (d.type === "rental" && (snap.cashFlowMonthly || 0) < 0) || (d.type === "costs" && snap.netProceeds < 0);
+  const metricCls = negMetric ? "neg" : "";
   return `
     <div class="card deal-card" data-deal="${d.id}">
       <div class="thumb">
@@ -266,10 +274,11 @@ async function newDealFlow() {
   openModal({
     title: "New Deal",
     body: `<div class="field"><label>Strategy</label>
-      <div class="seg" id="nd-type" style="display:flex; width:100%">
-        <button class="on" data-t="flip" style="flex:1">Fix &amp; Flip / BRRRR</button>
+      <div class="seg" id="nd-type" style="display:flex; width:100%; flex-wrap:wrap">
+        <button class="on" data-t="flip" style="flex:1">Flip / BRRRR</button>
         <button data-t="rental" style="flex:1">Rental</button>
         <button data-t="wholesale" style="flex:1">Wholesale</button>
+        <button data-t="costs" style="flex:1">Total Costs</button>
       </div></div>
       <div class="field"><label>Property address</label><input id="nd-addr" placeholder="123 Main St, Scranton, PA"></div>`,
     okText: "Create",
@@ -293,6 +302,7 @@ async function newDealFlow() {
 function defaultsFor(type) {
   if (type === "flip") return { purchasePrice: "", rehabCost: "", arv: "", taxes: "", insurancePremium: "", utilitiesMonthly: "", flipMonths: 5, beds: "", baths: "", sqft: "", yearBuilt: "" };
   if (type === "rental") return { purchasePrice: "", units: [{ name: "Unit 1", monthlyRent: "" }], insuranceMonthly: "", taxesMonthly: "", utilitiesOwnerMonthly: "", trashMonthly: "", waterSewerMonthly: "", rehabCost: "", arv: "" };
+  if (type === "costs") return { sellerAskingPrice: "", insurance: "", holdMonths: 3, electric: "", waterTrash: "", landscapingHold: "", gas: "", sellingPrice: "", rehab: {} };
   return { arv: "", rehabCost: "", assignmentFeePct: 0.15, sqft: "" };
 }
 
@@ -429,7 +439,7 @@ function renderEditForm(deal) {
       </div>`;
     renderUnits(deal);
     $("#add-unit").onclick = () => { I.units = I.units || []; I.units.push({ name: `Unit ${I.units.length + 1}`, monthlyRent: "" }); renderUnits(deal); recompute(deal); renderResults(deal); };
-  } else { // wholesale
+  } else if (deal.type === "wholesale") {
     form.innerHTML = `
       <div class="panel"><h3><span class="dot"></span>Property</h3>
         ${field("Address", "i-address", deal.address, { ph: "123 Main St" })}
@@ -442,6 +452,37 @@ function renderEditForm(deal) {
           ${field("Rehab cost", "i-rehabCost", I.rehabCost, { money: 1 })}
         </div>
         ${field("Assignment fee %", "a-assignmentFeePct", asPct(I.assignmentFeePct, 15), { hint: "Your target profit as % of ARV" })}
+      </div>`;
+  } else { // costs
+    const rehabFields = REHAB_LINE_ITEMS.map((k) =>
+      field(k[0].toUpperCase() + k.slice(1), `r-${k}`, (I.rehab || {})[k], { money: 1 })).join("");
+    form.innerHTML = `
+      <div class="panel"><h3><span class="dot"></span>Property</h3>
+        ${field("Address", "i-address", deal.address, { ph: "123 Main St" })}
+        ${imageStripHTML(deal)}
+      </div>
+      <div class="panel"><h3><span class="dot"></span>Acquisition</h3>
+        <div class="row2">
+          ${field("Seller asking price", "i-sellerAskingPrice", I.sellerAskingPrice, { money: 1 })}
+          ${field("Insurance", "i-insurance", I.insurance, { money: 1 })}
+        </div>
+        ${field("Loan amount (purchase + rehab)", "i-loanAmount", I.loanAmount, { money: 1, hint: "Blank = auto (purchase + rehab)" })}
+      </div>
+      <div class="panel"><h3><span class="dot"></span>Holding</h3>
+        ${field("Hold time (months)", "i-holdMonths", I.holdMonths)}
+        <div class="row3">
+          ${field("Electric /mo", "i-electric", I.electric, { money: 1 })}
+          ${field("Water/Trash /mo", "i-waterTrash", I.waterTrash, { money: 1 })}
+          ${field("Gas /mo", "i-gas", I.gas, { money: 1 })}
+        </div>
+        ${field("Landscaping /mo", "i-landscapingHold", I.landscapingHold, { money: 1 })}
+      </div>
+      <div class="panel"><h3><span class="dot"></span>Rehab Line Items</h3>
+        <div class="row3">${rehabFields}</div>
+      </div>
+      <div class="panel"><h3><span class="dot"></span>Exit</h3>
+        ${field("Selling price (ARV)", "i-sellingPrice", I.sellingPrice, { money: 1 })}
+        ${field("Seller concession", "i-sellerConcession", I.sellerConcession, { money: 1 })}
       </div>`;
   }
 
@@ -483,6 +524,7 @@ function renderUnits(deal) {
 function onFieldChange(deal, el) {
   const id = el.id;
   if (id === "i-address") { deal.address = el.value; }
+  else if (id.startsWith("r-")) { deal.inputs.rehab = deal.inputs.rehab || {}; deal.inputs.rehab[id.slice(2)] = el.value; }
   else if (id.startsWith("i-")) { deal.inputs[id.slice(2)] = el.value; }
   else if (id.startsWith("a-")) {
     deal.inputs.a = deal.inputs.a || {};
@@ -527,10 +569,14 @@ function recompute(deal) {
     const r = computeRental(I, a);
     deal.computed = r;
     deal.snapshot = { cashFlowMonthly: r.ratios.cashFlowAfterReservesMonthly, dscr: r.ratios.dscr, capRate: r.ratios.capRateAtPurchase };
-  } else {
+  } else if (deal.type === "wholesale") {
     const r = computeWholesale(I, { assignmentFeePct: I.assignmentFeePct });
     deal.computed = r;
     deal.snapshot = { maxAllowableOffer: r.maxAllowableOffer, buyerPrice: r.buyerPrice, assignmentFee: r.assignmentFee };
+  } else { // costs
+    const r = computeCosts(I, a);
+    deal.computed = r;
+    deal.snapshot = { netProceeds: r.netProceeds, roi: r.roi };
   }
 }
 
@@ -543,7 +589,37 @@ function renderResults(deal) {
   const c = deal.computed;
   if (deal.type === "flip") el.innerHTML = flipResults(c);
   else if (deal.type === "rental") el.innerHTML = rentalResults(c);
-  else el.innerHTML = wholesaleResults(c);
+  else if (deal.type === "wholesale") el.innerHTML = wholesaleResults(c);
+  else el.innerHTML = costsResults(c);
+}
+
+function costsResults(c) {
+  return `
+    <div class="panel">
+      <div class="stat-hero"><div class="label">Net Proceeds</div><div class="num ${cls(c.netProceeds)}">${money(c.netProceeds)}</div></div>
+      <div class="stat-hero"><div class="label">ROI on total invested</div><div class="num" style="font-size:24px">${pct(c.roi)}</div></div>
+    </div>
+    <div class="panel"><h3><span class="dot"></span>Acquisition</h3>
+      ${statRow("Purchase", money(c.acquisition.purchase))}
+      ${statRow("Closing", money(c.acquisition.closing))}
+      ${statRow("Insurance", money(c.acquisition.insurance))}
+      ${statRow("Loan origination", money(c.acquisition.loanOrigination))}
+      ${statRow("Total acquisition", money(c.acquisition.total), { big: 1 })}
+    </div>
+    <div class="panel"><h3><span class="dot"></span>Holding (${c.holding.holdMonths} mo)</h3>
+      ${statRow("Monthly loan payment", money(c.holding.monthlyLoanPayment))}
+      ${statRow("Total monthly holding", money(c.holding.monthly))}
+      ${statRow("Total holding", money(c.holding.total), { big: 1 })}
+    </div>
+    <div class="panel"><h3><span class="dot"></span>Rehab</h3>
+      ${statRow("Total rehab", money(c.rehab.total), { big: 1 })}
+    </div>
+    <div class="panel"><h3><span class="dot"></span>Exit</h3>
+      ${statRow("Selling price", money(c.exit.sellingPrice))}
+      ${statRow("Agent commission", money(c.exit.agentCommission))}
+      ${statRow("Closing", money(c.exit.closing))}
+      ${statRow("Total exit proceeds", money(c.exit.totalProceeds), { big: 1 })}
+    </div>`;
 }
 
 function flipResults(c) {
@@ -881,6 +957,140 @@ function renderSettings(view) {
     renderSettings(view);
   });
   $("#set-logout").onclick = logout;
+}
+
+// ───────────────────────── Markets ─────────────────────────
+function renderMarkets(view, id) {
+  if (id) return renderMarketScorecard(view, id);
+  view.innerHTML = `
+    <div class="page-head"><div><h1>Markets</h1><div class="sub">${state.markets.length} market ${state.markets.length === 1 ? "scorecard" : "scorecards"} · grade a city against your targets</div></div>
+      <button class="btn primary" id="new-market">＋ Add Market</button></div>
+    ${state.markets.length ? `<div class="grid deals-grid">${state.markets.map(marketCard).join("")}</div>` : emptyState("📍", "No markets yet", "Score a city on demographics, income, housing, and crime against your targets.")}`;
+  $("#new-market").onclick = () => marketCreateModal();
+  view.querySelectorAll("[data-market]").forEach((el) => el.onclick = () => { location.hash = `#/markets/${el.dataset.market}`; });
+}
+
+function marketCard(m) {
+  const r = computeMarket(m.kpis || []);
+  const gradeColor = r.score100 >= 80 ? "var(--good)" : r.score100 >= 60 ? "var(--warn)" : "var(--bad)";
+  return `
+    <div class="card deal-card" data-market="${m.id}">
+      <div class="body">
+        <div class="addr">${esc(m.name || "Untitled market")}</div>
+        <div class="sub" style="color:var(--text-faint);font-size:13px">${esc(m.location || "")}</div>
+        <div class="meta">
+          <div><div class="metric-label">Grade</div><div class="metric" style="color:${gradeColor}">${r.grade} · ${r.score100}</div></div>
+          <span class="badge">${r.passes}/${r.total} pass</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function marketCreateModal() {
+  openModal({
+    title: "Add Market",
+    body: `
+      ${labeled("Market name", `<input id="m-name" placeholder="Scranton, PA">`)}
+      ${labeled("Notes / location", `<input id="m-loc" placeholder="Lackawanna County">`)}
+      <div class="hint" style="margin-top:6px">Starts with a standard KPI template you can edit.</div>`,
+    okText: "Create",
+    onOk: async (close) => {
+      const name = $("#m-name").value.trim();
+      if (!name) return toast("Market name required");
+      const kpis = MARKET_KPI_TEMPLATE.map((k) => ({ ...k, value: "" }));
+      const { item } = await API.create("markets", { name, location: $("#m-loc").value.trim(), kpis, notes: "" });
+      state.markets.push(item);
+      close();
+      location.hash = `#/markets/${item.id}`;
+    }
+  });
+}
+
+function marketResultsCol(m) {
+  const r = computeMarket(m.kpis || []);
+  const gradeColor = r.score100 >= 80 ? "var(--good)" : r.score100 >= 60 ? "var(--warn)" : "var(--bad)";
+  const statusColor = { pass: "var(--good)", warn: "var(--warn)", fail: "var(--bad)" };
+  return `
+    <div class="panel">
+      <div class="stat-hero"><div class="label">Market Grade</div><div class="num" style="color:${gradeColor}">${r.grade}</div></div>
+      <div class="row2">
+        <div class="stat-hero"><div class="label">Score</div><div class="num" style="font-size:24px">${r.score100}</div></div>
+        <div class="stat-hero"><div class="label">Pass / Fail</div><div class="num" style="font-size:24px">${r.passes}/${r.fails}</div></div>
+      </div>
+    </div>
+    <div class="panel"><h3><span class="dot"></span>Scorecard</h3>
+      <table class="mini-table"><thead><tr><th>KPI</th><th>Perf</th></tr></thead><tbody>
+        ${r.rows.map((row) => `<tr><td>${esc(row.measurement)}</td><td style="color:${statusColor[row.status]}">${row.value === "" || row.value == null ? "—" : row.perfPct + "%"}</td></tr>`).join("")}
+      </tbody></table>
+    </div>`;
+}
+
+function renderMarketScorecard(view, id) {
+  const m = state.markets.find((x) => x.id === id);
+  if (!m) { view.innerHTML = emptyState("❓", "Market not found", ""); return; }
+  m.kpis = m.kpis || [];
+  const draw = () => {
+    const r = computeMarket(m.kpis);
+    const gradeColor = r.score100 >= 80 ? "var(--good)" : r.score100 >= 60 ? "var(--warn)" : "var(--bad)";
+    const statusColor = { pass: "var(--good)", warn: "var(--warn)", fail: "var(--bad)" };
+    const cats = Object.entries(r.byCategory);
+    view.innerHTML = `
+      <div class="page-head">
+        <div><a class="sub" data-back style="cursor:pointer">← Markets</a>
+          <h1 style="margin-top:6px">${esc(m.name)}</h1><div class="sub">${esc(m.location || "")}</div></div>
+        <div class="toolbar">
+          <button class="btn" id="m-del">Delete</button>
+          <button class="btn primary" id="m-save">Save</button>
+        </div>
+      </div>
+      <div class="editor">
+        <div>
+          ${cats.map(([cat, rows]) => `
+            <div class="panel"><h3><span class="dot"></span>${esc(cat)}</h3>
+              ${rows.map((row) => {
+                const i = m.kpis.indexOf(m.kpis.find((k) => k === row || (k.measurement === row.measurement && k.category === row.category)));
+                return `<div class="row3" style="align-items:end; margin-bottom:4px">
+                  <div class="field" style="margin-bottom:8px"><label>${esc(row.measurement)}</label>
+                    <select data-kpi="${i}" data-kf="direction">
+                      <option value="gte" ${row.direction === "gte" ? "selected" : ""}>≥ target</option>
+                      <option value="lte" ${row.direction === "lte" ? "selected" : ""}>≤ target</option>
+                    </select></div>
+                  <div class="field" style="margin-bottom:8px"><label>Target</label><input data-kpi="${i}" data-kf="target" value="${esc(row.target ?? "")}" inputmode="decimal"></div>
+                  <div class="field" style="margin-bottom:8px"><label>Value</label><input data-kpi="${i}" data-kf="value" value="${esc(row.value ?? "")}" inputmode="decimal"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin:-2px 0 12px"><span style="color:var(--text-faint)">${esc(row.unit || "")}</span><span style="color:${statusColor[row.status]};font-weight:650">${row.value === "" || row.value == null ? "—" : row.perfPct + "% · " + row.status}</span></div>`;
+              }).join("")}
+            </div>`).join("")}
+          <button class="btn sm" id="m-addkpi">＋ Add KPI</button>
+        </div>
+        <div class="results" id="mkt-results">${marketResultsCol(m)}</div>
+      </div>`;
+    $("[data-back]").onclick = () => { location.hash = "#/markets"; };
+    view.querySelectorAll("[data-kpi]").forEach((el) => {
+      // 'input' updates the model + results sidebar live (no focus loss);
+      // 'change' (on blur / select change) does a full redraw to refresh inline statuses.
+      el.addEventListener("input", () => {
+        m.kpis[+el.dataset.kpi][el.dataset.kf] = el.value;
+        const rc = $("#mkt-results"); if (rc) rc.innerHTML = marketResultsCol(m);
+      });
+      el.addEventListener("change", () => {
+        m.kpis[+el.dataset.kpi][el.dataset.kf] = el.value;
+        draw();
+      });
+    });
+    $("#m-addkpi").onclick = () => { m.kpis.push({ category: "Custom", measurement: "New KPI", target: 0, value: "", direction: "gte", unit: "" }); draw(); };
+    $("#m-save").onclick = async () => {
+      const { item } = await API.update("markets", m.id, { name: m.name, location: m.location, kpis: m.kpis, notes: m.notes });
+      Object.assign(m, item); toast("Saved ✓");
+    };
+    $("#m-del").onclick = async () => {
+      if (!confirm("Delete this market?")) return;
+      await API.remove("markets", m.id);
+      state.markets = state.markets.filter((x) => x.id !== m.id);
+      location.hash = "#/markets";
+    };
+  };
+  draw();
 }
 
 // ───────────────────────── Modal ─────────────────────────

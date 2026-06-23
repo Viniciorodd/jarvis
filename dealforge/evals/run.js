@@ -8,6 +8,8 @@
 import { computeFlip } from "../engine/flip-brrrr.js";
 import { computeRental } from "../engine/rental.js";
 import { computeWholesale } from "../engine/wholesale.js";
+import { computeCosts } from "../engine/costs.js";
+import { computeMarket } from "../engine/market.js";
 
 let passed = 0;
 let failed = 0;
@@ -110,6 +112,37 @@ function eq(actual, expected, label) {
 {
   const r = computeWholesale({ arv: 310361, rehabCost: 65000 }, { assignmentFeePct: 0.10 });
   approx(r.maxAllowableOffer, 121217, 1, "wholesale MAO (example 2)");
+}
+
+// ───────────────────────── TOTAL COSTS ─────────────────────────
+// Seller $60,000 / ARV $150,000 example -> net proceeds $14,625.
+{
+  const r = computeCosts({
+    sellerAskingPrice: 60000,
+    insurance: 600,
+    rehab: { kitchen: 15000, floors: 7500, bathrooms: 12500, paint: 5000, dumpster: 500, plumbing: 7500, labor: 8000, landscaping: 2500 },
+    holdMonths: 3,
+    electric: 150, waterTrash: 100, landscapingHold: 100, gas: 0,
+    loanAmount: 118500,
+    sellingPrice: 150000
+  });
+  approx(r.acquisition.total, 62220, 1, "costs total acquisition");
+  approx(r.holding.monthlyLoanPayment, 1185, 1, "costs monthly loan payment (12% IO on 118,500)");
+  approx(r.holding.total, 4605, 1, "costs total holding (3 mo)");
+  approx(r.rehab.total, 58500, 1, "costs total rehab");
+  approx(r.exit.totalProceeds, 139950, 1, "costs total exit proceeds");
+  approx(r.netProceeds, 14625, 1, "costs net proceeds");
+}
+
+// ───────────────────────── MARKET ─────────────────────────
+{
+  const r = computeMarket([
+    { category: "Demographics", measurement: "Poverty rate", target: 20, value: 10, direction: "lte" }, // 200% -> pass
+    { category: "Income", measurement: "Median HH income", target: 50000, value: 49531, direction: "gte" } // ~99% -> warn
+  ]);
+  eq(r.rows[0].status, "pass", "market lte KPI well under target => pass");
+  eq(r.rows[1].status, "warn", "market gte KPI just under target => warn");
+  approx(r.rows[1].perfPct, 99.1, 0.3, "market perf-to-target ≈ 99%");
 }
 
 // ───────────────────────── report ─────────────────────────

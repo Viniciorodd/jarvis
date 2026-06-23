@@ -5,6 +5,8 @@
 export { computeFlip } from "./flip-brrrr.js";
 export { computeRental, amortizedPayment } from "./rental.js";
 export { computeWholesale } from "./wholesale.js";
+export { computeCosts, COSTS_DEFAULTS, REHAB_LINE_ITEMS } from "./costs.js";
+export { computeMarket, perfToTarget, kpiStatus, MARKET_KPI_TEMPLATE } from "./market.js";
 export { rehabEstimate } from "./rehab.js";
 export {
   FLIP_DEFAULTS,

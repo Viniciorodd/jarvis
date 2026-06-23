@@ -12,7 +12,8 @@
     "wholesale": true,
     "crm": true,
     "expenses": true,
-    "market": false,
+    "costs": true,
+    "market": true,
     "imageAttachments": true,
     "archive": true
   },

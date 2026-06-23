@@ -967,3 +967,23 @@ body.dock-open .j-dock-fab{ display:none; }
 .ps-btn:hover{ background:rgba(var(--teal-rgb),.2); }
 .ps-btn-sm{ padding:5px 11px; font-size:11.5px; }
 .ps-empty{ text-align:center; color:var(--dim); font-size:13px; padding:40px 20px; }
+
+/* ─── BRAIN DUMP ─── */
+.ps-brain{ display:flex; flex-direction:column; }
+.ps-brain-h{ font-size:18px; font-weight:500; color:var(--cream); margin-bottom:4px; }
+.ps-brain-sub{ font-size:12.5px; color:var(--dim); line-height:1.5; margin-bottom:14px; }
+.ps-brain-area{ width:100%; min-height:180px; resize:vertical; background:rgba(var(--teal-rgb),.04);
+  border:1px solid rgba(var(--teal-rgb),.16); border-radius:12px; padding:14px 16px;
+  color:var(--cream); font-family:inherit; font-size:14.5px; line-height:1.6; outline:none; }
+.ps-brain-area:focus{ border-color:rgba(var(--teal-rgb),.4); }
+.ps-brain-area::placeholder{ color:var(--dim); }
+.ps-brain-acts{ display:flex; align-items:center; gap:12px; margin-top:12px; }
+.ps-brain-status{ font-size:12.5px; color:var(--teal); }
+.ps-brain-feed{ margin-top:20px; display:flex; flex-direction:column; gap:8px; }
+.ps-brain-filed{ background:var(--panel); border:1px solid rgba(var(--teal-rgb),.1); border-radius:9px;
+  padding:10px 13px; font-size:13px; color:var(--cream); display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  animation:brainFiled .35s ease; }
+@keyframes brainFiled{ from{ opacity:0; transform:translateY(-6px); } to{ opacity:1; transform:none; } }
+.ps-brain-folder{ font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-on-accent);
+  background:var(--teal); border-radius:5px; padding:2px 8px; font-weight:600; flex:none; }
+.ps-brain-path{ font-size:11px; color:var(--dim); font-family:ui-monospace,Menlo,monospace; margin-left:auto; }

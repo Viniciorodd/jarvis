@@ -26,7 +26,7 @@ function close(){
   stopRecording();
 }
 $('personalX').addEventListener('click', close);
-$('jMorePersonal').addEventListener('click', function(){ open('notes'); });
+$('jMorePersonal').addEventListener('click', function(){ open('braindump'); });
 
 /* ── search ── */
 var searchInput = $('psSearch');
@@ -78,11 +78,59 @@ function showTab(name, skipLoad, extra){
   if(searchInput.value.trim() && !skipLoad) return;
   curTab = name;
   document.querySelectorAll('.ps-tab').forEach(function(b){ b.classList.toggle('on', b.dataset.tab===name); });
-  if(name==='notes')   loadNotes();
+  if(name==='braindump') loadBrainDump();
+  else if(name==='notes')   loadNotes();
   else if(name==='journal') loadJournal(extra||today());
   else if(name==='voice')   loadVoice();
   else if(name==='todos')   loadTodos('active');
   else if(name==='people')  loadPeople();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BRAIN DUMP — dump raw thoughts; the AI sorter files them into the vault
+══════════════════════════════════════════════════════════════ */
+function loadBrainDump(){
+  body.innerHTML = '';
+  var wrap = el('div','ps-brain');
+  wrap.innerHTML =
+    '<div class="ps-brain-h">Brain dump</div>' +
+    '<div class="ps-brain-sub">Empty your head. Jarvis sorts each dump into the right place in your second brain.</div>';
+  var area = el('textarea','ps-brain-area');
+  area.placeholder = 'Type or paste anything — a thought, a meeting, an idea, a person, a to-do…';
+  wrap.appendChild(area);
+  var actions = el('div','ps-brain-acts');
+  var sortBtn = el('button','ps-btn','Sort it →');
+  var status = el('div','ps-brain-status','');
+  actions.appendChild(sortBtn); actions.appendChild(status);
+  wrap.appendChild(actions);
+  var feed = el('div','ps-brain-feed'); feed.id = 'psBrainFeed';
+  wrap.appendChild(feed);
+  body.appendChild(wrap);
+  area.focus();
+
+  function submit(){
+    var text = area.value.trim();
+    if(!text){ return; }
+    sortBtn.disabled = true; status.textContent = 'sorting…';
+    fetch('/api/knowledge/braindump',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        sortBtn.disabled = false;
+        if(d.ok && d.filed){
+          area.value = '';
+          status.textContent = '';
+          var card = el('div','ps-brain-filed');
+          card.innerHTML = '<span class="ps-brain-folder">'+esc(d.filed.folder)+'</span> '+esc(d.filed.title)+
+            '<span class="ps-brain-path">'+esc(d.filed.file)+'</span>';
+          feed.insertBefore(card, feed.firstChild);
+        } else {
+          status.textContent = 'error: '+esc(d.error||'failed');
+        }
+      })
+      .catch(function(){ sortBtn.disabled=false; status.textContent='network error'; });
+  }
+  sortBtn.addEventListener('click', submit);
+  area.addEventListener('keydown', function(e){ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); submit(); } });
 }
 
 /* ══════════════════════════════════════════════════════════════

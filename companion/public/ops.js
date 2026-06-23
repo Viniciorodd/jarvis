@@ -21,8 +21,9 @@
     { id: 'fiverr', label: '🎨 Fiverr Studio', pods: ['fiverr'], tabs: ['studio', 'activity', 'leads'] },
     { id: 'saas', label: '🖥 SaaS / Recon', pods: ['saas'], tabs: ['activity', 'leads'] },
     { id: 'webstudio', label: '🌐 Web Studio', pods: ['webstudio'], tabs: ['projects', 'sites', 'clients', 'pipeline'] },
+    { id: 'agents', label: '🤖 Agents', pods: ['chief-of-staff', 'exec'], tabs: ['assistant', 'busops', 'queue'] },
   ];
-  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', analyzer: '📊 Deal Analyzer', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline' };
+  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', analyzer: '📊 Deal Analyzer', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline', assistant: '🧠 Assistant', busops: '⚙ Business Ops', queue: '✋ Review queue' };
   let biz = 'gov', tab = 'leads';
   const curBiz = () => BUSINESSES.find((b) => b.id === biz) || BUSINESSES[0];
 
@@ -85,6 +86,66 @@
     if (tab === 'sites') return renderWSSites();
     if (tab === 'clients') return renderWSClients();
     if (tab === 'pipeline') return renderWSPipeline();
+    if (tab === 'assistant') return renderAgent('assistant');
+    if (tab === 'busops') return renderAgent('ops');
+    if (tab === 'queue') return renderAgentQueue();
+  }
+
+  // ── AGENTS (executive assistant + business-ops autopilot, draft + gated) ──
+  const AGENT_TASKS = {
+    assistant: [
+      { task: 'briefing', label: 'Morning briefing', desc: 'Prioritized rundown of your day from todos + urgent + inbox.' },
+      { task: 'plan', label: 'Plan my day', desc: 'A realistic time-blocked plan, highest-leverage first.' },
+      { task: 'organize', label: 'Organize my tasks', desc: 'Group + prioritize your open todos (suggestions only).' },
+    ],
+    ops: [
+      { task: 'report', label: 'Status report', desc: "What's moving, stuck, and needs your decision." },
+      { task: 'qualify', label: 'Qualify a lead', desc: 'Paste an inquiry — get fit score, signals, next step.', input: 'Paste the lead / inquiry…' },
+      { task: 'draft-reply', label: 'Draft a reply', desc: 'Paste a message — drafts a reply (saved to the gated queue).', input: 'Paste the message to reply to…' },
+    ],
+  };
+  function renderAgent(agent) {
+    const who = agent === 'assistant' ? '🧠 Executive Assistant' : '⚙ Business Ops';
+    const tasks = AGENT_TASKS[agent];
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>${who}</b> — runs on your real data. Read + draft only; anything that would send is held in the <b>Review queue</b> for your approval.</div>` +
+      tasks.map((t) => `<div class="ag-task">
+        <div class="ag-task-head"><div class="ag-task-title">${esc(t.label)}</div>
+          <button class="btn sm go" data-agent="${agent}" data-task="${t.task}">Run</button></div>
+        <div class="ag-task-desc">${esc(t.desc)}</div>
+        ${t.input ? `<textarea class="ag-input" data-agent-input="${agent}:${t.task}" placeholder="${esc(t.input)}"></textarea>` : ''}
+        <div class="ag-out" id="agout-${agent}-${t.task}" hidden></div>
+      </div>`).join('');
+  }
+  async function runAgentTask(agent, task) {
+    const outEl = el(`agout-${agent}-${task}`);
+    const inEl = body.querySelector(`[data-agent-input="${agent}:${task}"]`);
+    const input = inEl ? inEl.value.trim() : '';
+    outEl.hidden = false; outEl.innerHTML = '<span class="ag-think">thinking…</span>';
+    try {
+      const r = await fetch('/api/agent/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent, task, input }) });
+      const d = await r.json();
+      if (d.error) { outEl.innerHTML = `<span class="ag-err">${esc(d.error)}</span>`; return; }
+      const gated = d.gated ? `<div class="ag-gated">✋ ${esc(d.note || 'Saved to the review queue — not sent.')}</div>` : '';
+      outEl.innerHTML = `<pre class="ag-text">${esc(d.output || '')}</pre>${gated}`;
+    } catch (e) { outEl.innerHTML = `<span class="ag-err">${esc(e.message)}</span>`; }
+  }
+  async function renderAgentQueue() {
+    body.innerHTML = '<div class="ops-empty">loading queue…</div>';
+    try {
+      const drafts = await fetch('/api/agent/drafts').then((r) => r.json());
+      if (!drafts.length) { body.innerHTML = `<div class="ops-explain"><b>✋ Review queue</b><br>Empty — agent drafts that would send anything land here for your approval. Nothing sends on its own.</div>`; return; }
+      body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>✋ Review queue</b> — ${drafts.length} draft${drafts.length !== 1 ? 's' : ''} awaiting you. Approving never auto-sends; it clears it for the gated executor.</div>` +
+        drafts.map((d) => `<div class="re-card">
+          <div class="re-card-head"><div class="re-card-addr">${esc(d.kind || 'draft')} · ${esc(d.agent)}</div>
+            <div class="re-card-type"><span class="re-hap-${d.status === 'approved' ? 'ok' : 'pend'}">${esc(d.status)}</span></div></div>
+          ${d.input ? `<div class="re-row" style="color:var(--dim)">Re: <span style="color:var(--dim)">${esc(d.input)}</span></div>` : ''}
+          <pre class="ag-text" style="margin-top:8px">${esc(d.body || '')}</pre>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn sm go" data-draft-approve="${d.id}">Approve</button>
+            <button class="btn sm" data-draft-discard="${d.id}">Discard</button>
+          </div>
+        </div>`).join('');
+    } catch (e) { body.innerHTML = `<div class="ops-empty">queue offline — ${esc(e.message)}</div>`; }
   }
 
   // ── DEAL ANALYZER (embeds the DealForge app) ────────────────────────────────
@@ -947,6 +1008,21 @@
     if (wsCancel) { const f = el('wsAddForm'); if (f) f.hidden = true; return; }
     const wsSave = e.target.closest('[data-ws-save]');
     if (wsSave) return submitWS();
+    // ── agents: run a task / approve-discard a gated draft ──
+    const agRun = e.target.closest('[data-agent][data-task]');
+    if (agRun) return runAgentTask(agRun.getAttribute('data-agent'), agRun.getAttribute('data-task'));
+    const dApprove = e.target.closest('[data-draft-approve]');
+    if (dApprove) {
+      fetch('/api/agent/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: dApprove.getAttribute('data-draft-approve'), action: 'approve' }) })
+        .then((r) => r.json()).then(() => renderAgentQueue()).catch(() => {});
+      return;
+    }
+    const dDiscard = e.target.closest('[data-draft-discard]');
+    if (dDiscard) {
+      fetch('/api/agent/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: dDiscard.getAttribute('data-draft-discard'), action: 'discard' }) })
+        .then((r) => r.json()).then(() => renderAgentQueue()).catch(() => {});
+      return;
+    }
   });
   // Enter inside an add-form field saves it
   body.addEventListener('keydown', (e) => {

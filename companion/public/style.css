@@ -764,6 +764,22 @@ select.map-filter{ background:rgba(var(--teal-rgb),.06); color:var(--cream); bor
 .re-cancel:hover{ color:var(--cream); border-color:rgba(255,255,255,.28); }
 .re-add-msg{ font-size:12px; color:var(--teal); }
 
+/* ══════════════════════════════════════════ AGENTS (assistant + business-ops) ══ */
+.ag-task{ background:var(--panel); border:1px solid rgba(var(--teal-rgb),.12); border-radius:11px; padding:13px 15px; margin-bottom:10px; }
+.ag-task-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.ag-task-title{ font-size:14px; font-weight:500; color:var(--cream); }
+.ag-task-desc{ font-size:12px; color:var(--dim); margin-top:4px; line-height:1.45; }
+.ag-input{ width:100%; margin-top:10px; min-height:64px; resize:vertical; background:rgba(255,255,255,.04);
+  border:1px solid rgba(var(--teal-rgb),.2); border-radius:9px; padding:9px 12px; color:var(--cream);
+  font-family:inherit; font-size:13px; outline:none; }
+.ag-input:focus{ border-color:var(--teal); }
+.ag-out{ margin-top:11px; border-top:1px solid rgba(var(--teal-rgb),.1); padding-top:11px; }
+.ag-text{ white-space:pre-wrap; word-wrap:break-word; font-family:inherit; font-size:13.5px; line-height:1.6; color:var(--cream); margin:0; }
+.ag-think{ font-size:13px; color:var(--teal); }
+.ag-err{ font-size:13px; color:var(--err); }
+.ag-gated{ margin-top:10px; font-size:12.5px; color:var(--warn); background:rgba(255,192,106,.08);
+  border:1px solid rgba(255,192,106,.25); border-radius:8px; padding:8px 11px; }
+
 /* ══════════════════════════════════════════ GLOBAL JARVIS DOCK ══ */
 /* Floating button — only visible when an overlay covers the normal composer. */
 .j-dock-fab{ position:fixed; right:18px; bottom:20px; z-index:60;

@@ -95,15 +95,56 @@
     catch (e) { body.innerHTML = `<div class="ops-empty">portfolio offline — ${esc(e.message)}</div>`; }
   }
 
+  // ── Add-property form: per-type fields, posts real data to /api/real-estate ──
+  const RE_FORMS = {
+    unit:   [['address', 'Address', 'text'], ['unit', 'Unit / floor', 'text'], ['rent', 'Rent $/mo', 'number'], ['tenant', 'Tenant', 'text'], ['hap', 'HAP $', 'number'], ['notes', 'Notes', 'text']],
+    flip:   [['address', 'Address', 'text'], ['budget', 'Budget $', 'number'], ['spent', 'Spent $', 'number'], ['status', 'Status', 'text'], ['notes', 'Notes', 'text']],
+    build:  [['address', 'Address / lot', 'text'], ['budget', 'Budget $', 'number'], ['status', 'Status', 'text'], ['notes', 'Notes', 'text']],
+    rental: [['address', 'Address', 'text'], ['rent', 'Rent $/mo', 'number'], ['tenant', 'Tenant', 'text'], ['notes', 'Notes', 'text']],
+  };
+  const RE_TITLE = { unit: 'unit', flip: 'flip', build: 'new build', rental: 'rental' };
+  function reAddBar(type) {
+    const fields = RE_FORMS[type].map(([k, label, t]) =>
+      `<input class="re-f" data-re-field="${k}" type="${t}" placeholder="${esc(label)}"${k === 'address' ? ' style="grid-column:1/-1"' : ''}>`).join('');
+    return `<div class="re-add">
+      <button class="re-add-btn" data-re-add="${type}">+ Add ${RE_TITLE[type]}</button>
+      <div class="re-add-form" id="reAddForm-${type}" hidden>
+        <div class="re-add-grid">${fields}</div>
+        <div class="re-add-acts">
+          <button class="re-save" data-re-save="${type}">Save</button>
+          <button class="re-cancel" data-re-cancel="${type}">Cancel</button>
+          <span class="re-add-msg" id="reAddMsg-${type}"></span>
+        </div>
+      </div>
+    </div>`;
+  }
+  async function submitRE(type) {
+    const f = el('reAddForm-' + type); if (!f) return;
+    const data = {};
+    f.querySelectorAll('.re-f').forEach((inp) => {
+      let v = inp.value.trim(); if (!v) return;
+      if (inp.type === 'number') v = Number(v) || 0;
+      data[inp.getAttribute('data-re-field')] = v;
+    });
+    const msg = el('reAddMsg-' + type);
+    if (!data.address) { if (msg) msg.textContent = 'address required'; return; }
+    if (msg) msg.textContent = 'saving…';
+    try {
+      const r = await fetch('/api/real-estate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, data }) });
+      if (!r.ok) throw new Error('save failed');
+      reData = null; await loadRE();   // reload real portfolio from disk + re-render
+    } catch (e) { if (msg) msg.textContent = 'error: ' + esc(e.message); }
+  }
+
   function renderUnits() {
     if (!reData) { loadRE(); return; }
     const units = reData.units || [];
-    if (!units.length) {
-      body.innerHTML = `<div class="ops-explain"><b>🏠 Section 8 Units & Rentals</b><br>No units in your portfolio yet.<br>Tell Jarvis: <i>"Add unit at 123 Main St, Section 8, rent $1200, HAP $900"</i></div>`; return;
-    }
     const hapReceived = units.filter((u) => u.hap_status === 'received').length;
     const total = units.reduce((s, u) => s + (u.rent || 0), 0);
-    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🏠 Section 8 Units</b> — ${units.length} units · HAP: ${hapReceived}/${units.length} received · Monthly rent roll: <b style="color:var(--teal)">$${total.toLocaleString()}</b></div>` +
+    const head = units.length
+      ? `<div class="ops-explain" style="margin-bottom:12px"><b>🏠 Section 8 Units</b> — ${units.length} units · HAP: ${hapReceived}/${units.length} received · Monthly rent roll: <b style="color:var(--teal)">$${total.toLocaleString()}</b></div>`
+      : `<div class="ops-explain" style="margin-bottom:12px"><b>🏠 Section 8 Units</b><br>No units yet — add one below, or tell Jarvis <i>"Add unit at 123 Main St, rent $1200, HAP $900"</i>.</div>`;
+    body.innerHTML = reAddBar('unit') + head +
       units.map((u) => {
         const hapClass = u.hap_status === 'received' ? 're-hap-ok' : 're-hap-pend';
         return `<div class="re-card">
@@ -120,10 +161,10 @@
   function renderFlips() {
     if (!reData) { loadRE(); return; }
     const flips = reData.flips || [];
-    if (!flips.length) {
-      body.innerHTML = `<div class="ops-explain"><b>🔨 Active Flips</b><br>No active flips tracked yet.<br>Tell Jarvis: <i>"Add flip at 456 Oak Ave, budget $85k, framing complete"</i></div>`; return;
-    }
-    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🔨 Active Flips</b> — ${flips.length} properties · Total budget: <b style="color:var(--teal)">$${flips.reduce((s, f) => s + (f.budget || 0), 0).toLocaleString()}</b></div>` +
+    const head = flips.length
+      ? `<div class="ops-explain" style="margin-bottom:12px"><b>🔨 Active Flips</b> — ${flips.length} properties · Total budget: <b style="color:var(--teal)">$${flips.reduce((s, f) => s + (f.budget || 0), 0).toLocaleString()}</b></div>`
+      : `<div class="ops-explain" style="margin-bottom:12px"><b>🔨 Active Flips</b><br>No active flips yet — add one below, or tell Jarvis <i>"Add flip at 456 Oak Ave, budget $85k"</i>.</div>`;
+    body.innerHTML = reAddBar('flip') + head +
       flips.map((f) => {
         const pct = f.budget ? Math.min(100, Math.round(((f.spent || 0) / f.budget) * 100)) : 0;
         return `<div class="re-card">
@@ -139,10 +180,10 @@
   function renderBuilds() {
     if (!reData) { loadRE(); return; }
     const builds = reData.new_builds || [];
-    if (!builds.length) {
-      body.innerHTML = `<div class="ops-explain"><b>🏗 New Builds</b><br>No new builds tracked yet.<br>Tell Jarvis: <i>"Add new build at Lot 4, permits filed, $250k budget"</i></div>`; return;
-    }
-    body.innerHTML = builds.map((b) => `<div class="re-card">
+    const head = builds.length
+      ? `<div class="ops-explain" style="margin-bottom:12px"><b>🏗 New Builds</b> — ${builds.length} project${builds.length === 1 ? '' : 's'}</div>`
+      : `<div class="ops-explain" style="margin-bottom:12px"><b>🏗 New Builds</b><br>No new builds yet — add one below, or tell Jarvis <i>"Add new build at Lot 4, $250k budget"</i>.</div>`;
+    body.innerHTML = reAddBar('build') + head + builds.map((b) => `<div class="re-card">
       <div class="re-card-head"><div class="re-card-addr">${esc(b.address || b.id)}</div><div class="re-card-type">${esc(b.status || 'planning')}</div></div>
       ${b.budget ? `<div class="re-row">Budget <span>$${(b.budget || 0).toLocaleString()}</span></div>` : ''}
       ${b.notes ? `<div class="re-row">Notes <span>${esc(b.notes)}</span></div>` : ''}
@@ -152,14 +193,15 @@
   function renderRentals() {
     if (!reData) { loadRE(); return; }
     const rentals = reData.rentals || [];
-    if (!rentals.length) {
-      body.innerHTML = `<div class="ops-explain"><b>🔑 Market Rentals</b><br>No market-rate rentals tracked yet.<br>Tell Jarvis: <i>"Add rental at 789 Pine St, rent $1500/mo, tenant John"</i></div>`; return;
-    }
-    const total = rentals.reduce((s, r) => s + (r.rent || 0), 0);
-    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🔑 Market Rentals</b> — ${rentals.length} units · Monthly: <b style="color:var(--teal)">$${total.toLocaleString()}</b></div>` +
+    const rentOf = (r) => Number(r.rent || r.rent_monthly || 0);   // tolerate both field names
+    const total = rentals.reduce((s, r) => s + rentOf(r), 0);
+    const head = rentals.length
+      ? `<div class="ops-explain" style="margin-bottom:12px"><b>🔑 Market Rentals</b> — ${rentals.length} units · Monthly: <b style="color:var(--teal)">$${total.toLocaleString()}</b></div>`
+      : `<div class="ops-explain" style="margin-bottom:12px"><b>🔑 Market Rentals</b><br>No market-rate rentals yet — add one below, or tell Jarvis <i>"Add rental at 789 Pine St, rent $1500/mo"</i>.</div>`;
+    body.innerHTML = reAddBar('rental') + head +
       rentals.map((r) => `<div class="re-card">
         <div class="re-card-head"><div class="re-card-addr">${esc(r.address || r.id)}</div><div class="re-card-type">rental</div></div>
-        <div class="re-row">Rent <span>$${(r.rent || 0).toLocaleString()}/mo</span></div>
+        <div class="re-row">Rent <span>$${rentOf(r).toLocaleString()}/mo</span></div>
         ${r.tenant ? `<div class="re-row">Tenant <span>${esc(r.tenant)}</span></div>` : ''}
         ${r.notes ? `<div class="re-row">Notes <span>${esc(r.notes)}</span></div>` : ''}
       </div>`).join('');
@@ -862,6 +904,23 @@
         .then((r) => r.json()).then(() => { wsData = null; render(); }).catch(() => {});
       return;
     }
+    // ── real estate: add / save / cancel a property ──
+    const reAdd = e.target.closest('[data-re-add]');
+    if (reAdd) {
+      const t = reAdd.getAttribute('data-re-add'); const f = el('reAddForm-' + t);
+      if (f) { f.hidden = !f.hidden; if (!f.hidden) { const fi = f.querySelector('.re-f'); if (fi) fi.focus(); } }
+      return;
+    }
+    const reCancel = e.target.closest('[data-re-cancel]');
+    if (reCancel) { const f = el('reAddForm-' + reCancel.getAttribute('data-re-cancel')); if (f) f.hidden = true; return; }
+    const reSave = e.target.closest('[data-re-save]');
+    if (reSave) return submitRE(reSave.getAttribute('data-re-save'));
+  });
+  // Enter inside an add-form field saves it
+  body.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || !e.target.classList || !e.target.classList.contains('re-f')) return;
+    const form = e.target.closest('.re-add-form'); if (!form) return;
+    const saveBtn = form.querySelector('[data-re-save]'); if (saveBtn) { e.preventDefault(); submitRE(saveBtn.getAttribute('data-re-save')); }
   });
   // ── WEB STUDIO (Lovable + Vercel client projects) ────────────────────────────
   const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });

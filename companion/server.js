@@ -84,6 +84,14 @@ function loadJson(file, def) { try { return JSON.parse(fs.readFileSync(file, 'ut
 function loadWS() { return loadJson(WEB_STUDIO_FILE, { projects: [] }); }
 function saveWS(d) { try { fs.writeFileSync(WEB_STUDIO_FILE, JSON.stringify(d, null, 2)); } catch { /* */ } }
 function saveJson(file, data) { try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(data, null, 2)); } catch { /* */ } }
+// Personal OS knowledge base — notes, journal, voice memos, todos, people
+// Default ~/knowledge; override with JARVIS_KNOWLEDGE env var (set to NAS mount for real deployment)
+const KNOWLEDGE_DIR = path.resolve(process.env.JARVIS_KNOWLEDGE || path.join(os.homedir(), 'knowledge'));
+['voice','notes','journal','people'].forEach(d => fs.mkdirSync(path.join(KNOWLEDGE_DIR, d), { recursive: true }));
+const TODOS_FILE = path.join(KNOWLEDGE_DIR, 'todos.json');
+// OpenAI key — used for Whisper voice transcription (Whisper API, ~$0.006/min)
+let OPENAI_KEY = process.env.OPENAI_API_KEY || '';
+if (!OPENAI_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^OPENAI_API_KEY=(.+)$/m); if (m) OPENAI_KEY = m[1].trim(); } catch { /* */ } }
 // Focus mode: normal | gaming | work | dnd
 let focusMode = 'normal';
 // Stripe money-in (READ-ONLY): available + pending balance and recently collected. Test or live by the key.
@@ -1532,6 +1540,231 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, positions: p.positions }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // ── PERSONAL OS: knowledge base (notes, journal, voice, todos, people, search) ──────────────────
+  // All data is plain Markdown / JSON under KNOWLEDGE_DIR — NAS-mountable, no lock-in.
+
+  function parseFM(raw) {
+    const m = String(raw || '').match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    if (!m) return { meta: {}, body: String(raw || '') };
+    const meta = {};
+    for (const line of m[1].split('\n')) { const [k, ...v] = line.split(':'); if (k && v.length) meta[k.trim()] = v.join(':').trim(); }
+    return { meta, body: m[2].trim() };
+  }
+  function writeFM(meta, body) {
+    return `---\n${Object.entries(meta).map(([k,v])=>`${k}: ${v}`).join('\n')}\n---\n${body}`;
+  }
+
+  // NOTES — list
+  if (req.method === 'GET' && url.pathname === '/api/knowledge/notes') {
+    try {
+      const files = await fsp.readdir(path.join(KNOWLEDGE_DIR,'notes')).catch(()=>[]);
+      const notes = [];
+      for (const f of files.filter(f=>f.endsWith('.md'))) {
+        const raw = await fsp.readFile(path.join(KNOWLEDGE_DIR,'notes',f),'utf8').catch(()=>'');
+        const {meta,body} = parseFM(raw);
+        notes.push({ id: meta.id||f.replace('.md',''), title: meta.title||'(untitled)', date: meta.date||'', tags: meta.tags||'', preview: body.slice(0,100) });
+      }
+      notes.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+      return send(res, 200, JSON.stringify(notes));
+    } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+  }
+  // NOTES — create
+  if (req.method === 'POST' && url.pathname === '/api/knowledge/notes') {
+    try {
+      const {title,body,tags} = await readBody(req);
+      const id = Date.now().toString(36);
+      const meta = { id, title: title||'Untitled', date: new Date().toISOString(), tags: tags||'' };
+      await fsp.writeFile(path.join(KNOWLEDGE_DIR,'notes',id+'.md'), writeFM(meta, body||''), 'utf8');
+      return send(res, 200, JSON.stringify({ ok:true, id, title: meta.title }));
+    } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+  }
+  // NOTES — read / update by id
+  { const nm = url.pathname.match(/^\/api\/knowledge\/notes\/([a-z0-9]+)$/);
+    if (nm) {
+      const id = nm[1], file = path.join(KNOWLEDGE_DIR,'notes',id+'.md');
+      if (req.method === 'GET') {
+        try { const raw = await fsp.readFile(file,'utf8'); const {meta,body} = parseFM(raw); return send(res,200,JSON.stringify({id,title:meta.title||'',date:meta.date||'',tags:meta.tags||'',body})); }
+        catch { return send(res,404,JSON.stringify({error:'not found'})); }
+      }
+      if (req.method === 'PUT') {
+        try {
+          const updates = await readBody(req);
+          let raw=''; try { raw=await fsp.readFile(file,'utf8'); } catch {}
+          const {meta,body} = parseFM(raw);
+          const newMeta = {...meta, id, ...(updates.title!==undefined?{title:updates.title}:{}), ...(updates.tags!==undefined?{tags:updates.tags}:{}), updated:new Date().toISOString()};
+          await fsp.writeFile(file, writeFM(newMeta, updates.body!==undefined?updates.body:body), 'utf8');
+          return send(res,200,JSON.stringify({ok:true,id}));
+        } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+      }
+      if (req.method === 'DELETE') {
+        try { await fsp.unlink(file); return send(res,200,JSON.stringify({ok:true})); }
+        catch { return send(res,404,JSON.stringify({error:'not found'})); }
+      }
+    }
+  }
+
+  // JOURNAL — read (auto-creates template) / write by date
+  { const jm = url.pathname.match(/^\/api\/knowledge\/journal\/(\d{4}-\d{2}-\d{2})$/);
+    if (jm) {
+      const date = jm[1], file = path.join(KNOWLEDGE_DIR,'journal',date+'.md');
+      const TMPL = (d) => `## Today's intention\n\n\n## Gratitude\n\n\n## Notes\n\n\n## End-of-day reflection\n\n`;
+      if (req.method === 'GET') {
+        try {
+          let raw; try { raw=await fsp.readFile(file,'utf8'); } catch { raw=writeFM({date}, TMPL(date)); }
+          const {body} = parseFM(raw);
+          return send(res,200,JSON.stringify({date, body, exists: fs.existsSync(file)}));
+        } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+      }
+      if (req.method === 'PUT') {
+        try {
+          const {body} = await readBody(req);
+          await fsp.writeFile(file, writeFM({date}, body||''), 'utf8');
+          return send(res,200,JSON.stringify({ok:true,date}));
+        } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+      }
+    }
+  }
+
+  // TODOS — list
+  if (req.method === 'GET' && url.pathname === '/api/knowledge/todos') {
+    const todos = loadJson(TODOS_FILE, []);
+    const pod = url.searchParams.get('pod');
+    return send(res,200,JSON.stringify(pod ? todos.filter(t=>t.pod===pod) : todos));
+  }
+  // TODOS — create
+  if (req.method === 'POST' && url.pathname === '/api/knowledge/todos') {
+    try {
+      const body = await readBody(req);
+      if (!String(body.title||'').trim()) return send(res,400,JSON.stringify({error:'title required'}));
+      const todos = loadJson(TODOS_FILE, []);
+      const todo = { id:Date.now().toString(36), title:String(body.title).trim(), done:false, pod:body.pod||'', priority:Number(body.priority)||2, due:body.due||'', created:new Date().toISOString() };
+      todos.unshift(todo);
+      saveJson(TODOS_FILE, todos);
+      return send(res,200,JSON.stringify({ok:true,todo}));
+    } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+  }
+  // TODOS — update / delete by id
+  { const tm = url.pathname.match(/^\/api\/knowledge\/todos\/([a-z0-9]+)$/);
+    if (tm) {
+      const id = tm[1];
+      if (req.method === 'PUT') {
+        try {
+          const updates = await readBody(req);
+          const todos = loadJson(TODOS_FILE,[]);
+          const idx = todos.findIndex(t=>t.id===id);
+          if (idx<0) return send(res,404,JSON.stringify({error:'not found'}));
+          todos[idx] = {...todos[idx],...updates,id};
+          saveJson(TODOS_FILE,todos);
+          return send(res,200,JSON.stringify({ok:true,todo:todos[idx]}));
+        } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+      }
+      if (req.method === 'DELETE') {
+        const todos = loadJson(TODOS_FILE,[]);
+        saveJson(TODOS_FILE, todos.filter(t=>t.id!==id));
+        return send(res,200,JSON.stringify({ok:true}));
+      }
+    }
+  }
+
+  // PEOPLE — list
+  if (req.method === 'GET' && url.pathname === '/api/knowledge/people') {
+    try {
+      const files = await fsp.readdir(path.join(KNOWLEDGE_DIR,'people')).catch(()=>[]);
+      const people = [];
+      for (const f of files.filter(f=>f.endsWith('.md'))) {
+        const raw = await fsp.readFile(path.join(KNOWLEDGE_DIR,'people',f),'utf8').catch(()=>'');
+        const {meta,body} = parseFM(raw);
+        people.push({ id:meta.id||f.replace('.md',''), slug:f.replace('.md',''), name:meta.name||'', role:meta.role||'', lastContact:meta.lastContact||'', preview:body.slice(0,80) });
+      }
+      people.sort((a,b)=>(b.lastContact||'').localeCompare(a.lastContact||''));
+      return send(res,200,JSON.stringify(people));
+    } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+  }
+  // PEOPLE — create / update
+  if (req.method === 'POST' && url.pathname === '/api/knowledge/people') {
+    try {
+      const {name,role,notes} = await readBody(req);
+      if (!name) return send(res,400,JSON.stringify({error:'name required'}));
+      const id = Date.now().toString(36);
+      const slug = id + '-' + String(name).toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,30);
+      const meta = { id, name, role:role||'', lastContact:new Date().toISOString().slice(0,10) };
+      await fsp.writeFile(path.join(KNOWLEDGE_DIR,'people',slug+'.md'), writeFM(meta, notes||''), 'utf8');
+      return send(res,200,JSON.stringify({ok:true,id,slug}));
+    } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+  }
+
+  // VOICE — upload audio blob → save file → transcribe via OpenAI Whisper
+  if (req.method === 'POST' && url.pathname === '/api/knowledge/voice') {
+    try {
+      const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+      const ct = req.headers['content-type'] || 'audio/webm';
+      const ext = ct.includes('mp4')||ct.includes('m4a') ? 'm4a' : 'webm';
+      const audioPath = path.join(KNOWLEDGE_DIR,'voice',`${ts}.${ext}`);
+      const mdPath    = path.join(KNOWLEDGE_DIR,'voice',`${ts}.md`);
+      const chunks=[]; let n=0;
+      await new Promise((resolve,reject)=>{
+        req.on('data',c=>{ n+=c.length; if(n>150e6){req.destroy();reject(new Error('audio too large'));} chunks.push(c); });
+        req.on('end',resolve); req.on('error',reject);
+      });
+      const audio = Buffer.concat(chunks);
+      await fsp.writeFile(audioPath, audio);
+      let transcript = '';
+      if (OPENAI_KEY && audio.length > 100) {
+        try {
+          const form = new FormData();
+          form.append('file', new Blob([audio],{type:ct}), `audio.${ext}`);
+          form.append('model','whisper-1');
+          const wr = await fetch('https://api.openai.com/v1/audio/transcriptions', { method:'POST', headers:{Authorization:`Bearer ${OPENAI_KEY}`}, body:form, signal:AbortSignal.timeout(90000) });
+          const wd = await wr.json();
+          transcript = wd.text || (wd.error&&wd.error.message) || '';
+        } catch(e){ transcript = '(transcription error: '+e.message+')'; }
+      } else if (!OPENAI_KEY) {
+        transcript = '(add OPENAI_API_KEY to .env to enable transcription)';
+      }
+      await fsp.writeFile(mdPath, writeFM({ date:new Date().toISOString(), duration:req.headers['x-duration']||'', source:'voice-memo' }, transcript), 'utf8');
+      return send(res,200,JSON.stringify({ ok:true, file:`${ts}.${ext}`, transcript, mdFile:`${ts}.md` }));
+    } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+  }
+  // VOICE — list transcribed memos
+  if (req.method === 'GET' && url.pathname === '/api/knowledge/voice') {
+    try {
+      const files = await fsp.readdir(path.join(KNOWLEDGE_DIR,'voice')).catch(()=>[]);
+      const memos = [];
+      for (const f of files.filter(f=>f.endsWith('.md'))) {
+        const raw = await fsp.readFile(path.join(KNOWLEDGE_DIR,'voice',f),'utf8').catch(()=>'');
+        const {meta,body} = parseFM(raw);
+        const base = f.replace('.md','');
+        memos.push({ file:base, date:meta.date||'', duration:meta.duration||'', transcript:body, hasAudio: files.includes(base+'.webm')||files.includes(base+'.m4a') });
+      }
+      memos.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+      return send(res,200,JSON.stringify(memos.slice(0,50)));
+    } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+  }
+
+  // SEARCH — unified across all knowledge types
+  if (req.method === 'GET' && url.pathname === '/api/knowledge/search') {
+    try {
+      const q = (url.searchParams.get('q')||'').toLowerCase().trim();
+      if (!q) return send(res,200,JSON.stringify([]));
+      const results = [];
+      const searchDir = async (dir,type,mkRow) => {
+        const files = await fsp.readdir(path.join(KNOWLEDGE_DIR,dir)).catch(()=>[]);
+        for (const f of files.filter(f=>f.endsWith('.md'))) {
+          const raw = await fsp.readFile(path.join(KNOWLEDGE_DIR,dir,f),'utf8').catch(()=>'');
+          if (raw.toLowerCase().includes(q)) { const {meta,body}=parseFM(raw); results.push(mkRow(f,meta,body)); }
+        }
+      };
+      await searchDir('notes','note',(f,m,b)=>({ type:'note', id:m.id||f.replace('.md',''), title:m.title||'(untitled)', date:m.date||'', preview:b.slice(0,120) }));
+      await searchDir('journal','journal',(f,m,b)=>({ type:'journal', id:f.replace('.md',''), title:'Journal: '+f.replace('.md',''), date:f.replace('.md',''), preview:b.slice(0,120) }));
+      await searchDir('people','person',(f,m,b)=>({ type:'person', id:m.id||f.replace('.md',''), title:m.name||f, date:m.lastContact||'', preview:b.slice(0,80) }));
+      await searchDir('voice','voice',(f,m,b)=>({ type:'voice', id:f.replace('.md',''), title:'Voice: '+(m.date||f).slice(0,16).replace('T',' '), date:m.date||'', preview:b.slice(0,120) }));
+      const todos = loadJson(TODOS_FILE,[]);
+      for (const t of todos) if ((t.title||'').toLowerCase().includes(q)) results.push({ type:'todo', id:t.id, title:t.title, date:t.created||'', preview:t.pod?`Pod: ${t.pod}`:'' });
+      results.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+      return send(res,200,JSON.stringify(results.slice(0,30)));
+    } catch(e){ return send(res,500,JSON.stringify({error:e.message})); }
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/tv/discover') {
     try {
       const tvs = await discoverTVs(3500);

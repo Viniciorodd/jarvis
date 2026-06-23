@@ -14,6 +14,10 @@ const SERVER = path.join(__dirname, '..', 'companion', 'server.js');
 let win = null, tray = null, server = null;
 app.isQuitting = false;
 
+// Windows: bind an explicit AppUserModelID so the taskbar groups under our icon
+// (without this, an unpackaged `electron .` run shows the generic Electron icon).
+if (process.platform === 'win32') app.setAppUserModelId('com.rodgate.jarvis');
+
 function startCompanion() {
   if (!fs.existsSync(SERVER)) return; // skip if running outside the repo
   server = spawn(process.execPath, [SERVER], {
@@ -56,12 +60,23 @@ function makeTray() {
   } catch { /* tray optional */ }
 }
 
-app.whenReady().then(() => {
-  startCompanion();
-  createWindow();
-  makeTray();
-  globalShortcut.register('CommandOrControl+Shift+J', toggle);
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
-});
+// Single-instance lock: a second launch (e.g. installer auto-start + a manual
+// click) focuses the existing window instead of spawning a duplicate.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
+    else createWindow();
+  });
+
+  app.whenReady().then(() => {
+    startCompanion();
+    createWindow();
+    makeTray();
+    globalShortcut.register('CommandOrControl+Shift+J', toggle);
+    app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  });
+}
 app.on('window-all-closed', () => { /* keep running in tray */ });
 app.on('will-quit', () => { globalShortcut.unregisterAll(); if (server) server.kill(); });

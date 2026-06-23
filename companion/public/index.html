@@ -4,46 +4,80 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>JARVIS</title>
-<meta name="theme-color" content="#04070f">
+<meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="JARVIS">
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon.png">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="style.css">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('jarvis-theme')||'mono'}catch(e){}</script>
 </head>
 <body>
-  <div class="shell">
-    <div class="app">
-      <div class="topbar">
-        <div class="px brand">J A R V I S</div>
-        <div class="state" id="state">standby</div>
-        <button class="floor-btn" id="commandBtn" title="Command Center — the cinematic wall display">⬢ Command</button>
-        <button class="floor-btn" id="opsBtn" title="Operations cockpit — leads, opportunities, proposals, CRM">⛭ Operations</button>
-        <button class="floor-btn" id="mapBtn" title="Map — where the work is">▣ Map</button>
-        <button class="floor-btn" id="floorBtn" title="The floor — your agents, by room">▦ Floor</button>
-        <button class="floor-btn" id="hqBtn" title="JARVIS HQ — the game floor, embedded in this window">⬢ HQ</button>
-        <button class="floor-btn" id="activityBtn" title="Activity log — calendar + what was done each day">📋 Activity</button>
-        <button class="t-btn" id="dashBtn" title="Toggle the dashboard">📊 Dashboard</button>
-        <button class="t-btn" id="settingsBtn" title="Settings — theme, voice, conversation">⚙ Settings</button>
-        <button class="focus-pill" id="focusPill" title="Focus mode: click to cycle normal → gaming → work → dnd">◉ normal</button>
+
+<!-- ══════════════════════════════ MAIN SHELL ══ -->
+<div class="j-shell">
+
+  <!-- Minimal top bar -->
+  <header class="j-top" id="jTop">
+    <span class="j-brand px">J A R V I S</span>
+    <span class="j-state" id="state">standby</span>
+    <button class="j-icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
+      <i class="ti ti-settings" aria-hidden="true"></i>
+    </button>
+  </header>
+
+  <!-- Main scrollable views -->
+  <div class="j-main">
+
+    <!-- ── HOME VIEW (default) ── -->
+    <div class="j-view active" id="jHomeView">
+      <div class="j-hero">
+        <div class="j-greeting" id="homeGreet">Good morning, sir.</div>
+        <div class="j-hero-sub" id="jHeroSub">ready.</div>
       </div>
 
-      <div class="stage" id="stage">
-        <div class="home-greet" id="homeGreet"></div>
+      <!-- Quick metrics (filled by updateHome() in app.js) -->
+      <div class="j-metrics" id="homeMetrics"></div>
+
+      <!-- Needs you — action cards (filled by home.js) -->
+      <div class="j-section" id="jNeedsSection" style="display:none">
+        <div class="j-sh">Needs you <span class="j-sh-n" id="jNeedsCount"></span></div>
+        <div id="jNeedsCards"></div>
+      </div>
+
+      <!-- Gov pipeline (filled by home.js) -->
+      <div class="j-section">
+        <div class="j-sh">Gov pipeline</div>
+        <div id="jGovPipe"><div class="j-pipe-empty">loading…</div></div>
+      </div>
+
+      <!-- Recent activity (filled by home.js) -->
+      <div class="j-section" id="jFeedSection" style="display:none">
+        <div class="j-sh">Recent</div>
+        <div id="jFeedList"></div>
+      </div>
+
+      <!-- Weather (loaded by app.js) -->
+      <div class="j-section">
+        <div class="wx-bar" id="wxBar" hidden></div>
+      </div>
+    </div>
+
+    <!-- ── TALK VIEW (chat + orb) ── -->
+    <div class="j-view" id="jTalkView">
+      <div class="j-stage">
         <canvas id="orb"></canvas>
         <div class="orb-center" id="orbCenter">
-          <div class="hint" id="hint">tap the orb, type, or drag a file in</div>
+          <div class="hint" id="hint">tap to talk · or type below</div>
         </div>
-        <div class="home-metrics" id="homeMetrics"></div>
-        <!-- weather widget — auto-loads, collapses to one line when minimized -->
-        <div class="wx-bar" id="wxBar" hidden></div>
-        <!-- visual panel: maps / images / web she pulls up -->
+        <!-- Visual panel: maps / images / web pulled up by tools -->
         <div class="visual" id="visual" hidden>
           <div class="visual-bar">
             <span class="visual-cap" id="visualCap"></span>
@@ -52,233 +86,330 @@
           <div class="visual-body" id="visualBody"></div>
         </div>
       </div>
-
-      <div class="transcript" id="transcript"></div>
-
-      <form class="composer" id="composer">
-        <button type="button" class="mic" id="mic" title="Talk">🎙</button>
-        <input id="input" autocomplete="off" placeholder="Talk to Jarvis…  (or drag a document onto the window)" />
-        <button type="submit" class="send">➤</button>
-      </form>
+      <div class="j-transcript" id="transcript"></div>
     </div>
 
-    <!-- DASHBOARD RAIL -->
-    <aside class="dash" id="dash">
-      <div class="dash-head"><span class="px">FLOOR</span><button class="dash-refresh" id="dashRefresh" title="Refresh">⟳</button></div>
-
-      <div class="dash-grid">
-        <div class="metric"><div class="m-k">Income · pods (lifetime)</div><div class="m-v teal" id="mIncome">—</div><div class="m-sub" id="mXp"></div></div>
-        <div class="metric"><div class="m-k">Spend · AI (total)</div><div class="m-v" id="mSpend">—</div><div class="m-sub" id="mSpendToday"></div></div>
-        <div class="metric"><div class="m-k">Tokens used</div><div class="m-v" id="mTokens">—</div><div class="m-sub" id="mCalls"></div></div>
-        <div class="metric"><div class="m-k">Net</div><div class="m-v" id="mNet">—</div><div class="m-sub">income − AI spend</div></div>
+    <!-- ── MORE VIEW ── -->
+    <div class="j-view" id="jMoreView">
+      <div class="j-more-list">
+        <button class="j-more-item" id="jMoreMap">
+          <i class="ti ti-map" aria-hidden="true"></i><span>Map</span>
+          <i class="ti ti-chevron-right j-more-chevron" aria-hidden="true"></i>
+        </button>
+        <button class="j-more-item" id="jMoreFloor">
+          <i class="ti ti-layout-grid" aria-hidden="true"></i><span>Floor</span>
+          <i class="ti ti-chevron-right j-more-chevron" aria-hidden="true"></i>
+        </button>
+        <button class="j-more-item" id="jMoreHQ">
+          <i class="ti ti-dashboard" aria-hidden="true"></i><span>HQ</span>
+          <i class="ti ti-chevron-right j-more-chevron" aria-hidden="true"></i>
+        </button>
+        <button class="j-more-item" id="jMoreCommand">
+          <i class="ti ti-device-tv" aria-hidden="true"></i><span>Command</span>
+          <i class="ti ti-chevron-right j-more-chevron" aria-hidden="true"></i>
+        </button>
+        <button class="j-more-item" id="jMoreActivity">
+          <i class="ti ti-calendar" aria-hidden="true"></i><span>Activity</span>
+          <i class="ti ti-chevron-right j-more-chevron" aria-hidden="true"></i>
+        </button>
+        <button class="j-more-item" id="jMoreDash">
+          <i class="ti ti-chart-bar" aria-hidden="true"></i><span>Dashboard</span>
+          <i class="ti ti-chevron-right j-more-chevron" aria-hidden="true"></i>
+        </button>
+        <button class="j-more-item" id="jMorePersonal">
+          <i class="ti ti-notebook" aria-hidden="true"></i><span>Personal</span>
+          <i class="ti ti-chevron-right j-more-chevron" aria-hidden="true"></i>
+        </button>
       </div>
+    </div>
 
-      <div class="dash-sec">
-        <div class="ds-h">⚑ Needs you <span class="ds-n" id="nUrgent">0</span></div>
-        <ul class="ds-list" id="urgentList"><li class="ds-empty">nothing urgent</li></ul>
-      </div>
+  </div><!-- .j-main -->
 
-      <div class="dash-sec">
-        <div class="ds-h">✉ Emails to answer <span class="ds-n" id="nEmails">0</span></div>
-        <ul class="ds-list" id="emailList"><li class="ds-empty">inbox quiet</li></ul>
-      </div>
-
-      <div class="dash-sec">
-        <div class="ds-h">✔ Tasks <span class="ds-n" id="nTasks">0</span></div>
-        <ul class="ds-list" id="taskList"><li class="ds-empty">no open tasks</li></ul>
-      </div>
-
-      <div class="dash-sec">
-        <div class="ds-h">▦ Pods on the floor</div>
-        <ul class="ds-list" id="opsList"><li class="ds-empty">HQ offline</li></ul>
-      </div>
-
-      <div class="dash-sec">
-        <div class="ds-h">⟁ Recent activity</div>
-        <ul class="ds-list feed" id="feedList"><li class="ds-empty">quiet</li></ul>
-      </div>
-    </aside>
+  <!-- Composer bar: always visible, always accessible -->
+  <div class="j-composer-bar">
+    <form class="j-composer" id="composer">
+      <button type="button" class="mic" id="mic" aria-label="Talk">
+        <i class="ti ti-microphone" aria-hidden="true"></i>
+      </button>
+      <input id="input" autocomplete="off" placeholder="Ask Jarvis…" />
+      <button type="submit" class="send" aria-label="Send">
+        <i class="ti ti-arrow-right" aria-hidden="true"></i>
+      </button>
+    </form>
   </div>
 
-  <!-- OPERATIONS view (cockpit overlay) -->
-  <div class="ops" id="ops" hidden>
-    <div class="ops-head">
-      <span class="px ops-brand">⛭ OPERATIONS</span>
-      <nav class="ops-biz" id="opsBiz"></nav>
-      <button class="ops-refresh" id="opsRefresh" title="Refresh">⟳</button>
-      <button class="ops-x" id="opsX" title="Close">✕</button>
-    </div>
-    <nav class="ops-tabs" id="opsTabs"></nav>
-    <div class="ops-body" id="opsBody"><div class="ops-empty">loading…</div></div>
-    <!-- proposal reader -->
-    <div class="ops-reader" id="opsReader" hidden>
-      <div class="ops-reader-bar"><span class="ops-reader-cap px" id="opsReaderCap"></span><button class="ops-x" id="opsReaderX">✕</button></div>
-      <pre class="ops-reader-body" id="opsReaderBody"></pre>
-    </div>
-    <!-- opportunity / RFP detail (real solicitation documents from SAM) -->
-    <div class="ops-reader" id="oppDetail" hidden>
-      <div class="ops-reader-bar"><span class="ops-reader-cap px" id="oppDetailCap">Opportunity</span><button class="ops-x" id="oppDetailX">✕</button></div>
-      <div class="ops-detail-body" id="oppDetailBody"></div>
-    </div>
-    <!-- email composition panel -->
-    <div class="ops-reader" id="emailPanel" hidden>
-      <div class="ops-reader-bar"><span class="ops-reader-cap px" id="emailPanelCap">Prepare email</span><button class="ops-x" id="emailPanelX">✕</button></div>
-      <div class="email-compose" id="emailCompose"></div>
-    </div>
-    <!-- approve confirmation: shows EXACTLY what will happen before you approve -->
-    <div class="ops-confirm" id="opsConfirm" hidden>
-      <div class="ops-confirm-card">
-        <div class="ops-confirm-h px" id="opsConfirmH">If you approve — here's what happens next</div>
-        <div class="ops-confirm-body" id="opsConfirmBody"></div>
-        <div class="ops-confirm-acts">
-          <button class="btn ghost" id="opsConfirmCancel">Cancel</button>
-          <button class="btn go" id="opsConfirmGo">Approve &amp; do it →</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- Bottom navigation -->
+  <nav class="j-nav" id="jNav">
+    <button class="j-nav-btn active" id="jNavHome">
+      <i class="ti ti-home" aria-hidden="true"></i>
+      <span>Home</span>
+    </button>
+    <button class="j-nav-btn" id="jNavTalk">
+      <i class="ti ti-message" aria-hidden="true"></i>
+      <span>Talk</span>
+    </button>
+    <button class="j-nav-btn" id="jNavOps">
+      <i class="ti ti-briefcase" aria-hidden="true"></i>
+      <span>Ops</span>
+    </button>
+    <button class="j-nav-btn" id="jNavMore">
+      <i class="ti ti-dots" aria-hidden="true"></i>
+      <span>More</span>
+    </button>
+  </nav>
 
-  <!-- MAP view (where the work is) -->
-  <div class="mapview" id="mapView" hidden>
-    <div class="ops-head">
-      <span class="px ops-brand">▣ MAP — PLACE OF PERFORMANCE</span>
-      <span class="map-stat" id="mapStat"></span>
-      <label class="map-filter"><input type="checkbox" id="mapHideClosed" checked> hide closed</label>
-      <select class="map-filter" id="mapDays" title="Filter by days to deadline">
-        <option value="0">all open</option>
-        <option value="7">≤ 7 days</option>
-        <option value="14">≤ 14 days</option>
-        <option value="30">≤ 30 days</option>
-      </select>
-      <button class="ops-refresh" id="mapRefresh" title="Refresh">⟳</button>
-      <button class="ops-x" id="mapX" title="Close">✕</button>
-    </div>
-    <div class="map-wrap">
-      <div class="map-panel" id="mapPins"><div class="map-compass">N</div></div>
-      <div class="map-log" id="mapLog"><div class="ops-empty">loading…</div></div>
-    </div>
-  </div>
+</div><!-- .j-shell -->
 
-  <!-- FLOOR view (the org as rooms, folded in — no separate site) -->
-  <div class="floorview" id="floorView" hidden>
-    <div class="ops-head">
-      <span class="px ops-brand">▦ THE FLOOR</span>
-      <span class="map-stat" id="floorStat">your agents, by room</span>
-      <a class="btn ghost" id="floorHqLink" target="_blank" rel="noreferrer" style="display:none; font-size:11px; padding:5px 11px;">full game floor ↗</a>
-      <button class="ops-refresh" id="floorRefresh" title="Refresh">⟳</button>
-      <button class="ops-x" id="floorX" title="Close">✕</button>
-    </div>
-    <div class="ops-body" id="floorBody"><div class="ops-empty">loading…</div></div>
-    <!-- pod drill-in (team + recent activity) -->
-    <div class="ops-reader" id="podDetail" hidden>
-      <div class="ops-reader-bar"><span class="ops-reader-cap px" id="podDetailCap"></span><button class="ops-x" id="podDetailX">✕</button></div>
-      <div class="ops-detail-body" id="podDetailBody"></div>
-    </div>
-  </div>
+<!-- ══════════════════════════════ OVERLAY VIEWS ══ -->
+<!-- All fixed-position — cover the full screen when open -->
 
-  <!-- COMMAND CENTER (cinematic wall display) -->
-  <div class="commandview" id="commandView" hidden>
-    <div class="cmd-head">
-      <div class="cmd-title"><span class="px">RODGATE COMMAND</span><span class="cmd-sub">JARVIS · one-person enterprise OS</span></div>
-      <span class="cmd-clock" id="cmdClock"></span>
-      <button class="floor-btn" id="cmdBrief" title="Speak the briefing">🔊 Briefing</button>
-      <button class="floor-btn" id="cmdFull" title="Full screen — cast to a TV">⛶ Full screen</button>
-      <button class="floor-btn" id="cmdCast" title="Cast Command Center to a TV on your network">📺 Cast</button>
-      <button class="ops-refresh" id="commandRefresh" title="Refresh">⟳</button>
-      <button class="ops-x" id="commandX" title="Close">✕</button>
-    </div>
-    <div class="cmd-body">
-      <div class="cmd-col cmd-left" id="cmdKpis"></div>
-      <div class="cmd-center">
-        <canvas id="cmdCore"></canvas>
-        <div class="cmd-core-label"><div class="px">CORE</div><div class="cmd-dim" id="cmdBriefText">reasoning online</div></div>
-      </div>
-      <div class="cmd-col cmd-right">
-        <div class="cmd-panel" id="cmdRoster"></div>
-        <div class="cmd-panel" id="cmdConnectors"></div>
-      </div>
-    </div>
-    <div class="cmd-ticker" id="cmdFeed"></div>
+<!-- OPERATIONS -->
+<div class="ops" id="ops" hidden>
+  <div class="ops-head">
+    <span class="px ops-brand">Operations</span>
+    <nav class="ops-biz" id="opsBiz"></nav>
+    <button class="ops-refresh" id="opsRefresh" title="Refresh">⟳</button>
+    <button class="ops-x" id="opsX" title="Close">✕</button>
   </div>
-
-  <!-- ACTIVITY view (calendar + log + drill-in + archive) -->
-  <div class="activityview" id="activityView" hidden>
-    <div class="ops-head">
-      <span class="px ops-brand">📋 ACTIVITY</span>
-      <span class="map-stat" id="activityStat"></span>
-      <label class="map-filter"><input type="checkbox" id="actShowArchived"> show archived</label>
-      <button class="ops-refresh" id="activityRefresh" title="Refresh">⟳</button>
-      <button class="ops-x" id="activityX" title="Close">✕</button>
-    </div>
-    <div class="activity-wrap">
-      <div class="activity-cal" id="activityCal"></div>
-      <div class="activity-log" id="activityLog"><div class="ops-empty">loading…</div></div>
-    </div>
-    <div class="ops-reader" id="actDetail" hidden>
-      <div class="ops-reader-bar"><span class="ops-reader-cap px" id="actDetailCap"></span><button class="ops-x" id="actDetailX">✕</button></div>
-      <div class="ops-detail-body" id="actDetailBody"></div>
-    </div>
+  <nav class="ops-tabs" id="opsTabs"></nav>
+  <div class="ops-body" id="opsBody"><div class="ops-empty">loading…</div></div>
+  <div class="ops-reader" id="opsReader" hidden>
+    <div class="ops-reader-bar"><span class="ops-reader-cap px" id="opsReaderCap"></span><button class="ops-x" id="opsReaderX">✕</button></div>
+    <pre class="ops-reader-body" id="opsReaderBody"></pre>
   </div>
-
-  <!-- JARVIS HQ (in-app tab — the game floor, embedded here instead of a separate window) -->
-  <div class="hqview" id="hqView" hidden>
-    <div class="ops-head">
-      <span class="px ops-brand">⬢ JARVIS HQ</span>
-      <span class="map-stat" id="hqStat">the game floor — live</span>
-      <a class="btn ghost" id="hqPop" target="_blank" rel="noreferrer" style="font-size:11px; padding:5px 11px;">open in browser ↗</a>
-      <button class="ops-refresh" id="hqRefresh" title="Refresh">⟳</button>
-      <button class="ops-x" id="hqX" title="Close">✕</button>
-    </div>
-    <iframe class="hq-frame" id="hqFrame" title="JARVIS HQ" referrerpolicy="no-referrer"></iframe>
+  <div class="ops-reader" id="oppDetail" hidden>
+    <div class="ops-reader-bar"><span class="ops-reader-cap px" id="oppDetailCap">Opportunity</span><button class="ops-x" id="oppDetailX">✕</button></div>
+    <div class="ops-detail-body" id="oppDetailBody"></div>
   </div>
-
-  <!-- SETTINGS view -->
-  <div class="settingsview" id="settingsView" hidden>
-    <div class="ops-head">
-      <span class="px ops-brand">⚙ SETTINGS</span>
-      <span class="map-stat">theme · voice · conversation</span>
-      <button class="ops-x" id="settingsX" title="Close">✕</button>
-    </div>
-    <div class="settings-body">
-      <div class="set-sec">
-        <div class="set-h">Theme — pick by mood</div>
-        <div class="theme-swatches">
-          <button class="theme-swatch" data-theme="arc"><span class="sw sw-arc"></span>Arc · obsidian glass <span class="sw-new">NEW</span></button>
-          <button class="theme-swatch" data-theme="teal"><span class="sw sw-teal"></span>Teal</button>
-          <button class="theme-swatch" data-theme="mono"><span class="sw sw-mono"></span>Mono</button>
-          <button class="theme-swatch" data-theme="dark"><span class="sw sw-dark"></span>Full dark</button>
-        </div>
-      </div>
-      <div class="set-sec">
-        <div class="set-h">Display</div>
-        <button class="t-btn set-toggle" id="clockBtn" title="12-hour or 24-hour clock">🕛 Clock: 12-hour</button>
-        <p class="set-note">Switches the Command Center clock between 12-hour (3:40 PM) and 24-hour (15:40).</p>
-      </div>
-      <div class="set-sec">
-        <div class="set-h">Voice &amp; conversation</div>
-        <button class="t-btn set-toggle" id="voiceBtn" title="Toggle her speaking voice">🔊 Voice: on</button>
-        <button class="t-btn set-toggle" id="wakeBtn" title="Hands-free wake word">‘‘ Hey Jarvis ’’ : off</button>
-        <button class="t-btn set-toggle" id="convoBtn" title="Keep listening so you can talk freely">💬 Open conversation: off</button>
-        <p class="set-note">Turn on <b>Hey Jarvis</b> to wake her by voice. With <b>Open conversation</b> on, she keeps listening after you speak — talk freely, no clicking the mic. (Say “Hey Jarvis” or “Hello Jarvis”.) Say <b>“Hey Jarvis, wake up”</b> to open the Command Center and hear your briefing.</p>
-      </div>
-      <div class="set-sec">
-        <div class="set-h">Command Center</div>
-        <button class="t-btn set-toggle" id="coreStyleBtn" title="Core animation style">◉ Core: sphere</button>
-        <button class="t-btn set-toggle" id="briefAutoBtn" title="Speak a briefing each morning while the app is open">🔊 Morning briefing: on</button>
-        <p class="set-note">Open <b>⬢ Command</b> for the cinematic wall display. <b>Neural burst</b> is the colorful core; <b>sphere</b> is the calm teal one. Use <b>⛶ Full screen</b> to cast it to a TV.</p>
+  <div class="ops-reader" id="emailPanel" hidden>
+    <div class="ops-reader-bar"><span class="ops-reader-cap px" id="emailPanelCap">Prepare email</span><button class="ops-x" id="emailPanelX">✕</button></div>
+    <div class="email-compose" id="emailCompose"></div>
+  </div>
+  <div class="ops-confirm" id="opsConfirm" hidden>
+    <div class="ops-confirm-card">
+      <div class="ops-confirm-h px" id="opsConfirmH">If you approve — here's what happens next</div>
+      <div class="ops-confirm-body" id="opsConfirmBody"></div>
+      <div class="ops-confirm-acts">
+        <button class="btn ghost" id="opsConfirmCancel">Cancel</button>
+        <button class="btn go" id="opsConfirmGo">Approve &amp; do it →</button>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- drag-drop overlay -->
-  <div class="dropmask" id="dropmask"><div class="dropmask-inner">⤓ Drop the file — Jarvis will read it</div></div>
+<!-- MAP -->
+<div class="mapview" id="mapView" hidden>
+  <div class="ops-head">
+    <span class="px ops-brand">Map</span>
+    <span class="map-stat" id="mapStat"></span>
+    <label class="map-filter"><input type="checkbox" id="mapHideClosed" checked> hide closed</label>
+    <select class="map-filter" id="mapDays" title="Filter by days to deadline">
+      <option value="0">all open</option>
+      <option value="7">≤ 7 days</option>
+      <option value="14">≤ 14 days</option>
+      <option value="30">≤ 30 days</option>
+    </select>
+    <button class="ops-refresh" id="mapRefresh" title="Refresh">⟳</button>
+    <button class="ops-x" id="mapX" title="Close">✕</button>
+  </div>
+  <div class="map-wrap">
+    <div class="map-panel" id="mapPins"><div class="map-compass">N</div></div>
+    <div class="map-log" id="mapLog"><div class="ops-empty">loading…</div></div>
+  </div>
+</div>
 
-  <script src="orb.js"></script>
-  <script src="app.js"></script>
-  <script src="ops.js"></script>
-  <script src="map.js"></script>
-  <script src="floor.js"></script>
-  <script src="activity.js"></script>
-  <script src="command.js"></script>
+<!-- FLOOR -->
+<div class="floorview" id="floorView" hidden>
+  <div class="ops-head">
+    <span class="px ops-brand">Floor</span>
+    <span class="map-stat" id="floorStat">your agents, by room</span>
+    <a class="btn ghost" id="floorHqLink" target="_blank" rel="noreferrer" style="display:none; font-size:11px; padding:5px 11px;">full game floor ↗</a>
+    <button class="ops-refresh" id="floorRefresh" title="Refresh">⟳</button>
+    <button class="ops-x" id="floorX" title="Close">✕</button>
+  </div>
+  <div class="ops-body" id="floorBody"><div class="ops-empty">loading…</div></div>
+  <div class="ops-reader" id="podDetail" hidden>
+    <div class="ops-reader-bar"><span class="ops-reader-cap px" id="podDetailCap"></span><button class="ops-x" id="podDetailX">✕</button></div>
+    <div class="ops-detail-body" id="podDetailBody"></div>
+  </div>
+</div>
+
+<!-- COMMAND CENTER -->
+<div class="commandview" id="commandView" hidden>
+  <div class="cmd-head">
+    <div class="cmd-title"><span class="px">RODGATE COMMAND</span><span class="cmd-sub">JARVIS · one-person enterprise OS</span></div>
+    <span class="cmd-clock" id="cmdClock"></span>
+    <button class="floor-btn" id="cmdBrief" title="Speak the briefing">🔊 Briefing</button>
+    <button class="floor-btn" id="cmdFull" title="Full screen">⛶ Full screen</button>
+    <button class="floor-btn" id="cmdCast" title="Cast to TV">📺 Cast</button>
+    <button class="ops-refresh" id="commandRefresh" title="Refresh">⟳</button>
+    <button class="ops-x" id="commandX" title="Close">✕</button>
+  </div>
+  <div class="cmd-body">
+    <div class="cmd-col cmd-left" id="cmdKpis"></div>
+    <div class="cmd-center">
+      <canvas id="cmdCore"></canvas>
+      <div class="cmd-core-label"><div class="px">CORE</div><div class="cmd-dim" id="cmdBriefText">reasoning online</div></div>
+    </div>
+    <div class="cmd-col cmd-right">
+      <div class="cmd-panel" id="cmdRoster"></div>
+      <div class="cmd-panel" id="cmdConnectors"></div>
+    </div>
+  </div>
+  <div class="cmd-ticker" id="cmdFeed"></div>
+</div>
+
+<!-- ACTIVITY -->
+<div class="activityview" id="activityView" hidden>
+  <div class="ops-head">
+    <span class="px ops-brand">Activity</span>
+    <span class="map-stat" id="activityStat"></span>
+    <label class="map-filter"><input type="checkbox" id="actShowArchived"> show archived</label>
+    <button class="ops-refresh" id="activityRefresh" title="Refresh">⟳</button>
+    <button class="ops-x" id="activityX" title="Close">✕</button>
+  </div>
+  <div class="activity-wrap">
+    <div class="activity-cal" id="activityCal"></div>
+    <div class="activity-log" id="activityLog"><div class="ops-empty">loading…</div></div>
+  </div>
+  <div class="ops-reader" id="actDetail" hidden>
+    <div class="ops-reader-bar"><span class="ops-reader-cap px" id="actDetailCap"></span><button class="ops-x" id="actDetailX">✕</button></div>
+    <div class="ops-detail-body" id="actDetailBody"></div>
+  </div>
+</div>
+
+<!-- HQ embedded iframe -->
+<div class="hqview" id="hqView" hidden>
+  <div class="ops-head">
+    <span class="px ops-brand">JARVIS HQ</span>
+    <span class="map-stat" id="hqStat">the game floor — live</span>
+    <a class="btn ghost" id="hqPop" target="_blank" rel="noreferrer" style="font-size:11px; padding:5px 11px;">open in browser ↗</a>
+    <button class="ops-refresh" id="hqRefresh" title="Refresh">⟳</button>
+    <button class="ops-x" id="hqX" title="Close">✕</button>
+  </div>
+  <iframe class="hq-frame" id="hqFrame" title="JARVIS HQ" referrerpolicy="no-referrer"></iframe>
+</div>
+
+<!-- SETTINGS -->
+<div class="settingsview" id="settingsView" hidden>
+  <div class="ops-head">
+    <span class="px ops-brand">Settings</span>
+    <span class="map-stat">theme · voice · conversation</span>
+    <button class="ops-x" id="settingsX" title="Close">✕</button>
+  </div>
+  <div class="settings-body">
+    <div class="set-sec">
+      <div class="set-h">Theme</div>
+      <div class="theme-swatches">
+        <button class="theme-swatch" data-theme="arc"><span class="sw sw-arc"></span>Arc · obsidian glass <span class="sw-new">NEW</span></button>
+        <button class="theme-swatch" data-theme="teal"><span class="sw sw-teal"></span>Teal</button>
+        <button class="theme-swatch" data-theme="mono"><span class="sw sw-mono"></span>Mono</button>
+        <button class="theme-swatch" data-theme="dark"><span class="sw sw-dark"></span>Full dark</button>
+      </div>
+    </div>
+    <div class="set-sec">
+      <div class="set-h">Display</div>
+      <button class="t-btn set-toggle" id="clockBtn" title="12/24-hour clock">🕛 Clock: 12-hour</button>
+      <p class="set-note">Switches the Command Center clock between 12-hour (3:40 PM) and 24-hour (15:40).</p>
+    </div>
+    <div class="set-sec">
+      <div class="set-h">Voice &amp; conversation</div>
+      <button class="t-btn set-toggle" id="voiceBtn" title="Toggle her speaking voice">🔊 Voice: on</button>
+      <button class="t-btn set-toggle" id="wakeBtn" title="Hands-free wake word">'' Hey Jarvis '' : off</button>
+      <button class="t-btn set-toggle" id="convoBtn" title="Keep listening so you can talk freely">💬 Open conversation: off</button>
+      <p class="set-note">Turn on <b>Hey Jarvis</b> to wake her by voice. With <b>Open conversation</b> on, she keeps listening after you speak — talk freely, no clicking the mic. Say <b>"Hey Jarvis, wake up"</b> to open the Command Center and hear your briefing.</p>
+    </div>
+    <div class="set-sec">
+      <div class="set-h">Command Center</div>
+      <button class="t-btn set-toggle" id="coreStyleBtn" title="Core animation style">◉ Core: sphere</button>
+      <button class="t-btn set-toggle" id="briefAutoBtn" title="Speak a briefing each morning">🔊 Morning briefing: on</button>
+      <p class="set-note">Open <b>Command</b> from the More tab for the cinematic wall display. Use <b>Full screen</b> to cast it to a TV.</p>
+    </div>
+  </div>
+</div>
+
+<!-- PERSONAL OS overlay -->
+<div class="personalview" id="personalView" hidden>
+  <div class="ops-head">
+    <span class="px ops-brand">Personal</span>
+    <div class="ps-search-wrap">
+      <input class="ps-search" id="psSearch" placeholder="Search everything…" autocomplete="off" />
+    </div>
+    <button class="ops-x" id="personalX" title="Close">✕</button>
+  </div>
+  <nav class="ps-tabs" id="psTabs">
+    <button class="ps-tab on" data-tab="notes">Notes</button>
+    <button class="ps-tab" data-tab="journal">Journal</button>
+    <button class="ps-tab" data-tab="voice">Voice</button>
+    <button class="ps-tab" data-tab="todos">Todos</button>
+    <button class="ps-tab" data-tab="people">People</button>
+  </nav>
+  <div class="ps-body" id="psBody">
+    <div class="ops-empty">loading…</div>
+  </div>
+</div>
+
+<!-- Global Jarvis dock — reach her (text + voice) from ANY screen, incl. overlays -->
+<button class="j-dock-fab" id="jDockFab" aria-label="Talk to Jarvis" title="Talk to Jarvis">
+  <span class="j-dock-orb"></span>
+</button>
+<div class="j-dock" id="jDock" hidden>
+  <div class="j-dock-head">
+    <span class="j-dock-title px">JARVIS</span>
+    <button class="j-dock-icon" id="jDockExpand" title="Open full chat"><i class="ti ti-arrows-diagonal" aria-hidden="true"></i></button>
+    <button class="j-dock-icon" id="jDockClose" title="Close"><i class="ti ti-x" aria-hidden="true"></i></button>
+  </div>
+  <div class="j-dock-log" id="jDockLog"></div>
+  <form class="j-dock-bar" id="jDockForm">
+    <button type="button" class="j-dock-mic" id="jDockMic" aria-label="Talk"><i class="ti ti-microphone" aria-hidden="true"></i></button>
+    <input id="jDockInput" autocomplete="off" placeholder="Ask Jarvis…" />
+    <button type="submit" class="j-dock-send" aria-label="Send"><i class="ti ti-arrow-right" aria-hidden="true"></i></button>
+  </form>
+</div>
+
+<!-- Drag-drop overlay -->
+<div class="dropmask" id="dropmask"><div class="dropmask-inner">⤓ Drop the file — Jarvis will read it</div></div>
+
+<!-- ══ GHOST ══ Hidden elements that existing JS references by ID.
+     They must live in the DOM so scripts don't throw, but are never rendered. -->
+<div id="ghostElements" aria-hidden="true"
+  style="position:fixed;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;z-index:-999">
+  <!-- Nav buttons referenced by ops.js / map.js / floor.js / activity.js / command.js -->
+  <button id="opsBtn"></button>
+  <button id="mapBtn"></button>
+  <button id="floorBtn"></button>
+  <button id="commandBtn"></button>
+  <button id="activityBtn"></button>
+  <button id="hqBtn"></button>
+  <button id="dashBtn"></button>
+  <button id="focusPill" class="focus-pill">◉ normal</button>
+  <!-- Dashboard rail — filled by loadDash() in app.js -->
+  <div id="dash" class="dash">
+    <div class="dash-head"><span class="px">FLOOR</span><button id="dashRefresh">⟳</button></div>
+    <div class="dash-grid">
+      <div class="metric"><div class="m-k">Income</div><div class="m-v teal" id="mIncome">—</div><div class="m-sub" id="mXp"></div></div>
+      <div class="metric"><div class="m-k">Spend</div><div class="m-v" id="mSpend">—</div><div class="m-sub" id="mSpendToday"></div></div>
+      <div class="metric"><div class="m-k">Tokens</div><div class="m-v" id="mTokens">—</div><div class="m-sub" id="mCalls"></div></div>
+      <div class="metric"><div class="m-k">Net</div><div class="m-v" id="mNet">—</div><div class="m-sub">income − spend</div></div>
+    </div>
+    <div class="dash-sec"><div class="ds-h">Needs you <span class="ds-n" id="nUrgent">0</span></div><ul class="ds-list" id="urgentList"><li class="ds-empty">nothing urgent</li></ul></div>
+    <div class="dash-sec"><div class="ds-h">Emails <span class="ds-n" id="nEmails">0</span></div><ul class="ds-list" id="emailList"><li class="ds-empty">inbox quiet</li></ul></div>
+    <div class="dash-sec"><div class="ds-h">Tasks <span class="ds-n" id="nTasks">0</span></div><ul class="ds-list" id="taskList"><li class="ds-empty">no open tasks</li></ul></div>
+    <div class="dash-sec"><div class="ds-h">Pods</div><ul class="ds-list" id="opsList"><li class="ds-empty">HQ offline</li></ul></div>
+    <div class="dash-sec"><div class="ds-h">Feed</div><ul class="ds-list feed" id="feedList"><li class="ds-empty">quiet</li></ul></div>
+  </div>
+</div>
+
+<script src="orb.js"></script>
+<script src="app.js"></script>
+<script src="home.js"></script>
+<script src="nav.js"></script>
+<script src="ops.js"></script>
+<script src="map.js"></script>
+<script src="floor.js"></script>
+<script src="activity.js"></script>
+<script src="command.js"></script>
+<script src="personal.js"></script>
+<script src="assistant.js"></script>
 </body>
 </html>

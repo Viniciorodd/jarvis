@@ -27,7 +27,9 @@ function addMsg(who, text) {
   if (who === 'you') { el.className = 'msg you'; el.textContent = text; }
   else if (who === 'err') { el.className = 'msg err'; el.textContent = '⚠ ' + text; }
   else { el.className = 'msg j'; el.innerHTML = '<span class="who">JARVIS</span>'; el.append(document.createTextNode(text)); }
-  transcript.appendChild(el); transcript.scrollTop = transcript.scrollHeight; return el;
+  transcript.appendChild(el); transcript.scrollTop = transcript.scrollHeight;
+  if (window.JDock) window.JDock.mirror(who, text);   // mirror into the global "reach her anywhere" dock
+  return el;
 }
 function addActions(actions) {
   if (!actions || !actions.length) return;

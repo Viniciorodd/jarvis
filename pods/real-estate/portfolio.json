@@ -1,13 +1,47 @@
 {
   "units": [
     {
-      "id": "u1", "address": "Add your first unit address here", "type": "section8",
-      "tenant": "", "rent": 0, "hap": 0,
-      "hap_status": "pending", "hap_date": null, "notes": "Update with real data"
+      "id": "u1",
+      "address": "Add your first unit address here",
+      "type": "section8",
+      "tenant": "",
+      "rent": 0,
+      "hap": 0,
+      "hap_status": "pending",
+      "hap_date": null,
+      "notes": "Update with real data"
+    },
+    {
+      "address": "218 W Ridge St, Nanticoke PA",
+      "unit": "1st Floor",
+      "rent": 1300,
+      "id": "mqqwrnlv"
+    },
+    {
+      "address": "218 W Ridge St, Nanticoke PA",
+      "unit": "2nd Floor",
+      "rent": 1200,
+      "id": "mqqwrnlw"
     }
   ],
   "flips": [],
   "new_builds": [],
-  "rentals": [],
-  "updated": null
+  "rentals": [
+    {
+      "address": "2135 Brick Ave, Scranton PA",
+      "rent_monthly": 1850,
+      "id": "mqqwomq3"
+    },
+    {
+      "address": "463 2nd Street, Plymouth, PA",
+      "rent_monthly": 1500,
+      "id": "mqqwps3x"
+    },
+    {
+      "address": "465 2nd Street, Plymouth, PA",
+      "rent_monthly": 1500,
+      "id": "mqqwq6dr"
+    }
+  ],
+  "updated": "2026-06-23T17:28:49.303Z"
 }

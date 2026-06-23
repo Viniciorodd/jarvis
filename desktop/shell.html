@@ -104,14 +104,23 @@
     }
   }
 
-  // Retry World until companion server is up (it takes ~1s to spawn)
+  // Retry World until companion server is up, then reload the webview.
+  // Setting view.src to the same URL is a no-op in Electron — use reload() instead.
+  let worldReady = false;
   function goWorld(){
-    go('world');
-    if (surface !== 'world') return;
-    const check = () => fetch('http://localhost:8095/', { cache: 'no-store', signal: AbortSignal.timeout(800) })
-      .then(() => { if (surface === 'world') view.src = WORLD_URL; })
-      .catch(() => setTimeout(check, 1000));
-    check();
+    surface = 'world';
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.surface === 'world'));
+    if (worldReady) { view.reloadIgnoringCache(); return; }
+    view.src = WORLD_URL; // initial attempt (may show error page if server not up yet)
+    const check = () => fetch('http://localhost:8095/', { cache:'no-store', signal:AbortSignal.timeout(1200) })
+      .then(() => {
+        if (!worldReady) {
+          worldReady = true;
+          if (surface === 'world') view.reloadIgnoringCache(); // reload now that server is confirmed up
+        }
+      })
+      .catch(() => setTimeout(check, 800));
+    setTimeout(check, 600); // slight head-start for the companion server
   }
 
   goWorld();

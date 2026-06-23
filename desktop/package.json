@@ -19,7 +19,7 @@
     "productName": "Jarvis",
     "files": ["main.js", "shell.html", "icon.*"],
     "publish": null,
-    "win": { "target": "nsis" },
+    "win": { "target": "nsis", "icon": "icon.png" },
     "mac": { "target": "dmg", "category": "public.app-category.productivity" },
     "linux": { "target": "AppImage" }
   }

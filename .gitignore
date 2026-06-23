@@ -14,6 +14,7 @@ prompts/operator-profile.draft.md
 companion/.usage.json
 companion/.dashboard.json
 companion/.reminders.json
+companion/.web-studio.json
 # media-generation spend ledger (code-enforced monthly cap state)
 scripts/.media-usage.json
 # control-plane event store (system of record — local runtime data) + eval results

@@ -22,8 +22,9 @@
     { id: 'saas', label: '🖥 SaaS / Recon', pods: ['saas'], tabs: ['activity', 'leads'] },
     { id: 'webstudio', label: '🌐 Web Studio', pods: ['webstudio'], tabs: ['projects', 'sites', 'clients', 'pipeline'] },
     { id: 'agents', label: '🤖 Agents', pods: ['chief-of-staff', 'exec'], tabs: ['assistant', 'busops', 'queue'] },
+    { id: 'music', label: '🎵 Music', pods: ['music'], tabs: ['identity', 'tracks', 'releases'] },
   ];
-  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', analyzer: '📊 Deal Analyzer', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', predictions: '🔮 Predictions', paper: '🧪 Paper P&L', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline', assistant: '🧠 Assistant', busops: '⚙ Business Ops', queue: '✋ Review queue' };
+  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', analyzer: '📊 Deal Analyzer', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', predictions: '🔮 Predictions', paper: '🧪 Paper P&L', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline', assistant: '🧠 Assistant', busops: '⚙ Business Ops', queue: '✋ Review queue', identity: '🪪 Identity', tracks: '🎙 Studio', releases: '🚀 Releases' };
   let biz = 'gov', tab = 'leads';
   const curBiz = () => BUSINESSES.find((b) => b.id === biz) || BUSINESSES[0];
 
@@ -91,6 +92,62 @@
     if (tab === 'assistant') return renderAgent('assistant');
     if (tab === 'busops') return renderAgent('ops');
     if (tab === 'queue') return renderAgentQueue();
+    if (tab === 'identity') return renderMusicIdentity();
+    if (tab === 'tracks') return renderMusicStudio();
+    if (tab === 'releases') return renderMusicReleases();
+  }
+
+  // ── MUSIC (artist identity + AI songwriting + GATED releases) ──
+  let musicData = null;
+  async function loadMusic() {
+    body.innerHTML = '<div class="ops-empty">loading studio…</div>';
+    try { musicData = await fetch('/api/music').then((r) => r.json()); render(); }
+    catch (e) { body.innerHTML = `<div class="ops-empty">music offline — ${esc(e.message)}</div>`; }
+  }
+  function renderMusicIdentity() {
+    if (!musicData) { loadMusic(); return; }
+    const id = musicData.identity || {};
+    const f = (k, label, ph) => `<input class="re-f ms-f" data-ms="${k}" placeholder="${esc(ph)}" value="${esc(id[k] || '')}" style="grid-column:1/-1">`;
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🪪 Artist Identity</b> — define the act. You set the sound; nothing publishes without you.</div>
+      <div class="re-add-form" style="display:block">
+        <div class="re-add-grid" style="grid-template-columns:1fr">
+          ${f('name', 'Artist name', 'Artist / project name')}
+          ${f('genre', 'Genre', 'Genre(s) — e.g. dark synthwave, trap soul')}
+          ${f('persona', 'Persona', 'Persona / vibe — who is this artist?')}
+          ${f('influences', 'Influences', 'Influences / reference artists')}
+          <textarea class="re-f ms-f" data-ms="params" placeholder="Sound parameters — tempo, mood, vocal style, themes (set these when ready)" style="min-height:70px">${esc(id.params || '')}</textarea>
+        </div>
+        <div class="re-add-acts"><button class="re-save" data-ms-save="1">Save identity</button><span class="re-add-msg" id="msIdMsg"></span></div>
+      </div>`;
+  }
+  function renderMusicStudio() {
+    if (!musicData) { loadMusic(); return; }
+    const tracks = musicData.tracks || [];
+    const keyNote = musicData.hasProviderKey ? '' : ' <span style="color:var(--warn)">· audio pending a provider key (MUSIC_API_KEY)</span>';
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🎙 Studio</b> — brief a track; Jarvis writes the concept + full lyrics now.${keyNote}</div>
+      <div class="re-add-form" style="display:block">
+        <textarea class="re-f" id="msBrief" placeholder="Brief: what's this song about? mood, story, hook…" style="min-height:70px;width:100%"></textarea>
+        <div class="re-add-acts"><button class="re-save" data-ms-generate="1">Write it →</button><span class="re-add-msg" id="msGenMsg"></span></div>
+      </div>
+      ${tracks.length ? tracks.map((t) => `<div class="re-card">
+        <div class="re-card-head"><div class="re-card-addr">${esc(t.title)}</div><div class="re-card-type">${esc(t.audioStatus || 'concept')}</div></div>
+        ${t.style ? `<div class="re-row">Style <span>${esc(t.style)}</span></div>` : ''}
+        ${t.concept ? `<div class="re-row" style="color:var(--dim)">${esc(t.concept)}</div>` : ''}
+        ${t.lyrics ? `<pre class="ag-text" style="margin-top:8px;max-height:160px;overflow:auto">${esc(t.lyrics)}</pre>` : ''}
+        <div style="margin-top:10px"><button class="btn sm go" data-ms-release="${esc(t.id)}">Queue release →</button></div>
+      </div>`).join('') : '<div class="ops-empty" style="margin-top:10px">No tracks yet — write your first above.</div>'}`;
+  }
+  function renderMusicReleases() {
+    if (!musicData) { loadMusic(); return; }
+    const rels = musicData.releases || [];
+    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🚀 Releases</b> — every release is <b>gated</b>. Approving records intent; it never posts to Spotify / Apple / TikTok on its own (needs a distributor + your final go).</div>` +
+      (rels.length ? rels.map((r) => `<div class="re-card">
+        <div class="re-card-head"><div class="re-card-addr">${esc(r.title)}</div><div class="re-card-type"><span class="re-hap-${r.status === 'approved' ? 'ok' : 'pend'}">${esc(r.status)}</span></div></div>
+        <div class="re-row">Platforms <span>${esc((r.platforms || []).join(', '))}</span></div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="btn sm go" data-ms-rel-approve="${esc(r.id)}">Approve</button>
+          <button class="btn sm" data-ms-rel-discard="${esc(r.id)}">Discard</button>
+        </div></div>`).join('') : '<div class="ops-empty">Release queue empty — queue a track from the Studio.</div>');
   }
 
   // ── AGENTS (executive assistant + business-ops autopilot, draft + gated) ──
@@ -1097,6 +1154,44 @@
       pClose.disabled = true;
       fetch('/api/market/paper/close', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: pClose.getAttribute('data-paper-close') }) })
         .then((r) => r.json()).then(() => { paperData = null; loadPaper(); }).catch(() => { pClose.disabled = false; });
+      return;
+    }
+    // ── music: identity / generate / release (publishing gated) ──
+    const msSave = e.target.closest('[data-ms-save]');
+    if (msSave) {
+      const data = {}; body.querySelectorAll('.ms-f').forEach((i) => { data[i.getAttribute('data-ms')] = i.value.trim(); });
+      const msg = el('msIdMsg'); if (msg) msg.textContent = 'saving…';
+      fetch('/api/music/identity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+        .then((r) => r.json()).then(() => { if (msg) msg.textContent = 'saved'; musicData = null; }).catch(() => { if (msg) msg.textContent = 'error'; });
+      return;
+    }
+    const msGen = e.target.closest('[data-ms-generate]');
+    if (msGen) {
+      const brief = (el('msBrief') || {}).value ? el('msBrief').value.trim() : '';
+      const msg = el('msGenMsg');
+      if (!brief) { if (msg) msg.textContent = 'write a brief first'; return; }
+      msGen.disabled = true; if (msg) msg.textContent = 'writing…';
+      fetch('/api/music/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: brief }) })
+        .then((r) => r.json()).then((d) => { if (d.error) { if (msg) msg.textContent = d.error; msGen.disabled = false; return; } musicData = null; renderMusicStudio(); })
+        .catch(() => { if (msg) msg.textContent = 'error'; msGen.disabled = false; });
+      return;
+    }
+    const msRel = e.target.closest('[data-ms-release]');
+    if (msRel) {
+      fetch('/api/music/release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trackId: msRel.getAttribute('data-ms-release') }) })
+        .then((r) => r.json()).then(() => { tab = 'releases'; renderTabs(); musicData = null; renderMusicReleases(); }).catch(() => {});
+      return;
+    }
+    const msApprove = e.target.closest('[data-ms-rel-approve]');
+    if (msApprove) {
+      fetch('/api/music/release/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: msApprove.getAttribute('data-ms-rel-approve'), action: 'approve' }) })
+        .then((r) => r.json()).then(() => { musicData = null; renderMusicReleases(); }).catch(() => {});
+      return;
+    }
+    const msDiscard = e.target.closest('[data-ms-rel-discard]');
+    if (msDiscard) {
+      fetch('/api/music/release/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: msDiscard.getAttribute('data-ms-rel-discard'), action: 'discard' }) })
+        .then((r) => r.json()).then(() => { musicData = null; renderMusicReleases(); }).catch(() => {});
       return;
     }
   });

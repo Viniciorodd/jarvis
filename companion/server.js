@@ -607,6 +607,30 @@ async function predictTicker(ticker) {
   } catch { const direction = (q.changePct || 0) >= 0 ? 'up' : 'down'; return { ...base, direction, confidence: 50, horizon: '1w', rationale: 'fallback' }; }
 }
 
+// ── Music agent (scaffold): artist identity + AI songwriting + GATED releases ──
+// Concept + lyrics are real now (Claude). Audio generation activates when
+// MUSIC_API_KEY is set (Suno/Udio adapter). Publishing to Spotify/Apple/TikTok is
+// always GATED — needs operator approval + a distributor; nothing posts on its own.
+const MUSIC_FILE = path.join(__dirname, '.music.json');
+const MUSIC_KEY = process.env.MUSIC_API_KEY || '';
+const MUSIC_PROVIDER = process.env.MUSIC_PROVIDER || 'suno';
+function loadMusic() { return loadJson(MUSIC_FILE, { identity: {}, tracks: [], releases: [] }); }
+function saveMusic(m) { saveJson(MUSIC_FILE, m); }
+
+async function generateTrackConcept(prompt, identity) {
+  if (!API_KEY) return { title: '', style: '', concept: '', lyrics: '(set ANTHROPIC_API_KEY to write lyrics)' };
+  const sys = 'You are A&R + songwriter for an AI music artist. Given the brief + artist identity, return ONLY JSON: {"title":"...","style":"genre/mood/tempo tags for a music model","concept":"2 sentences","lyrics":"full lyrics with [Verse]/[Chorus]/[Bridge] tags"}.';
+  const usr = `ARTIST IDENTITY: ${JSON.stringify(identity || {})}\nBRIEF: ${prompt}`;
+  const out = await agentComplete(sys, usr, 'claude-sonnet-4-6', 1600);
+  try { return JSON.parse((out.text.match(/\{[\s\S]*\}/) || ['{}'])[0]); }
+  catch { return { title: '', style: '', concept: out.text || '', lyrics: '' }; }
+}
+// Pluggable audio provider — wire the real Suno/Udio call here once the key is set.
+async function renderAudio(/* track, identity */) {
+  if (!MUSIC_KEY) return { status: 'needs-provider', audioUrl: null, provider: MUSIC_PROVIDER };
+  return { status: 'provider-stub', audioUrl: null, provider: MUSIC_PROVIDER }; // TODO: real provider call
+}
+
 // Decide what a target is and open it. Files/folders must live inside an allowed root.
 function openTarget(raw) {
   const t = String(raw || '').trim();
@@ -1830,6 +1854,59 @@ const server = http.createServer(async (req, res) => {
       d.status = 'approved'; d.approvedAt = new Date().toISOString();
       saveJson(AGENT_DRAFTS, drafts);
       return send(res, 200, JSON.stringify({ ok: true, status: 'approved', note: 'Approved for sending via the gated executor — not sent automatically.' }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+
+  // MUSIC — artist identity + AI songwriting + gated release queue
+  if (req.method === 'GET' && url.pathname === '/api/music') {
+    const m = loadMusic();
+    return send(res, 200, JSON.stringify({ ...m, hasProviderKey: !!MUSIC_KEY, provider: MUSIC_PROVIDER }));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/music/identity') {
+    try {
+      const body = await readBody(req);
+      const m = loadMusic();
+      m.identity = { ...m.identity, ...body, updated: new Date().toISOString() };
+      saveMusic(m);
+      return send(res, 200, JSON.stringify({ ok: true, identity: m.identity }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/music/generate') {
+    try {
+      const { prompt } = await readBody(req);
+      if (!prompt) return send(res, 400, JSON.stringify({ error: 'a brief/prompt is required' }));
+      const m = loadMusic();
+      const concept = await generateTrackConcept(prompt, m.identity);
+      const audio = await renderAudio();
+      const track = { id: Date.now().toString(36), brief: String(prompt).slice(0, 300), title: concept.title || 'Untitled', style: concept.style || '', concept: concept.concept || '', lyrics: concept.lyrics || '', audioStatus: audio.status, audioUrl: audio.audioUrl, created: new Date().toISOString() };
+      m.tracks.unshift(track);
+      saveMusic(m);
+      return send(res, 200, JSON.stringify({ ok: true, track, note: MUSIC_KEY ? undefined : 'Lyrics + concept ready. Audio needs a music provider key (MUSIC_API_KEY).' }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/music/release') {
+    try {
+      const { trackId, platforms } = await readBody(req);
+      const m = loadMusic();
+      const track = m.tracks.find((t) => t.id === trackId);
+      if (!track) return send(res, 404, JSON.stringify({ error: 'track not found' }));
+      const rel = { id: Date.now().toString(36), trackId, title: track.title, platforms: platforms || ['spotify', 'apple', 'tiktok'], status: 'pending-approval', created: new Date().toISOString() };
+      m.releases.unshift(rel);
+      saveMusic(m);
+      return send(res, 200, JSON.stringify({ ok: true, release: rel, note: 'Queued for your approval — nothing publishes until you approve, and a distributor is connected.' }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/music/release/approve') {
+    try {
+      const { id, action } = await readBody(req);
+      const m = loadMusic();
+      const rel = m.releases.find((r) => r.id === id);
+      if (!rel) return send(res, 404, JSON.stringify({ error: 'release not found' }));
+      if (action === 'discard') { m.releases = m.releases.filter((r) => r.id !== id); saveMusic(m); return send(res, 200, JSON.stringify({ ok: true, removed: true })); }
+      // Approving records intent only. It NEVER auto-publishes — needs a connected distributor + your final go.
+      rel.status = 'approved'; rel.approvedAt = new Date().toISOString();
+      saveMusic(m);
+      return send(res, 200, JSON.stringify({ ok: true, status: 'approved', note: 'Approved. Connect a distributor (DistroKid/TuneCore) + keys to actually publish — not posted automatically.' }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 

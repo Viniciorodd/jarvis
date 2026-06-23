@@ -18,6 +18,7 @@ companion/.web-studio.json
 companion/.agent-runs.json
 companion/.agent-drafts.json
 companion/.paper.json
+companion/.music.json
 # media-generation spend ledger (code-enforced monthly cap state)
 scripts/.media-usage.json
 # control-plane event store (system of record — local runtime data) + eval results

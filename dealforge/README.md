@@ -42,9 +42,29 @@ Set `DEALFORGE_PORT` to override the port.
 > source contains `#REF!` errors and cross-tab references). DealForge computes profit transparently
 > from itemized lines so it is auditable. Tell us if you want it pinned to a specific definition.
 
-## Status
-- **Phase 1 (done):** engine + evals, auth + cloud-synced REST API, responsive SPA (deals, live
+## Status — all four phases built
+- **Phase 1:** engine + evals, auth + cloud-synced REST API, responsive SPA (deals, live
   calculators, lenders with auto-fill, CRM pipeline, expenses, archive, images, settings/themes), PWA.
-- **Phase 2:** Electron Win/Mac installers; embed into the JARVIS "Real Estate Desk" room.
-- **Phase 3:** Market Analysis + Total Costs tabs.
-- **Phase 4 (separate approval):** Stripe membership (monthly/quarterly/yearly/lifetime) + license keys.
+- **Phase 2:** `desktop/` Electron shell for Windows + macOS (verified launches + serves);
+  network-first service worker; embedded into the JARVIS companion via a "📊 Deal Analyzer" tab
+  in the Real Estate section (iframe + `?theme=` passthrough).
+- **Phase 3:** Total Costs P&L + Market Analysis KPI scorecard (engines + evals + UI).
+- **Phase 4:** membership/billing — plans (monthly/quarterly/yearly/lifetime), deterministic
+  entitlement gate, offline HMAC license keys, Stripe Checkout + webhook (dependency-free, via
+  `fetch`), pricing UI + paywall. **Disabled by default** and inert until `STRIPE_*` env vars are
+  set; the owner instance bypasses the paywall. No live credentials touched, no money moved.
+
+### Going live as a product (operator steps)
+1. In `config/brand.json` set `"mode": "multi-tenant"` and `"billing": { "enabled": true, ... }`.
+2. Create the four Stripe Prices and set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and
+   `STRIPE_PRICE_MONTHLY/_QUARTERLY/_YEARLY/_LIFETIME` in the environment (never in code).
+3. Point a Stripe webhook at `/api/billing/webhook`.
+4. Mint lifetime/offline keys with `node scripts/make-license.mjs --plan lifetime --email …`
+   (set `DEALFORGE_LICENSE_SECRET` to the same value on the server).
+
+## Build desktop installers
+```bash
+cd dealforge/desktop && npm install
+npm run dist:win     # NSIS installer (Windows)
+npm run dist:mac     # DMG (must run on macOS)
+```

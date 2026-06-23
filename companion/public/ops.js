@@ -940,6 +940,13 @@
     if (reCancel) { const f = el('reAddForm-' + reCancel.getAttribute('data-re-cancel')); if (f) f.hidden = true; return; }
     const reSave = e.target.closest('[data-re-save]');
     if (reSave) return submitRE(reSave.getAttribute('data-re-save'));
+    // ── web studio: new 3D site ──
+    const wsAdd = e.target.closest('[data-ws-add]');
+    if (wsAdd) { const f = el('wsAddForm'); if (f) { f.hidden = !f.hidden; if (!f.hidden) { const fi = f.querySelector('.wsf'); if (fi) fi.focus(); } } return; }
+    const wsCancel = e.target.closest('[data-ws-cancel]');
+    if (wsCancel) { const f = el('wsAddForm'); if (f) f.hidden = true; return; }
+    const wsSave = e.target.closest('[data-ws-save]');
+    if (wsSave) return submitWS();
   });
   // Enter inside an add-form field saves it
   body.addEventListener('keydown', (e) => {
@@ -985,13 +992,52 @@
       ${nextBtn ? `<div style="margin-top:10px">${nextBtn}</div>` : ''}
     </div>`;
   }
+  // Every new site defaults to the fully-3D starter (prompts/web-studio-spec.md).
+  function wsAddBar() {
+    return `<div class="re-add">
+      <button class="re-add-btn" data-ws-add="1">+ New 3D site</button>
+      <div class="re-add-form" id="wsAddForm" hidden>
+        <div class="re-add-grid">
+          <input class="re-f wsf" data-wsf="client" placeholder="Client / project name" style="grid-column:1/-1">
+          <input class="re-f wsf" data-wsf="price" type="number" placeholder="Price $">
+          <input class="re-f wsf" data-wsf="deadline" placeholder="Deadline (optional)">
+        </div>
+        <div class="re-add-acts">
+          <button class="re-save" data-ws-save="1">Create</button>
+          <button class="re-cancel" data-ws-cancel="1">Cancel</button>
+          <span class="re-add-msg" id="wsAddMsg">fully 3D · React Three Fiber starter</span>
+        </div>
+      </div>
+    </div>`;
+  }
+  async function submitWS() {
+    const f = el('wsAddForm'); if (!f) return;
+    const get = (k) => { const i = f.querySelector(`[data-wsf="${k}"]`); return i ? i.value.trim() : ''; };
+    const client = get('client');
+    const msg = el('wsAddMsg');
+    if (!client) { if (msg) msg.textContent = 'client / project name required'; return; }
+    if (msg) msg.textContent = 'creating…';
+    const data = {
+      client,
+      type: '3D immersive site',
+      stack: 'React Three Fiber (web-templates/3d-starter)',
+      price: Number(get('price')) || 0,
+      deadline: get('deadline'),
+      notes: 'Fully 3D — scaffold from web-templates/3d-starter per web-studio-spec.md',
+    };
+    try {
+      const r = await fetch('/api/web-studio/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      if (!r.ok) throw new Error('create failed');
+      wsData = null; loadWS();
+    } catch (e) { if (msg) msg.textContent = 'error: ' + esc(e.message); }
+  }
   function renderWSProjects() {
     if (!wsData) { loadWS(); return; }
     const active = (wsData.projects || []).filter((p) => !['paid'].includes(p.status));
-    if (!active.length) {
-      body.innerHTML = `<div class="ops-explain"><b>🌐 Web Studio</b><br>No active projects yet.<br>Tell Jarvis: <i>"New web project for [Client], [type], $[price]"</i></div>`; return;
-    }
-    body.innerHTML = `<div class="ops-explain" style="margin-bottom:12px"><b>🌐 Web Studio</b> — ${active.length} active project${active.length !== 1 ? 's' : ''}</div>` + active.map(wsCard).join('');
+    const head = active.length
+      ? `<div class="ops-explain" style="margin-bottom:12px"><b>🌐 Web Studio</b> — ${active.length} active project${active.length !== 1 ? 's' : ''} · every site ships fully 3D</div>` + active.map(wsCard).join('')
+      : `<div class="ops-explain" style="margin-bottom:12px"><b>🌐 Web Studio</b><br>No active projects yet. Every new site starts from the fully-3D starter — add one below.</div>`;
+    body.innerHTML = wsAddBar() + head;
   }
   function renderWSSites() {
     if (!wsData) { loadWS(); return; }

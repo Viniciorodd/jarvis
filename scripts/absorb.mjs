@@ -10,14 +10,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const CACHE = path.join(SCRIPT_DIR, '.yt-titles.json');
 const VAULT_DIR = process.env.VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
 const OUT_DIR = path.join(VAULT_DIR, '05 - Knowledge', 'Absorbed');
 const MODEL = process.env.ABSORB_MODEL || 'claude-haiku-4-5';
 
 function env(k) {
   if (process.env[k]) return process.env[k];
-  try { const m = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..', '.env'), 'utf8').match(new RegExp('^' + k + '=(.+)$', 'm')); return m ? m[1].trim() : ''; } catch { return ''; }
+  try { const m = fs.readFileSync(path.join(SCRIPT_DIR, '..', '.env'), 'utf8').match(new RegExp('^' + k + '=(.+)$', 'm')); return m ? m[1].trim() : ''; } catch { return ''; }
 }
 const API_KEY = env('ANTHROPIC_API_KEY');
 
@@ -125,21 +128,39 @@ function writeNote(id, meta, sum, transcript) {
 // ── main ──────────────────────────────────────────────────────────────────────────────────────────
 const RUN = process.argv[1] && process.argv[1].endsWith('absorb.mjs');
 if (RUN) {
-  const ids = process.argv.slice(2).map(vid).filter(Boolean);
-  if (!ids.length) { console.error('usage: node scripts/absorb.mjs <videoId|url> [more…]'); process.exit(1); }
-  let totIn = 0, totOut = 0;
+  const args = process.argv.slice(2);
+  const argVal = (flag, def) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : def; };
+  const BUDGET = Number(argVal('--budget', 5));        // hard $ stop — never overspend the operator's credit
+  const MAX = Number(argVal('--max', 0)) || Infinity;
+  let ids;
+  if (args.includes('--keep')) {
+    // Absorb only the genuinely-valuable backlog: the keep buckets, skipping entertainment + the long tail
+    // and anything already absorbed. Reads the title cache from youtube-triage.
+    const { classify } = await import('./youtube-triage.mjs');
+    let cache = {}; try { cache = JSON.parse(fs.readFileSync(CACHE, 'utf8')); } catch { /* run youtube-triage first */ }
+    const KEEP = new Set(['gov', 'ai', 'business', 'health', 'reading', 'mindset', 'invest']);
+    let done = new Set(); try { done = new Set(fs.readdirSync(OUT_DIR)); } catch { /* none yet */ }
+    ids = Object.keys(cache).filter((id) => cache[id] && KEEP.has(classify(cache[id])) && !done.has(slug(cache[id]) + '.md')).slice(0, MAX);
+    console.error(`--keep: ${ids.length} valuable videos to absorb (≈ $${(ids.length * 0.008).toFixed(2)}; budget cap $${BUDGET})\n`);
+  } else {
+    ids = args.filter((a) => !a.startsWith('--') && args[args.indexOf(a) - 1] !== '--budget' && args[args.indexOf(a) - 1] !== '--max').map(vid).filter(Boolean);
+  }
+  if (!ids.length) { console.error('usage: node scripts/absorb.mjs <videoId|url … | --keep [--max N] [--budget 5]>'); process.exit(1); }
+  let totIn = 0, totOut = 0, n = 0;
   for (const id of ids) {
+    const cost = (totIn / 1e6) * 1 + (totOut / 1e6) * 5;
+    if (cost >= BUDGET) { console.error(`\n⛔ budget $${BUDGET} reached — stopping at ${n}/${ids.length}.`); break; }
     process.stderr.write(`• ${id} … `);
     const meta = await oembed(id);
     const { text } = fetchTranscript(id);
-    if (!text || text.split(/\s+/).length < 30) { console.error(`no transcript (captions off?) — skipped: ${meta.title}`); continue; }
+    if (!text || text.split(/\s+/).length < 30) { console.error(`no transcript — skipped: ${meta.title}`); continue; }
     let sum;
     try { sum = await summarize(meta.title, meta.channel, text); }
     catch (e) { console.error(`(summary skipped — ${e.message.slice(0, 70)})`); sum = { keyPoints: [], whyItMatters: '', worthIt: 'skim', tags: [], oneLine: '', usage: {}, pending: true }; }
     const file = writeNote(id, meta, sum, text);
-    totIn += sum.usage.input_tokens || 0; totOut += sum.usage.output_tokens || 0;
-    console.error(`✓ ${path.basename(file)}  (${text.split(/\s+/).length} words → ${(sum.keyPoints || []).length} key points)`);
+    totIn += sum.usage.input_tokens || 0; totOut += sum.usage.output_tokens || 0; n++;
+    console.error(`✓ ${path.basename(file)}  (${text.split(/\s+/).length}w → ${(sum.keyPoints || []).length} pts)`);
   }
   const cost = (totIn / 1e6) * 1 + (totOut / 1e6) * 5; // rough Haiku $/Mtok
-  console.error(`\nTokens: ${totIn} in / ${totOut} out  ≈ $${cost.toFixed(4)} for ${ids.length} video(s) → notes in 05 - Knowledge/Absorbed/`);
+  console.error(`\nDone: ${n} absorbed · ${totIn} in / ${totOut} out  ≈ $${cost.toFixed(4)} → 05 - Knowledge/Absorbed/`);
 }

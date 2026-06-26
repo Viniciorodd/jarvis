@@ -104,6 +104,23 @@ const GOV_STATE_FILE = path.join(__dirname, '..', 'pods', 'gov', 'pipeline-state
 function loadGovState() { try { return JSON.parse(fs.readFileSync(GOV_STATE_FILE, 'utf8')); } catch { return { dispositions: {} }; } }
 function saveGovState(s) { try { fs.writeFileSync(GOV_STATE_FILE, JSON.stringify(s, null, 2)); } catch { /* */ } }
 
+// Businesses registry (pods/businesses.mjs) — the Businesses hub. Add a business there, not here.
+let _bizMod = null;
+function bizRegistry() { return (_bizMod ||= import('../pods/businesses.mjs')); }
+const ORDERS_FILE = path.join(__dirname, '..', 'fiverr-assets', '.orders.json');
+// Gather the raw data each business summarizes from (keyed by business id).
+async function gatherBusinessRaw() {
+  const [gov, money] = await Promise.all([govBoardData().catch(() => null), stripeMoney().catch(() => null)]);
+  return {
+    gov,
+    realestate: loadJson(PORTFOLIO_FILE, {}),
+    web: loadWS(),
+    fiverr: loadJson(ORDERS_FILE, { seen: [] }),
+    music: loadJson(MUSIC_FILE, { identity: {}, tracks: [], releases: [] }),
+    finance: money,
+  };
+}
+
 // THE single source of truth for "where does gov stand + what's your next move" — used by both the Gov
 // board and the cockpit's one thing, so the two can never disagree. Derives from live scout scores +
 // drafted proposals + open gates + awards + the operator's manual dispositions.
@@ -2261,6 +2278,20 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 400, JSON.stringify({ error: e.message })); }
   }
 
+  // ── BUSINESSES HUB: every business, one view (status · your next move · whose move) ─────────────
+  if (req.method === 'GET' && url.pathname === '/api/businesses') {
+    try { const R = await bizRegistry(); return send(res, 200, JSON.stringify({ businesses: R.buildHub(await gatherBusinessRaw()) })); }
+    catch (e) { return send(res, 200, JSON.stringify({ error: e.message, businesses: [] })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/business') {
+    try {
+      const id = url.searchParams.get('id');
+      const R = await bizRegistry();
+      const biz = R.BUSINESSES.find((b) => b.id === id);
+      if (!biz) return send(res, 404, JSON.stringify({ error: 'unknown business' }));
+      return send(res, 200, JSON.stringify(R.summarize(biz, await gatherBusinessRaw())));
+    } catch (e) { return send(res, 200, JSON.stringify({ error: e.message })); }
+  }
   // ── GOV PIPELINE BOARD: one plain view of where every opportunity stands + whose move is next ────
   if (req.method === 'GET' && url.pathname === '/api/gov-board') {
     try { return send(res, 200, JSON.stringify(await govBoardData())); }

@@ -26,9 +26,11 @@ That's the morning. If you do nothing else, do the one thing.
 | **Home** | The glance. | See the one thing, the ticker, today's tasks. Start here. |
 | **Today** | Your to-dos + calendar. | Add/complete tasks, see your week, dump a thought into Capture. |
 | **Talk** | Ask Jarvis anything. | "What's the news on X", "draft this", "what's my next gov move". |
-| **Gov Pipeline** (More → Gov Pipeline) | Your business, on one board. | See where every contract stands + your next move. |
+| **Ops** (bottom tab) | All your businesses, one view. | See where each business stands + whose move is next; tap one for its board. Gov opens the full pipeline. |
 
-Everything under **More → "Behind the scenes"** (Floor, HQ, Command, Dashboard) is optional eye-candy.
+The **Ops** tab is your **Businesses hub** — every business (Gov, Fiverr, Web Studio, Real estate, Finance, Music, ZeroTick, Lifeline) reads the same way: a status line + your single next move + whose move it is. Tap any one to open its board. Adding a new business later is easy — just give Jarvis the files + a few notes and she wires it up. The old Ops view is still there via "old Ops ↗" in the hub header.
+
+Everything under **More → "Behind the scenes"** (Floor, HQ, Command) is optional eye-candy.
 Ignore it. It does not run your business; **you + the four places above do.**
 
 ---

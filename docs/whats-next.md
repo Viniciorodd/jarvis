@@ -2,6 +2,27 @@
 
 _Updated 2026-06-26. Everything is committed + pushed to `origin/feat/core-infrastructure-v2`. Resume from here._
 
+### 🆕 2026-06-26 (later) — Businesses hub + UX cohesion + calendar live + vault-reorg fixes
+- **Calendar is editable + LIVE** (re-auth done): scope bumped to `calendar.events`; add/delete events from
+  the Today tab, verified create→delete. `scripts/google-auth.mjs` redirect port moved to 8723 (53682 was
+  in a Windows reserved range) + `GOOGLE_AUTH_PORT` override.
+- **UX cohesion (the "maze" fix):** the bottom nav now stays visible ON TOP of every overlay (overlays stop
+  54px above it; `closeAllOverlays()` in `nav.js`), so a tab is always an exit; Escape closes any overlay.
+  Dead **Dashboard** item removed (its #dash lived in the hidden ghost container). Ops cards de-boxed.
+- **Businesses hub (the new Ops default):** `pods/businesses.mjs` is a REGISTRY of all 8 businesses
+  (Gov · Fiverr · Web Studio · Real estate · Finance · Music · ZeroTick(SaaS) · Lifeline). Each summarizes
+  to status + your-next-move + whose-move from live data (gov board, RE portfolio, web-studio/orders/music
+  JSON, Stripe). Hub UI (`businesses.js` + `bizView` overlay) lists them; tap → Gov opens its dedicated
+  board, others render a generic board reusing the gov-card classes, unwired ones (ZeroTick/Lifeline) show
+  a "give Jarvis the files" setup path. **Add a business = one entry in `pods/businesses.mjs`.** Old Ops
+  reachable via "old Ops ↗" in the hub header. Routes `/api/businesses` + `/api/business?id=`. +7 evals.
+- **Vault reorg-proofing:** vault moved to 01 - To-Do / 04 - Projects / 05 - Knowledge / 09 - Archive.
+  `tasks.mjs` now finds ⚡ Quick Capture by basename anywhere (+ skips 09 - Archive); `youtube-triage`
+  writes to 05 - Knowledge. (Stray earlier 📺 To Absorb note still in old 07 - Knowledge — regenerate to move.)
+- ⏭ Open: the mockup-driven full business boards are generic for now (real data where it exists; most
+  businesses are early-stage/empty). Wire each pod's real workflow as they grow.
+
+
 ### 🆕 2026-06-26 — shipped: the COCKPIT + the GOV PIPELINE BOARD (operator clarity pass)
 The operator's #1 need was clarity — "I don't know what I need to be doing / how to run my business."
 Built the calm cockpit **inside Jarvis** (not a separate page) + one plain gov board. Read

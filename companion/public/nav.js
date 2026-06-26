@@ -20,7 +20,7 @@ var navBtns = {
 var currentView = 'home';
 
 /* ── every full-screen overlay. One place so the bottom nav can always close them ── */
-var OVERLAY_IDS = ['ops','mapView','floorView','commandView','activityView','hqView','settingsView','personalView','govView'];
+var OVERLAY_IDS = ['bizView','ops','mapView','floorView','commandView','activityView','hqView','settingsView','personalView','govView'];
 function closeAllOverlays(){
   OVERLAY_IDS.forEach(function(id){ var o = document.getElementById(id); if(o && !o.hidden) o.hidden = true; });
 }
@@ -75,7 +75,7 @@ if(navBtns.talk){
 
 if(navBtns.ops){
   navBtns.ops.addEventListener('click', function(){
-    triggerGhost('opsBtn');
+    triggerGhost('bizBtn'); /* the Businesses hub is the new Ops default; old Ops is reachable from inside it */
   });
 }
 

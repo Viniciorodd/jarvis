@@ -1,6 +1,36 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-06-19. Everything is committed to git + saved to memory. Resume from here._
+_Updated 2026-06-26. Everything is committed + pushed to `origin/feat/core-infrastructure-v2`. Resume from here._
+
+### 🆕 2026-06-26 — shipped: the COCKPIT + the GOV PIPELINE BOARD (operator clarity pass)
+The operator's #1 need was clarity — "I don't know what I need to be doing / how to run my business."
+Built the calm cockpit **inside Jarvis** (not a separate page) + one plain gov board. Read
+[`docs/operator-guide.md`](operator-guide.md) for the operator-facing "how to run it".
+- **Vault task engine** (`control-plane/tasks.mjs`, +17 evals): reads/adds/completes the Obsidian
+  "Second Brain" Markdown checkboxes (Tasks-plugin format). Excludes holding-pen files + a section-aware
+  "curated active" set so "today" stays calm (was flooding with 5k stale tasks). `VAULT_DIR` env.
+- **Cockpit folded into the Companion** (themed via shared CSS vars — follows `data-theme`): a **Today**
+  tab (tasks + Google week + capture) and on **Home** the 🎯 one thing + a rolling approvals ticker +
+  today's tasks. Routes `/api/cockpit` + `/api/cockpit/{task/add,task/complete,capture}`. The old
+  standalone `/cockpit.html` was removed.
+- **Gov Pipeline board** (`pods/gov/pipeline.mjs`, +11 evals; `/api/gov-board` + `/disposition`): one
+  board (Found→Reviewing→Responding→Submitted→Won/Lost) derived from the LIVE truth (scout scores +
+  drafted proposals + open gates + awards + manual dispositions). Every card shows **whose move is next
+  (👤 You vs 🤖 Jarvis)** + fit 1–5; flags out-of-lane set-asides (8(a)/SDVOSB/WOSB/HUBZone). UI = themed
+  overlay (More → Gov Pipeline / Home "open board →") with the straight-line model + a YOUR NEXT MOVE
+  banner. `govBoardData()` is the single source for "your next gov move", shared with the cockpit one-thing
+  so Home + board never disagree.
+- **Game UIs demoted**: HQ / Floor / Command / Dashboard moved under a "Behind the scenes — optional"
+  divider in More. Nothing deleted. CLAUDE.md architecture updated to "cockpit is the front door".
+- **Watch-later backlog**: `scripts/youtube-triage.mjs` → `07 - Knowledge/📺 To Absorb.md` in the vault
+  (199 videos → 113 keep / 86 skip, grouped + starred). The full summarizer pod is **deferred** (one fire
+  at a time). Operator getting the full ~2000-video export.
+- ⏭ **Still open:** (a) **calendar EDITABLE** (increment 3) — needs the Google scope bumped to
+  `calendar.events` + the operator to re-run `node scripts/google-auth.mjs` once (currently read-only by
+  design). (b) Fold the Notion Company Brain Opportunities into the board if manual ones aren't in the
+  scout stream. (c) the watch-later pod when ready.
+
+### 🆕 2026-06-19 — shipped: Fiverr Studio is LIVE (real clickable thumbnails)
 
 ### 🆕 2026-06-19 — shipped: Fiverr Studio is LIVE (real clickable thumbnails)
 - **Hybrid thumbnail engine** (`scripts/make-thumbnail.mjs`): Claude designs a spec → FLUX paints the

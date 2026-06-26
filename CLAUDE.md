@@ -8,6 +8,7 @@ This repo is the build-out of a personal AI operations system ("Jarvis") for a o
 3. **[`docs/STATE-OF-BUILD.md`](docs/STATE-OF-BUILD.md)** — what's done / partial / missing right now, and the prioritized next builds.
 4. **[`docs/reference/jarvis-build-plan.md`](docs/reference/jarvis-build-plan.md)** — full business context (the why).
 5. **[`docs/roadmap.md`](docs/roadmap.md)** + **[`docs/whats-next.md`](docs/whats-next.md)** — phase ordering + latest session handoff.
+6. **[`docs/operator-guide.md`](docs/operator-guide.md)** — the plain-English "how the operator actually uses Jarvis day to day" (the cockpit). Read it to understand the operator-facing front door before changing UI.
 Then say "read the repo, here's today's task." Don't re-derive context — update these files when phases complete so the next session resumes instead of restarting.
 
 ## The five prime directives (full text in the doctrine — enforce in CODE, not prompts)
@@ -25,10 +26,13 @@ Propose options + a recommendation, then wait for an explicit go-ahead before wr
 
 Self-hosted on a UGREEN NAS (Docker): **n8n** orchestrates all workflows; the **Claude API**
 is the brain (Haiku = scanning/classification, Sonnet = drafting/agent work, Opus = weekly
-strategy); **Notion** is long-term memory; **Telegram** is the mobile command/approval channel;
-**JARVIS HQ** (`hq/`) is a game-style dashboard that reads an events feed and renders pods as
-rooms with operators. Tailscale provides private access from iPhone/iPad — nothing is exposed
-to the public internet.
+strategy); **Notion** is long-term memory; **Telegram** is the mobile command/approval channel.
+The **operator front door is the calm cockpit inside the Companion** (`companion/`): the **Home**
+glance (the ONE thing + a rolling approvals ticker + today's tasks), the **Today** tab (vault tasks +
+Google calendar + capture), and the **Gov Pipeline** board (`pods/gov/pipeline.mjs`). The game-style
+surfaces — **JARVIS HQ** (`hq/`) and **Jarvis World** (`jarvis-world/`) — are kept but **demoted** to
+"behind the scenes" (More menu); don't make them the front door. Tailscale provides private access from
+iPhone/iPad — nothing is exposed to the public internet.
 
 ## Key invariants
 
@@ -48,6 +52,15 @@ to the public internet.
 
 ## Where things live
 
+- **Cockpit (operator front door)**: served by `companion/server.js` inside the Jarvis shell.
+  - Tasks engine (vault Markdown checkboxes, source of truth): `control-plane/tasks.mjs` → `/api/cockpit`,
+    `/api/cockpit/{task/add,task/complete,capture}`. Vault path = `VAULT_DIR` (default `~/Documents/Second Brain`).
+  - Gov Pipeline board logic (derives stage / fit / whose-move from live data): `pods/gov/pipeline.mjs` →
+    `/api/gov-board` (+ `/disposition`). `govBoardData()` in the server is the ONE source for "your next gov
+    move" — shared with the cockpit one-thing so Home and the board never disagree. Manual dispositions:
+    `pods/gov/pipeline-state.json`.
+  - Front-end: `companion/public/index.html` (Home + Today tab + Gov overlay), `today.js`/`today.css`
+    (Home glance + Today + gov-board styles), `govboard.js`. Theme follows `data-theme` via shared CSS vars.
 - HQ API contract: documented at the top of `hq/server.js` (POST /api/event, /api/approval, GET /api/state).
 - Room/rank unlock thresholds: `hq/config/rooms.json` (rooms) and the RANKS list in `hq/public/app.js`.
 - n8n workflows are exported JSON in `n8n/workflows/` — they are the source of truth; if you

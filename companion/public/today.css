@@ -73,6 +73,9 @@
 .td-label{ font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); padding:2px 20px 4px; }
 .td-toast{ font-size:12px; color:var(--teal); padding:2px 20px; min-height:16px; }
 
+/* "Behind the scenes" divider in the More menu (demotes the game/extra surfaces) */
+.j-more-label{ font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); padding:16px 18px 6px; opacity:.7; }
+
 /* ── Gov Pipeline board (overlay) ───────────────────────────────────────────── */
 .govview{ position:fixed; inset:0; z-index:25; display:flex; flex-direction:column;
   background:radial-gradient(1100px 700px at 50% -10%, var(--ink2) 0%, transparent 70%), var(--ink); }

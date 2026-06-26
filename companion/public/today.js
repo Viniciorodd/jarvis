@@ -1,0 +1,173 @@
+/* today.js — folds the cockpit into the Jarvis shell: the Home glance (one thing · today's tasks ·
+   rolling approvals ticker) and the full Today tab (tasks · week · capture). Reads /api/cockpit and
+   writes back to the vault (add/complete/capture). Vanilla, theme-agnostic (styling lives in today.css). */
+(function(){
+  function $id(id){ return document.getElementById(id); }
+  function el(tag, cls, txt){ var n=document.createElement(tag); if(cls)n.className=cls; if(txt!=null)n.textContent=txt; return n; }
+  function api(path, opts){ return fetch(path, opts).then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); }); }
+
+  function fmtTime(iso){
+    if(!iso) return '';
+    if(/^\d{4}-\d{2}-\d{2}$/.test(iso)) return 'all day';
+    var d = new Date(iso); if(isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
+  }
+  function dayKey(iso){ return String(iso).slice(0,10); }
+
+  /* one task row — compact (home) hides the meta line */
+  function taskRow(t, compact){
+    var row = el('div','td-task');
+    var box = el('span','td-box'); box.title = 'Complete';
+    box.addEventListener('click', function(){ completeTask(t, row); });
+    var body = el('div','td-body');
+    body.appendChild(el('div','td-txt', t.text));
+    if(!compact){
+      var meta = el('div','td-meta');
+      if(t.due) meta.appendChild(el('span','td-due','📅 '+t.due));
+      if(t.priority === 'high' || t.priority === 'highest') meta.appendChild(el('span','td-hi','↑ '+t.priority));
+      (t.tags||[]).slice(0,3).forEach(function(tg){ meta.appendChild(el('span','td-tag','#'+tg)); });
+      if(meta.childNodes.length) body.appendChild(meta);
+    }
+    row.appendChild(box); row.appendChild(body);
+    return row;
+  }
+
+  /* ── HOME: ticker + one thing + today's tasks ─────────────────────────────── */
+  function renderTicker(aps){
+    var ticker = $id('jTicker'), track = $id('jTickerTrack');
+    if(!ticker || !track) return;
+    if(!aps.length){ ticker.hidden = true; return; }
+    ticker.hidden = false;
+    track.innerHTML = '';
+    var titles = aps.map(function(a){ return a.title || a.action; });
+    // one segment, duplicated, so the -50% keyframe loops seamlessly
+    function seg(){
+      var s = el('span','j-ticker-seg');
+      s.appendChild(el('span','j-tk-lead', '  ⏳ '+aps.length+' awaiting you  '));
+      titles.forEach(function(t){ s.appendChild(el('span','j-tk-dot','•  ')); s.appendChild(document.createTextNode(t+'  ')); });
+      return s;
+    }
+    track.appendChild(seg()); track.appendChild(seg());
+  }
+
+  function renderOneThing(o){
+    var card = $id('jOneThing');
+    if(!card) return;
+    if(!o){ card.hidden = true; return; }
+    card.hidden = false;
+    $id('jOtText').textContent = o.text;
+    var meta = $id('jOtMeta'); meta.innerHTML = '';
+    if(o.kind === 'gov') meta.appendChild(el('span','j-ot-tag gov','Gov · #1 priority'));
+    else if(o.kind === 'approval') meta.appendChild(el('span','j-ot-tag gov','Awaiting your sign-off'));
+    else if(o.kind === 'task') meta.appendChild(el('span','j-ot-tag','From your tasks'));
+    if(o.deadline) meta.appendChild(el('span','j-ot-due','due '+o.deadline));
+  }
+
+  function renderHomeTasks(tasks){
+    var wrap = $id('jTodayTasks'), cnt = $id('jTodayCount');
+    if(!wrap) return;
+    var due = (tasks && tasks.dueToday) || [], active = (tasks && tasks.active) || [];
+    if(cnt) cnt.textContent = (due.length ? due.length+' due · ' : '') + active.length + ' active';
+    wrap.innerHTML = '';
+    var list = due.concat(active).slice(0,5);
+    if(!list.length){ wrap.appendChild(el('div','j-pipe-empty','Nothing queued — add one in Today.')); return; }
+    list.forEach(function(t){ wrap.appendChild(taskRow(t, true)); });
+  }
+
+  /* ── TODAY tab: tasks + week + capture ────────────────────────────────────── */
+  function renderTodayTab(d){
+    var due = (d.tasks && d.tasks.dueToday) || [], active = (d.tasks && d.tasks.active) || [];
+    var cnt = $id('tdTaskCount'); if(cnt) cnt.textContent = (due.length ? due.length+' due · ' : '') + active.length + ' active';
+    var dueWrap = $id('tdDueWrap'), dueList = $id('tdDueList');
+    if(dueList){
+      dueList.innerHTML = '';
+      if(!due.length){ if(dueWrap) dueWrap.style.display = 'none'; }
+      else { if(dueWrap) dueWrap.style.display = ''; due.forEach(function(t){ dueList.appendChild(taskRow(t, false)); }); }
+    }
+    var aList = $id('tdActiveList');
+    if(aList){
+      aList.innerHTML = '';
+      if(!active.length) aList.appendChild(el('div','j-pipe-empty','Nothing active. Add a task above.'));
+      else active.slice(0,40).forEach(function(t){ aList.appendChild(taskRow(t, false)); });
+    }
+    var st = $id('tdCalStatus');
+    if(st) st.textContent = d.calError === 'not-connected' ? 'not connected' : (d.calError ? 'error' : ((d.week||[]).length + ' events'));
+    var wk = $id('tdWeek');
+    if(wk){
+      wk.innerHTML = '';
+      var evs = d.week || [];
+      if(!evs.length){ wk.appendChild(el('div','j-pipe-empty', d.hasGoogle ? 'Nothing scheduled in the next 7 days.' : 'Connect Google Calendar to see your week.')); return; }
+      var byDay = {};
+      evs.forEach(function(e){ var k = dayKey(e.start); (byDay[k] = byDay[k] || []).push(e); });
+      Object.keys(byDay).sort().forEach(function(k){
+        var day = el('div','td-day' + (k === d.date ? ' is-today' : ''));
+        var dt = new Date(k + 'T12:00:00');
+        var h = el('div','td-day-h');
+        h.appendChild(el('span','td-dow', dt.toLocaleDateString([], { weekday:'short' })));
+        h.appendChild(document.createTextNode('  ' + dt.toLocaleDateString([], { month:'short', day:'numeric' }) + (k === d.date ? ' · today' : '')));
+        day.appendChild(h);
+        byDay[k].forEach(function(e){ var ev = el('div','td-ev'); ev.appendChild(el('span','td-ev-t', fmtTime(e.start))); ev.appendChild(el('span', null, e.summary || '(busy)')); day.appendChild(ev); });
+        wk.appendChild(day);
+      });
+    }
+  }
+
+  function render(d){
+    if(!d) return;
+    renderTicker(d.approvals || []);
+    renderOneThing(d.oneThing);
+    renderHomeTasks(d.tasks);
+    renderTodayTab(d);
+  }
+
+  var loading = false;
+  function load(){
+    if(loading) return; loading = true;
+    api('/api/cockpit').then(render).catch(function(){}).then(function(){ loading = false; });
+  }
+
+  function completeTask(t, row){
+    if(row) row.classList.add('td-gone');
+    api('/api/cockpit/task/complete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id:t.id, file:t.file, raw:t.raw }) })
+      .then(function(){ setTimeout(load, 350); })
+      .catch(function(){ if(row) row.classList.remove('td-gone'); });
+  }
+
+  /* parse inline "📅 2026-07-01" + "#tags" out of a quick-add line */
+  function parseQuickAdd(raw){
+    var dm = raw.match(/📅\s*(\d{4}-\d{2}-\d{2})/) || raw.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+    var due = dm ? dm[1] : '';
+    var tags = [], m, re = /#([A-Za-z0-9_\/-]+)/g;
+    while((m = re.exec(raw))) tags.push(m[1]);
+    var text = raw.replace(/📅\s*\d{4}-\d{2}-\d{2}/g,'').replace(/\b\d{4}-\d{2}-\d{2}\b/g,'').replace(/#[A-Za-z0-9_\/-]+/g,'').replace(/\s+/g,' ').trim();
+    return { text:text, due:due, tags:tags };
+  }
+
+  function wire(){
+    var addForm = $id('tdAddForm');
+    if(addForm) addForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      var inp = $id('tdAddInput'); var v = inp.value.trim(); if(!v) return;
+      var body = parseQuickAdd(v); if(!body.text) return;
+      inp.value = '';
+      api('/api/cockpit/task/add', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(load).catch(function(){ inp.value = v; });
+    });
+    var capForm = $id('tdCapForm');
+    if(capForm) capForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      var inp = $id('tdCapInput'); var v = inp.value.trim(); if(!v) return;
+      inp.value = '';
+      var toast = $id('tdToast');
+      api('/api/cockpit/capture', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text:v }) })
+        .then(function(){ if(toast){ toast.textContent = '✓ captured to the vault'; setTimeout(function(){ toast.textContent = ''; }, 2500); } load(); })
+        .catch(function(){ if(toast) toast.textContent = 'failed'; });
+    });
+    // "all →" jumps to the Today tab; the ticker opens Operations (where you review + approve)
+    var more = $id('jTodayMore'); if(more) more.addEventListener('click', function(e){ e.preventDefault(); var b = $id('jNavToday'); if(b) b.click(); });
+    var ticker = $id('jTicker'); if(ticker) ticker.addEventListener('click', function(){ var b = $id('opsBtn'); if(b) b.click(); });
+  }
+
+  wire();
+  load();
+  setInterval(load, 60000);
+})();

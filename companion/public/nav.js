@@ -4,12 +4,14 @@
 
 var views = {
   home: document.getElementById('jHomeView'),
+  today: document.getElementById('jTodayView'),
   talk: document.getElementById('jTalkView'),
   more: document.getElementById('jMoreView')
 };
 
 var navBtns = {
   home: document.getElementById('jNavHome'),
+  today: document.getElementById('jNavToday'),
   talk: document.getElementById('jNavTalk'),
   ops:  document.getElementById('jNavOps'),
   more: document.getElementById('jNavMore')
@@ -45,6 +47,10 @@ function triggerGhost(id){
 /* ── bottom nav wiring ── */
 if(navBtns.home){
   navBtns.home.addEventListener('click', function(){ showView('home'); });
+}
+
+if(navBtns.today){
+  navBtns.today.addEventListener('click', function(){ showView('today'); });
 }
 
 if(navBtns.talk){

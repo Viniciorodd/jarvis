@@ -17,6 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="today.css">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('jarvis-theme')||'mono'}catch(e){}</script>
 </head>
 <body>
@@ -38,9 +39,28 @@
 
     <!-- ── HOME VIEW (default) ── -->
     <div class="j-view active" id="jHomeView">
+
+      <!-- Rolling approvals ticker (like a stock crawl) — filled by today.js -->
+      <div class="j-ticker" id="jTicker" hidden title="What's waiting on you — tap to review">
+        <div class="j-ticker-track" id="jTickerTrack"></div>
+      </div>
+
       <div class="j-hero">
         <div class="j-greeting" id="homeGreet">Good morning, sir.</div>
         <div class="j-hero-sub" id="jHeroSub">ready.</div>
+      </div>
+
+      <!-- 🎯 The one thing (filled by today.js) -->
+      <div class="j-onething" id="jOneThing" hidden>
+        <div class="j-ot-label">THE ONE THING</div>
+        <div class="j-ot-text" id="jOtText">—</div>
+        <div class="j-ot-meta" id="jOtMeta"></div>
+      </div>
+
+      <!-- Today's tasks at a glance (filled by today.js) -->
+      <div class="j-section" id="jTodaySection">
+        <div class="j-sh">Today <span class="j-sh-n" id="jTodayCount"></span><a class="j-sh-link" id="jTodayMore" href="#">all →</a></div>
+        <div id="jTodayTasks"><div class="j-pipe-empty">loading…</div></div>
       </div>
 
       <!-- Quick metrics (filled by updateHome() in app.js) -->
@@ -67,6 +87,47 @@
       <!-- Weather (loaded by app.js) -->
       <div class="j-section">
         <div class="wx-bar" id="wxBar" hidden></div>
+      </div>
+    </div>
+
+    <!-- ── TODAY VIEW (tasks · calendar · capture — vault-backed) ── -->
+    <div class="j-view" id="jTodayView">
+      <div class="j-hero">
+        <div class="j-greeting">Today</div>
+        <div class="j-hero-sub">tasks, calendar &amp; capture — backed by your vault</div>
+      </div>
+
+      <!-- ✅ Tasks -->
+      <div class="j-section">
+        <div class="j-sh">Tasks <span class="j-sh-n" id="tdTaskCount"></span></div>
+        <form class="td-add" id="tdAddForm">
+          <input id="tdAddInput" autocomplete="off" placeholder="Add a task…  (#gov 📅 2026-07-01)" />
+          <button type="submit" class="td-btn">Add</button>
+        </form>
+        <div class="td-sub" id="tdDueWrap">
+          <div class="td-label">🔥 Today &amp; overdue</div>
+          <div id="tdDueList"></div>
+        </div>
+        <div class="td-sub">
+          <div class="td-label">⚡ Active</div>
+          <div id="tdActiveList"></div>
+        </div>
+      </div>
+
+      <!-- 📅 Week -->
+      <div class="j-section">
+        <div class="j-sh">Week <span class="j-sh-n" id="tdCalStatus"></span></div>
+        <div id="tdWeek"></div>
+      </div>
+
+      <!-- ⚡ Capture -->
+      <div class="j-section">
+        <div class="j-sh">Capture <span class="j-sh-link">→ vault</span></div>
+        <form class="td-add" id="tdCapForm">
+          <input id="tdCapInput" autocomplete="off" placeholder="Dump a thought → ⚡ Quick Capture…" />
+          <button type="submit" class="td-btn">Capture</button>
+        </form>
+        <div class="td-toast" id="tdToast"></div>
       </div>
     </div>
 
@@ -143,6 +204,10 @@
     <button class="j-nav-btn active" id="jNavHome">
       <i class="ti ti-home" aria-hidden="true"></i>
       <span>Home</span>
+    </button>
+    <button class="j-nav-btn" id="jNavToday">
+      <i class="ti ti-checklist" aria-hidden="true"></i>
+      <span>Today</span>
     </button>
     <button class="j-nav-btn" id="jNavTalk">
       <i class="ti ti-message" aria-hidden="true"></i>
@@ -406,6 +471,7 @@
 <script src="app.js"></script>
 <script src="home.js"></script>
 <script src="nav.js"></script>
+<script src="today.js"></script>
 <script src="ops.js"></script>
 <script src="map.js"></script>
 <script src="floor.js"></script>

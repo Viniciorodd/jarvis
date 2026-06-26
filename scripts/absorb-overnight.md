@@ -4,13 +4,14 @@ You are running unattended (scheduled, overnight). Do **ONE batch (~20 videos)**
 Do not loop. This uses the Claude subscription, not the Anthropic API.
 
 ## Step 1 — stage transcripts (free, no API)
-Run once:
+Run BOTH (the playlist first — it's the operator's curated keepers — then the backlog):
 
 ```
+node scripts/absorb.mjs --playlist --no-llm
 node scripts/absorb.mjs --keep --no-llm --max 20
 ```
 
-It writes up to 20 new valuable-bucket videos into
+These write new videos into
 `C:\Users\vinic\Documents\Second Brain\05 - Knowledge\Absorbed\`
 as notes containing the marker `⏳ AI summary pending`, each with the full transcript at the bottom.
 (If it prints "Nothing new to absorb", there's nothing pending — stop here.)

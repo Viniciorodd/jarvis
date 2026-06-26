@@ -2,6 +2,26 @@
 
 _Updated 2026-06-26. Everything is committed + pushed to `origin/feat/core-infrastructure-v2`. Resume from here._
 
+### 🆕 2026-06-26 (newest) — absorb pipeline + calendar views + CRM + agent SOP files
+- **Absorb pipeline** (`scripts/absorb.mjs`): YouTube → skimmable Obsidian note (key-points summary on top,
+  why-it-matters, tags, related links, full polished transcript at bottom). Transcript via **yt-dlp** auto-
+  captions (YouTube blocks the simple fetch; `pip install yt-dlp` required). Summary via Claude Haiku
+  (~$0.008/video). `--keep` batch mode absorbs only the valuable buckets w/ a hard `--budget` $ stop.
+  Notes → `05 - Knowledge/Absorbed/`. **Gotcha learned: Claude Pro ≠ API** — the autonomous engine needs
+  API credit; only in-session Claude Code work uses the subscription. Going-forward = an **unlisted YouTube
+  playlist** (yt-dlp reads it w/o auth) on a local-scheduled Claude-Code run (subscription, no API cost).
+- **Calendar day/week/month** (`companion/public/calendar.js`, `google.calendarRange`, `/api/calendar`):
+  real navigable grid in the Today tab (replaces the flat 7-day list); add/delete events.
+- **CRM in the hub** (`projects.mjs` parseCrm/readCrm/addCrmRow, `/api/business/crm`): gov subs + RE tenants
+  show as a table w/ an add-contact form, written to `Contacts (CRM).md`. Gov detail now has activity + CRM
+  + an "Open the Gov Pipeline board →" button.
+- **Agent SOP/identity files** (`scripts/scaffold-agents.mjs`): each business folder got `_Operating.md`
+  (mission/vision/how-we-operate/how-the-operator-thinks) + per-agent `agents/<Name>.md` seeded from the org
+  roster (pods/org.mjs), with ✍️ spots for the operator's SOPs + parameters. So any new Claude session on a
+  project reads the doctrine + agent SOPs + Log + CRM and operates consistently.
+- ⏭ Open: fill in the agent SOP `✍️` sections (operator); wire the playlist + the scheduled absorb run once
+  there's a playlist; per-pod agents writing outputs into their `agents/` folders.
+
 ### 🆕 2026-06-26 (latest) — per-business vault folders + activity log + Takeout at scale
 - **Watch-later at scale:** `scripts/youtube-triage.mjs` now reads Google Takeout playlist CSVs (IDs only)
   and resolves titles via YouTube oEmbed (cached `scripts/.yt-titles.json`). Full backlog = **1,078 videos**

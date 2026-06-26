@@ -77,6 +77,7 @@ if(navBtns.more){
 
 /* ── More menu items ── */
 var moreItems = {
+  jMoreGov:     function(){ triggerGhost('govBtn'); },
   jMoreMap:     function(){ triggerGhost('mapBtn'); },
   jMoreFloor:   function(){ triggerGhost('floorBtn'); },
   jMoreHQ:      function(){ triggerGhost('hqBtn'); },

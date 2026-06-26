@@ -74,7 +74,7 @@
 
       <!-- Gov pipeline (filled by home.js) -->
       <div class="j-section">
-        <div class="j-sh">Gov pipeline</div>
+        <div class="j-sh">Gov pipeline <a class="j-sh-link" id="jHomeGovOpen" href="#">open board →</a></div>
         <div id="jGovPipe"><div class="j-pipe-empty">loading…</div></div>
       </div>
 
@@ -153,6 +153,10 @@
     <!-- ── MORE VIEW ── -->
     <div class="j-view" id="jMoreView">
       <div class="j-more-list">
+        <button class="j-more-item" id="jMoreGov">
+          <i class="ti ti-building-bank" aria-hidden="true"></i><span>Gov Pipeline</span>
+          <i class="ti ti-chevron-right j-more-chevron" aria-hidden="true"></i>
+        </button>
         <button class="j-more-item" id="jMoreMap">
           <i class="ti ti-map" aria-hidden="true"></i><span>Map</span>
           <i class="ti ti-chevron-right j-more-chevron" aria-hidden="true"></i>
@@ -260,6 +264,26 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- GOV PIPELINE BOARD -->
+<div class="govview" id="govView" hidden>
+  <div class="ops-head">
+    <span class="px ops-brand">Gov Pipeline</span>
+    <span class="map-stat" id="govStat">where every opportunity stands — and whose move is next</span>
+    <button class="ops-refresh" id="govRefresh" title="Refresh">⟳</button>
+    <button class="ops-x" id="govX" title="Close">✕</button>
+  </div>
+  <div class="gov-model">
+    <span class="gov-step">Find</span><span class="gov-arrow">→</span>
+    <span class="gov-step">Score</span><span class="gov-arrow">→</span>
+    <span class="gov-step">Respond</span><span class="gov-arrow">→</span>
+    <span class="gov-step">Build past performance</span><span class="gov-arrow">→</span>
+    <span class="gov-step">Track</span>
+    <span class="gov-lane">your lane: janitorial · custodial · grounds · &lt;$150k · Small-Business / SDB set-asides (not 8(a)/SDVOSB/WOSB/HUBZone)</span>
+  </div>
+  <div class="gov-next" id="govNext" hidden></div>
+  <div class="gov-board" id="govBoard"><div class="ops-empty">loading…</div></div>
 </div>
 
 <!-- MAP -->
@@ -449,6 +473,7 @@
   <button id="activityBtn"></button>
   <button id="hqBtn"></button>
   <button id="dashBtn"></button>
+  <button id="govBtn"></button>
   <button id="focusPill" class="focus-pill">◉ normal</button>
   <!-- Dashboard rail — filled by loadDash() in app.js -->
   <div id="dash" class="dash">
@@ -472,6 +497,7 @@
 <script src="home.js"></script>
 <script src="nav.js"></script>
 <script src="today.js"></script>
+<script src="govboard.js"></script>
 <script src="ops.js"></script>
 <script src="map.js"></script>
 <script src="floor.js"></script>

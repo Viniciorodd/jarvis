@@ -96,6 +96,45 @@ if (!VAULT_DIR) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.e
 let _tasksMod = null;
 function tasksEngine() { return (_tasksMod ||= import('../control-plane/tasks.mjs')); }
 const vaultOpt = () => (VAULT_DIR ? { vaultDir: VAULT_DIR } : {});
+
+// Gov pipeline board (pods/gov/pipeline.mjs, ESM) + the operator's manual dispositions (won/lost/passed).
+let _govMod = null;
+function govPipeline() { return (_govMod ||= import('../pods/gov/pipeline.mjs')); }
+const GOV_STATE_FILE = path.join(__dirname, '..', 'pods', 'gov', 'pipeline-state.json');
+function loadGovState() { try { return JSON.parse(fs.readFileSync(GOV_STATE_FILE, 'utf8')); } catch { return { dispositions: {} }; } }
+function saveGovState(s) { try { fs.writeFileSync(GOV_STATE_FILE, JSON.stringify(s, null, 2)); } catch { /* */ } }
+
+// THE single source of truth for "where does gov stand + what's your next move" — used by both the Gov
+// board and the cockpit's one thing, so the two can never disagree. Derives from live scout scores +
+// drafted proposals + open gates + awards + the operator's manual dispositions.
+async function govBoardData() {
+  const cp = (p) => fetch(CP_URL + p, { signal: AbortSignal.timeout(4500) }).then((r) => r.json());
+  const [pending, govEvents] = await Promise.all([cp('/approvals/pending').catch(() => []), cp('/events?pod=gov').catch(() => [])]);
+  const ev = Array.isArray(govEvents) ? govEvents : [];
+  const propByNotice = {};
+  for (const e of ev.filter((x) => x.action === 'proposal.draft' && x.payload && x.payload.file)) if (e.payload.noticeId) propByNotice[e.payload.noticeId] = e.payload.file;
+  const oppMap = new Map();
+  for (const e of ev.filter((x) => x.action === 'bid.score')) {
+    const pl = e.payload || {}; const id = pl.noticeId || e.id;
+    oppMap.set(id, {
+      noticeId: id, title: pl.title || (e.rationale || '').split(' — ')[0], score: pl.score, recommendation: pl.recommendation,
+      setAside: pl.setAside || pl.set_aside_fit, agency: pl.agency, place: pl.place, placeState: pl.placeState,
+      deadline: pl.deadline, url: pl.url, proposalFile: propByNotice[id] || null,
+    });
+  }
+  const approvals = (Array.isArray(pending) ? pending : []).map((a) => ({ pod: a.pod, action: a.action, noticeId: a.payload && a.payload.noticeId, file: a.payload && a.payload.file, rationale: a.rationale }));
+  // anything with an OPEN gov gate must show on the board even if its score predates the current scout window
+  const subjOf = (r) => { const x = String(r || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' '); const m = x.match(/drafted for (.+?)\s*(?:\.|$)/i) || x.match(/ for (.+?)\s*(?:\.|$)/i); return (m ? m[1] : x.split(/[.—]/)[0]).trim(); };
+  for (const a of approvals) {
+    if (a.pod !== 'gov' || !/submit/i.test(a.action || '')) continue;
+    const id = a.noticeId || a.file; if (!id || oppMap.has(id)) continue;
+    oppMap.set(id, { noticeId: id, title: subjOf(a.rationale) || 'Drafted proposal', score: 60, recommendation: 'bid', setAside: '', proposalFile: a.file || null });
+  }
+  let awards = []; try { awards = (JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'pods', 'gov', 'awards.json'), 'utf8')).awards) || []; } catch { /* none */ }
+  const dispositions = loadGovState().dispositions || {};
+  const P = await govPipeline();
+  return P.buildBoard({ opportunities: [...oppMap.values()], approvals, awards, dispositions });
+}
 // OpenAI key — used for Whisper voice transcription (Whisper API, ~$0.006/min)
 let OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 if (!OPENAI_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^OPENAI_API_KEY=(.+)$/m); if (m) OPENAI_KEY = m[1].trim(); } catch { /* */ } }
@@ -2155,42 +2194,24 @@ const server = http.createServer(async (req, res) => {
     try { week = await google.calendarUpcoming({ days: 7, max: 30 }); }
     catch (e) { calError = google.googleConfigured() ? e.message : 'not-connected'; }
     const todayCalendar = week.filter((e) => String(e.start).slice(0, 10) === todayStr);
-    // approvals (control-plane pending) + gov opportunities → today's gov next action
-    let approvals = [], govNextAction = null;
+    // pending gates for the strip/ticker (friendly titles)
+    let approvals = [];
     try {
-      const cp = (p) => fetch(CP_URL + p, { signal: AbortSignal.timeout(4000) }).then((r) => r.json());
-      const [pending, govEvents] = await Promise.all([cp('/approvals/pending').catch(() => []), cp('/events?pod=gov').catch(() => [])]);
-      // A short human subject for an approval (the rationale is like "Proposal drafted for X (score N). …").
+      const pending = await fetch(CP_URL + '/approvals/pending', { signal: AbortSignal.timeout(4000) }).then((r) => r.json()).catch(() => []);
       const subj = (a) => {
         if (a.payload && a.payload.title) return a.payload.title;
-        const r = (a.rationale || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' '); // drop parentheticals
+        const r = (a.rationale || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ');
         const m = r.match(/drafted for (.+?)\s*(?:\.|$)/i) || r.match(/ for (.+?)\s*(?:\.|$)/i);
         return (m ? m[1] : r.split(/[.—]/)[0]).trim() || a.action;
       };
-      approvals = (Array.isArray(pending) ? pending : []).map((a) => ({
-        id: a.id, pod: a.pod, action: a.action, rationale: a.rationale, title: subj(a), ts: a.ts,
-      }));
-      const ev = Array.isArray(govEvents) ? govEvents : [];
-      const opps = new Map();
-      for (const e of ev.filter((x) => x.action === 'bid.score')) {
-        const pl = e.payload || {};
-        opps.set(pl.noticeId || e.id, { title: pl.title || (e.rationale || '').split(' — ')[0], score: pl.score, rec: pl.recommendation, deadline: pl.deadline, url: pl.url });
-      }
-      const ranked = [...opps.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
-      const top = ranked.find((o) => /bid/i.test(o.rec || '')) || ranked[0];
-      if (top) govNextAction = { text: `Respond to ${top.title}`, deadline: top.deadline || null, url: top.url || null, score: top.score || null };
+      approvals = (Array.isArray(pending) ? pending : []).map((a) => ({ id: a.id, pod: a.pod, action: a.action, rationale: a.rationale, title: subj(a), ts: a.ts }));
     } catch { /* control-plane offline — cockpit still renders */ }
-    // the ONE thing (deterministic): a gov send awaiting approval > today's gov next action >
-    // highest-priority due task > highest-priority active task.
+    // Your next gov move comes from the SAME pipeline the Gov board uses, so Home + board never disagree.
+    let govNextAction = null;
+    try { const board = await govBoardData(); govNextAction = board.yourNextAction || null; } catch { /* */ }
+    // the ONE thing (deterministic): your next gov move > a due task > the top active task.
     let oneThing = null;
-    // Prefer signing & submitting a drafted proposal (highest-leverage gov action) over outreach sends.
-    const govApproval = approvals.find((a) => a.pod === 'gov' && a.action === 'submit')
-      || approvals.find((a) => a.pod === 'gov' && /send|email/i.test(a.action || ''));
-    if (govApproval) {
-      const verb = govApproval.action === 'submit' ? 'Review, sign & submit' : 'Approve & send';
-      oneThing = { text: `${verb}: ${govApproval.title}`, kind: 'approval', id: govApproval.id };
-    }
-    else if (govNextAction) oneThing = { text: govNextAction.text, kind: 'gov', deadline: govNextAction.deadline, url: govNextAction.url };
+    if (govNextAction) oneThing = { text: govNextAction.text + ' — ' + govNextAction.title, kind: 'gov', deadline: govNextAction.deadline, url: govNextAction.url };
     else if (tasks.dueToday && tasks.dueToday[0]) oneThing = { text: tasks.dueToday[0].text, kind: 'task', id: tasks.dueToday[0].id };
     else if (tasks.active && tasks.active[0]) oneThing = { text: tasks.active[0].text, kind: 'task', id: tasks.active[0].id };
     return send(res, 200, JSON.stringify({ date: todayStr, oneThing, govNextAction, todayCalendar, week, tasks, approvals, calError, hasGoogle: google.googleConfigured() }));
@@ -2220,6 +2241,22 @@ const server = http.createServer(async (req, res) => {
       const T = await tasksEngine();
       const r = T.capture(String(text).trim(), vaultOpt());
       return send(res, 200, JSON.stringify({ ok: true, ...r }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+
+  // ── GOV PIPELINE BOARD: one plain view of where every opportunity stands + whose move is next ────
+  if (req.method === 'GET' && url.pathname === '/api/gov-board') {
+    try { return send(res, 200, JSON.stringify(await govBoardData())); }
+    catch (e) { return send(res, 200, JSON.stringify({ error: e.message, columns: [], counts: {}, total: 0 })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/gov-board/disposition') {
+    try {
+      const { noticeId, stage } = await readBody(req);
+      if (!noticeId || ['won', 'lost', 'passed', 'reset'].indexOf(stage) < 0) return send(res, 400, JSON.stringify({ error: 'noticeId + stage (won|lost|passed|reset) required' }));
+      const st = loadGovState(); st.dispositions = st.dispositions || {};
+      if (stage === 'reset') delete st.dispositions[noticeId]; else st.dispositions[noticeId] = stage;
+      saveGovState(st);
+      return send(res, 200, JSON.stringify({ ok: true }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 

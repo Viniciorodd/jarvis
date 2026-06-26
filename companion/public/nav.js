@@ -19,8 +19,15 @@ var navBtns = {
 
 var currentView = 'home';
 
-/* ── switch inline view ── */
+/* ── every full-screen overlay. One place so the bottom nav can always close them ── */
+var OVERLAY_IDS = ['ops','mapView','floorView','commandView','activityView','hqView','settingsView','personalView','govView'];
+function closeAllOverlays(){
+  OVERLAY_IDS.forEach(function(id){ var o = document.getElementById(id); if(o && !o.hidden) o.hidden = true; });
+}
+
+/* ── switch inline view (also drops you out of any overlay, so a tab is always an exit) ── */
 function showView(name){
+  closeAllOverlays();
   Object.keys(views).forEach(function(k){
     var v = views[k];
     if(!v) return;
@@ -38,8 +45,9 @@ function showView(name){
   currentView = name;
 }
 
-/* ── trigger ghost button for overlay views ── */
+/* ── trigger ghost button for overlay views (only one overlay open at a time) ── */
 function triggerGhost(id){
+  closeAllOverlays();
   var btn = document.getElementById(id);
   if(btn) btn.click();
 }
@@ -82,8 +90,7 @@ var moreItems = {
   jMoreFloor:   function(){ triggerGhost('floorBtn'); },
   jMoreHQ:      function(){ triggerGhost('hqBtn'); },
   jMoreCommand: function(){ triggerGhost('commandBtn'); },
-  jMoreActivity:function(){ triggerGhost('activityBtn'); },
-  jMoreDash:    function(){ triggerGhost('dashBtn'); }
+  jMoreActivity:function(){ triggerGhost('activityBtn'); }
 };
 
 Object.keys(moreItems).forEach(function(id){
@@ -113,6 +120,9 @@ if(mic){
     if(currentView !== 'talk') showView('talk');
   }, true);
 }
+
+/* ── Escape always backs you out of any overlay (consistent exit everywhere) ── */
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeAllOverlays(); });
 
 /* ── Start on home ── */
 showView('home');

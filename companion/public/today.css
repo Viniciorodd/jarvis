@@ -73,6 +73,23 @@
 .td-label{ font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); padding:2px 20px 4px; }
 .td-toast{ font-size:12px; color:var(--teal); padding:2px 20px; min-height:16px; }
 
+/* ── Cohesion: the bottom nav stays visible ON TOP of every overlay, so a tab is always an exit
+   (no more "lost in a maze"). Overlays stop just above the 54px nav instead of covering it. ───── */
+.ops, .mapview, .floorview, .commandview, .activityview, .hqview, .settingsview, .personalview, .govview{
+  bottom: calc(54px + env(safe-area-inset-bottom)) !important;
+}
+.j-nav{ position:relative; z-index:40; }
+
+/* ── Ops: softer, less boxy — lighter borders, pill tabs, rounder cards, more air ──────────────── */
+.ops-head{ border-bottom-color:rgba(var(--teal-rgb),.10); }
+.ops-tabs{ border-bottom-color:rgba(var(--teal-rgb),.06); }
+.ops-bizbtn, .ops-tab{ border-radius:999px; border-color:rgba(var(--teal-rgb),.12); }
+.ops-tab.on{ border-color:transparent; background:rgba(var(--teal-rgb),.16); }
+.ops-body{ gap:14px; padding:18px 18px 26px; }
+.ops-card{ border-radius:16px; border-color:rgba(var(--teal-rgb),.10); background:rgba(var(--teal-rgb),.045);
+  box-shadow:0 1px 0 rgba(255,255,255,.02), 0 6px 20px rgba(0,0,0,.18); padding:16px; gap:9px; }
+.ops-card:hover{ border-color:rgba(var(--teal-rgb),.24); background:rgba(var(--teal-rgb),.06); }
+
 /* "Behind the scenes" divider in the More menu (demotes the game/extra surfaces) */
 .j-more-label{ font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); padding:16px 18px 6px; opacity:.7; }
 

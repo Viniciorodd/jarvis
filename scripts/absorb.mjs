@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const CACHE = path.join(SCRIPT_DIR, '.yt-titles.json');
+const DONE_FILE = path.join(SCRIPT_DIR, '.absorb-done.json'); // ids already absorbed (so playlist re-runs skip them)
 const VAULT_DIR = process.env.VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
 const OUT_DIR = path.join(VAULT_DIR, '05 - Knowledge', 'Absorbed');
 const MODEL = process.env.ABSORB_MODEL || 'claude-haiku-4-5';
@@ -38,6 +39,12 @@ function fetchTranscript(id) {
   return { text, ...meta };
 }
 function parseMeta() { return {}; } // title/channel come from oEmbed below (more reliable than parsing yt-dlp logs)
+
+// List a playlist's video ids via yt-dlp (no API key; works for public/unlisted playlists).
+function playlistIds(url) {
+  const r = spawnSync('python', ['-m', 'yt_dlp', '--flat-playlist', '--no-warnings', '--print', '%(id)s', '--', url], { encoding: 'utf8', timeout: 120000 });
+  return (r.stdout || '').split(/\r?\n/).map((s) => s.trim()).filter((id) => /^[A-Za-z0-9_-]{6,}$/.test(id));
+}
 
 // PURE: VTT → readable text. Strips timing + inline tags, drops the rolling-duplicate lines auto-subs emit.
 export function vttToText(vtt) {
@@ -132,20 +139,27 @@ if (RUN) {
   const argVal = (flag, def) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : def; };
   const BUDGET = Number(argVal('--budget', 5));        // hard $ stop — never overspend the operator's credit
   const MAX = Number(argVal('--max', 0)) || Infinity;
+  let done = {}; try { done = JSON.parse(fs.readFileSync(DONE_FILE, 'utf8')); } catch { /* fresh */ }
   let ids;
-  if (args.includes('--keep')) {
-    // Absorb only the genuinely-valuable backlog: the keep buckets, skipping entertainment + the long tail
-    // and anything already absorbed. Reads the title cache from youtube-triage.
+  if (args.includes('--playlist')) {
+    // The going-forward path: absorb NEW videos from your unlisted "📚 To Absorb" playlist.
+    let url = argVal('--playlist'); if (!url || url.startsWith('--')) url = env('ABSORB_PLAYLIST');
+    if (!url) { console.error('--playlist needs a URL (or set ABSORB_PLAYLIST in .env)'); process.exit(1); }
+    const all = playlistIds(url);
+    ids = all.filter((id) => !done[id]).slice(0, MAX);
+    console.error(`--playlist: ${all.length} in playlist · ${ids.length} new to absorb (≈ $${(ids.length * 0.008).toFixed(2)})\n`);
+  } else if (args.includes('--keep')) {
     const { classify } = await import('./youtube-triage.mjs');
     let cache = {}; try { cache = JSON.parse(fs.readFileSync(CACHE, 'utf8')); } catch { /* run youtube-triage first */ }
     const KEEP = new Set(['gov', 'ai', 'business', 'health', 'reading', 'mindset', 'invest']);
-    let done = new Set(); try { done = new Set(fs.readdirSync(OUT_DIR)); } catch { /* none yet */ }
-    ids = Object.keys(cache).filter((id) => cache[id] && KEEP.has(classify(cache[id])) && !done.has(slug(cache[id]) + '.md')).slice(0, MAX);
+    let noteFiles = new Set(); try { noteFiles = new Set(fs.readdirSync(OUT_DIR)); } catch { /* none yet */ }
+    ids = Object.keys(cache).filter((id) => cache[id] && KEEP.has(classify(cache[id])) && !done[id] && !noteFiles.has(slug(cache[id]) + '.md')).slice(0, MAX);
     console.error(`--keep: ${ids.length} valuable videos to absorb (≈ $${(ids.length * 0.008).toFixed(2)}; budget cap $${BUDGET})\n`);
   } else {
-    ids = args.filter((a) => !a.startsWith('--') && args[args.indexOf(a) - 1] !== '--budget' && args[args.indexOf(a) - 1] !== '--max').map(vid).filter(Boolean);
+    ids = args.filter((a) => !a.startsWith('--')).map(vid);
   }
-  if (!ids.length) { console.error('usage: node scripts/absorb.mjs <videoId|url … | --keep [--max N] [--budget 5]>'); process.exit(1); }
+  ids = (ids || []).filter((id) => /^[A-Za-z0-9_-]{6,}$/.test(id));
+  if (!ids.length) { console.error('Nothing new to absorb.  usage: absorb <id|url …> | --playlist <url> | --keep'); process.exit(0); }
   let totIn = 0, totOut = 0, n = 0;
   for (const id of ids) {
     const cost = (totIn / 1e6) * 1 + (totOut / 1e6) * 5;
@@ -153,11 +167,12 @@ if (RUN) {
     process.stderr.write(`• ${id} … `);
     const meta = await oembed(id);
     const { text } = fetchTranscript(id);
-    if (!text || text.split(/\s+/).length < 30) { console.error(`no transcript — skipped: ${meta.title}`); continue; }
+    if (!text || text.split(/\s+/).length < 30) { console.error(`no transcript — skipped: ${meta.title}`); done[id] = 'no-transcript'; fs.writeFileSync(DONE_FILE, JSON.stringify(done)); continue; }
     let sum;
     try { sum = await summarize(meta.title, meta.channel, text); }
     catch (e) { console.error(`(summary skipped — ${e.message.slice(0, 70)})`); sum = { keyPoints: [], whyItMatters: '', worthIt: 'skim', tags: [], oneLine: '', usage: {}, pending: true }; }
     const file = writeNote(id, meta, sum, text);
+    if (!sum.pending) { done[id] = true; fs.writeFileSync(DONE_FILE, JSON.stringify(done)); } // only "done" once it has a real summary
     totIn += sum.usage.input_tokens || 0; totOut += sum.usage.output_tokens || 0; n++;
     console.error(`✓ ${path.basename(file)}  (${text.split(/\s+/).length}w → ${(sum.keyPoints || []).length} pts)`);
   }

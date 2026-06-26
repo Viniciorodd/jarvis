@@ -110,7 +110,9 @@ const inputs = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_IN
 const items = load(inputs);
 if (!items.length) { console.error('No videos loaded. Pass JSON export paths as arguments.'); process.exit(1); }
 const note = buildNote(items);
-const outFile = path.join(VAULT_DIR, '07 - Knowledge', '📺 To Absorb.md');
+// Reorg-proof: write into whichever "* Knowledge" folder the vault currently uses (now 05 - Knowledge).
+const knowledgeDir = ['05 - Knowledge', '07 - Knowledge'].map((d) => path.join(VAULT_DIR, d)).find((d) => fs.existsSync(d)) || path.join(VAULT_DIR, '05 - Knowledge');
+const outFile = path.join(knowledgeDir, '📺 To Absorb.md');
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, note);
 const counts = {}; for (const it of items) { const k = classify(it.title); counts[k] = (counts[k] || 0) + 1; }

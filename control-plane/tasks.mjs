@@ -26,7 +26,7 @@ const CAPTURE_FILE = '⚡ Quick Capture.md';      // fast adds land here, per th
 const CAPTURE_INBOX_MARKER = '## Inbox (new captures)';
 // Folders we never scan for tasks (archives, trash, vcs, plugin internals, review piles + the raw
 // Things import). The vault's own docs treat 🗂️ Things Import as the "full untouched library".
-const SKIP_DIRS = new Set(['.git', '.obsidian', '.trash', 'node_modules', 'old', '🧹 Review & Delete', '🗂️ Things Import']);
+const SKIP_DIRS = new Set(['.git', '.obsidian', '.trash', 'node_modules', 'old', '🧹 Review & Delete', '🗂️ Things Import', '09 - Archive']);
 // Individual "holding pen" files that are NOT the live task set — raw exports + triage/someday piles.
 // Without this, the cockpit's "today + overdue" floods with stale recurring items dated back to 2018
 // (e.g. Things3 Export.md), which kills the whole point of a calm screen. The curated working set
@@ -191,9 +191,19 @@ export function completeTask({ file, raw, id, vaultDir = VAULT_DIR, doneDate = t
   return { changed, file };
 }
 
+// Find a file anywhere in the vault by its basename (reorg-proof — the vault moves files between
+// numbered folders). Returns the absolute path or null.
+function findInVault(vaultDir, basename) {
+  for (const f of walk(vaultDir, [])) if (path.basename(f) === basename) return f;
+  return null;
+}
+
 // Append a line into ⚡ Quick Capture's Inbox (or end of file if the marker is gone). Returns { file, line }.
+// Locates the real Quick Capture wherever the vault put it (currently 01 - To-Do/) so captures never
+// land in a stray duplicate at the root.
 export function appendCapture(line, { vaultDir = VAULT_DIR } = {}) {
-  const abs = path.join(vaultDir, CAPTURE_FILE);
+  const abs = findInVault(vaultDir, CAPTURE_FILE) || path.join(vaultDir, '01 - To-Do', CAPTURE_FILE);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
   let content;
   try { content = fs.readFileSync(abs, 'utf8'); }
   catch { content = `# ⚡ Quick Capture\n\n${CAPTURE_INBOX_MARKER}\n`; }

@@ -16,7 +16,10 @@ const env = (k) => { try { const m = fs.readFileSync(ENV_FILE, 'utf8').match(new
 
 const CLIENT_ID = env('GOOGLE_CLIENT_ID');
 const CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET');
-const PORT = 53682;
+// Loopback redirect port. "Desktop app" OAuth clients accept http://localhost:<any-port>, so this can be
+// any free port — Windows reserves shifting dynamic ranges (Hyper-V/WSL), so make it overridable and pick
+// a default outside the usual reserved blocks. If you hit "EACCES", set GOOGLE_AUTH_PORT to another port.
+const PORT = Number(process.env.GOOGLE_AUTH_PORT) || 8723;
 const REDIRECT = `http://localhost:${PORT}`;
 // gmail.readonly (she reads, never sends) · calendar.events (read + add/edit/delete events, NOT calendar
 // management) · tasks.readonly. Least privilege for what the cockpit needs.

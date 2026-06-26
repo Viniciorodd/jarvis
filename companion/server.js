@@ -2243,6 +2243,23 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, ...r }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // Calendar write (the operator's own action on their own calendar — reversible, ungated). Needs the
+  // calendar.events scope; google.js returns a clear "re-run google-auth" message on 403.
+  if (req.method === 'POST' && url.pathname === '/api/cockpit/event') {
+    try {
+      const { summary, date, time, location } = await readBody(req);
+      const ev = await google.createEvent({ summary, date, time, location });
+      return send(res, 200, JSON.stringify({ ok: true, event: ev }));
+    } catch (e) { return send(res, 400, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/cockpit/event/delete') {
+    try {
+      const { id } = await readBody(req);
+      if (!id) return send(res, 400, JSON.stringify({ error: 'id required' }));
+      await google.deleteEvent(id);
+      return send(res, 200, JSON.stringify({ ok: true }));
+    } catch (e) { return send(res, 400, JSON.stringify({ error: e.message })); }
+  }
 
   // ── GOV PIPELINE BOARD: one plain view of where every opportunity stands + whose move is next ────
   if (req.method === 'GET' && url.pathname === '/api/gov-board') {

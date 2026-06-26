@@ -106,7 +106,13 @@
         h.appendChild(el('span','td-dow', dt.toLocaleDateString([], { weekday:'short' })));
         h.appendChild(document.createTextNode('  ' + dt.toLocaleDateString([], { month:'short', day:'numeric' }) + (k === d.date ? ' · today' : '')));
         day.appendChild(h);
-        byDay[k].forEach(function(e){ var ev = el('div','td-ev'); ev.appendChild(el('span','td-ev-t', fmtTime(e.start))); ev.appendChild(el('span', null, e.summary || '(busy)')); day.appendChild(ev); });
+        byDay[k].forEach(function(e){
+          var ev = el('div','td-ev');
+          ev.appendChild(el('span','td-ev-t', fmtTime(e.start)));
+          ev.appendChild(el('span','td-ev-name', e.summary || '(busy)'));
+          if(e.id){ var x = el('button','td-ev-x','✕'); x.title = 'Delete event'; x.addEventListener('click', function(){ if(confirm('Delete “' + (e.summary || 'event') + '”?')) deleteEvent(e.id); }); ev.appendChild(x); }
+          day.appendChild(ev);
+        });
         wk.appendChild(day);
       });
     }
@@ -131,6 +137,13 @@
     api('/api/cockpit/task/complete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id:t.id, file:t.file, raw:t.raw }) })
       .then(function(){ setTimeout(load, 350); })
       .catch(function(){ if(row) row.classList.remove('td-gone'); });
+  }
+
+  function deleteEvent(id){
+    fetch('/api/cockpit/event/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id:id }) })
+      .then(function(r){ return r.json(); })
+      .then(function(res){ if(res && res.error) alert('Delete failed: ' + res.error); else load(); })
+      .catch(function(){});
   }
 
   /* parse inline "📅 2026-07-01" + "#tags" out of a quick-add line */
@@ -161,6 +174,16 @@
       api('/api/cockpit/capture', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text:v }) })
         .then(function(){ if(toast){ toast.textContent = '✓ captured to the vault'; setTimeout(function(){ toast.textContent = ''; }, 2500); } load(); })
         .catch(function(){ if(toast) toast.textContent = 'failed'; });
+    });
+    var evForm = $id('tdEventForm');
+    if(evForm) evForm.addEventListener('submit', function(e){
+      e.preventDefault();
+      var title = $id('tdEventTitle').value.trim(), date = $id('tdEventDate').value, time = $id('tdEventTime').value;
+      var toast = $id('tdEventToast');
+      if(!title || !date){ if(toast){ toast.style.color = 'var(--dim)'; toast.textContent = 'need a title + date'; } return; }
+      api('/api/cockpit/event', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ summary:title, date:date, time:time }) })
+        .then(function(){ if(toast){ toast.style.color = 'var(--teal)'; toast.textContent = '✓ added to your calendar'; setTimeout(function(){ toast.textContent = ''; }, 2500); } $id('tdEventTitle').value = ''; load(); })
+        .catch(function(err){ if(toast){ toast.style.color = 'var(--coral, #f08a7a)'; toast.textContent = String(err.message || 'failed — re-run google-auth for calendar write'); } });
     });
     // "all →" jumps to the Today tab; the ticker opens Operations (where you review + approve)
     var more = $id('jTodayMore'); if(more) more.addEventListener('click', function(e){ e.preventDefault(); var b = $id('jNavToday'); if(b) b.click(); });

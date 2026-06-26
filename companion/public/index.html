@@ -117,6 +117,13 @@
       <!-- 📅 Week -->
       <div class="j-section">
         <div class="j-sh">Week <span class="j-sh-n" id="tdCalStatus"></span></div>
+        <form class="td-add td-event-add" id="tdEventForm">
+          <input id="tdEventTitle" autocomplete="off" placeholder="Add event…" />
+          <input id="tdEventDate" type="date" title="Date" />
+          <input id="tdEventTime" type="time" title="Time (optional — leave blank for all-day)" />
+          <button type="submit" class="td-btn">Add</button>
+        </form>
+        <div class="td-toast" id="tdEventToast"></div>
         <div id="tdWeek"></div>
       </div>
 

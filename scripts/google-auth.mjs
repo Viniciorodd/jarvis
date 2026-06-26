@@ -1,7 +1,8 @@
-// One-time Google connect for the companion (Gmail + Calendar, READ-ONLY).
-// Prereq: a Google "Desktop app" OAuth client — put its id/secret in .env as GOOGLE_CLIENT_ID /
-// GOOGLE_CLIENT_SECRET (see docs/google-setup.md). Then run:  node scripts/google-auth.mjs
-// It opens your browser, you approve, and it saves GOOGLE_REFRESH_TOKEN into .env. Run once.
+// One-time Google connect for the companion: Gmail READ-ONLY + Calendar READ/WRITE (events) + Tasks
+// read-only. Prereq: a Google "Desktop app" OAuth client — put its id/secret in .env as
+// GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET (see docs/google-setup.md). Then run: node scripts/google-auth.mjs
+// It opens your browser, you approve, and it saves GOOGLE_REFRESH_TOKEN into .env. Re-run this whenever
+// the scopes change (e.g. after enabling calendar write) so the new permission is granted.
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -17,7 +18,9 @@ const CLIENT_ID = env('GOOGLE_CLIENT_ID');
 const CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET');
 const PORT = 53682;
 const REDIRECT = `http://localhost:${PORT}`;
-const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly';
+// gmail.readonly (she reads, never sends) · calendar.events (read + add/edit/delete events, NOT calendar
+// management) · tasks.readonly. Least privilege for what the cockpit needs.
+const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks.readonly';
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
   console.error('Missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env. Create a "Desktop app" OAuth client first (see docs/google-setup.md).');

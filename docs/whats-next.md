@@ -2,6 +2,21 @@
 
 _Updated 2026-06-26. Everything is committed + pushed to `origin/feat/core-infrastructure-v2`. Resume from here._
 
+### 🆕 2026-06-26 (latest) — per-business vault folders + activity log + Takeout at scale
+- **Watch-later at scale:** `scripts/youtube-triage.mjs` now reads Google Takeout playlist CSVs (IDs only)
+  and resolves titles via YouTube oEmbed (cached `scripts/.yt-titles.json`). Full backlog = **1,078 videos**
+  → ~593 bucketed + 274 skipped + 485 long-tail (collapsed). Note → `05 - Knowledge/📺 To Absorb.md`.
+- **Per-business vault folders + activity log (the "report"):** `control-plane/projects.mjs` gives each
+  business a folder under `04 - Projects/<name>/` with `Log.md` (done/to-do/idea/blocker — native Markdown),
+  `agents/` (where each agent drops files), and a seeded `Contacts (CRM).md` for gov (subs) + real estate
+  (tenants). The log is read/written by Jarvis AND lives in Obsidian — **one source, both places.** +5 evals.
+  Server: `/api/projects/scaffold` (creates all folders, idempotent), `/api/business/log` (append),
+  activity in `/api/business?id=`. Hub detail now shows the activity feed + a "log it" box (Done/To-do/Idea/
+  Blocker chips). Registry (`pods/businesses.mjs`) gained `folder` + `crm` fields.
+- ⏭ **Open (sequenced):** (a) **calendar week/month/day views** in Today (currently a 7-day list — operator
+  wants a real grid); (b) **interactive CRM UI** in the hub (the files are seeded; surface + edit in-app);
+  (c) **wire each pod agent to write its outputs into `04 - Projects/<biz>/agents/`** (scaffold exists).
+
 ### 🆕 2026-06-26 (later) — Businesses hub + UX cohesion + calendar live + vault-reorg fixes
 - **Calendar is editable + LIVE** (re-auth done): scope bumped to `calendar.events`; add/delete events from
   the Today tab, verified create→delete. `scripts/google-auth.mjs` redirect port moved to 8723 (53682 was

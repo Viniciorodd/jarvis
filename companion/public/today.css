@@ -92,9 +92,29 @@
 .biz-who.you{ background:rgba(240,138,122,.14); color:var(--coral, #f08a7a); }
 .biz-who.jarvis{ background:rgba(var(--teal-rgb),.12); color:var(--teal); }
 .biz-next-text{ font-size:12px; color:var(--cream); margin-top:4px; line-height:1.35; }
-.biz-detail-body{ position:absolute; inset:44px 0 0; display:flex; flex-direction:column; overflow:hidden; }
+.biz-detail-body{ position:absolute; inset:44px 0 0; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--teal-dim) transparent; }
 .biz-detail-body .gov-next{ margin:14px 16px 6px; cursor:default; }
-.biz-detail-body .gov-board{ flex:1; }
+.biz-detail-body .gov-board{ padding-bottom:24px; }
+.biz-detail-body .gov-col{ overflow:visible; }
+/* activity log + log-it box (the per-business report — mirrors the vault Log.md) */
+.biz-act{ margin:10px 16px 6px; }
+.biz-act-h{ font-size:11px; color:var(--dim); margin-bottom:8px; }
+.biz-logbox{ display:flex; gap:7px; flex-wrap:wrap; align-items:center; margin-bottom:11px; }
+.biz-logbox input{ flex:1; min-width:160px; background:rgba(var(--teal-rgb),.04); border:1px solid rgba(var(--teal-rgb),.18); color:var(--cream); border-radius:10px; padding:9px 12px; font-size:13px; font-family:inherit; outline:none; }
+.biz-logbox input:focus{ border-color:rgba(var(--teal-rgb),.45); }
+.biz-logtypes{ display:flex; gap:5px; }
+.biz-chip{ font-size:11px; padding:5px 10px; border-radius:999px; cursor:pointer; font-family:inherit; background:transparent; border:1px solid rgba(var(--teal-rgb),.18); color:var(--dim); }
+.biz-chip.on{ background:rgba(var(--teal-rgb),.16); color:var(--cream); border-color:transparent; }
+.biz-act-list{ display:flex; flex-direction:column; gap:4px; max-height:210px; overflow-y:auto; }
+.biz-act-row{ display:flex; gap:9px; align-items:baseline; font-size:12.5px; color:var(--cream); padding:3px 2px; }
+.biz-act-ic{ flex:none; width:16px; }
+.biz-act-tx{ flex:1; min-width:0; }
+.biz-act-dt{ font-size:11px; color:var(--dim); white-space:nowrap; }
+.biz-act-row.idea .biz-act-tx{ color:var(--teal); }
+.biz-act-row.done .biz-act-tx{ color:var(--dim); text-decoration:line-through; }
+.biz-act-row.blocker .biz-act-tx{ color:var(--coral, #f08a7a); }
+.biz-act-empty{ font-size:12.5px; color:var(--dim); padding:4px 2px; }
+.biz-act-div{ height:1px; background:rgba(255,255,255,.06); margin:14px 16px 2px; }
 .biz-setup{ display:flex; gap:14px; align-items:flex-start; margin:8px 18px; padding:18px; border-radius:14px;
   background:rgba(var(--teal-rgb),.04); border:1px dashed rgba(var(--teal-rgb),.28); }
 .biz-setup > i{ font-size:26px; color:var(--teal); }

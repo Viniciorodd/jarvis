@@ -107,6 +107,20 @@ function saveGovState(s) { try { fs.writeFileSync(GOV_STATE_FILE, JSON.stringify
 // Businesses registry (pods/businesses.mjs) — the Businesses hub. Add a business there, not here.
 let _bizMod = null;
 function bizRegistry() { return (_bizMod ||= import('../pods/businesses.mjs')); }
+// Per-business vault folders + activity log (control-plane/projects.mjs).
+let _projMod = null;
+function projects() { return (_projMod ||= import('../control-plane/projects.mjs')); }
+// Seed a readable CRM table from the gov subcontractor list / the real-estate portfolio.
+function govCrmSeed() {
+  let subs = []; try { subs = (JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'pods', 'gov', 'subs.json'), 'utf8')).subs) || []; } catch { /* none */ }
+  const rows = subs.filter((s) => !/^SUB-EXAMPLE/i.test(s.id || '')).map((s) => `| ${s.name || ''} | ${s.trade || ''} | ${s.contact_email || s.phone || s.website || ''} | ${s.status || ''} |`);
+  return `# Gov contracting — Subcontractors (CRM)\n\n> Primes + subs for past performance. Synced from pods/gov/subs.json; edit freely.\n\n| Company | Trade | Contact | Status |\n|---|---|---|---|\n${rows.join('\n')}\n`;
+}
+function reCrmSeed(p) {
+  const units = (p && p.units) || [];
+  const rows = units.filter((u) => !/add your first|example/i.test(u.address || '')).map((u) => `| ${u.address || ''} | ${u.tenant || ''} | ${u.rent ? '$' + u.rent : ''} | ${u.hap_status || ''} |`);
+  return `# Real estate — Tenants (CRM)\n\n> Units, tenants, rent + HAP. Synced from pods/real-estate/portfolio.json; edit freely.\n\n| Unit | Tenant | Rent | HAP |\n|---|---|---|---|\n${rows.join('\n')}\n`;
+}
 const ORDERS_FILE = path.join(__dirname, '..', 'fiverr-assets', '.orders.json');
 // Gather the raw data each business summarizes from (keyed by business id).
 async function gatherBusinessRaw() {
@@ -2289,8 +2303,36 @@ const server = http.createServer(async (req, res) => {
       const R = await bizRegistry();
       const biz = R.BUSINESSES.find((b) => b.id === id);
       if (!biz) return send(res, 404, JSON.stringify({ error: 'unknown business' }));
-      return send(res, 200, JSON.stringify(R.summarize(biz, await gatherBusinessRaw())));
+      const summary = R.summarize(biz, await gatherBusinessRaw());
+      let activity = []; try { const P = await projects(); activity = P.readLog(biz, { limit: 15 }); } catch { /* no log yet */ }
+      return send(res, 200, JSON.stringify({ ...summary, activity, folder: '04 - Projects/' + (biz.folder || biz.name) }));
     } catch (e) { return send(res, 200, JSON.stringify({ error: e.message })); }
+  }
+  // Log a done/to-do/idea/blocker to a business's vault Log.md (shows in Obsidian AND the app).
+  if (req.method === 'POST' && url.pathname === '/api/business/log') {
+    try {
+      const { id, type, text } = await readBody(req);
+      if (!id || !text || !String(text).trim()) return send(res, 400, JSON.stringify({ error: 'id + text required' }));
+      const R = await bizRegistry(); const biz = R.BUSINESSES.find((b) => b.id === id);
+      if (!biz) return send(res, 404, JSON.stringify({ error: 'unknown business' }));
+      const P = await projects();
+      const r = P.appendLog(biz, { type: ['done', 'todo', 'idea', 'blocker', 'note'].indexOf(type) >= 0 ? type : 'note', text: String(text).trim() });
+      return send(res, 200, JSON.stringify({ ok: true, ...r }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // Create the vault folder + standard files (Log, agents/, CRM) for every business. Idempotent.
+  if (req.method === 'GET' && url.pathname === '/api/projects/scaffold') {
+    try {
+      const R = await bizRegistry(); const P = await projects(); const raw = await gatherBusinessRaw();
+      const made = [];
+      for (const biz of R.BUSINESSES) {
+        const seed = {};
+        if (biz.id === 'gov') seed.crm = govCrmSeed();
+        if (biz.id === 'realestate') seed.crm = reCrmSeed(raw.realestate);
+        made.push(P.ensureScaffold(biz, seed));
+      }
+      return send(res, 200, JSON.stringify({ ok: true, count: made.length, made }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   // ── GOV PIPELINE BOARD: one plain view of where every opportunity stands + whose move is next ────
   if (req.method === 'GET' && url.pathname === '/api/gov-board') {

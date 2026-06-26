@@ -8,15 +8,17 @@ const jarvis = (text) => ({ who: 'jarvis', text });
 
 // The registry. icon = Tabler name. `source` selects the summarizer; `board`: 'gov' opens the dedicated
 // Gov board, 'generic' renders a board from the summarizer's {stages,cards}, null = status only.
+// `folder` = the business's home folder under the vault's "04 - Projects/" (its Log/CRM/agents live there).
+// `crm` = true scaffolds a Contacts (CRM) file (gov subs, real-estate tenants).
 export const BUSINESSES = [
-  { id: 'gov',        name: 'Gov contracting', icon: 'building-bank', source: 'gov',         board: 'gov' },
-  { id: 'fiverr',     name: 'Fiverr Studio',   icon: 'palette',       source: 'fiverr',      board: 'generic' },
-  { id: 'web',        name: 'Web Studio',      icon: 'world',         source: 'web',         board: 'generic' },
-  { id: 'realestate', name: 'Real estate',     icon: 'home',          source: 'realestate',  board: 'generic' },
-  { id: 'finance',    name: 'Finance',         icon: 'cash',          source: 'finance',     board: null },
-  { id: 'music',      name: 'Music',           icon: 'music',         source: 'music',       board: 'generic' },
-  { id: 'zerotick',   name: 'ZeroTick',        icon: 'chart-line',    source: 'placeholder', tagline: 'SaaS', board: null },
-  { id: 'lifeline',   name: 'Lifeline',        icon: 'heartbeat',     source: 'placeholder', board: null },
+  { id: 'gov',        name: 'Gov contracting', icon: 'building-bank', source: 'gov',         board: 'gov',     folder: 'Gov Contracting', crm: true },
+  { id: 'fiverr',     name: 'Fiverr Studio',   icon: 'palette',       source: 'fiverr',      board: 'generic', folder: 'Fiverr Studio' },
+  { id: 'web',        name: 'Web Studio',      icon: 'world',         source: 'web',         board: 'generic', folder: 'Web Studio' },
+  { id: 'realestate', name: 'Real estate',     icon: 'home',          source: 'realestate',  board: 'generic', folder: 'Real Estate', crm: true },
+  { id: 'finance',    name: 'Finance',         icon: 'cash',          source: 'finance',     board: null,      folder: 'Finance' },
+  { id: 'music',      name: 'Music',           icon: 'music',         source: 'music',       board: 'generic', folder: 'Music' },
+  { id: 'zerotick',   name: 'ZeroTick',        icon: 'chart-line',    source: 'placeholder', tagline: 'SaaS',  board: null, folder: 'ZeroTick' },
+  { id: 'lifeline',   name: 'Lifeline',        icon: 'heartbeat',     source: 'placeholder', board: null,      folder: 'Lifeline' },
 ];
 
 // PURE per-source summarizers: (raw, biz) => { status, metric, next:{who,text}, setup?, board?, empty? }

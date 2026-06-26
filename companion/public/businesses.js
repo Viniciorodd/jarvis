@@ -34,31 +34,75 @@
     list.forEach(function(b){ hub.appendChild(row(b)); });
   }
 
+  var ACT_ICON = { done: '✓', todo: '☐', idea: '💡', blocker: '⛔', note: '📝' };
+
   function openBusiness(b){
     if(b.boardKind === 'gov'){ close(); var g = $id('govBtn'); if(g) g.click(); return; }
     $id('bizDetailCap').textContent = b.name;
-    var body = $id('bizDetailBody'); body.innerHTML = '<div class="ops-empty">loading…</div>';
+    $id('bizDetailBody').innerHTML = '<div class="ops-empty">loading…</div>';
     $id('bizDetail').hidden = false;
-    fetch('/api/business?id=' + encodeURIComponent(b.id)).then(function(r){ return r.json(); }).then(renderDetail)
-      .catch(function(){ body.innerHTML = ''; body.appendChild(el('div','ops-empty','Could not load this business.')); });
+    loadDetail(b.id);
+  }
+  function loadDetail(id){
+    fetch('/api/business?id=' + encodeURIComponent(id)).then(function(r){ return r.json(); }).then(renderDetail)
+      .catch(function(){ var body = $id('bizDetailBody'); body.innerHTML = ''; body.appendChild(el('div','ops-empty','Could not load this business.')); });
+  }
+  function logIt(id, type, text){
+    fetch('/api/business/log', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id:id, type:type, text:text }) })
+      .then(function(r){ return r.json(); }).then(function(){ loadDetail(id); }).catch(function(){});
+  }
+
+  function activitySection(b){
+    var act = el('div','biz-act');
+    act.appendChild(el('div','biz-act-h','Activity — saved to ' + (b.folder || 'the vault') + ' (shows in Obsidian too)'));
+    var form = el('form','biz-logbox');
+    var inp = el('input'); inp.placeholder = 'Log something — done · to-do · idea · blocker'; inp.autocomplete = 'off';
+    form.appendChild(inp);
+    var chips = el('div','biz-logtypes'); var sel = { t: 'done' };
+    [['done','Done'],['todo','To-do'],['idea','Idea'],['blocker','Blocker']].forEach(function(p, i){
+      var c = el('button','biz-chip' + (i === 0 ? ' on' : ''), p[1]); c.type = 'button';
+      c.addEventListener('click', function(){ sel.t = p[0]; [].forEach.call(chips.children, function(x){ x.classList.remove('on'); }); c.classList.add('on'); });
+      chips.appendChild(c);
+    });
+    form.appendChild(chips);
+    var go = el('button','td-btn','Log'); go.type = 'submit'; form.appendChild(go);
+    form.addEventListener('submit', function(e){ e.preventDefault(); var v = inp.value.trim(); if(!v) return; inp.value = ''; logIt(b.id, sel.t, v); });
+    act.appendChild(form);
+    var list = el('div','biz-act-list');
+    (b.activity || []).forEach(function(e){
+      var rowt = el('div','biz-act-row ' + e.type);
+      rowt.appendChild(el('span','biz-act-ic', ACT_ICON[e.type] || '•'));
+      rowt.appendChild(el('span','biz-act-tx', e.text));
+      if(e.date) rowt.appendChild(el('span','biz-act-dt', e.date));
+      list.appendChild(rowt);
+    });
+    if(!(b.activity || []).length) list.appendChild(el('div','biz-act-empty','Nothing logged yet — add the first thing above.'));
+    act.appendChild(list);
+    return act;
   }
 
   function renderDetail(b){
     var body = $id('bizDetailBody'); body.innerHTML = '';
+    if(b && b.error){ body.appendChild(el('div','ops-empty','Could not load: ' + b.error)); return; }
     var nx = el('div','gov-next');
     nx.appendChild(el('div','gov-next-label','YOUR NEXT MOVE'));
     nx.appendChild(el('div','gov-next-text', b.next.text));
     nx.appendChild(el('div','gov-next-sub', b.status || ''));
     body.appendChild(nx);
+
+    body.appendChild(activitySection(b));
+
     if(b.setup){
+      body.appendChild(el('div','biz-act-div'));
       var s = el('div','biz-setup'); s.innerHTML = '<i class="ti ti-folder-plus" aria-hidden="true"></i>';
       var t = el('div');
-      t.appendChild(el('div','biz-setup-h','Not wired up yet'));
-      t.appendChild(el('div','biz-setup-p','Drop the files + a few notes for ' + b.name + ' into Jarvis (or just tell her in Talk), and she’ll set up this board the same way — same stages, same “whose move is next”.'));
+      t.appendChild(el('div','biz-setup-h','Board not wired up yet'));
+      t.appendChild(el('div','biz-setup-p','Drop the files + notes for ' + b.name + ' into Jarvis (or tell her in Talk) and she’ll wire up a board the same way. You can already log activity above.'));
       s.appendChild(t); body.appendChild(s); return;
     }
-    if(!b.board){ body.appendChild(el('div','ops-empty','Tracked as a status only — no board for this one yet.')); return; }
-    if(!b.board.cards.length){ body.appendChild(el('div','ops-empty', b.empty || 'Nothing here yet.')); return; }
+    if(!b.board) return; // status-only (e.g. Finance) — the activity log is enough
+    body.appendChild(el('div','biz-act-div'));
+    if(!b.board.cards.length){ body.appendChild(el('div','ops-empty', b.empty || 'Nothing on the board yet.')); return; }
     var board = el('div','gov-board');
     b.board.stages.forEach(function(stage){
       var cards = b.board.cards.filter(function(c){ return c.stage === stage; });

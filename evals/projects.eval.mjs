@@ -1,7 +1,7 @@
 // Regression suite for the per-business activity log (control-plane/projects.mjs). Pins the
 // format ⇄ parse round-trip so the report stays readable in Obsidian AND parseable by Jarvis.
 
-import { formatLogLine, parseLogLine } from '../control-plane/projects.mjs';
+import { formatLogLine, parseLogLine, parseCrm, crmRowLine } from '../control-plane/projects.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -28,6 +28,14 @@ export default {
     } },
     { name: 'non-log lines parse to null', run: () => {
       return ok(parseLogLine('## Recent') === null && parseLogLine('plain prose') === null && parseLogLine('') === null);
+    } },
+    { name: 'parseCrm reads a Markdown table, dropping the separator row', run: () => {
+      const md = '# CRM\n\n| Company | Trade | Status |\n|---|---|---|\n| JAN-PRO | janitorial | prospect |\n| AmeriStar | cleaning | contactable |\n';
+      const c = parseCrm(md);
+      return ok(c.headers.join(',') === 'Company,Trade,Status' && c.rows.length === 2 && c.rows[0][0] === 'JAN-PRO' && c.rows[1][2] === 'contactable', JSON.stringify(c));
+    } },
+    { name: 'crmRowLine formats a row and neutralizes pipes', run: () => {
+      return ok(crmRowLine(['Acme | Co', 'janitorial', '']) === '| Acme / Co | janitorial |  |');
     } },
   ],
 };

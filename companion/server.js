@@ -2314,8 +2314,9 @@ const server = http.createServer(async (req, res) => {
       const biz = R.BUSINESSES.find((b) => b.id === id);
       if (!biz) return send(res, 404, JSON.stringify({ error: 'unknown business' }));
       const summary = R.summarize(biz, await gatherBusinessRaw());
-      let activity = []; try { const P = await projects(); activity = P.readLog(biz, { limit: 15 }); } catch { /* no log yet */ }
-      return send(res, 200, JSON.stringify({ ...summary, activity, folder: '04 - Projects/' + (biz.folder || biz.name) }));
+      let activity = [], crm = null;
+      try { const P = await projects(); activity = P.readLog(biz, { limit: 15 }); if (biz.crm) crm = P.readCrm(biz); } catch { /* no log/crm yet */ }
+      return send(res, 200, JSON.stringify({ ...summary, activity, crm, folder: '04 - Projects/' + (biz.folder || biz.name) }));
     } catch (e) { return send(res, 200, JSON.stringify({ error: e.message })); }
   }
   // Log a done/to-do/idea/blocker to a business's vault Log.md (shows in Obsidian AND the app).
@@ -2328,6 +2329,19 @@ const server = http.createServer(async (req, res) => {
       const P = await projects();
       const r = P.appendLog(biz, { type: ['done', 'todo', 'idea', 'blocker', 'note'].indexOf(type) >= 0 ? type : 'note', text: String(text).trim() });
       return send(res, 200, JSON.stringify({ ok: true, ...r }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // Add a CRM contact (gov sub / real-estate tenant) — appends a row to the business's Contacts (CRM).md.
+  if (req.method === 'POST' && url.pathname === '/api/business/crm') {
+    try {
+      const { id, cells } = await readBody(req);
+      if (!id || !Array.isArray(cells) || !cells.some((c) => String(c || '').trim())) return send(res, 400, JSON.stringify({ error: 'id + cells required' }));
+      const R = await bizRegistry(); const biz = R.BUSINESSES.find((b) => b.id === id);
+      if (!biz || !biz.crm) return send(res, 404, JSON.stringify({ error: 'no CRM for this business' }));
+      const P = await projects(); const raw = await gatherBusinessRaw();
+      const seed = id === 'gov' ? govCrmSeed() : id === 'realestate' ? reCrmSeed(raw.realestate) : undefined;
+      P.addCrmRow(biz, cells, seed);
+      return send(res, 200, JSON.stringify({ ok: true }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   // Create the vault folder + standard files (Log, agents/, CRM) for every business. Idempotent.

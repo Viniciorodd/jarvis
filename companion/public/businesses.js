@@ -37,11 +37,30 @@
   var ACT_ICON = { done: '✓', todo: '☐', idea: '💡', blocker: '⛔', note: '📝' };
 
   function openBusiness(b){
-    if(b.boardKind === 'gov'){ close(); var g = $id('govBtn'); if(g) g.click(); return; }
     $id('bizDetailCap').textContent = b.name;
     $id('bizDetailBody').innerHTML = '<div class="ops-empty">loading…</div>';
     $id('bizDetail').hidden = false;
     loadDetail(b.id);
+  }
+  function addContact(id, cells){
+    fetch('/api/business/crm', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id:id, cells:cells }) })
+      .then(function(r){ return r.json(); }).then(function(){ loadDetail(id); }).catch(function(){});
+  }
+  function crmSection(b){
+    var wrap = el('div','biz-crm');
+    wrap.appendChild(el('div','biz-act-h', 'Contacts (CRM) — ' + b.crm.rows.length + ' · synced to the vault'));
+    if(b.crm.headers.length){
+      var table = el('table','crm-table');
+      var thead = el('tr'); b.crm.headers.forEach(function(h){ thead.appendChild(el('th', null, h)); }); table.appendChild(thead);
+      b.crm.rows.slice(0, 40).forEach(function(row){ var tr = el('tr'); b.crm.headers.forEach(function(_, i){ tr.appendChild(el('td', null, row[i] || '')); }); table.appendChild(tr); });
+      wrap.appendChild(table);
+      var form = el('form','crm-add');
+      var inputs = b.crm.headers.map(function(h){ var i = el('input'); i.placeholder = h; i.autocomplete = 'off'; form.appendChild(i); return i; });
+      var go = el('button','td-btn','Add'); go.type = 'submit'; form.appendChild(go);
+      form.addEventListener('submit', function(e){ e.preventDefault(); var cells = inputs.map(function(i){ return i.value.trim(); }); if(!cells.some(Boolean)) return; inputs.forEach(function(i){ i.value = ''; }); addContact(b.id, cells); });
+      wrap.appendChild(form);
+    } else { wrap.appendChild(el('div','biz-act-empty','No contacts yet — add the first one below.')); }
+    return wrap;
   }
   function loadDetail(id){
     fetch('/api/business?id=' + encodeURIComponent(id)).then(function(r){ return r.json(); }).then(renderDetail)
@@ -90,7 +109,14 @@
     nx.appendChild(el('div','gov-next-sub', b.status || ''));
     body.appendChild(nx);
 
+    if(b.boardKind === 'gov'){
+      var openBtn = el('button','crm-openboard','Open the Gov Pipeline board →');
+      openBtn.addEventListener('click', function(){ close(); var g = $id('govBtn'); if(g) g.click(); });
+      body.appendChild(openBtn);
+    }
+
     body.appendChild(activitySection(b));
+    if(b.crm){ body.appendChild(el('div','biz-act-div')); body.appendChild(crmSection(b)); }
 
     if(b.setup){
       body.appendChild(el('div','biz-act-div'));
@@ -100,6 +126,7 @@
       t.appendChild(el('div','biz-setup-p','Drop the files + notes for ' + b.name + ' into Jarvis (or tell her in Talk) and she’ll wire up a board the same way. You can already log activity above.'));
       s.appendChild(t); body.appendChild(s); return;
     }
+    if(b.boardKind === 'gov') return; // the board is the dedicated Gov Pipeline overlay (button above)
     if(!b.board) return; // status-only (e.g. Finance) — the activity log is enough
     body.appendChild(el('div','biz-act-div'));
     if(!b.board.cards.length){ body.appendChild(el('div','ops-empty', b.empty || 'Nothing on the board yet.')); return; }

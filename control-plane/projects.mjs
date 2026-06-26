@@ -81,3 +81,26 @@ export function readLog(biz, { limit = 15 } = {}) {
   for (const line of content.split(/\r?\n/)) { const e = parseLogLine(line); if (e && e.text) out.push(e); if (out.length >= limit) break; }
   return out;
 }
+
+// ── CRM (a Markdown table in Contacts (CRM).md — gov subs, real-estate tenants) ───────────────────
+// PURE: parse a Markdown table → { headers, rows }; format one row.
+export function parseCrm(content) {
+  const tbl = String(content).split(/\r?\n/).filter((l) => /^\s*\|.*\|\s*$/.test(l));
+  if (tbl.length < 2) return { headers: [], rows: [] };
+  const cells = (l) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+  const headers = cells(tbl[0]);
+  const rows = tbl.slice(1).filter((l) => !/^\s*\|[\s:|-]+\|\s*$/.test(l)).map(cells).filter((r) => r.some((c) => c));
+  return { headers, rows };
+}
+export function crmRowLine(cells) { return '| ' + cells.map((c) => String(c == null ? '' : c).replace(/\|/g, '/').trim()).join(' | ') + ' |'; }
+
+const CRM_FILE = (biz) => path.join(projectDir(biz), 'Contacts (CRM).md');
+export function readCrm(biz) { try { return parseCrm(fs.readFileSync(CRM_FILE(biz), 'utf8')); } catch { return { headers: [], rows: [] }; } }
+export function addCrmRow(biz, cells, seedCrm) {
+  ensureScaffold(biz, { crm: seedCrm });
+  const file = CRM_FILE(biz);
+  let content = fs.readFileSync(file, 'utf8');
+  const eol = /\r\n/.test(content) ? '\r\n' : '\n';
+  fs.writeFileSync(file, content.replace(/\s*$/, '') + eol + crmRowLine(cells) + eol);
+  return { ok: true };
+}

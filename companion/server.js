@@ -2274,6 +2274,16 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, ...r }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // Calendar events in a date range (for the day/week/month views). start=YYYY-MM-DD, days=N.
+  if (req.method === 'GET' && url.pathname === '/api/calendar') {
+    try {
+      const start = url.searchParams.get('start') || new Date().toLocaleDateString('en-CA');
+      const days = Math.min(60, Math.max(1, Number(url.searchParams.get('days')) || 42));
+      const base = new Date(start + 'T00:00:00');
+      const events = await google.calendarRange({ timeMin: base.toISOString(), timeMax: new Date(base.getTime() + days * 86400000).toISOString(), max: 250 });
+      return send(res, 200, JSON.stringify({ events, hasGoogle: google.googleConfigured() }));
+    } catch (e) { return send(res, 200, JSON.stringify({ error: google.googleConfigured() ? e.message : 'not-connected', events: [] })); }
+  }
   // Calendar write (the operator's own action on their own calendar — reversible, ungated). Needs the
   // calendar.events scope; google.js returns a clear "re-run google-auth" message on 403.
   if (req.method === 'POST' && url.pathname === '/api/cockpit/event') {

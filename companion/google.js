@@ -81,6 +81,21 @@ async function createEvent({ summary, date, time = '', durationMin = 60, locatio
   return { id: ev.id, summary: ev.summary, start: (ev.start && (ev.start.dateTime || ev.start.date)) || '', htmlLink: ev.htmlLink };
 }
 
+// Events in an explicit date range (for the day/week/month calendar). Returns each event with its id,
+// start/end, all-day flag, location.
+async function calendarRange({ timeMin, timeMax, max = 250 } = {}) {
+  const tok = await getAccessToken();
+  const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime&maxResults=${max}`, { headers: { authorization: 'Bearer ' + tok } });
+  if (!r.ok) throw new Error('Calendar fetch failed (' + r.status + ')');
+  return ((await r.json()).items || []).map((e) => ({
+    id: e.id, summary: e.summary || '(busy)',
+    start: (e.start && (e.start.dateTime || e.start.date)) || '',
+    end: (e.end && (e.end.dateTime || e.end.date)) || '',
+    allDay: !!(e.start && e.start.date && !e.start.dateTime),
+    location: e.location || '',
+  }));
+}
+
 async function deleteEvent(id) {
   if (!id) throw new Error('event id required');
   const tok = await getAccessToken();
@@ -98,4 +113,4 @@ async function tasksRecent({ max = 15 } = {}) {
   return ((await r.json()).items || []).filter((t) => t.title).map((t) => ({ title: t.title, due: t.due || '', notes: (t.notes || '').slice(0, 120) }));
 }
 
-module.exports = { googleConfigured, gmailRecent, calendarUpcoming, tasksRecent, createEvent, deleteEvent };
+module.exports = { googleConfigured, gmailRecent, calendarUpcoming, calendarRange, tasksRecent, createEvent, deleteEvent };

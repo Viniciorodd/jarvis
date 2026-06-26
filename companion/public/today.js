@@ -90,32 +90,7 @@
       if(!active.length) aList.appendChild(el('div','j-pipe-empty','Nothing active. Add a task above.'));
       else active.slice(0,40).forEach(function(t){ aList.appendChild(taskRow(t, false)); });
     }
-    var st = $id('tdCalStatus');
-    if(st) st.textContent = d.calError === 'not-connected' ? 'not connected' : (d.calError ? 'error' : ((d.week||[]).length + ' events'));
-    var wk = $id('tdWeek');
-    if(wk){
-      wk.innerHTML = '';
-      var evs = d.week || [];
-      if(!evs.length){ wk.appendChild(el('div','j-pipe-empty', d.hasGoogle ? 'Nothing scheduled in the next 7 days.' : 'Connect Google Calendar to see your week.')); return; }
-      var byDay = {};
-      evs.forEach(function(e){ var k = dayKey(e.start); (byDay[k] = byDay[k] || []).push(e); });
-      Object.keys(byDay).sort().forEach(function(k){
-        var day = el('div','td-day' + (k === d.date ? ' is-today' : ''));
-        var dt = new Date(k + 'T12:00:00');
-        var h = el('div','td-day-h');
-        h.appendChild(el('span','td-dow', dt.toLocaleDateString([], { weekday:'short' })));
-        h.appendChild(document.createTextNode('  ' + dt.toLocaleDateString([], { month:'short', day:'numeric' }) + (k === d.date ? ' · today' : '')));
-        day.appendChild(h);
-        byDay[k].forEach(function(e){
-          var ev = el('div','td-ev');
-          ev.appendChild(el('span','td-ev-t', fmtTime(e.start)));
-          ev.appendChild(el('span','td-ev-name', e.summary || '(busy)'));
-          if(e.id){ var x = el('button','td-ev-x','✕'); x.title = 'Delete event'; x.addEventListener('click', function(){ if(confirm('Delete “' + (e.summary || 'event') + '”?')) deleteEvent(e.id); }); ev.appendChild(x); }
-          day.appendChild(ev);
-        });
-        wk.appendChild(day);
-      });
-    }
+    // the calendar (day/week/month) is rendered by calendar.js into #calWidget
   }
 
   function render(d){
@@ -182,7 +157,7 @@
       var toast = $id('tdEventToast');
       if(!title || !date){ if(toast){ toast.style.color = 'var(--dim)'; toast.textContent = 'need a title + date'; } return; }
       api('/api/cockpit/event', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ summary:title, date:date, time:time }) })
-        .then(function(){ if(toast){ toast.style.color = 'var(--teal)'; toast.textContent = '✓ added to your calendar'; setTimeout(function(){ toast.textContent = ''; }, 2500); } $id('tdEventTitle').value = ''; load(); })
+        .then(function(){ if(toast){ toast.style.color = 'var(--teal)'; toast.textContent = '✓ added to your calendar'; setTimeout(function(){ toast.textContent = ''; }, 2500); } $id('tdEventTitle').value = ''; load(); if(window.__calRefresh) window.__calRefresh(); })
         .catch(function(err){ if(toast){ toast.style.color = 'var(--coral, #f08a7a)'; toast.textContent = String(err.message || 'failed — re-run google-auth for calendar write'); } });
     });
     // "all →" jumps to the Today tab; the ticker opens Operations (where you review + approve)

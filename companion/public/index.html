@@ -114,9 +114,9 @@
         </div>
       </div>
 
-      <!-- 📅 Week -->
+      <!-- 📅 Calendar (day / week / month) -->
       <div class="j-section">
-        <div class="j-sh">Week <span class="j-sh-n" id="tdCalStatus"></span></div>
+        <div class="j-sh">Calendar <span class="j-sh-n" id="tdCalStatus"></span></div>
         <form class="td-add td-event-add" id="tdEventForm">
           <input id="tdEventTitle" autocomplete="off" placeholder="Add event…" />
           <input id="tdEventDate" type="date" title="Date" />
@@ -124,7 +124,22 @@
           <button type="submit" class="td-btn">Add</button>
         </form>
         <div class="td-toast" id="tdEventToast"></div>
-        <div id="tdWeek"></div>
+        <div class="cal" id="calWidget">
+          <div class="cal-head">
+            <div class="cal-nav">
+              <button class="cal-btn" id="calPrev" aria-label="Previous">‹</button>
+              <button class="cal-btn" id="calToday">Today</button>
+              <button class="cal-btn" id="calNext" aria-label="Next">›</button>
+            </div>
+            <div class="cal-title" id="calTitle"></div>
+            <div class="cal-views">
+              <button class="cal-vbtn" data-view="day">Day</button>
+              <button class="cal-vbtn" data-view="week">Week</button>
+              <button class="cal-vbtn on" data-view="month">Month</button>
+            </div>
+          </div>
+          <div class="cal-body" id="calBody"></div>
+        </div>
       </div>
 
       <!-- ⚡ Capture -->
@@ -521,6 +536,7 @@
 <script src="today.js"></script>
 <script src="govboard.js"></script>
 <script src="businesses.js"></script>
+<script src="calendar.js"></script>
 <script src="ops.js"></script>
 <script src="map.js"></script>
 <script src="floor.js"></script>

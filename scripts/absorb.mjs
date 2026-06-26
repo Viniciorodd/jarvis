@@ -40,6 +40,21 @@ function fetchTranscript(id) {
 }
 function parseMeta() { return {}; } // title/channel come from oEmbed below (more reliable than parsing yt-dlp logs)
 
+// Mark every already-SUMMARIZED note (no "summary pending") as done, keyed on its real video id — so
+// re-runs never re-process or overwrite a finished note. Pending notes are left for the summarizer.
+function reconcileDone(done) {
+  let files = []; try { files = fs.readdirSync(OUT_DIR).filter((f) => f.endsWith('.md')); } catch { return done; }
+  for (const f of files) {
+    try {
+      const c = fs.readFileSync(path.join(OUT_DIR, f), 'utf8');
+      if (/summary pending/.test(c)) continue;
+      const m = c.match(/url:\s*https?:\/\/[^\n]*[?&]v=([A-Za-z0-9_-]{6,})/);
+      if (m) done[m[1]] = true;
+    } catch { /* skip */ }
+  }
+  return done;
+}
+
 // List a playlist's video ids via yt-dlp (no API key; works for public/unlisted playlists).
 function playlistIds(url) {
   const r = spawnSync('python', ['-m', 'yt_dlp', '--flat-playlist', '--no-warnings', '--print', '%(id)s', '--', url], { encoding: 'utf8', timeout: 120000 });
@@ -139,7 +154,9 @@ if (RUN) {
   const argVal = (flag, def) => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : def; };
   const BUDGET = Number(argVal('--budget', 5));        // hard $ stop — never overspend the operator's credit
   const MAX = Number(argVal('--max', 0)) || Infinity;
+  const NO_LLM = args.includes('--no-llm');            // stage transcripts only (free) — summary filled later by Claude Code
   let done = {}; try { done = JSON.parse(fs.readFileSync(DONE_FILE, 'utf8')); } catch { /* fresh */ }
+  done = reconcileDone(done); fs.writeFileSync(DONE_FILE, JSON.stringify(done)); // never re-do a summarized note
   let ids;
   if (args.includes('--playlist')) {
     // The going-forward path: absorb NEW videos from your unlisted "📚 To Absorb" playlist.
@@ -169,8 +186,9 @@ if (RUN) {
     const { text } = fetchTranscript(id);
     if (!text || text.split(/\s+/).length < 30) { console.error(`no transcript — skipped: ${meta.title}`); done[id] = 'no-transcript'; fs.writeFileSync(DONE_FILE, JSON.stringify(done)); continue; }
     let sum;
-    try { sum = await summarize(meta.title, meta.channel, text); }
-    catch (e) { console.error(`(summary skipped — ${e.message.slice(0, 70)})`); sum = { keyPoints: [], whyItMatters: '', worthIt: 'skim', tags: [], oneLine: '', usage: {}, pending: true }; }
+    if (NO_LLM) { sum = { keyPoints: [], whyItMatters: '', worthIt: 'skim', tags: [], oneLine: '', usage: {}, pending: true }; } // transcript-only; Claude Code summarizes later
+    else { try { sum = await summarize(meta.title, meta.channel, text); }
+      catch (e) { console.error(`(summary skipped — ${e.message.slice(0, 70)})`); sum = { keyPoints: [], whyItMatters: '', worthIt: 'skim', tags: [], oneLine: '', usage: {}, pending: true }; } }
     const file = writeNote(id, meta, sum, text);
     if (!sum.pending) { done[id] = true; fs.writeFileSync(DONE_FILE, JSON.stringify(done)); } // only "done" once it has a real summary
     totIn += sum.usage.input_tokens || 0; totOut += sum.usage.output_tokens || 0; n++;

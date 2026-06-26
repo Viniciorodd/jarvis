@@ -64,12 +64,33 @@ export function classify(title) {
 // the handful worth watching first (by video id) — surfaced to the top regardless of bucket
 const MUST_WATCH = new Set(['9CjJn8A07e4', 'WX-HS9o5VMY', 'd8BGxfW3Vj4', 'mKyaNr3jK-E', 'LboBIgC10uY', '7W75s7I-Gds', 'GrclaHACPhU', 'yaqpVGekrro']);
 
-// Parse one input file: JSON [{title,url}] (titles included) OR a Google Takeout playlist CSV whose
-// first column is the Video ID (no titles — those get resolved via oEmbed below).
+// Split one CSV line, honoring "quoted, fields" that contain commas.
+function csvLine(line) {
+  const out = []; let cur = '', q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) { if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true; else if (c === ',') { out.push(cur); cur = ''; } else cur += c;
+  }
+  out.push(cur); return out;
+}
+
+// Parse one input file: JSON [{title,url}]; a "title,url" CSV (titles included); or a Google Takeout
+// playlist CSV whose first column is the Video ID (no titles — resolved via oEmbed below).
 function parseInput(f) {
   const text = fs.readFileSync(f, 'utf8');
   if (/\.csv$/i.test(f)) {
     const lines = text.split(/\r?\n/).filter(Boolean);
+    if (/url/i.test(lines[0] || '')) {
+      const out = [];
+      for (let i = 1; i < lines.length; i++) {
+        const row = csvLine(lines[i]);
+        const url = row.find((c) => /youtu\.?be/.test(c)) || row[row.length - 1];
+        const id = videoId(url);
+        if (/^[A-Za-z0-9_-]{6,}$/.test(id)) out.push({ id, title: (row[0] || '').trim(), url: cleanUrl(url) });
+      }
+      return out;
+    }
     const start = /video id/i.test(lines[0] || '') ? 1 : 0;
     const out = [];
     for (let i = start; i < lines.length; i++) {

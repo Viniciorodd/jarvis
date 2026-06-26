@@ -98,20 +98,40 @@ export function completeLine(line, doneDate = todayStr()) {
   return `${m[1]}[x] ${rest}`;
 }
 
-// ── PURE: extract tasks from a file's lines (skips ```fenced``` query blocks) ─────────────────────
+// ── PURE: extract tasks from a file's lines (skips ```fenced``` query blocks, tracks headings) ─────
 function idFor(file, raw) { return crypto.createHash('sha1').update(`${file}|${raw}`).digest('hex').slice(0, 12); }
+// A heading whose text matches this marks the tasks beneath it as "parked" (not part of the live set) —
+// e.g. ⚡ Quick Capture's "💡 Someday / build ideas (parked — NOT active)" section.
+const PARKED_HEADING = /someday|parked|not active|build ideas|review & delete|done recently/i;
 export function extractTasks(lines, file = '') {
   const out = [];
-  let inFence = false;
+  let inFence = false, section = '', parked = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (/^\s*```/.test(line)) { inFence = !inFence; continue; }
     if (inFence) continue;
+    const h = /^#{1,6}\s+(.*)$/.exec(line);
+    if (h) { section = h[1].trim(); parked = PARKED_HEADING.test(section); continue; }
     const t = parseTaskLine(line);
     if (!t) continue;
-    out.push({ ...t, file, line: i, raw: line, id: idFor(file, line + '|' + line) });
+    out.push({ ...t, file, line: i, raw: line, section, parked, id: idFor(file, line + '|' + line) });
   }
   return out;
+}
+
+// ── PURE: the "curated active" set — undated working tasks worth showing when nothing's due ────────
+// Files that ARE the live working set even when their tasks carry no tag. Everything else only counts
+// as active if it carries a project tag (which keeps untagged Notion templates + journals out).
+const CURATED_FILES = new Set(['From Things — Active (promoted).md', '⚡ Quick Capture.md', '✅ Tasks.md']);
+export function isCuratedActive(task) {
+  if (task.done || task.due || task.parked) return false;        // dated → shows in today+overdue instead
+  const base = String(task.file).split('/').pop();
+  return CURATED_FILES.has(base) || (task.tags && task.tags.length > 0);
+}
+export function curatedActive(tasks) {
+  return tasks
+    .filter(isCuratedActive)
+    .sort((a, b) => (PRIORITY_RANK[a.priority] ?? 5) - (PRIORITY_RANK[b.priority] ?? 5));
 }
 
 // ── I/O: walk the vault, scan, edit ───────────────────────────────────────────────────────────────
@@ -139,6 +159,12 @@ export function scanTasks({ vaultDir = VAULT_DIR } = {}) {
     }
   }
   return out;
+}
+
+// The two lists the cockpit's ✅ Tasks panel renders: what's due now, and the curated active backlog.
+export function cockpitTasks({ vaultDir = VAULT_DIR, today = todayStr() } = {}) {
+  const all = scanTasks({ vaultDir });
+  return { today, dueToday: todayAndOverdue(all, today), active: curatedActive(all) };
 }
 
 function eolOf(content) { return /\r\n/.test(content) ? '\r\n' : '\n'; }
@@ -207,11 +233,14 @@ async function trace(action, rationale) {
 if (process.argv[1] && process.argv[1].endsWith('tasks.mjs')) {
   const [cmd, ...rest] = process.argv.slice(2);
   if (cmd === 'today') {
-    const list = todayAndOverdue(scanTasks());
+    const { dueToday, active } = cockpitTasks();
     console.log(`Vault: ${VAULT_DIR}`);
-    console.log(list.length
-      ? list.map((t) => `  • ${t.text}  (due ${t.due}${t.priority ? ', ' + t.priority : ''})  [${t.file}]`).join('\n')
+    console.log('\n🔥 Today & overdue:');
+    console.log(dueToday.length
+      ? dueToday.map((t) => `  • ${t.text}  (due ${t.due}${t.priority ? ', ' + t.priority : ''})  [${t.file}]`).join('\n')
       : '  Nothing due today or overdue. 🎉');
+    console.log(`\n⚡ Active (no date) — top 15 of ${active.length}:`);
+    console.log(active.slice(0, 15).map((t) => `  • ${t.text}${t.priority ? '  [' + t.priority + ']' : ''}${t.tags.length ? '  #' + t.tags.join(' #') : ''}`).join('\n') || '  (none)');
   } else if (cmd === 'add' || cmd === 'capture') {
     const text = rest.join(' ').trim();
     if (!text) { console.error(`usage: node control-plane/tasks.mjs ${cmd} "text"`); process.exit(1); }

@@ -4,6 +4,7 @@
 
 import {
   parseTaskLine, isOpenDueByToday, todayAndOverdue, formatTaskLine, completeLine, extractTasks,
+  isCuratedActive, curatedActive,
 } from '../control-plane/tasks.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
@@ -79,6 +80,29 @@ export default {
       const lines = ['# ✅ Tasks', '```tasks', 'not done', 'due before tomorrow', '```', '- [ ] real task 📅 2026-07-01', 'prose'];
       const got = extractTasks(lines, 'Tasks.md');
       return ok(got.length === 1 && got[0].text === 'real task' && got[0].file === 'Tasks.md', JSON.stringify(got.map((g) => g.text)));
+    } },
+    { name: 'extractTasks marks tasks under a "Someday / parked" heading', run: () => {
+      const lines = ['## Active', '- [ ] live one #gov', '## 💡 Someday / build ideas (parked — NOT active)', '- [ ] parked one #personal-dev'];
+      const got = extractTasks(lines, '⚡ Quick Capture.md');
+      const live = got.find((t) => t.text === 'live one'), parked = got.find((t) => t.text === 'parked one');
+      return ok(live && live.parked === false && parked && parked.parked === true, JSON.stringify(got.map((g) => ({ t: g.text, p: g.parked }))));
+    } },
+    { name: 'isCuratedActive: undated+tagged in, dated/parked/untagged-noise out', run: () => {
+      const inCuratedFile = { done: false, due: null, parked: false, tags: [], file: 'From Things — Active (promoted).md' };
+      const taggedAnywhere = { done: false, due: null, parked: false, tags: ['gov-contracting'], file: '01 - Businesses/RodGate.md' };
+      const dated = { done: false, due: '2026-06-25', parked: false, tags: ['gov'], file: 'x.md' };
+      const parked = { done: false, due: null, parked: true, tags: ['personal-dev'], file: '⚡ Quick Capture.md' };
+      const notionTemplate = { done: false, due: null, parked: false, tags: [], file: '09 - Notion/.../TRIPS/Paris.md' };
+      return ok(isCuratedActive(inCuratedFile) === true && isCuratedActive(taggedAnywhere) === true
+        && isCuratedActive(dated) === false && isCuratedActive(parked) === false && isCuratedActive(notionTemplate) === false);
+    } },
+    { name: 'curatedActive sorts by priority (highest first)', run: () => {
+      const tasks = [
+        { done: false, due: null, parked: false, tags: ['a'], file: 'n.md', text: 'low', priority: 'low' },
+        { done: false, due: null, parked: false, tags: ['a'], file: 'n.md', text: 'top', priority: 'highest' },
+        { done: false, due: null, parked: false, tags: ['a'], file: 'n.md', text: 'mid', priority: 'medium' },
+      ];
+      return ok(curatedActive(tasks).map((t) => t.text).join(',') === 'top,mid,low');
     } },
   ],
 };

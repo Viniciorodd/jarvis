@@ -54,3 +54,6 @@ Biography/
 
 # personal reference media (not code)
 jarvis video ideas/
+
+# youtube-triage title cache (generated)
+scripts/.yt-titles.json

@@ -89,6 +89,13 @@ function saveJson(file, data) { try { fs.mkdirSync(path.dirname(file), { recursi
 const KNOWLEDGE_DIR = path.resolve(process.env.JARVIS_KNOWLEDGE || path.join(os.homedir(), 'knowledge'));
 ['voice','notes','journal','people','braindumps','projects','ideas','tasks'].forEach(d => fs.mkdirSync(path.join(KNOWLEDGE_DIR, d), { recursive: true }));
 const TODOS_FILE = path.join(KNOWLEDGE_DIR, 'todos.json');
+// Vault task engine (control-plane/tasks.mjs) — the Obsidian "Second Brain" is the source of truth for
+// the cockpit's tasks. That module is ESM; load it dynamically from this CommonJS server (promise cached).
+let VAULT_DIR = process.env.VAULT_DIR || '';
+if (!VAULT_DIR) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^VAULT_DIR=(.+)$/m); if (m) VAULT_DIR = m[1].trim(); } catch { /* tasks.mjs falls back to ~/Documents/Second Brain */ } }
+let _tasksMod = null;
+function tasksEngine() { return (_tasksMod ||= import('../control-plane/tasks.mjs')); }
+const vaultOpt = () => (VAULT_DIR ? { vaultDir: VAULT_DIR } : {});
 // OpenAI key — used for Whisper voice transcription (Whisper API, ~$0.006/min)
 let OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 if (!OPENAI_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^OPENAI_API_KEY=(.+)$/m); if (m) OPENAI_KEY = m[1].trim(); } catch { /* */ } }
@@ -2133,6 +2140,86 @@ const server = http.createServer(async (req, res) => {
       if (!tv || !castUrl) return send(res, 400, JSON.stringify({ error: 'tv and url required' }));
       const result = await castToTV(tv, String(castUrl));
       return send(res, 200, JSON.stringify({ ok: true, ...result }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+
+  // ── COCKPIT: the one calm screen (🎯 Today · ✅ Tasks · 📅 Week · ⚡ Capture · approvals strip) ────
+  if (req.method === 'GET' && url.pathname === '/api/cockpit') {
+    const todayStr = new Date().toLocaleDateString('en-CA'); // local YYYY-MM-DD
+    // tasks (vault is the source of truth)
+    let tasks = { dueToday: [], active: [] };
+    try { const T = await tasksEngine(); tasks = T.cockpitTasks(vaultOpt()); }
+    catch (e) { tasks = { dueToday: [], active: [], error: e.message }; }
+    // calendar (Google, read-only): next 7 days, plus today's slice
+    let week = [], calError = null;
+    try { week = await google.calendarUpcoming({ days: 7, max: 30 }); }
+    catch (e) { calError = google.googleConfigured() ? e.message : 'not-connected'; }
+    const todayCalendar = week.filter((e) => String(e.start).slice(0, 10) === todayStr);
+    // approvals (control-plane pending) + gov opportunities → today's gov next action
+    let approvals = [], govNextAction = null;
+    try {
+      const cp = (p) => fetch(CP_URL + p, { signal: AbortSignal.timeout(4000) }).then((r) => r.json());
+      const [pending, govEvents] = await Promise.all([cp('/approvals/pending').catch(() => []), cp('/events?pod=gov').catch(() => [])]);
+      // A short human subject for an approval (the rationale is like "Proposal drafted for X (score N). …").
+      const subj = (a) => {
+        if (a.payload && a.payload.title) return a.payload.title;
+        const r = (a.rationale || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' '); // drop parentheticals
+        const m = r.match(/drafted for (.+?)\s*(?:\.|$)/i) || r.match(/ for (.+?)\s*(?:\.|$)/i);
+        return (m ? m[1] : r.split(/[.—]/)[0]).trim() || a.action;
+      };
+      approvals = (Array.isArray(pending) ? pending : []).map((a) => ({
+        id: a.id, pod: a.pod, action: a.action, rationale: a.rationale, title: subj(a), ts: a.ts,
+      }));
+      const ev = Array.isArray(govEvents) ? govEvents : [];
+      const opps = new Map();
+      for (const e of ev.filter((x) => x.action === 'bid.score')) {
+        const pl = e.payload || {};
+        opps.set(pl.noticeId || e.id, { title: pl.title || (e.rationale || '').split(' — ')[0], score: pl.score, rec: pl.recommendation, deadline: pl.deadline, url: pl.url });
+      }
+      const ranked = [...opps.values()].sort((a, b) => (b.score || 0) - (a.score || 0));
+      const top = ranked.find((o) => /bid/i.test(o.rec || '')) || ranked[0];
+      if (top) govNextAction = { text: `Respond to ${top.title}`, deadline: top.deadline || null, url: top.url || null, score: top.score || null };
+    } catch { /* control-plane offline — cockpit still renders */ }
+    // the ONE thing (deterministic): a gov send awaiting approval > today's gov next action >
+    // highest-priority due task > highest-priority active task.
+    let oneThing = null;
+    // Prefer signing & submitting a drafted proposal (highest-leverage gov action) over outreach sends.
+    const govApproval = approvals.find((a) => a.pod === 'gov' && a.action === 'submit')
+      || approvals.find((a) => a.pod === 'gov' && /send|email/i.test(a.action || ''));
+    if (govApproval) {
+      const verb = govApproval.action === 'submit' ? 'Review, sign & submit' : 'Approve & send';
+      oneThing = { text: `${verb}: ${govApproval.title}`, kind: 'approval', id: govApproval.id };
+    }
+    else if (govNextAction) oneThing = { text: govNextAction.text, kind: 'gov', deadline: govNextAction.deadline, url: govNextAction.url };
+    else if (tasks.dueToday && tasks.dueToday[0]) oneThing = { text: tasks.dueToday[0].text, kind: 'task', id: tasks.dueToday[0].id };
+    else if (tasks.active && tasks.active[0]) oneThing = { text: tasks.active[0].text, kind: 'task', id: tasks.active[0].id };
+    return send(res, 200, JSON.stringify({ date: todayStr, oneThing, govNextAction, todayCalendar, week, tasks, approvals, calError, hasGoogle: google.googleConfigured() }));
+  }
+  if (req.method === 'POST' && url.pathname === '/api/cockpit/task/add') {
+    try {
+      const { text, due, tags, priority } = await readBody(req);
+      if (!text || !String(text).trim()) return send(res, 400, JSON.stringify({ error: 'text required' }));
+      const T = await tasksEngine();
+      const r = T.addTask(String(text).trim(), { due, priority, tags: Array.isArray(tags) ? tags : (tags ? [tags] : []), ...vaultOpt() });
+      return send(res, 200, JSON.stringify({ ok: true, ...r }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/cockpit/task/complete') {
+    try {
+      const { id, file, raw } = await readBody(req);
+      if (!id && !(file && raw != null)) return send(res, 400, JSON.stringify({ error: 'id or file+raw required' }));
+      const T = await tasksEngine();
+      const r = T.completeTask({ id, file, raw, ...vaultOpt() });
+      return send(res, 200, JSON.stringify({ ok: !!r.changed, ...r }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/cockpit/capture') {
+    try {
+      const { text } = await readBody(req);
+      if (!text || !String(text).trim()) return send(res, 400, JSON.stringify({ error: 'text required' }));
+      const T = await tasksEngine();
+      const r = T.capture(String(text).trim(), vaultOpt());
+      return send(res, 200, JSON.stringify({ ok: true, ...r }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 

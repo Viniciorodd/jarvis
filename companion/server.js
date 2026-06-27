@@ -110,6 +110,9 @@ function bizRegistry() { return (_bizMod ||= import('../pods/businesses.mjs')); 
 // Per-business vault folders + activity log (control-plane/projects.mjs).
 let _projMod = null;
 function projects() { return (_projMod ||= import('../control-plane/projects.mjs')); }
+// Income ledger (control-plane/money.mjs) — "on top of income" toward the $10k/mo goal.
+let _moneyMod = null;
+function moneyLedger() { return (_moneyMod ||= import('../control-plane/money.mjs')); }
 // Seed a readable CRM table from the gov subcontractor list / the real-estate portfolio.
 function govCrmSeed() {
   let subs = []; try { subs = (JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'pods', 'gov', 'subs.json'), 'utf8')).subs) || []; } catch { /* none */ }
@@ -2314,9 +2317,12 @@ const server = http.createServer(async (req, res) => {
       const biz = R.BUSINESSES.find((b) => b.id === id);
       if (!biz) return send(res, 404, JSON.stringify({ error: 'unknown business' }));
       const summary = R.summarize(biz, await gatherBusinessRaw());
-      let activity = [], crm = null;
+      let activity = [], crm = null, money = null;
       try { const P = await projects(); activity = P.readLog(biz, { limit: 15 }); if (biz.crm) crm = P.readCrm(biz); } catch { /* no log/crm yet */ }
-      return send(res, 200, JSON.stringify({ ...summary, activity, crm, folder: '04 - Projects/' + (biz.folder || biz.name) }));
+      if (biz.id === 'finance') {
+        try { const M = await moneyLedger(); const entries = M.readLedger(); money = { ...M.summarize(entries), recent: entries.slice(-8).reverse(), stripe: await stripeMoney().catch(() => null) }; } catch { /* none */ }
+      }
+      return send(res, 200, JSON.stringify({ ...summary, activity, crm, money, folder: '04 - Projects/' + (biz.folder || biz.name) }));
     } catch (e) { return send(res, 200, JSON.stringify({ error: e.message })); }
   }
   // Log a done/to-do/idea/blocker to a business's vault Log.md (shows in Obsidian AND the app).
@@ -2329,6 +2335,15 @@ const server = http.createServer(async (req, res) => {
       const P = await projects();
       const r = P.appendLog(biz, { type: ['done', 'todo', 'idea', 'blocker', 'note'].indexOf(type) >= 0 ? type : 'note', text: String(text).trim() });
       return send(res, 200, JSON.stringify({ ok: true, ...r }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // Log income toward the $10k/mo goal — appends to 💵 Income Log.md in the vault.
+  if (req.method === 'POST' && url.pathname === '/api/money/log') {
+    try {
+      const { source, amount, notes } = await readBody(req);
+      if (!source || !(Number(String(amount).replace(/[^0-9.\-]/g, '')) > 0)) return send(res, 400, JSON.stringify({ error: 'source + amount required' }));
+      const M = await moneyLedger(); M.logIncome({ source, amount, notes });
+      return send(res, 200, JSON.stringify({ ok: true }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   // Add a CRM contact (gov sub / real-estate tenant) — appends a row to the business's Contacts (CRM).md.

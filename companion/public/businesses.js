@@ -100,6 +100,35 @@
     return act;
   }
 
+  function moneySection(b){
+    var m = b.money;
+    var wrap = el('div','money');
+    var head = el('div','money-head');
+    head.appendChild(el('span','money-mtd', '$' + (m.mtd || 0).toLocaleString()));
+    head.appendChild(el('span','money-goal', ' / $' + (m.goal || 10000).toLocaleString() + ' this month'));
+    wrap.appendChild(head);
+    var bar = el('div','money-bar'); var fill = el('div','money-fill'); fill.style.width = (m.pct || 0) + '%'; bar.appendChild(fill); wrap.appendChild(bar);
+    wrap.appendChild(el('div','money-sub', m.pct >= 100 ? '🎯 Goal hit this month!' : '$' + (m.remaining || 0).toLocaleString() + ' to go · lifetime $' + (m.total || 0).toLocaleString()));
+    if(m.stripe && !m.stripe.error){ wrap.appendChild(el('div','money-stripe', 'Stripe: $' + (m.stripe.weekCollected || 0).toLocaleString() + ' this week (' + m.stripe.mode + ')')); }
+    var form = el('form','money-add');
+    var src = el('input'); src.placeholder = 'Source (gov, Fiverr, cash…)'; src.autocomplete = 'off';
+    var amt = el('input'); amt.placeholder = '$ amount'; amt.inputMode = 'decimal'; amt.autocomplete = 'off';
+    var note = el('input'); note.placeholder = 'note (optional)'; note.autocomplete = 'off';
+    form.appendChild(src); form.appendChild(amt); form.appendChild(note);
+    var go = el('button','td-btn','Log $'); go.type = 'submit'; form.appendChild(go);
+    form.addEventListener('submit', function(e){ e.preventDefault(); if(!src.value.trim() || !amt.value.trim()) return;
+      fetch('/api/money/log', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ source:src.value.trim(), amount:amt.value.trim(), notes:note.value.trim() }) })
+        .then(function(r){ return r.json(); }).then(function(){ loadDetail(b.id); }).catch(function(){});
+    });
+    wrap.appendChild(form);
+    if(m.recent && m.recent.length){
+      var list = el('div','money-recent');
+      m.recent.forEach(function(r){ var row = el('div','money-row'); row.appendChild(el('span','money-rdate', r.date)); row.appendChild(el('span','money-rsrc', r.source)); row.appendChild(el('span','money-ramt', '$' + (r.amount || 0).toLocaleString())); list.appendChild(row); });
+      wrap.appendChild(list);
+    }
+    return wrap;
+  }
+
   function renderDetail(b){
     var body = $id('bizDetailBody'); body.innerHTML = '';
     if(b && b.error){ body.appendChild(el('div','ops-empty','Could not load: ' + b.error)); return; }
@@ -108,6 +137,8 @@
     nx.appendChild(el('div','gov-next-text', b.next.text));
     nx.appendChild(el('div','gov-next-sub', b.status || ''));
     body.appendChild(nx);
+
+    if(b.money){ body.appendChild(moneySection(b)); body.appendChild(el('div','biz-act-div')); }
 
     if(b.boardKind === 'gov'){
       var openBtn = el('button','crm-openboard','Open the Gov Pipeline board →');

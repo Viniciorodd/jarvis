@@ -115,6 +115,27 @@
 .biz-act-row.blocker .biz-act-tx{ color:var(--coral, #f08a7a); }
 .biz-act-empty{ font-size:12.5px; color:var(--dim); padding:4px 2px; }
 .biz-act-div{ height:1px; background:rgba(255,255,255,.06); margin:14px 16px 2px; }
+/* Income tracker (Finance) — progress toward the $10k/mo goal */
+.money{ margin:10px 16px 4px; }
+.money-head{ display:flex; align-items:baseline; gap:4px; }
+.money-mtd{ font-size:26px; font-weight:600; color:var(--teal); letter-spacing:-.01em; }
+.money-goal{ font-size:13px; color:var(--dim); }
+.money-bar{ height:8px; background:rgba(var(--teal-rgb),.1); border-radius:99px; overflow:hidden; margin:9px 0 6px; }
+.money-fill{ height:100%; background:var(--teal); border-radius:99px; transition:width .3s; min-width:2px; }
+.money-sub{ font-size:12px; color:var(--dim); }
+.money-stripe{ font-size:11.5px; color:var(--teal-dim); margin-top:4px; }
+.money-add{ display:flex; gap:6px; flex-wrap:wrap; margin:11px 0 8px; }
+.money-add input{ background:rgba(var(--teal-rgb),.04); border:1px solid rgba(var(--teal-rgb),.16); color:var(--cream); border-radius:8px; padding:8px 10px; font-size:12.5px; font-family:inherit; outline:none; }
+.money-add input:first-child{ flex:1; min-width:120px; }
+.money-add input:nth-child(2){ width:88px; }
+.money-add input:nth-child(3){ flex:1; min-width:90px; }
+.money-add input:focus{ border-color:rgba(var(--teal-rgb),.42); }
+.money-recent{ display:flex; flex-direction:column; gap:3px; margin-top:4px; }
+.money-row{ display:flex; gap:10px; align-items:baseline; font-size:12.5px; padding:3px 2px; border-top:0.5px solid rgba(255,255,255,.05); }
+.money-rdate{ color:var(--dim); min-width:78px; font-variant-numeric:tabular-nums; }
+.money-rsrc{ flex:1; color:var(--cream); }
+.money-ramt{ color:var(--teal); font-variant-numeric:tabular-nums; }
+
 /* CRM (gov subs / real-estate tenants) */
 .biz-crm{ margin:10px 16px 6px; }
 .crm-table{ width:100%; border-collapse:collapse; font-size:12px; margin:6px 0 10px; }

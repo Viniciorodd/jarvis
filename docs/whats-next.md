@@ -45,8 +45,23 @@ Directly fixes the pain "when I hit the Claude limit I'm not productive" + the a
   renders, no console errors. ⚠️ Quality ideas need gemma4/qwen3.6 **loaded** (free the RAM — they OOM'd
   at test time; tiny glm-ocr runs but is too weak to synthesize). Scheduling = "Mine now" / CLI
   (`node pods/vault/idea-miner.mjs`) for now.
-- ⏭ **Remaining (optional):** Phase 5 llm-council (karpathy, OpenRouter free models). Plan:
-  `~/.claude/plans/synthetic-exploring-kahan.md`.
+- ✅ **Phase 5 — LLM council** (karpathy's pattern, FOLDED INTO Jarvis instead of cloning the external
+  app — committable, no uv/extra servers). `pods/council.mjs`: a panel of brains (local + OpenRouter +
+  Claude) answer a hard question via the model-router (free-first; unavailable seats skipped), answers
+  are anonymized A/B/C, and a chairman (strongest available) synthesizes Recommendation / Why /
+  Disagreements / Confidence — judging on merit, not averaging. CLI (`node pods/council.mjs "..."`) +
+  `POST /api/council`. Pure logic eval-pinned (`evals/council.eval.mjs`, 6). **Verified live:** with a
+  weak local model + a 429'd OpenRouter, the Opus chairman explicitly DISCARDED the incoherent local
+  answer and delivered a strong teamed-bid recommendation. (Council consults cloud brains by design —
+  not for #ana/finance secrets.)
+- ✅ **Rodgate website → 3D** (`site/index.html`, single self-contained file; deploys to
+  rodgate-llc.netlify.app). Tasteful pro 3D: a slow wireframe-globe hero (Three.js via CDN, progressive
+  enhancement) with glowing PA/NJ/FL service-area points + starfield; card tilt-on-hover, scroll-reveal,
+  Inter, richer shadows. Respects reduced-motion, pauses when hidden, and FALLS BACK to the polished
+  gradient hero if CDN/WebGL fail. All capability data preserved (UEI/CAGE/NAICS/PSC/contact). Verified
+  loads with no console errors + globe initializes. NOT deployed — operator reviews, then deploy.
+
+### ✅ Everything above committed. Session complete — the free-compute build + 4 surfaces + 3D site are in.
 - ⚠️ **Security to-dos (operator):** rotate the OpenRouter key pasted in chat; vault the plaintext Telegram
   bot token in `openclaw.json` (`openclaw secrets configure`).
 

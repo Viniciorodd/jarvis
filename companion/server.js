@@ -36,6 +36,14 @@ async function getIdeaMiner() {
   _ideaMod = await import(pathToFileURL(path.join(__dirname, '..', 'pods', 'vault', 'idea-miner.mjs')).href);
   return _ideaMod;
 }
+// LLM council (ESM) — a panel of brains (local+OpenRouter+Claude) answer a hard question; chairman synthesizes.
+let _councilMod = null;
+async function getCouncil() {
+  if (_councilMod) return _councilMod;
+  const { pathToFileURL } = require('node:url');
+  _councilMod = await import(pathToFileURL(path.join(__dirname, '..', 'pods', 'council.mjs')).href);
+  return _councilMod;
+}
 
 const PORT = Number(process.env.COMPANION_PORT || process.env.PORT || 8095);
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -2451,6 +2459,12 @@ const server = http.createServer(async (req, res) => {
     try { const { id } = await readBody(req); if (!id) return send(res, 400, JSON.stringify({ error: 'id required' }));
       const I = await getIdeaMiner(); return send(res, 200, JSON.stringify(I.setStatus(id, 'dismissed'))); }
     catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── LLM COUNCIL: a panel of brains answer a hard question; the chairman synthesizes (free-first) ──
+  if (req.method === 'POST' && url.pathname === '/api/council') {
+    try { const { question } = await readBody(req); if (!question || !String(question).trim()) return send(res, 400, JSON.stringify({ ok: false, reason: 'question required' }));
+      const C = await getCouncil(); return send(res, 200, JSON.stringify(await C.council(String(question)))); }
+    catch (e) { return send(res, 500, JSON.stringify({ ok: false, reason: e.message })); }
   }
   // ── GOV PIPELINE BOARD: one plain view of where every opportunity stands + whose move is next ────
   if (req.method === 'GET' && url.pathname === '/api/gov-board') {

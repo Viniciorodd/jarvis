@@ -5,86 +5,125 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Rodgate, LLC — Proudly Serving America's Facilities</title>
 <meta name="description" content="Rodgate, LLC (DBA Rodgate Group) — an American-owned Small Disadvantaged, Minority-Owned (Hispanic American) small business providing janitorial, custodial, grounds, and haul-away services to federal, state, and local government in PA, NJ, and FL." />
+<meta property="og:title" content="Rodgate, LLC — Proudly Serving America's Facilities" />
+<meta property="og:description" content="American-owned Small Disadvantaged, Minority-Owned small business. Custodial · Grounds · Haul-away · Facilities support for federal, state & local government." />
+<meta property="og:type" content="website" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root{
     --blue:#0a1f44;        /* Old Glory Blue (deep) */
     --blue2:#102a54;
+    --blue3:#16356a;
     --red:#b22234;         /* Old Glory Red */
     --red2:#9e1b2c;
+    --redlite:#ff6b78;
     --white:#ffffff;
     --parchment:#f7f6f1;
     --ink:#0a1f44;
     --line:#d9dde6;
     --muted:#54607a;
     --gold:#c9a227;
+    --shadow:0 10px 30px rgba(10,31,68,.10), 0 2px 6px rgba(10,31,68,.06);
+    --shadow-lg:0 24px 60px rgba(10,31,68,.18);
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--parchment);line-height:1.6}
-  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+  body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--parchment);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+  a{color:inherit}
   /* flag ribbon */
   .ribbon{height:6px;background:repeating-linear-gradient(90deg,var(--red) 0 60px,var(--white) 60px 120px)}
-  /* header */
-  header{position:relative;color:#eef2fa;background:
-      radial-gradient(circle at 12% 18%, rgba(255,255,255,.10) 0 1.4px, transparent 1.6px) 0 0/46px 46px,
-      radial-gradient(circle at 32% 60%, rgba(255,255,255,.08) 0 1.2px, transparent 1.4px) 0 0/64px 64px,
-      linear-gradient(160deg,var(--blue),var(--blue2));}
-  .nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0}
+
+  /* ── header / hero (3D) ───────────────────────────────────── */
+  header{position:relative;color:#eef2fa;overflow:hidden;
+      background:linear-gradient(165deg,#0b234d 0%,var(--blue) 45%,#081a3a 100%);}
+  /* the 3D canvas sits behind the hero text */
+  #scene{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0;opacity:0;transition:opacity 1.4s ease}
+  #scene.ready{opacity:1}
+  header::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+      background:radial-gradient(120% 90% at 78% 18%, transparent 30%, rgba(8,20,40,.55) 100%)}
+  header .wrap{position:relative;z-index:2}
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
   .brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:1px;font-size:18px}
-  .star{width:40px;height:40px;display:grid;place-items:center;background:var(--red);border-radius:8px;box-shadow:0 0 0 2px rgba(255,255,255,.25) inset}
-  .star svg{width:24px;height:24px;fill:#fff}
-  .nav a{color:#cdd8ea;text-decoration:none;margin-left:22px;font-size:14px;font-weight:600}
-  .nav a:hover{color:#fff}
-  .hero{padding:52px 0 66px;position:relative}
-  .flagchip{display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#fff;background:rgba(178,34,52,.85);padding:6px 14px;border-radius:999px;font-weight:700}
-  .hero h1{font-size:42px;line-height:1.12;margin:20px 0 14px;font-weight:800}
-  .hero h1 .red{color:#ff6b78}
-  .hero p{font-size:18px;color:#c4d0e4;max-width:700px}
-  .cta{margin-top:28px;display:flex;gap:14px;flex-wrap:wrap}
-  .btn{display:inline-block;padding:13px 24px;border-radius:8px;font-weight:700;text-decoration:none;font-size:15px}
-  .btn-red{background:var(--red);color:#fff}
+  .star{width:42px;height:42px;display:grid;place-items:center;background:var(--red);border-radius:9px;box-shadow:0 0 0 2px rgba(255,255,255,.25) inset, 0 6px 18px rgba(178,34,52,.45)}
+  .star svg{width:25px;height:25px;fill:#fff}
+  .nav nav a{color:#cdd8ea;text-decoration:none;margin-left:24px;font-size:14px;font-weight:600;transition:color .15s}
+  .nav nav a:hover{color:#fff}
+  .hero{padding:64px 0 86px;position:relative}
+  .flagchip{display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#fff;background:rgba(178,34,52,.85);padding:7px 15px;border-radius:999px;font-weight:700;backdrop-filter:blur(4px);box-shadow:0 6px 18px rgba(178,34,52,.35)}
+  .hero h1{font-size:48px;line-height:1.1;margin:22px 0 16px;font-weight:900;letter-spacing:-.5px;max-width:15ch;text-shadow:0 2px 30px rgba(0,0,0,.35)}
+  .hero h1 .red{color:var(--redlite)}
+  .hero p{font-size:18.5px;color:#c8d4ea;max-width:660px}
+  .cta{margin-top:30px;display:flex;gap:14px;flex-wrap:wrap}
+  .btn{display:inline-block;padding:14px 26px;border-radius:9px;font-weight:700;text-decoration:none;font-size:15px;transition:transform .15s ease, box-shadow .15s ease, background .15s}
+  .btn:hover{transform:translateY(-2px)}
+  .btn-red{background:var(--red);color:#fff;box-shadow:0 10px 24px rgba(178,34,52,.4)}
   .btn-red:hover{background:var(--red2)}
   .btn-ghost{border:2px solid rgba(255,255,255,.45);color:#eef2fa}
-  .btn-ghost:hover{border-color:#fff}
-  .creds{margin-top:30px;display:flex;gap:26px;flex-wrap:wrap;color:#9fb0cc;font-size:13px}
-  .creds b{color:#fff;font-weight:700}
-  /* sections */
-  section{padding:58px 0}
+  .btn-ghost:hover{border-color:#fff;background:rgba(255,255,255,.06)}
+  .creds{margin-top:34px;display:flex;gap:14px;flex-wrap:wrap}
+  .creds span{display:inline-flex;flex-direction:column;gap:1px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 15px;font-size:13px;color:#9fb0cc;backdrop-filter:blur(6px)}
+  .creds b{color:#fff;font-weight:800;font-size:13.5px;letter-spacing:.4px}
+
+  /* ── sections ─────────────────────────────────────────────── */
+  section{padding:64px 0}
   .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--red);font-weight:800;margin:0 0 6px}
   .eyebrow::before{content:"★";color:var(--gold)}
-  .lead{font-size:27px;font-weight:800;margin:0 0 26px;color:var(--blue)}
+  .lead{font-size:29px;font-weight:800;margin:0 0 28px;color:var(--blue);letter-spacing:-.3px}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
-  .card{background:var(--white);border:1px solid var(--line);border-top:3px solid var(--red);border-radius:12px;padding:22px}
-  .card h3{margin:0 0 8px;font-size:17px;color:var(--blue)}
+  .card{background:var(--white);border:1px solid var(--line);border-top:3px solid var(--red);border-radius:14px;padding:24px;box-shadow:var(--shadow);transition:transform .2s cubic-bezier(.2,.7,.2,1), box-shadow .2s;transform-style:preserve-3d;will-change:transform}
+  .card:hover{box-shadow:var(--shadow-lg)}
+  .card h3{margin:0 0 8px;font-size:17.5px;color:var(--blue)}
   .card p{margin:0;color:var(--muted);font-size:14.5px}
-  .ico{width:36px;height:36px;border-radius:8px;background:#eef2fb;color:var(--blue);display:grid;place-items:center;margin-bottom:12px;font-size:19px}
+  .ico{width:44px;height:44px;border-radius:11px;background:linear-gradient(150deg,#eef2fb,#dfe7f7);color:var(--blue);display:grid;place-items:center;margin-bottom:14px;font-size:22px;box-shadow:inset 0 1px 0 #fff, 0 4px 10px rgba(10,31,68,.08)}
   ul.diff{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-  ul.diff li{background:var(--white);border:1px solid var(--line);border-radius:8px;padding:14px 16px 14px 40px;font-size:14.5px;position:relative}
-  ul.diff li::before{content:"★";position:absolute;left:15px;top:13px;color:var(--red);font-size:15px}
+  ul.diff li{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:16px 16px 16px 42px;font-size:14.5px;position:relative;box-shadow:var(--shadow)}
+  ul.diff li::before{content:"★";position:absolute;left:16px;top:15px;color:var(--red);font-size:15px}
   /* banner */
-  .banner{background:var(--red);color:#fff;text-align:center;padding:26px;border-radius:14px;font-size:20px;font-weight:700;letter-spacing:.3px;position:relative;overflow:hidden}
-  .banner small{display:block;font-weight:500;font-size:14px;color:#ffe1e5;margin-top:6px;letter-spacing:0}
+  .banner{background:linear-gradient(135deg,var(--red),var(--red2));color:#fff;text-align:center;padding:30px;border-radius:16px;font-size:21px;font-weight:800;letter-spacing:.2px;position:relative;overflow:hidden;box-shadow:0 16px 40px rgba(178,34,52,.28)}
+  .banner::before{content:"★ ★ ★";position:absolute;top:10px;left:0;right:0;text-align:center;color:rgba(255,255,255,.18);letter-spacing:10px;font-size:13px}
+  .banner small{display:block;font-weight:500;font-size:14.5px;color:#ffe1e5;margin-top:8px;letter-spacing:0}
   /* data table */
-  .data{background:var(--blue2);color:#e7eef8;border-radius:14px;overflow:hidden;border:1px solid #1c3666}
+  .data{background:linear-gradient(160deg,var(--blue2),var(--blue));color:#e7eef8;border-radius:16px;overflow:hidden;border:1px solid #1c3666;box-shadow:var(--shadow-lg)}
   .data table{width:100%;border-collapse:collapse}
-  .data td{padding:13px 22px;border-bottom:1px solid rgba(255,255,255,.08);font-size:14.5px;vertical-align:top}
+  .data td{padding:14px 24px;border-bottom:1px solid rgba(255,255,255,.08);font-size:14.5px;vertical-align:top}
   .data tr:last-child td{border-bottom:none}
-  .data td.k{color:#9fc1ff;width:200px;font-weight:700;white-space:nowrap}
+  .data tr:hover td{background:rgba(255,255,255,.03)}
+  .data td.k{color:#9fc1ff;width:210px;font-weight:700;white-space:nowrap}
   .pill{display:inline-block;background:rgba(178,34,52,.9);color:#fff;border-radius:999px;padding:3px 11px;font-size:12px;margin:2px 4px 2px 0;font-weight:700}
   /* contact */
   .contact{background:
       radial-gradient(circle at 85% 20%, rgba(255,255,255,.08) 0 1.4px, transparent 1.6px) 0 0/46px 46px,
-      linear-gradient(160deg,var(--blue2),var(--blue));color:#eef2fa;border-radius:14px;padding:36px;display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center}
-  .contact h3{margin:0 0 6px;font-size:23px}
+      linear-gradient(160deg,var(--blue2),var(--blue));color:#eef2fa;border-radius:16px;padding:40px;display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center;box-shadow:var(--shadow-lg)}
+  .contact h3{margin:0 0 6px;font-size:24px}
   .contact p{margin:0;color:#c4d0e4}
   .contact a{color:#fff;font-weight:700}
-  footer{padding:28px 0;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
-  @media(max-width:640px){.hero h1{font-size:31px}.contact{padding:24px}.data td.k{width:140px}}
+  footer{padding:30px 0;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+
+  /* scroll-reveal */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+
+  @media(max-width:640px){
+    .hero{padding:44px 0 60px}
+    .hero h1{font-size:33px}
+    .contact{padding:26px}
+    .data td.k{width:140px}
+    .nav nav a{margin-left:16px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .reveal{opacity:1;transform:none;transition:none}
+    .btn:hover,.card:hover{transform:none}
+    html{scroll-behavior:auto}
+  }
 </style>
 </head>
 <body>
 <div class="ribbon"></div>
 <header>
+  <canvas id="scene" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="nav">
       <div class="brand">
@@ -99,7 +138,7 @@
     </div>
     <div class="hero">
       <span class="flagchip">🇺🇸 An American-Owned Small Business</span>
-      <h1>Proudly keeping <span class="red">America's</span> facilities<br>clean, safe, and mission-ready.</h1>
+      <h1>Proudly keeping <span class="red">America's</span> facilities clean, safe, and mission-ready.</h1>
       <p>Rodgate, LLC (DBA Rodgate Group) is a Small Disadvantaged, Minority-Owned (Hispanic
         American) small business serving federal, state, and local government. We deliver
         dependable custodial, grounds, and haul-away services through a vetted network of
@@ -119,25 +158,25 @@
 </header>
 <div class="ribbon"></div>
 
-<section id="services" class="wrap">
+<section id="services" class="wrap reveal">
   <span class="eyebrow">What we do</span>
   <div class="lead">Core competencies</div>
-  <div class="grid">
-    <div class="card"><div class="ico">🧹</div><h3>Custodial &amp; Janitorial</h3><p>Recurring cleaning for offices, public buildings, and federal facilities — daily, weekly, or by call.</p></div>
-    <div class="card"><div class="ico">🌿</div><h3>Grounds &amp; Landscaping</h3><p>Grounds maintenance and upkeep that keeps installations presentable and compliant year-round.</p></div>
-    <div class="card"><div class="ico">🚛</div><h3>Trash &amp; Haul-Away</h3><p>Refuse collection, removal, and haul-away services scaled to the size of the requirement.</p></div>
-    <div class="card"><div class="ico">🏢</div><h3>Facilities Support</h3><p>Facilities operations and maintenance support, carpet care, and general building upkeep.</p></div>
+  <div class="grid" id="svcGrid">
+    <div class="card tilt"><div class="ico">🧹</div><h3>Custodial &amp; Janitorial</h3><p>Recurring cleaning for offices, public buildings, and federal facilities — daily, weekly, or by call.</p></div>
+    <div class="card tilt"><div class="ico">🌿</div><h3>Grounds &amp; Landscaping</h3><p>Grounds maintenance and upkeep that keeps installations presentable and compliant year-round.</p></div>
+    <div class="card tilt"><div class="ico">🚛</div><h3>Trash &amp; Haul-Away</h3><p>Refuse collection, removal, and haul-away services scaled to the size of the requirement.</p></div>
+    <div class="card tilt"><div class="ico">🏢</div><h3>Facilities Support</h3><p>Facilities operations and maintenance support, carpet care, and general building upkeep.</p></div>
   </div>
 </section>
 
-<section class="wrap" style="padding-top:0">
+<section class="wrap reveal" style="padding-top:0">
   <div class="banner">
     Built on service, accountability, and American values.
     <small>A family-driven small business earning its place serving the United States Government.</small>
   </div>
 </section>
 
-<section id="why" class="wrap">
+<section id="why" class="wrap reveal">
   <span class="eyebrow">Why Rodgate</span>
   <div class="lead">Our differentiators</div>
   <ul class="diff">
@@ -148,7 +187,7 @@
   </ul>
 </section>
 
-<section id="capabilities" class="wrap" style="padding-top:0">
+<section id="capabilities" class="wrap reveal" style="padding-top:0">
   <span class="eyebrow">Capability statement</span>
   <div class="lead">Company data</div>
   <div class="data">
@@ -170,7 +209,7 @@
   </div>
 </section>
 
-<section id="contact" class="wrap" style="padding-top:0">
+<section id="contact" class="wrap reveal" style="padding-top:0">
   <div class="contact">
     <div>
       <h3>Let's talk about your requirement</h3>
@@ -191,6 +230,107 @@
     UEI Z1SWBFEK7EM4 · CAGE 18S75
   </div>
 </footer>
+
 <script>document.getElementById('yr').textContent=new Date().getFullYear();</script>
+
+<!-- scroll-reveal + subtle 3D card tilt (no dependencies; respects reduced-motion) -->
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // reveal on scroll
+  var io = new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(function(el){io.observe(el);});
+  if(reduce) return;
+  // card tilt
+  document.querySelectorAll('.card.tilt').forEach(function(card){
+    card.addEventListener('mousemove',function(ev){
+      var r=card.getBoundingClientRect(),x=(ev.clientX-r.left)/r.width-.5,y=(ev.clientY-r.top)/r.height-.5;
+      card.style.transform='perspective(800px) rotateX('+(-y*6)+'deg) rotateY('+(x*6)+'deg) translateY(-4px)';
+    });
+    card.addEventListener('mouseleave',function(){card.style.transform='';});
+  });
+})();
+</script>
+
+<!-- 3D hero globe — progressive enhancement via Three.js (CDN). If it fails to load, the gradient hero stands on its own. -->
+<script type="module">
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  try {
+    const THREE = await import('https://unpkg.com/three@0.160.0/build/three.module.js');
+    const canvas = document.getElementById('scene');
+    const header = document.querySelector('header');
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+    camera.position.z = 3.15;
+
+    const world = new THREE.Group(); scene.add(world);
+
+    // wireframe globe
+    const R = 1.05;
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(R, 36, 28),
+      new THREE.MeshBasicMaterial({ color:0x4f7bd6, wireframe:true, transparent:true, opacity:0.22 })
+    );
+    world.add(sphere);
+    // solid inner core for depth
+    world.add(new THREE.Mesh(new THREE.SphereGeometry(R*0.985, 36, 28),
+      new THREE.MeshBasicMaterial({ color:0x0c2550, transparent:true, opacity:0.55 })));
+    // faint atmosphere
+    world.add(new THREE.Mesh(new THREE.SphereGeometry(R*1.12, 24, 18),
+      new THREE.MeshBasicMaterial({ color:0x3b6fd0, transparent:true, opacity:0.05, side:THREE.BackSide })));
+
+    function latLong(lat, lon, r){
+      const phi=(90-lat)*Math.PI/180, th=(lon+180)*Math.PI/180;
+      return new THREE.Vector3(-r*Math.sin(phi)*Math.cos(th), r*Math.cos(phi), r*Math.sin(phi)*Math.sin(th));
+    }
+    // service-area glow points (PA, NJ, FL) + a few national anchors
+    const pts=[[41.2,-76.0,0xc9a227],[40.2,-74.7,0xff6b78],[28.5,-81.4,0xff6b78],[38.9,-77.0,0xffffff]];
+    const dots=[];
+    pts.forEach(function(p){
+      const m=new THREE.Mesh(new THREE.SphereGeometry(0.025,16,16), new THREE.MeshBasicMaterial({color:p[2]}));
+      m.position.copy(latLong(p[0],p[1],R*1.01)); world.add(m); dots.push(m);
+      const halo=new THREE.Mesh(new THREE.SphereGeometry(0.05,16,16), new THREE.MeshBasicMaterial({color:p[2],transparent:true,opacity:0.25}));
+      halo.position.copy(m.position); world.add(halo); dots.push(halo);
+    });
+    // orient the Americas toward the viewer
+    world.rotation.y = -1.9; world.rotation.x = 0.32;
+
+    // starfield
+    const sg=new THREE.BufferGeometry(), N=420, arr=new Float32Array(N*3);
+    for(let i=0;i<N;i++){const r=6+Math.random()*10,t=Math.random()*Math.PI*2,p=Math.acos(2*Math.random()-1);
+      arr[i*3]=r*Math.sin(p)*Math.cos(t);arr[i*3+1]=r*Math.cos(p);arr[i*3+2]=r*Math.sin(p)*Math.sin(t);}
+    sg.setAttribute('position',new THREE.BufferAttribute(arr,3));
+    const stars=new THREE.Points(sg,new THREE.PointsMaterial({color:0x9fb6e6,size:0.03,transparent:true,opacity:0.7}));
+    scene.add(stars);
+
+    function resize(){
+      const w=header.clientWidth,h=header.clientHeight;
+      renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+      // nudge the globe to the right on wide screens so it sits behind/beside the copy
+      world.position.x = w>900 ? 0.95 : 0;
+    }
+    window.addEventListener('resize', resize); resize();
+    canvas.classList.add('ready');
+
+    let mx=0,my=0;
+    window.addEventListener('mousemove',function(e){mx=(e.clientX/window.innerWidth-.5);my=(e.clientY/window.innerHeight-.5);});
+
+    let raf;
+    function tick(){
+      raf=requestAnimationFrame(tick);
+      world.rotation.y += 0.0016;
+      const pulse=1+Math.sin(Date.now()*0.003)*0.12; dots.forEach(function(d,i){ if(i%2) d.scale.setScalar(pulse); });
+      camera.position.x += ((mx*0.5)-camera.position.x)*0.04;
+      camera.position.y += ((-my*0.4)-camera.position.y)*0.04;
+      camera.lookAt(0,0,0);
+      stars.rotation.y += 0.0004;
+      renderer.render(scene,camera);
+    }
+    if(reduce){ resize(); renderer.render(scene,camera); }
+    else { tick(); document.addEventListener('visibilitychange',function(){ if(document.hidden){cancelAnimationFrame(raf);} else {tick();} }); }
+  } catch(e){ /* CDN/WebGL unavailable — the gradient hero stands alone */ }
+</script>
 </body>
 </html>

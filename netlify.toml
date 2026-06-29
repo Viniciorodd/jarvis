@@ -1,0 +1,13 @@
+# Netlify config for the Rodgate public site. The site is a single static folder — no build step.
+# This pins the publish directory so a deploy from this repo always serves site/index.html.
+[build]
+  publish = "site"
+  command = ""
+
+# Cache the immutable-ish single page lightly; let HTML revalidate so updates show fast.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

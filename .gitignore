@@ -57,3 +57,5 @@ jarvis video ideas/
 
 # youtube-triage title cache (generated)
 scripts/.yt-titles.json
+
+scripts/.absorb-done.json

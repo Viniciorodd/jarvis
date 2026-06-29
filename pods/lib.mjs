@@ -5,8 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { modelFor } from './org.mjs';
-import { getSecret } from '../control-plane/vault.mjs';
+import { llm } from './model-router.mjs';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // pods/ -> repo root
 export const CP_URL = (process.env.CONTROL_PLANE_URL || 'http://localhost:8787').replace(/\/$/, '');
@@ -55,23 +54,14 @@ export async function notify({ title, detail = '', pod = 'Operations', verb = 'O
   notifyTelegram(`${title}\n${detail}`);
 }
 
-// `agent` (a codename) routes the key request through the vault so least privilege is enforced in code
-// (doctrine #3). Without it, falls back to .env for back-compat (dev / the classifier path).
-export async function claude(system, user, { tier = 'cheap', maxTokens = 700, agent = null } = {}) {
-  let key;
-  try { key = agent ? getSecret(agent, 'ANTHROPIC_API_KEY') : env('ANTHROPIC_API_KEY'); }
-  catch (e) { return { text: '', cost: 0, error: e.message }; } // vault denied this agent
-  if (!key) return { text: '', cost: 0, stub: true };
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: modelFor(tier), max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }),
-    });
-    if (!r.ok) return { text: '', cost: 0, error: r.status };
-    const data = await r.json();
-    const text = (data.content || []).map((c) => c.text || '').join('');
-    const u = data.usage || {};
-    const cost = ((u.input_tokens || 0) * 0.8 + (u.output_tokens || 0) * 4) / 1e6;
-    return { text, cost, usage: u };
-  } catch (e) { return { text: '', cost: 0, error: e.message }; }
+// The pod-facing LLM call. Delegates to the model-router (pods/model-router.mjs), which picks the
+// provider deterministically and falls down a FREE chain so a pod never goes dark when Claude tokens
+// run out: local Ollama → OpenRouter (free) → Claude. `agent` (a codename) still routes the Claude key
+// through the vault for least privilege (doctrine #3). `privacy:true` forces LOCAL-ONLY (#ana/finance
+// never leave the PC). `provider`/tier let a caller pin or hint a choice. Return shape is unchanged
+// ({ text, cost, usage }) plus { provider, model } so callers can see which brain answered.
+export async function claude(system, user, { tier = 'cheap', maxTokens = 700, agent = null, privacy = false, provider = null } = {}) {
+  const r = await llm({ system, user, tier, maxTokens, agent, privacy, provider });
+  if (!r.text && r.error) return { text: '', cost: 0, error: r.error, provider: r.provider || null };
+  return { text: r.text, cost: r.cost || 0, usage: r.usage || {}, provider: r.provider, model: r.model };
 }

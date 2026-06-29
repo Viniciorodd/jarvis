@@ -1,6 +1,54 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-06-26. Everything is committed + pushed to `origin/feat/core-infrastructure-v2`. Resume from here._
+_Updated 2026-06-29. Everything is committed + pushed to `origin/feat/core-infrastructure-v2`. Resume from here._
+
+### 🆕 2026-06-29 (newest) — FREE compute layer: the model router ("Jarvis never goes dark")
+Directly fixes the pain "when I hit the Claude limit I'm not productive" + the absorb gotcha below (Pro ≠ API).
+- **`pods/model-router.mjs` (NEW):** every LLM call now routes through one chokepoint that falls down a
+  chain **local Ollama → OpenRouter (free) → Claude**. On any Claude error (429/401/no-credit/network) it
+  auto-falls to a free brain; when a free model is unsure it can escalate up. Pure `pickChain()` is
+  eval-pinned (`evals/router.eval.mjs`, 10 cases). **Privacy flag forces LOCAL-ONLY** (#ana/finance never
+  leave the PC). Manual override via `LLM_PREFER` or the UI chip (`control-plane/brain-mode.json`).
+- **`pods/lib.mjs` `claude()` now delegates to the router** — all pods inherit fallback, zero call-site
+  changes; return shape unchanged (+`provider`/`model`).
+- **Companion front door routed too** (`companion/server.js`): triage / brain-dump / agent helpers + the
+  main chat loop fall back to a free brain when Claude is down (tool-less plain answer, tells you so). New
+  `GET/POST /api/brain` + a top-bar **brain chip** (`companion/public/brain.js`: Auto/Local/Claude/OpenRouter).
+- **Config** in `.env.example` (Free compute layer block): `OLLAMA_URL`, `OLLAMA_AUTOSTART=1`, `LOCAL_MODEL`
+  (qwen3.6), `LOCAL_MODEL_FAST` (gemma4), `OPENROUTER_API_KEY`, `OPENROUTER_MODEL_FREE`, `LLM_PREFER`. Ollama
+  auto-starts via `companion/start-jarvis.cmd` + `ensureOllama()`.
+- **Verified live:** router answers via Ollama (glm-ocr "IT WORKS"); brain=Local + big model OOM → auto
+  fell back to Claude (`attempts:["local:local 500","claude:ok"]`); privacy stays local; 170/170 evals green.
+- ⚠️ **Local 8B/36B (gemma4/qwen3.6) hit a memory OOM at test time** (host-buffer alloc) — they ran before,
+  so it's transient RAM/VRAM pressure; free other GPU apps. Tiny glm-ocr loads fine. Fallback covers it.
+- ✅ **Phase 2 — OpenClaw LIVE (free local hands).** Was installed but its gateway was dead (missing
+  service unit). Fixed: `doctor --fix`, command-owner set to the operator's Telegram id (only he approves
+  dangerous actions), gateway token generated, **gateway service reinstalled + running** (`runtime.status:
+  running`). Runs on free local **gemma4** (Ollama) — zero Claude tokens. Setup doc: `docs/openclaw.md`.
+  ⏳ Operator's one step: DM the Telegram bot → `openclaw pairing approve telegram <code>`; free RAM so
+  gemma4 loads. Lane: OpenClaw = free dev/ops hands; irreversibles (send/spend) gate to the owner.
+- ✅ **Phase 4 — GovCon OS preview (parallel, non-destructive).** New surface at **`/govcon`**
+  (`companion/public/govcon.{html,css,js}`), reachable from **More → GovCon OS (preview)**; the normal
+  cockpit is untouched (delete the 3 files to remove). "Palantir-for-GovCon" look (Midnight Navy / Royal
+  Blue / Emerald / Inter, dark, calm). Reads **live** data only — `/api/gov-board`, `/api/cockpit`,
+  `/api/business?id=finance`: CEO briefing + health ring, KPI cards, pipeline funnel, whose-move Kanban,
+  Opportunity Genome + transparent win-estimate. **Verified in-browser** (54 tracked, real board/genome,
+  no console errors). Server route: one line in `companion/server.js` maps `/govcon`→`govcon.html`.
+- ✅ **Phase 3 — proactive vault idea-miner.** `pods/vault/idea-miner.mjs` scans the vault (To Absorb +
+  recent notes + Goals) on the **FREE LOCAL model with privacy=true** (vault never leaves the PC), and
+  proposes a ranked, deduped **"Ideas to approve"** list → writes `05 - Knowledge/💡 Ideas to Approve.md`
+  + `pods/vault/ideas.json` (gitignored runtime). Companion: `GET /api/ideas`, `POST /api/ideas/{run,
+  approve,dismiss}`; **Approve → a vault task** (reversible; nothing irreversible auto-runs), **Dismiss →
+  never nags again** (dedupe cache). New page **`/ideas`** + **More → "Ideas to approve"** + a "Mine now"
+  button. Pure logic eval-pinned (`evals/idea-miner.eval.mjs`, 6 cases). **Verified:** pipeline runs
+  (gather→local→parse→dedupe→write); inbox + approve→task + dismiss proven on a temp vault; `/ideas`
+  renders, no console errors. ⚠️ Quality ideas need gemma4/qwen3.6 **loaded** (free the RAM — they OOM'd
+  at test time; tiny glm-ocr runs but is too weak to synthesize). Scheduling = "Mine now" / CLI
+  (`node pods/vault/idea-miner.mjs`) for now.
+- ⏭ **Remaining (optional):** Phase 5 llm-council (karpathy, OpenRouter free models). Plan:
+  `~/.claude/plans/synthetic-exploring-kahan.md`.
+- ⚠️ **Security to-dos (operator):** rotate the OpenRouter key pasted in chat; vault the plaintext Telegram
+  bot token in `openclaw.json` (`openclaw secrets configure`).
 
 ### 🆕 2026-06-26 (newest) — absorb pipeline + calendar views + CRM + agent SOP files
 - **Absorb pipeline** (`scripts/absorb.mjs`): YouTube → skimmable Obsidian note (key-points summary on top,

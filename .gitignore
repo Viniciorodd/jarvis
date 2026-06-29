@@ -2,6 +2,7 @@
 node_modules/
 hq/data/
 prompts/operator-profile.md
+prompts/operator-profile.prev-*
 prompts/gov/entity-profile.md
 prompts/gov/boilerplate/
 *.log
@@ -24,6 +25,10 @@ scripts/.media-usage.json
 # control-plane event store (system of record — local runtime data) + eval results
 control-plane/data/
 evals/.results.json
+# model-router runtime brain-mode toggle (Auto/Local/Claude/OpenRouter — set from the UI chip)
+control-plane/brain-mode.json
+# vault idea-miner runtime state (regenerated each run; the 💡 Ideas note lives in the vault)
+pods/vault/ideas.json
 # companion-generated images (work product, regenerated)
 companion/public/_generated/
 # offline Vosk wake model (~41MB binary — download via scripts/get-vosk-model.mjs)

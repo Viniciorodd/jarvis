@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rodgate · GovCon OS</title>
+<meta name="theme-color" content="#0F172A">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="govcon.css">
+</head>
+<body>
+<div class="gc-app">
+  <!-- Top bar -->
+  <header class="gc-top">
+    <div class="gc-brand">
+      <span class="gc-logo">▣</span>
+      <span class="gc-brand-text">RODGATE <em>· GovCon OS</em></span>
+      <span class="gc-preview-tag" title="A preview surface — your normal cockpit is untouched.">PREVIEW</span>
+    </div>
+    <div class="gc-top-right">
+      <span class="gc-live"><span class="gc-dot"></span> Live</span>
+      <span class="gc-date" id="gcDate">—</span>
+      <a class="gc-back" href="/" title="Back to the JARVIS cockpit">← Jarvis</a>
+    </div>
+  </header>
+
+  <main class="gc-main">
+    <!-- CEO Briefing hero -->
+    <section class="gc-briefing card" id="gcBriefing">
+      <div class="gc-briefing-head">
+        <div>
+          <h1 id="gcGreeting">Good morning.</h1>
+          <p class="gc-sub" id="gcBriefSub">Pulling your pipeline together…</p>
+        </div>
+        <div class="gc-health" id="gcHealth" title="Business health — derived from pipeline movement, open gates, and income pace.">
+          <div class="gc-health-ring" id="gcHealthRing"><span id="gcHealthScore">—</span></div>
+          <span class="gc-health-label">Health</span>
+        </div>
+      </div>
+      <div class="gc-nextmove" id="gcNextMove">
+        <span class="gc-nextmove-label">Your next move</span>
+        <span class="gc-nextmove-text" id="gcNextText">—</span>
+        <span class="gc-nextmove-meta" id="gcNextMeta"></span>
+      </div>
+      <ul class="gc-priorities" id="gcPriorities"></ul>
+    </section>
+
+    <!-- KPI cards -->
+    <section class="gc-kpis" id="gcKpis"></section>
+
+    <!-- Pipeline funnel -->
+    <section class="card gc-funnel">
+      <h2 class="gc-h2">Pipeline</h2>
+      <div class="gc-funnel-bars" id="gcFunnel"></div>
+    </section>
+
+    <div class="gc-two-col">
+      <!-- Kanban -->
+      <section class="card gc-board-wrap">
+        <h2 class="gc-h2">Board <span class="gc-h2-hint">your move first</span></h2>
+        <div class="gc-board" id="gcBoard"></div>
+      </section>
+
+      <!-- Opportunity Genome -->
+      <section class="card gc-genome">
+        <h2 class="gc-h2">Opportunity Genome</h2>
+        <p class="gc-genome-title" id="gcGenomeTitle">—</p>
+        <div class="gc-winprob">
+          <div class="gc-winprob-ring" id="gcWinRing"><span id="gcWinPct">—</span></div>
+          <div class="gc-winprob-why">
+            <span class="gc-winprob-label">Win estimate</span>
+            <ul id="gcWinWhy"></ul>
+          </div>
+        </div>
+        <div class="gc-dna" id="gcDna"></div>
+        <p class="gc-genome-foot">Derived from the scout's fit score + set-aside lane + trade. An estimate to prioritize — not a guarantee.</p>
+      </section>
+    </div>
+
+    <footer class="gc-foot">
+      <span id="gcFootStatus">Reading live data…</span>
+      <span class="gc-foot-note">Preview surface · reads your real pipeline · changes nothing · delete <code>govcon.*</code> to remove</span>
+    </footer>
+  </main>
+</div>
+<script src="govcon.js"></script>
+</body>
+</html>

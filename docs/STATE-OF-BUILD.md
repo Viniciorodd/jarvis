@@ -25,7 +25,7 @@ and formal **autonomy ladder with promotion rules** (workflows are human-gated b
 |---|---|---|
 | Self-hosted NAS + Docker | ✅ | Live on UGREEN ThanesKeep (192.168.6.121). |
 | n8n orchestration | ✅ | 7 workflows exported + deployed (`n8n/workflows/`). |
-| Claude API tiered (Haiku/Sonnet/Opus) | 🟡 | Models used; **prompt caching + Batch API not confirmed wired** (the 80–95% cost saver). |
+| Claude API tiered (Haiku/Sonnet/Opus) | ✅ | Models used + **free compute layer** (`pods/model-router.mjs`, 2026-06-29): every call routes local Ollama → OpenRouter (free) → Claude, auto-falling-back so Jarvis never goes dark when tokens run out; privacy→local-only; eval-pinned. Remaining cost saver: prompt caching + Batch API not yet wired. |
 | Control-plane API + append-only event store as system of record | 🟡 | HQ (`hq/server.js`) has `/api/event`, `/api/approval`, `/api/state` + an events feed — closest thing, but it's a **game dashboard, not a rigorous append-only ledger** treated as the system of record. |
 | Tailscale private access | ✅ | Per NAS deploy. |
 | Slack/Mattermost as comms-only | ✅ | Slack bridge (Socket Mode) + Telegram; comms clients, not source of truth. |

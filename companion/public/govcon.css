@@ -1,0 +1,143 @@
+/* govcon.css — the "Palantir-for-GovCon" preview surface. Calm, data-dense, dark.
+   Palette from the operator's design doc: Midnight Navy / Royal Blue / Emerald / Amber / Red / Slate.
+   Dark mode is the default (proposal managers work late); a light theme is available via data-theme. */
+
+:root, [data-theme="dark"] {
+  --navy: #0F172A;
+  --bg: #0B1120;            /* slightly deeper than navy for the page */
+  --panel: #131C30;         /* cards */
+  --panel-2: #18233B;       /* nested */
+  --line: #243047;          /* hairline borders */
+  --ink: #E8EDF6;           /* primary text */
+  --muted: #94A3B8;         /* secondary text (slate) */
+  --faint: #64748B;
+  --accent: #2563EB;        /* royal blue */
+  --accent-soft: #1D2A4D;
+  --ok: #10B981;            /* emerald */
+  --warn: #F59E0B;          /* amber */
+  --danger: #DC2626;        /* red */
+  --shadow: 0 1px 0 rgba(255,255,255,.03), 0 8px 24px rgba(0,0,0,.35);
+}
+[data-theme="light"] {
+  --navy: #0F172A; --bg: #F8FAFC; --panel: #FFFFFF; --panel-2: #F1F5F9; --line: #E2E8F0;
+  --ink: #0F172A; --muted: #475569; --faint: #94A3B8; --accent: #2563EB; --accent-soft: #E6EEFE;
+  --ok: #059669; --warn: #D97706; --danger: #DC2626; --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: radial-gradient(1200px 600px at 70% -10%, #16213b 0%, var(--bg) 60%) fixed;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1, "cv05" 1;
+}
+.gc-app { max-width: 1180px; margin: 0 auto; padding: 0 18px 56px; }
+
+/* ── top bar ─────────────────────────────────────────────── */
+.gc-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 2px 18px; position: sticky; top: 0; z-index: 5;
+  background: linear-gradient(var(--bg), rgba(11,17,32,.86)); backdrop-filter: blur(8px); }
+.gc-brand { display: flex; align-items: center; gap: 10px; }
+.gc-logo { color: var(--accent); font-size: 20px; }
+.gc-brand-text { font-weight: 800; letter-spacing: .04em; font-size: 15px; }
+.gc-brand-text em { color: var(--muted); font-style: normal; font-weight: 600; }
+.gc-preview-tag { font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); padding: 2px 6px; border-radius: 999px; }
+.gc-top-right { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--muted); }
+.gc-live { display: inline-flex; align-items: center; gap: 6px; color: var(--ok); font-weight: 600; }
+.gc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 70%, transparent); animation: gcPulse 2.4s infinite; }
+@keyframes gcPulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.gc-back { color: var(--muted); text-decoration: none; padding: 5px 10px; border: 1px solid var(--line); border-radius: 8px; transition: .15s; }
+.gc-back:hover { color: var(--ink); border-color: var(--accent); }
+
+/* ── cards ───────────────────────────────────────────────── */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 20px 22px; }
+.gc-main { display: flex; flex-direction: column; gap: 16px; }
+.gc-h2 { font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }
+.gc-h2-hint { color: var(--faint); font-weight: 500; text-transform: none; letter-spacing: 0; margin-left: 8px; }
+
+/* ── CEO briefing ────────────────────────────────────────── */
+.gc-briefing { background: linear-gradient(135deg, #15213c 0%, var(--panel) 55%); }
+.gc-briefing-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.gc-briefing h1 { font-size: 26px; font-weight: 800; margin: 0 0 4px; letter-spacing: -.01em; }
+.gc-sub { color: var(--muted); margin: 0; font-size: 14px; line-height: 1.5; max-width: 60ch; }
+.gc-health { text-align: center; flex-shrink: 0; }
+.gc-health-ring { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 20px;
+  background: conic-gradient(var(--ok) var(--p,0%), var(--panel-2) 0); position: relative; }
+.gc-health-ring::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--panel); }
+.gc-health-ring span { position: relative; z-index: 1; }
+.gc-health-label { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; letter-spacing: .04em; }
+.gc-nextmove { margin-top: 18px; padding: 14px 16px; border-radius: 12px; background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
+.gc-nextmove-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.gc-nextmove-text { font-size: 16px; font-weight: 600; flex: 1 1 60%; }
+.gc-nextmove-meta { font-size: 12px; color: var(--muted); }
+.gc-priorities { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.gc-priorities li { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink); }
+.gc-priorities li .gc-pri-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.gc-priorities li .gc-pri-tag { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+/* ── KPI cards ───────────────────────────────────────────── */
+.gc-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.gc-kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+.gc-kpi-val { font-size: 28px; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+.gc-kpi-label { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.gc-kpi-sub { font-size: 11px; color: var(--faint); margin-top: 3px; }
+.gc-kpi.accent .gc-kpi-val { color: var(--accent); }
+.gc-kpi.ok .gc-kpi-val { color: var(--ok); }
+.gc-kpi.warn .gc-kpi-val { color: var(--warn); }
+
+/* ── funnel ──────────────────────────────────────────────── */
+.gc-funnel-bars { display: flex; flex-direction: column; gap: 9px; }
+.gc-fbar { display: grid; grid-template-columns: 120px 1fr 40px; align-items: center; gap: 12px; }
+.gc-fbar-label { font-size: 13px; color: var(--muted); }
+.gc-fbar-track { height: 26px; background: var(--panel-2); border-radius: 7px; overflow: hidden; }
+.gc-fbar-fill { height: 100%; border-radius: 7px; background: linear-gradient(90deg, var(--accent), #3b82f6); transition: width .8s cubic-bezier(.2,.7,.2,1); min-width: 2px; }
+.gc-fbar-fill.s-found { background: linear-gradient(90deg,#3b4a6b,#4b5d85); }
+.gc-fbar-fill.s-reviewing { background: linear-gradient(90deg,#2563EB,#3b82f6); }
+.gc-fbar-fill.s-responding { background: linear-gradient(90deg,#7c3aed,#9333ea); }
+.gc-fbar-fill.s-submitted { background: linear-gradient(90deg,#0891b2,#06b6d4); }
+.gc-fbar-fill.s-closed { background: linear-gradient(90deg,#059669,#10b981); }
+.gc-fbar-num { font-size: 14px; font-weight: 700; text-align: right; }
+
+/* ── two-column (board + genome) ─────────────────────────── */
+.gc-two-col { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 880px) { .gc-two-col { grid-template-columns: 1fr; } .gc-briefing-head { flex-direction: column; } }
+
+/* ── kanban board ────────────────────────────────────────── */
+.gc-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.gc-col-head { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
+.gc-col-head .n { color: var(--ink); background: var(--panel-2); border-radius: 999px; padding: 0 7px; font-size: 11px; }
+.gc-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 8px; transition: .15s; }
+.gc-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.gc-card-title { font-size: 12.5px; font-weight: 600; line-height: 1.3; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.gc-card-meta { font-size: 11px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.gc-stars { color: var(--warn); letter-spacing: 1px; font-size: 11px; }
+.gc-stars .off { color: var(--faint); }
+.gc-who { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; letter-spacing: .04em; }
+.gc-who.you { background: color-mix(in srgb, var(--accent) 22%, transparent); color: #93b4ff; }
+.gc-who.jarvis { background: var(--panel); color: var(--muted); }
+.gc-card.out { opacity: .55; }
+
+/* ── genome ──────────────────────────────────────────────── */
+.gc-genome-title { font-size: 15px; font-weight: 600; margin: 0 0 14px; }
+.gc-winprob { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.gc-winprob-ring { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; position: relative;
+  background: conic-gradient(var(--accent) var(--p,0%), var(--panel-2) 0); font-size: 22px; font-weight: 800; }
+.gc-winprob-ring::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: var(--panel); }
+.gc-winprob-ring span { position: relative; z-index: 1; }
+.gc-winprob-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.gc-winprob-why ul { margin: 6px 0 0; padding-left: 16px; font-size: 12.5px; color: var(--ink); line-height: 1.5; }
+.gc-dna { display: flex; flex-direction: column; gap: 8px; }
+.gc-dna-row { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 10px; font-size: 13px; }
+.gc-dna-row .lab { color: var(--muted); }
+.gc-dna-stars { color: var(--accent); letter-spacing: 2px; }
+.gc-dna-stars .off { color: var(--faint); }
+.gc-genome-foot { font-size: 11px; color: var(--faint); margin: 14px 0 0; line-height: 1.5; }
+
+/* ── footer ──────────────────────────────────────────────── */
+.gc-foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--faint); padding: 8px 4px 0; }
+.gc-foot code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; }
+
+.gc-empty { color: var(--muted); font-size: 13px; padding: 8px 0; }

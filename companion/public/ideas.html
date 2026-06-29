@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ideas to Approve · Jarvis</title>
+<meta name="theme-color" content="#0F172A">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="govcon.css">
+<style>
+  .id-row { display:flex; gap:12px; align-items:flex-start; padding:14px 0; border-bottom:1px solid var(--line); }
+  .id-row:last-child { border-bottom:0; }
+  .id-eff { flex-shrink:0; width:30px; height:30px; border-radius:8px; display:grid; place-items:center; font-weight:800; font-size:13px; background:var(--panel-2); color:var(--muted); }
+  .id-eff.S { color:var(--ok); } .id-eff.M { color:var(--warn); } .id-eff.L { color:var(--danger); }
+  .id-body { flex:1; min-width:0; }
+  .id-title { font-weight:600; font-size:15px; }
+  .id-why { color:var(--muted); font-size:13px; margin-top:3px; line-height:1.5; }
+  .id-cat { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--accent); margin-top:6px; display:inline-block; }
+  .id-actions { display:flex; gap:8px; flex-shrink:0; }
+  .id-btn { border:1px solid var(--line); background:var(--panel-2); color:var(--ink); border-radius:8px; padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:.15s; }
+  .id-btn.approve:hover { border-color:var(--ok); color:var(--ok); }
+  .id-btn.dismiss:hover { border-color:var(--danger); color:var(--danger); }
+  .id-mine { border:1px solid color-mix(in srgb,var(--accent) 40%,transparent); background:var(--accent-soft); color:#93b4ff; border-radius:9px; padding:8px 16px; font-weight:700; cursor:pointer; font-family:inherit; font-size:13px; }
+  .id-mine:disabled { opacity:.6; cursor:default; }
+  .id-counts { display:flex; gap:16px; font-size:12px; color:var(--muted); margin-top:10px; }
+  .id-fade { animation: idFade .25s ease; }
+  @keyframes idFade { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+</style>
+</head>
+<body>
+<div class="gc-app">
+  <header class="gc-top">
+    <div class="gc-brand"><span class="gc-logo">💡</span><span class="gc-brand-text">IDEAS <em>· to approve</em></span></div>
+    <div class="gc-top-right">
+      <button class="id-mine" id="idMine">✦ Mine now</button>
+      <a class="gc-back" href="/" title="Back to JARVIS">← Jarvis</a>
+    </div>
+  </header>
+  <main class="gc-main">
+    <section class="card">
+      <h2 class="gc-h2">Mined from your vault — free &amp; local <span class="gc-h2-hint" id="idLast"></span></h2>
+      <div id="idList"><div class="gc-empty" id="idEmpty">Loading…</div></div>
+      <div class="id-counts" id="idCounts"></div>
+    </section>
+    <footer class="gc-foot">
+      <span id="idStatus"></span>
+      <span class="gc-foot-note">Jarvis proposes · you approve · approved → a task in your vault. Nothing runs on its own.</span>
+    </footer>
+  </main>
+</div>
+<script src="ideas.js"></script>
+</body>
+</html>

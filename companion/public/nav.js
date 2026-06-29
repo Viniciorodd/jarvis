@@ -86,6 +86,8 @@ if(navBtns.more){
 /* ── More menu items ── */
 var moreItems = {
   jMoreGov:     function(){ triggerGhost('govBtn'); },
+  jMoreGovcon:  function(){ window.location.href = '/govcon'; }, /* parallel GovCon OS preview surface */
+  jMoreIdeas:   function(){ window.location.href = '/ideas'; },  /* proactive vault idea-miner inbox */
   jMoreMap:     function(){ triggerGhost('mapBtn'); },
   jMoreFloor:   function(){ triggerGhost('floorBtn'); },
   jMoreHQ:      function(){ triggerGhost('hqBtn'); },

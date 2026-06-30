@@ -265,3 +265,17 @@ body {
 .gc-journal-item .ji-kind { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 5px; background: var(--panel-2); color: var(--muted); flex-shrink: 0; height: fit-content; }
 .gc-journal-item .ji-text { color: var(--ink); line-height: 1.4; }
 .gc-journal-empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+
+/* ── relationship graph / company brain (radial network) ─── */
+.gc-net { width: 100%; }
+.gc-net svg { width: 100%; height: auto; display: block; }
+.gc-net .net-link { stroke: color-mix(in srgb, var(--accent) 22%, transparent); stroke-width: 1px; }
+.gc-net .net-link.faint { stroke: color-mix(in srgb, var(--muted) 22%, transparent); stroke-width: .6px; }
+.gc-net .net-agency { fill: var(--accent); opacity: .88; }
+.gc-net .net-center { fill: var(--panel); stroke: var(--accent); stroke-width: 2.5px; }
+.gc-net .net-center-lbl { fill: var(--ink); font-size: 11px; font-weight: 800; text-anchor: middle; letter-spacing: .04em; }
+.gc-net .net-lbl { fill: var(--muted); font-size: 9px; text-anchor: middle; }
+.gc-net .net-opp { cursor: pointer; transition: .12s; }
+.gc-net .net-opp:hover { stroke: var(--ink); stroke-width: 1.5px; }
+.gc-net-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--muted); align-items: center; }
+.gc-net-legend .lg { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }

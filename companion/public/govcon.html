@@ -138,6 +138,18 @@
 
     </div>
 
+    <!-- Relationship graph / "company brain" — your gov universe -->
+    <section class="card gc-network">
+      <h2 class="gc-h2">Relationship graph <span class="gc-h2-hint" id="gcNetStat">your gov universe</span></h2>
+      <div id="gcNet" class="gc-net"></div>
+      <div class="gc-net-legend">
+        <span><i class="lg" style="background:var(--accent)"></i> agency</span>
+        <span><i class="lg" style="background:var(--ok)"></i> in-lane opportunity</span>
+        <span><i class="lg" style="background:var(--faint)"></i> out-of-lane</span>
+        <span class="gc-map-hint">click a node to open it</span>
+      </div>
+    </section>
+
     <footer class="gc-foot">
       <span id="gcFootStatus">Reading live data…</span>
       <span class="gc-foot-note">Preview surface · reads your real pipeline · changes nothing · delete <code>govcon.*</code> to remove</span>

@@ -252,6 +252,39 @@
       : '<div class="gc-journal-empty">No gov activity logged yet — it fills as you scout, draft, value, and decide.</div>';
   }
 
+  // ── Relationship graph / "company brain": radial network of Rodgate → agencies → opportunities ───
+  function renderNetwork(board) {
+    const el = $('gcNet'); if (!el) return;
+    const cards = allCards(board).filter((c) => c.stage !== 'closed');
+    if (!cards.length) { el.innerHTML = '<div class="gc-map-empty">No live opportunities to graph yet.</div>'; return; }
+    const W = 1000, H = 540, cx = W / 2, cy = H / 2;
+    const byAgency = {};
+    cards.forEach((c) => { const a = c.agency || 'Other'; (byAgency[a] = byAgency[a] || []).push(c); });
+    const agencies = Object.entries(byAgency).sort((a, b) => b[1].length - a[1].length).slice(0, 10);
+    const R1 = Math.min(W, H) * 0.31;
+    let links = '', nodes = '';
+    agencies.forEach(([name, opps], i) => {
+      const ang = (i / agencies.length) * Math.PI * 2 - Math.PI / 2;
+      const ax = cx + R1 * Math.cos(ang), ay = cy + R1 * Math.sin(ang);
+      links += `<line class="net-link" x1="${cx}" y1="${cy}" x2="${ax.toFixed(0)}" y2="${ay.toFixed(0)}"/>`;
+      const shown = opps.slice(0, 8), R2 = 46 + Math.min(opps.length * 3, 38);
+      shown.forEach((o, j) => {
+        const oa = ang + (j - (shown.length - 1) / 2) * 0.34;
+        const ox = ax + R2 * Math.cos(oa), oy = ay + R2 * Math.sin(oa);
+        const col = o.inLane ? 'var(--ok)' : 'var(--faint)';
+        links += `<line class="net-link faint" x1="${ax.toFixed(0)}" y1="${ay.toFixed(0)}" x2="${ox.toFixed(0)}" y2="${oy.toFixed(0)}"/>`;
+        nodes += `<circle class="net-opp" cx="${ox.toFixed(0)}" cy="${oy.toFixed(0)}" r="5" style="fill:${col}" data-url="${esc(o.url || '')}"><title>${esc(o.title)} — ${esc(o.setAside)}</title></circle>`;
+      });
+      const r = 10 + Math.min(opps.length * 1.4, 14);
+      nodes += `<circle class="net-agency" cx="${ax.toFixed(0)}" cy="${ay.toFixed(0)}" r="${r.toFixed(0)}"><title>${esc(name)} — ${opps.length} opportunit${opps.length > 1 ? 'ies' : 'y'}</title></circle>`;
+      nodes += `<text class="net-lbl" x="${ax.toFixed(0)}" y="${(ay + r + 11).toFixed(0)}">${esc(name.slice(0, 20))}</text>`;
+    });
+    nodes += `<circle class="net-center" cx="${cx}" cy="${cy}" r="27"/><text class="net-center-lbl" x="${cx}" y="${(cy + 4).toFixed(0)}">RODGATE</text>`;
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${links}${nodes}</svg>`;
+    const stat = $('gcNetStat'); if (stat) stat.textContent = `${cards.length} live · ${agencies.length} agenc${agencies.length === 1 ? 'y' : 'ies'}`;
+    el.querySelectorAll('.net-opp').forEach((c) => { c.onclick = () => { const u = c.getAttribute('data-url'); if (u) window.open(u, '_blank', 'noopener'); }; });
+  }
+
   function render(board, cockpit, finance) {
     $('gcDate').textContent = fmtDate();
     $('gcGreeting').textContent = greeting();
@@ -269,6 +302,7 @@
     renderCoach(board, cockpit);
     renderAgents(board, counts, total);
     renderMap(board);
+    renderNetwork(board);
 
     // ── briefing sub ──
     const bits = [`${total} opportunit${total === 1 ? 'y' : 'ies'} tracked`];

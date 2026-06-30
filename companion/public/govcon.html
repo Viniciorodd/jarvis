@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="govcon.css">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('govcon-theme')||'dark'}catch(e){}</script>
 </head>
 <body>
 <div class="gc-app">
@@ -23,6 +24,7 @@
     <div class="gc-top-right">
       <span class="gc-live"><span class="gc-dot"></span> Live</span>
       <span class="gc-date" id="gcDate">—</span>
+      <button class="gc-toggle" id="gcTheme" title="Toggle light / dark" aria-label="Toggle theme">☾</button>
       <a class="gc-back" href="/" title="Back to the JARVIS cockpit">← Jarvis</a>
     </div>
   </header>
@@ -48,6 +50,13 @@
       <ul class="gc-priorities" id="gcPriorities"></ul>
     </section>
 
+    <!-- Mission Today -->
+    <section class="card gc-mission">
+      <h2 class="gc-h2">Mission today <span class="gc-h2-hint">clear the board</span></h2>
+      <div class="gc-mission-list" id="gcMission"></div>
+      <div class="gc-mission-progress"><i id="gcMissionBar" style="width:0%"></i></div>
+    </section>
+
     <!-- KPI cards -->
     <section class="gc-kpis" id="gcKpis"></section>
 
@@ -55,6 +64,12 @@
     <section class="card gc-funnel">
       <h2 class="gc-h2">Pipeline</h2>
       <div class="gc-funnel-bars" id="gcFunnel"></div>
+    </section>
+
+    <!-- Your gov team (agents) -->
+    <section class="card gc-agents">
+      <h2 class="gc-h2">Your gov team <span class="gc-h2-hint">who's on it</span></h2>
+      <div class="gc-agents-row" id="gcAgents"></div>
     </section>
 
     <div class="gc-two-col">

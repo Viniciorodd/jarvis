@@ -16,19 +16,24 @@
   --ok: #10B981;            /* emerald */
   --warn: #F59E0B;          /* amber */
   --danger: #DC2626;        /* red */
+  --glow: #16213b;          /* page background glow (theme-aware) */
+  --briefing: #15213c;      /* briefing hero corner */
+  --topfade: rgba(11,17,32,.86);
   --shadow: 0 1px 0 rgba(255,255,255,.03), 0 8px 24px rgba(0,0,0,.35);
 }
 [data-theme="light"] {
   --navy: #0F172A; --bg: #F8FAFC; --panel: #FFFFFF; --panel-2: #F1F5F9; --line: #E2E8F0;
   --ink: #0F172A; --muted: #475569; --faint: #94A3B8; --accent: #2563EB; --accent-soft: #E6EEFE;
-  --ok: #059669; --warn: #D97706; --danger: #DC2626; --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.08);
+  --ok: #059669; --warn: #D97706; --danger: #DC2626;
+  --glow: #dce6f5; --briefing: #eef3fc; --topfade: rgba(248,250,252,.9);
+  --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.08);
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
   font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: radial-gradient(1200px 600px at 70% -10%, #16213b 0%, var(--bg) 60%) fixed;
+  background: radial-gradient(1200px 600px at 70% -10%, var(--glow) 0%, var(--bg) 60%) fixed;
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "tnum" 1, "cv05" 1;
@@ -37,7 +42,7 @@ body {
 
 /* ── top bar ─────────────────────────────────────────────── */
 .gc-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 2px 18px; position: sticky; top: 0; z-index: 5;
-  background: linear-gradient(var(--bg), rgba(11,17,32,.86)); backdrop-filter: blur(8px); }
+  background: linear-gradient(var(--bg), var(--topfade)); backdrop-filter: blur(8px); }
 .gc-brand { display: flex; align-items: center; gap: 10px; }
 .gc-logo { color: var(--accent); font-size: 20px; }
 .gc-brand-text { font-weight: 800; letter-spacing: .04em; font-size: 15px; }
@@ -58,7 +63,7 @@ body {
 .gc-h2-hint { color: var(--faint); font-weight: 500; text-transform: none; letter-spacing: 0; margin-left: 8px; }
 
 /* ── CEO briefing ────────────────────────────────────────── */
-.gc-briefing { background: linear-gradient(135deg, #15213c 0%, var(--panel) 55%); }
+.gc-briefing { background: linear-gradient(135deg, var(--briefing) 0%, var(--panel) 55%); }
 .gc-briefing-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .gc-briefing h1 { font-size: 26px; font-weight: 800; margin: 0 0 4px; letter-spacing: -.01em; }
 .gc-sub { color: var(--muted); margin: 0; font-size: 14px; line-height: 1.5; max-width: 60ch; }
@@ -141,3 +146,30 @@ body {
 .gc-foot code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; }
 
 .gc-empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+
+/* ── theme toggle ────────────────────────────────────────── */
+.gc-toggle { background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; width: 34px; height: 32px; cursor: pointer; font-size: 15px; line-height: 1; display: grid; place-items: center; transition: .15s; }
+.gc-toggle:hover { border-color: var(--accent); }
+
+/* ── Mission Today (gamified daily checklist) ────────────── */
+.gc-mission .gc-h2 { margin-bottom: 12px; }
+.gc-mission-list { display: flex; flex-direction: column; gap: 9px; }
+.gc-mission-item { display: flex; align-items: center; gap: 11px; padding: 11px 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px; font-size: 14.5px; }
+.gc-mission-item .box { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--faint); flex-shrink: 0; display: grid; place-items: center; font-size: 12px; }
+.gc-mission-item.you .box { border-color: var(--accent); color: var(--accent); }
+.gc-mission-item .who { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.gc-mission-item .who.you { color: var(--accent); }
+.gc-mission-empty { color: var(--ok); font-size: 14px; padding: 6px 2px; }
+.gc-mission-progress { margin-top: 12px; height: 6px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
+.gc-mission-progress > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--ok)); border-radius: 999px; transition: width .8s cubic-bezier(.2,.7,.2,1); }
+
+/* ── agent team strip (your gov pod) ─────────────────────── */
+.gc-agents-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.gc-agent { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; }
+.gc-agent .top { display: flex; align-items: center; gap: 8px; }
+.gc-agent .av { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 12px; color: #fff; background: var(--accent); flex-shrink: 0; }
+.gc-agent .nm { font-weight: 700; font-size: 13.5px; }
+.gc-agent .role { font-size: 11px; color: var(--muted); }
+.gc-agent .focus { font-size: 12.5px; color: var(--ink); margin-top: 8px; line-height: 1.4; }
+.gc-agent .dot { width: 7px; height: 7px; border-radius: 50%; margin-left: auto; }
+.gc-agent .dot.on { background: var(--ok); } .gc-agent .dot.idle { background: var(--faint); }

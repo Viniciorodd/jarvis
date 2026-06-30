@@ -58,6 +58,45 @@
 
   function whoChip(next) { const who = (next && next.who) || 'jarvis'; return `<span class="gc-who ${who === 'you' ? 'you' : 'jarvis'}">${who === 'you' ? 'YOUR MOVE' : 'Jarvis'}</span>`; }
 
+  // ── Mission Today: the concrete things that need YOU (gates + your-move cards + due tasks) ────────
+  function renderMission(board, cockpit) {
+    const el = $('gcMission'); if (!el) return;
+    const cards = allCards(board);
+    const items = [];
+    (cockpit && cockpit.approvals || []).forEach((a) => items.push(`Approve: ${a.title || a.action}`));
+    cards.filter((c) => c.next && c.next.who === 'you' && c.inLane && c.stage !== 'closed').forEach((c) => items.push(`${c.next.text} — ${c.title}`));
+    (cockpit && cockpit.tasks && cockpit.tasks.dueToday || []).forEach((t) => items.push(t.text));
+    const seen = new Set(); const uniq = items.filter((t) => { const k = String(t).slice(0, 60); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 7);
+    el.innerHTML = uniq.length
+      ? uniq.map((t) => `<div class="gc-mission-item you"><span class="box">▢</span><span>${esc(t)}</span><span class="who you">your move</span></div>`).join('')
+      : `<div class="gc-mission-empty">✓ Nothing needs you right now — Jarvis has the board.</div>`;
+    const active = cards.filter((c) => c.stage !== 'closed');
+    const handled = active.filter((c) => c.next && c.next.who === 'jarvis').length;
+    const pct = active.length ? Math.round(handled / active.length * 100) : 100;
+    const bar = $('gcMissionBar'); if (bar) requestAnimationFrame(() => { bar.style.width = pct + '%'; });
+  }
+
+  // ── Your gov team: the pod agents, focus derived from the live board (real, not fabricated) ───────
+  function renderAgents(board, counts, total) {
+    const el = $('gcAgents'); if (!el) return;
+    const won = allCards(board).filter((c) => c.stage === 'closed' && /^won/i.test(c.next && c.next.text || '')).length;
+    const team = [
+      { i: 'G', nm: 'Gideon', role: 'Gov Scout', focus: `Scanning SAM + state portals · ${total} tracked`, on: total > 0 },
+      { i: 'P', nm: 'Patricia', role: 'Bid Analyst', focus: `${counts.reviewing || 0} to review · ${counts.responding || 0} drafting`, on: (counts.reviewing || 0) + (counts.responding || 0) > 0 },
+      { i: 'H', nm: 'Hector', role: 'Procurement', focus: (counts.responding || 0) > 0 ? 'Sourcing subs for active bids' : 'Standing by for the next bid', on: (counts.responding || 0) > 0 },
+      { i: 'S', nm: 'Sloane', role: 'Project Ops', focus: won > 0 ? `${won} award(s) in performance` : 'Ready when you win the first', on: won > 0 },
+    ];
+    el.innerHTML = team.map((a) => `<div class="gc-agent"><div class="top"><span class="av">${a.i}</span><div><div class="nm">${a.nm}</div><div class="role">${a.role}</div></div><span class="dot ${a.on ? 'on' : 'idle'}"></span></div><div class="focus">${esc(a.focus)}</div></div>`).join('');
+  }
+
+  // ── light / dark theme toggle (persists; default dark) ────────────────────────────────────────────
+  function initTheme() {
+    const btn = $('gcTheme'); if (!btn) return;
+    const apply = (t) => { document.documentElement.dataset.theme = t; try { localStorage.setItem('govcon-theme', t); } catch { /* */ } btn.textContent = t === 'light' ? '☀' : '☾'; };
+    apply(document.documentElement.dataset.theme || 'dark');
+    btn.onclick = () => apply(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+  }
+
   function render(board, cockpit, finance) {
     $('gcDate').textContent = fmtDate();
     $('gcGreeting').textContent = greeting();
@@ -69,6 +108,9 @@
     const lost = closed.filter((c) => /^lost/i.test(c.next && c.next.text || '')).length;
     const pendingGates = (cockpit && cockpit.approvals ? cockpit.approvals.length : 0);
     const total = board.total || cards.length;
+
+    renderMission(board, cockpit);
+    renderAgents(board, counts, total);
 
     // ── briefing sub ──
     const bits = [`${total} opportunit${total === 1 ? 'y' : 'ies'} tracked`];
@@ -188,6 +230,7 @@
     catch (e) { $('gcFootStatus').textContent = 'Render error: ' + e.message; }
   }
 
+  initTheme();
   load();
   setInterval(load, 60000); // calm refresh
 })();

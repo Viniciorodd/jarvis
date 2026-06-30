@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { llm } from './model-router.mjs';
+import { getSecret } from '../control-plane/vault.mjs';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // pods/ -> repo root
 export const CP_URL = (process.env.CONTROL_PLANE_URL || 'http://localhost:8787').replace(/\/$/, '');
@@ -15,6 +16,16 @@ export function env(k, d = '') {
   if (process.env[k]) return process.env[k];
   try { const m = fs.readFileSync(path.join(ROOT, '.env'), 'utf8').match(new RegExp('^' + k + '=(.+)$', 'm')); if (m) return m[1].trim(); } catch { /* */ }
   return d;
+}
+
+// secret(agent, name) — the LEAST-PRIVILEGE way a pod reads a scoped credential (doctrine directive #3).
+// Routes through the vault broker, which enforces the per-agent ACL and LOGS any unauthorized request.
+// Degrades gracefully: an allowed-but-unset key returns '' (the pod falls back, e.g. scout → simulated
+// feed); a DENIED key is logged as a security event by the vault and also returns '' so a misconfigured
+// ACL can never crash a running pod. Use this — not env() — for anything sensitive (API keys, tokens).
+export function secret(agent, name) {
+  try { return getSecret(agent, name) || ''; }
+  catch { return ''; } // vault already logged the denial; degrade instead of throwing
 }
 
 export async function emit(ev) {

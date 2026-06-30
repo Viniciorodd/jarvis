@@ -13,6 +13,8 @@ export default {
     { name: 'Bid analyst may NOT read the Stripe key (only the CFO touches money)', run: () => ({ pass: isAllowed('GOV-ANALYST', 'STRIPE_API_KEY') === false && isAllowed('STUDIO-01', 'STRIPE_API_KEY') === false, detail: '' }) },
     { name: 'Gov scout may read the SAM key', run: () => ({ pass: isAllowed('SAM-SCOUT', 'SAM_API_KEY') === true, detail: '' }) },
     { name: 'Bid analyst may NOT read the SAM key', run: () => ({ pass: isAllowed('GOV-ANALYST', 'SAM_API_KEY') === false, detail: '' }) },
+    { name: 'Connector (Hector) may read SAM + Places + Hunter for sub discovery/enrichment', run: () => ({ pass: isAllowed('CONNECT-01', 'SAM_API_KEY') && isAllowed('CONNECT-01', 'GOOGLE_PLACES_API_KEY') && isAllowed('CONNECT-01', 'HUNTER_API_KEY'), detail: '' }) },
+    { name: 'Connector may NOT read money/image keys (least privilege still holds)', run: () => ({ pass: isAllowed('CONNECT-01', 'STRIPE_API_KEY') === false && isAllowed('CONNECT-01', 'FAL_KEY') === false, detail: '' }) },
     { name: 'every reasoning agent may read the Anthropic key', run: () => ({ pass: isAllowed('GOV-ANALYST', 'ANTHROPIC_API_KEY') && isAllowed('RECON-DEV', 'ANTHROPIC_API_KEY'), detail: '' }) },
     { name: 'the scheduler gets NO secrets', run: () => ({ pass: isAllowed('scheduler', 'ANTHROPIC_API_KEY') === false, detail: '' }) },
     { name: 'an unknown agent is denied everything', run: () => ({ pass: isAllowed('GHOST-99', 'ANTHROPIC_API_KEY') === false, detail: '' }) },

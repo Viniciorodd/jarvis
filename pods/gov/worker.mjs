@@ -11,7 +11,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, DRAFTS, env, profile, emit, mirror, hqApproval, gateApproval, claude } from './lib.mjs';
+import { ROOT, DRAFTS, env, secret, profile, emit, mirror, hqApproval, gateApproval, claude } from './lib.mjs';
 import { maybeConnect } from './connector.mjs';
 import { procurementPath } from './replies.mjs';
 import { checkCompliance } from './compliance.mjs';
@@ -29,7 +29,7 @@ function simulatedFeed() {
 // SEPARATELY over a configurable window with zero-padded MM/dd/yyyy dates, then merge + dedupe by noticeId.
 // Also captures the place-of-performance state so the map can drop a pin. Verified to surface 150+ real opps.
 export async function scout() {
-  const key = env('SAM_API_KEY');
+  const key = secret('SAM-SCOUT', 'SAM_API_KEY'); // least-privilege: only the scout may read the SAM key
   if (!key) return { source: 'simulated (no SAM_API_KEY)', opps: simulatedFeed() };
   const pad = (n) => String(n).padStart(2, '0');
   const fmt = (dt) => `${pad(dt.getMonth() + 1)}/${pad(dt.getDate())}/${dt.getFullYear()}`;

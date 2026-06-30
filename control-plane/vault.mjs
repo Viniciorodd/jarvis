@@ -27,7 +27,9 @@ export const ACL = {
   'MAILROOM-01': ['ANTHROPIC_API_KEY'],
   'SAM-SCOUT': ['SAM_API_KEY', 'ANTHROPIC_API_KEY'],
   'GOV-ANALYST': ['ANTHROPIC_API_KEY'],
-  'CONNECT-01': ['ANTHROPIC_API_KEY'],
+  // The Connector (Hector) discovers subs on SAM.gov + Google Places and finds their emails (Hunter) —
+  // so he needs those read keys, but NOT money/image keys (least privilege still holds).
+  'CONNECT-01': ['ANTHROPIC_API_KEY', 'SAM_API_KEY', 'GOOGLE_PLACES_API_KEY', 'HUNTER_API_KEY'],
   'STUDIO-01': ['ANTHROPIC_API_KEY', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'FAL_KEY', 'FAL_API_KEY', 'OPENAI_API_KEY', 'MEDIA_PROVIDER', 'MEDIA_BUDGET_USD'],
   'RECON-DEV': ['ANTHROPIC_API_KEY'],
   'WATCHTOWER-01': ['ANTHROPIC_API_KEY'],
@@ -82,7 +84,18 @@ export function getSecret(agent, name) {
   if (!isAllowed(agent, name)) { logDenial(agent, name); throw new Error(`vault: "${agent}" is not authorized for ${name} (least privilege — doctrine #3)`); }
   return secrets[name] || '';
 }
-export const vaultSource = () => SOURCE;
+export const vaultSource = () => { load(); return SOURCE; };
+
+// Programmatic audit (for the UI / control-plane /vault/audit). Shows, per agent, which scoped secrets
+// they may read and which of those are actually present — WITHOUT ever returning a secret value.
+export function auditAcl() {
+  const secrets = load();
+  const agents = Object.entries(ACL).map(([agent, allow]) => ({
+    agent,
+    secrets: allow.map((name) => ({ name, present: !!(secrets[name]) })),
+  }));
+  return { source: SOURCE, encrypted: SOURCE === 'vault.enc', agents };
+}
 
 // ── CLI ───────────────────────────────────────────────────────────────────────────────────────
 if (process.argv[1] && process.argv[1].endsWith('vault.mjs')) {

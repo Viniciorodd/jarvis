@@ -3,9 +3,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, env, emit, hqApproval, gateApproval, claude, mirror as genericMirror } from '../lib.mjs';
+import { ROOT, env, secret, emit, hqApproval, gateApproval, claude, mirror as genericMirror } from '../lib.mjs';
 
-export { ROOT, env, emit, hqApproval, gateApproval, claude };
+export { ROOT, env, secret, emit, hqApproval, gateApproval, claude };
 export const DRAFTS = path.join(ROOT, 'gov-drafts');
 export const mirror = (agent, state, text) => genericMirror(agent, state, text, 'gov');
 

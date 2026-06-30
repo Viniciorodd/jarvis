@@ -6,8 +6,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { getSecret } from '../control-plane/vault.mjs';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // scripts/ -> repo root
+
+// Least-privilege secret read scoped to the Creative Director (STUDIO-01). Falls back gracefully ('') so
+// a standalone `node scripts/make-thumbnail.mjs` still works when a key is simply absent (doctrine #3).
+const studioSecret = (name) => { try { return getSecret('STUDIO-01', name) || ''; } catch { return ''; } };
 
 export function env(k, d = '') {
   if (process.env[k]) return process.env[k];
@@ -40,7 +45,7 @@ export const bufToDataUri = (buf, mime = 'image/png') => `data:${mime};base64,${
 // Built-in Claude call (used standalone / from the server). Pod workers pass their own vault-scoped
 // claudeFn so least-privilege (doctrine #3) is preserved on that path.
 export async function defaultClaude(system, user, { maxTokens = 700, model } = {}) {
-  const key = env('ANTHROPIC_API_KEY');
+  const key = studioSecret('ANTHROPIC_API_KEY');
   if (!key) return { text: '' };
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -67,7 +72,7 @@ export function genImage(prompt, outRel, size = '1024x1024') {
 
 // One fal.ai call (image utilities: background removal, etc.). Uses the FAL_KEY already scoped to STUDIO-01.
 export async function falRun(model, input) {
-  const key = env('FAL_KEY') || env('FAL_API_KEY');
+  const key = studioSecret('FAL_KEY') || studioSecret('FAL_API_KEY');
   if (!key) return { error: 'set FAL_KEY in .env to use this (fal.ai gives free starter credits).' };
   try {
     const r = await fetch('https://fal.run/' + model, {

@@ -139,6 +139,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && p === '/kpis') return send(res, 200, kpis.computeKpis());
 
+    // Vault audit — who can read what (NEVER returns a secret value). Surfaces least-privilege (directive #3).
+    if (req.method === 'GET' && p === '/vault/audit') {
+      const vault = await import('./vault.mjs');
+      return send(res, 200, vault.auditAcl());
+    }
+
     if (req.method === 'GET' && p === '/roster') {
       const org = await import('../pods/org.mjs');
       return send(res, 200, { roster: org.ROSTER, pods: org.POD_IDS });

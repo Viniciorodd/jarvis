@@ -5,7 +5,7 @@
 // needed); if HUNTER_API_KEY is set it's used only as a fallback when scraping finds nothing. Degrades
 // gracefully everywhere. Outreach stays HITL-gated downstream — this only makes a sub reachable.
 
-import { env, emit, mirror } from './lib.mjs';
+import { env, secret, emit, mirror } from './lib.mjs';
 import { loadSubs, saveSubs } from './connector.mjs';
 
 const EMAIL_RE = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/g;
@@ -71,7 +71,7 @@ function contactLinks(html, base) {
 }
 
 async function viaHunter(domain) {
-  const key = env('HUNTER_API_KEY');
+  const key = secret('CONNECT-01', 'HUNTER_API_KEY');
   if (!key || !domain) return '';
   try {
     const r = await fetch(`https://api.hunter.io/v2/domain-search?domain=${encodeURIComponent(domain)}&limit=5&api_key=${key}`);

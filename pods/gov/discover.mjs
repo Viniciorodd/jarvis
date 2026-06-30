@@ -4,7 +4,7 @@
 // Discovered rows are "prospect" with no email yet — add a contact email (or a future enrichment step)
 // before Hector reaches out.
 
-import { env, emit, mirror } from './lib.mjs';
+import { env, secret, emit, mirror } from './lib.mjs';
 import { loadSubs, saveSubs } from './connector.mjs';
 
 const TRADE_NAICS = { janitorial: '561720', grounds: '561730', facilities: '561210', hvac: '238220', electrical: '238210', pest: '561710', guard: '561612' };
@@ -13,7 +13,7 @@ const stateOf = (loc) => (String(loc).match(/,\s*([A-Za-z]{2})\b/) || [])[1] || 
 // Places API (New) — Text Search. Returns website + phone in one call via the field mask (a direct email
 // still needs a paid finder; website/phone is the fast path to it). Requires "Places API (New)" enabled.
 async function viaPlaces({ trade, location }) {
-  const key = env('GOOGLE_PLACES_API_KEY');
+  const key = secret('CONNECT-01', 'GOOGLE_PLACES_API_KEY');
   if (!key) return { skipped: 'no GOOGLE_PLACES_API_KEY' };
   try {
     const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
@@ -28,7 +28,7 @@ async function viaPlaces({ trade, location }) {
 }
 
 async function viaSam({ naics, state }) {
-  const key = env('SAM_API_KEY');
+  const key = secret('CONNECT-01', 'SAM_API_KEY');
   if (!key) return { skipped: 'no SAM_API_KEY' };
   if (!naics) return { skipped: 'no NAICS for trade' };
   try {

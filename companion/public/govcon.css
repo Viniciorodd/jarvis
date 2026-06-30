@@ -239,3 +239,13 @@ body {
 .gc-sim-rec { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); font-weight: 600; font-size: 14px; }
 .gc-sim-risks { margin: 12px 0 0; padding-left: 18px; font-size: 13px; color: var(--ink); line-height: 1.6; }
 .score-hi { color: var(--ok); } .score-mid { color: var(--warn); } .score-lo { color: var(--danger); }
+
+/* ── bid simulator (slide the levers, watch margin) ──────── */
+.gc-sl { margin-bottom: 13px; }
+.gc-sl label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.gc-sl label b { color: var(--ink); font-weight: 700; }
+.gc-sl input[type=range] { width: 100%; accent-color: var(--accent); height: 4px; cursor: pointer; }
+.gc-simu-out { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.gc-simu-out > div { background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px; padding: 13px; text-align: center; }
+.gc-simu-out .lbl { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
+.gc-simu-out b { font-size: 22px; font-weight: 800; }

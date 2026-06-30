@@ -207,6 +207,21 @@
     };
   }
 
+  // ── Bid simulator: slide bid value / labor / overhead → live margin (pure client-side what-if) ────
+  function initSimulator() {
+    const vR = $('slValR'), lR = $('slLabR'), oR = $('slOhR'); if (!vR) return;
+    const calc = () => {
+      const v = Number(vR.value), lab = Number(lR.value) / 100, oh = Number(oR.value) / 100;
+      $('slVal').textContent = fmtMoney(v); $('slLab').textContent = lR.value + '%'; $('slOh').textContent = oR.value + '%';
+      const profit = Math.round(v * (1 - lab - oh)); const margin = v ? Math.round((profit / v) * 100) : 0;
+      const cls = margin >= 20 ? 'score-hi' : margin >= 10 ? 'score-mid' : 'score-lo';
+      const pf = $('slProfit'), mg = $('slMargin');
+      pf.textContent = fmtMoney(profit); pf.className = cls; mg.textContent = margin + '%'; mg.className = cls;
+    };
+    [vR, lR, oR].forEach((s) => s.addEventListener('input', calc));
+    calc();
+  }
+
   function render(board, cockpit, finance) {
     $('gcDate').textContent = fmtDate();
     $('gcGreeting').textContent = greeting();
@@ -314,6 +329,7 @@
     // ── genome ──
     const focus = pickFocus(board);
     focusOpp = focus;
+    const _vR = $('slValR'); if (_vR && focus && focus.value > 0) { _vR.value = Math.max(25000, Math.min(1500000, focus.value)); _vR.dispatchEvent(new Event('input')); }
     if (focus) {
       $('gcGenomeTitle').textContent = focus.title;
       const we = winEstimate(focus);
@@ -348,6 +364,7 @@
   initTheme();
   initPalette();
   initSim();
+  initSimulator();
   load();
   setInterval(load, 60000); // calm refresh
 })();

@@ -68,6 +68,17 @@
           <h2 class="gc-h2">Your gov team <span class="gc-h2-hint">who's on it</span></h2>
           <div class="gc-agents-row" id="gcAgents"></div>
         </section>
+
+        <section class="card gc-simu">
+          <h2 class="gc-h2">Bid simulator <span class="gc-h2-hint">watch your margin</span></h2>
+          <div class="gc-sl"><label>Bid value <b id="slVal">$400,000</b></label><input type="range" id="slValR" min="25000" max="1500000" step="5000" value="400000"></div>
+          <div class="gc-sl"><label>Labor / subcontractor cost <b id="slLab">65%</b></label><input type="range" id="slLabR" min="30" max="92" step="1" value="65"></div>
+          <div class="gc-sl"><label>Overhead &amp; insurance <b id="slOh">8%</b></label><input type="range" id="slOhR" min="0" max="25" step="1" value="8"></div>
+          <div class="gc-simu-out">
+            <div><span class="lbl">Gross profit</span><b id="slProfit">—</b></div>
+            <div><span class="lbl">Margin</span><b id="slMargin">—</b></div>
+          </div>
+        </section>
       </div>
 
       <!-- ── MID ── -->

@@ -150,6 +150,16 @@
       </div>
     </section>
 
+    <!-- Federal spending heatmap (USASpending.gov, real obligations in our NAICS) -->
+    <section class="card gc-spend">
+      <h2 class="gc-h2">Federal spending in your space <span class="gc-h2-hint" id="gcSpendStat">where the money is</span></h2>
+      <div class="gc-spend-grid">
+        <div id="gcSpendMap" class="gc-map"></div>
+        <div id="gcSpendBars" class="gc-spend-bars"></div>
+      </div>
+      <p class="gc-genome-foot">Obligations by place of performance for NAICS 561720/561210/561730/561990 — source: USASpending.gov.</p>
+    </section>
+
     <footer class="gc-foot">
       <span id="gcFootStatus">Reading live data…</span>
       <span class="gc-foot-note">Preview surface · reads your real pipeline · changes nothing · delete <code>govcon.*</code> to remove</span>

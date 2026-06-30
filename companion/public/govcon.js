@@ -285,6 +285,27 @@
     el.querySelectorAll('.net-opp').forEach((c) => { c.onclick = () => { const u = c.getAttribute('data-url'); if (u) window.open(u, '_blank', 'noopener'); }; });
   }
 
+  // ── Federal spending heatmap: real USASpending obligations by state in our NAICS ──────────────────
+  const fmtShort = (n) => { n = Number(n) || 0; if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B'; if (n >= 1e6) return (n / 1e6).toFixed(0) + 'M'; if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K'; return '' + n; };
+  const bubbleRClient = (amt, max, minR = 4, maxR = 26) => (!max || amt <= 0) ? 0 : +(minR + (maxR - minR) * Math.sqrt(amt / max)).toFixed(1);
+  async function loadSpending() {
+    const mapEl = $('gcSpendMap'), barEl = $('gcSpendBars'); if (!mapEl) return;
+    const d = await getJSON('/api/gov/spending'); const res = (d && d.results) || [];
+    const stat = $('gcSpendStat'); if (stat) stat.textContent = res.length ? `${d.period} · obligations by state${d.stale ? ' (cached)' : ''}` : 'unavailable';
+    const max = res.length ? res[0].amount : 0;
+    const G = window.US_GEO;
+    if (G && G.statesPath && G.pins) {
+      const W = G.W || 640, H = G.H || 388;
+      const bubbles = res.filter((s) => G.pins[s.state]).map((s) => { const xy = G.pins[s.state]; const r = bubbleRClient(s.amount, max); return `<circle class="pin-glow" cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${(r + 3).toFixed(1)}" style="fill:var(--accent)"/><circle cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${r}" style="fill:var(--accent);opacity:.78"><title>${esc(s.name || s.state)}: $${fmtShort(s.amount)}</title></circle>`; }).join('');
+      mapEl.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><path class="us-state" d="${G.statesPath}"/>${G.meshPath ? `<path class="us-mesh" d="${G.meshPath}"/>` : ''}${bubbles}</svg>`;
+    } else { mapEl.innerHTML = '<div class="gc-map-empty">map geometry didn’t load.</div>'; }
+    const top = res.slice(0, 8);
+    barEl.innerHTML = top.length
+      ? top.map((s) => `<div class="gc-spend-bar"><span class="sb-st">${esc(s.state)}</span><div class="sb-track"><div class="sb-fill" style="width:0%" data-w="${max ? Math.round(s.amount / max * 100) : 0}"></div></div><span class="sb-amt">$${fmtShort(s.amount)}</span></div>`).join('')
+      : `<div class="gc-map-empty">${esc((d && d.error) || 'No spending data available.')}</div>`;
+    requestAnimationFrame(() => barEl.querySelectorAll('.sb-fill').forEach((f) => { f.style.width = f.dataset.w + '%'; }));
+  }
+
   function render(board, cockpit, finance) {
     $('gcDate').textContent = fmtDate();
     $('gcGreeting').textContent = greeting();
@@ -425,6 +446,7 @@
     try { render(board, cockpit || {}, finance || {}); }
     catch (e) { $('gcFootStatus').textContent = 'Render error: ' + e.message; }
     loadJournal();
+    loadSpending();
   }
 
   initTheme();

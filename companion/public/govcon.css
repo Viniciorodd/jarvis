@@ -279,3 +279,13 @@ body {
 .gc-net .net-opp:hover { stroke: var(--ink); stroke-width: 1.5px; }
 .gc-net-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--muted); align-items: center; }
 .gc-net-legend .lg { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+
+/* ── federal spending heatmap ────────────────────────────── */
+.gc-spend-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 900px) { .gc-spend-grid { grid-template-columns: 1fr; } }
+.gc-spend-bars { display: flex; flex-direction: column; gap: 9px; }
+.gc-spend-bar { display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.gc-spend-bar .sb-st { font-weight: 700; color: var(--ink); }
+.gc-spend-bar .sb-track { height: 18px; background: var(--panel-2); border-radius: 6px; overflow: hidden; }
+.gc-spend-bar .sb-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #3b82f6); border-radius: 6px; transition: width .8s cubic-bezier(.2,.7,.2,1); }
+.gc-spend-bar .sb-amt { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; white-space: nowrap; }

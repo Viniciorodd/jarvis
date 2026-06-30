@@ -52,6 +52,14 @@ async function getSimulate() {
   _simMod = await import(pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'simulate.mjs')).href);
   return _simMod;
 }
+// Agency-spending feed (ESM) — real federal spending-by-state for our NAICS (USASpending, cached).
+let _spendMod = null;
+async function getSpendingMod() {
+  if (_spendMod) return _spendMod;
+  const { pathToFileURL } = require('node:url');
+  _spendMod = await import(pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'spending.mjs')).href);
+  return _spendMod;
+}
 
 const PORT = Number(process.env.COMPANION_PORT || process.env.PORT || 8095);
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -2508,6 +2516,11 @@ const server = http.createServer(async (req, res) => {
       fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'meta', actor: 'operator', pod: 'gov', action: 'estimate', rationale: `set $${v.toLocaleString()} value`, payload: { noticeId } }) }).catch(() => {});
       return send(res, 200, JSON.stringify({ ok: true, value: v }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // Federal spending-by-state for our NAICS (USASpending.gov, cached) — powers the spending heatmap.
+  if (req.method === 'GET' && url.pathname === '/api/gov/spending') {
+    try { const S = await getSpendingMod(); return send(res, 200, JSON.stringify(await S.getSpending({ force: url.searchParams.get('force') === '1' }))); }
+    catch (e) { return send(res, 200, JSON.stringify({ results: [], error: e.message })); }
   }
   // Decision journal — the gov pod's timeline from the control-plane event store (scored/drafted/gated/decided/valued).
   if (req.method === 'GET' && url.pathname === '/api/gov/journal') {

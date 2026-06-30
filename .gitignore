@@ -64,3 +64,6 @@ jarvis video ideas/
 scripts/.yt-titles.json
 
 scripts/.absorb-done.json
+
+# USASpending agency-spending cache (regenerated; refreshed on a TTL)
+pods/gov/.spending-cache.json

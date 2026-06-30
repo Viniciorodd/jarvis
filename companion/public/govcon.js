@@ -60,6 +60,7 @@
 
   let lastBoard = null; // shared with the ⌘K palette so search reflects current data
   let focusOpp = null;  // the opportunity the genome + simulation act on
+  let spendingData = null; // federal spending feed, merged into the opportunity map
 
   // extract a 2-letter state from a card's "place" (e.g. "Malmstrom AFB, MT" → MT)
   function stateOf(card) {
@@ -77,6 +78,13 @@
     const byState = {};
     allCards(board).filter((c) => c.stage !== 'closed').forEach((c) => { const s = stateOf(c); if (s && G.pins[s]) (byState[s] = byState[s] || []).push(c); });
     const labels = Object.entries(G.pins).map(([code, xy]) => `<text class="us-lbl" x="${xy[0].toFixed(1)}" y="${(xy[1] + 3).toFixed(1)}">${code}</text>`).join('');
+    // MERGED federal-spending heat layer (faint bubbles behind the opportunity pins) from /api/gov/spending
+    let spend = '';
+    const sd = (spendingData && spendingData.results) || [];
+    if (sd.length) {
+      const smax = sd[0].amount || 0;
+      spend = sd.filter((s) => G.pins[s.state]).map((s) => { const xy = G.pins[s.state]; const r = bubbleRClient(s.amount, smax, 6, 34); return `<circle class="spend-bubble" cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${r}"><title>${esc(s.name || s.state)}: $${fmtShort(s.amount)} federal spend (${spendingData.period || ''})</title></circle>`; }).join('');
+    }
     const pins = Object.entries(byState).map(([s, list]) => {
       const xy = G.pins[s];
       const soon = list.some((c) => { const d = daysTo(c.deadline); return d != null && d >= 0 && d <= 7; });
@@ -88,7 +96,7 @@
         + `<circle class="pin-glow" cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${(r + 5).toFixed(1)}" style="fill:${color}"/>`
         + `<circle class="pin-dot" cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${r.toFixed(1)}" style="fill:${color}"><title>${esc(s)}: ${list.length} opportunit${list.length > 1 ? 'ies' : 'y'} — top: ${esc(top.title)}</title></circle></g>`;
     }).join('');
-    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><path class="us-state" d="${G.statesPath}"/>${G.meshPath ? `<path class="us-mesh" d="${G.meshPath}"/>` : ''}${labels}${pins}</svg>`;
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><path class="us-state" d="${G.statesPath}"/>${G.meshPath ? `<path class="us-mesh" d="${G.meshPath}"/>` : ''}${spend}${labels}${pins}</svg>`;
     const stat = $('gcMapStat'); if (stat) { const n = Object.values(byState).reduce((a, l) => a + l.length, 0); const st = Object.keys(byState).length; stat.textContent = n ? `${n} live across ${st} state${st === 1 ? '' : 's'}` : 'no live opportunities to map'; }
     el.querySelectorAll('.pin').forEach((g) => { const open = () => { const u = g.getAttribute('data-url'); if (u) window.open(u, '_blank', 'noopener'); }; g.onclick = open; g.onkeydown = (e) => { if (e.key === 'Enter') open(); }; });
   }
@@ -289,21 +297,11 @@
   const fmtShort = (n) => { n = Number(n) || 0; if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B'; if (n >= 1e6) return (n / 1e6).toFixed(0) + 'M'; if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K'; return '' + n; };
   const bubbleRClient = (amt, max, minR = 4, maxR = 26) => (!max || amt <= 0) ? 0 : +(minR + (maxR - minR) * Math.sqrt(amt / max)).toFixed(1);
   async function loadSpending() {
-    const mapEl = $('gcSpendMap'), barEl = $('gcSpendBars'); if (!mapEl) return;
-    const d = await getJSON('/api/gov/spending'); const res = (d && d.results) || [];
-    const stat = $('gcSpendStat'); if (stat) stat.textContent = res.length ? `${d.period} · obligations by state${d.stale ? ' (cached)' : ''}` : 'unavailable';
-    const max = res.length ? res[0].amount : 0;
-    const G = window.US_GEO;
-    if (G && G.statesPath && G.pins) {
-      const W = G.W || 640, H = G.H || 388;
-      const bubbles = res.filter((s) => G.pins[s.state]).map((s) => { const xy = G.pins[s.state]; const r = bubbleRClient(s.amount, max); return `<circle class="pin-glow" cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${(r + 3).toFixed(1)}" style="fill:var(--accent)"/><circle cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${r}" style="fill:var(--accent);opacity:.78"><title>${esc(s.name || s.state)}: $${fmtShort(s.amount)}</title></circle>`; }).join('');
-      mapEl.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><path class="us-state" d="${G.statesPath}"/>${G.meshPath ? `<path class="us-mesh" d="${G.meshPath}"/>` : ''}${bubbles}</svg>`;
-    } else { mapEl.innerHTML = '<div class="gc-map-empty">map geometry didn’t load.</div>'; }
-    const top = res.slice(0, 8);
-    barEl.innerHTML = top.length
-      ? top.map((s) => `<div class="gc-spend-bar"><span class="sb-st">${esc(s.state)}</span><div class="sb-track"><div class="sb-fill" style="width:0%" data-w="${max ? Math.round(s.amount / max * 100) : 0}"></div></div><span class="sb-amt">$${fmtShort(s.amount)}</span></div>`).join('')
-      : `<div class="gc-map-empty">${esc((d && d.error) || 'No spending data available.')}</div>`;
-    requestAnimationFrame(() => barEl.querySelectorAll('.sb-fill').forEach((f) => { f.style.width = f.dataset.w + '%'; }));
+    const d = await getJSON('/api/gov/spending'); spendingData = d || null;
+    const res = (d && d.results) || [];
+    const top = $('gcSpendTop');
+    if (top) top.textContent = res.length ? `· $ heat: ${res.slice(0, 3).map((s) => `${s.state} $${fmtShort(s.amount)}`).join(', ')}` : '';
+    if (lastBoard) renderMap(lastBoard); // redraw the opportunity map with the merged spending heat layer
   }
 
   function render(board, cockpit, finance) {
@@ -396,8 +394,11 @@
     const bEl = $('gcBoard'); bEl.innerHTML = '';
     (board.columns || []).forEach((col) => {
       const c = document.createElement('div'); c.className = 'gc-col';
-      c.innerHTML = `<div class="gc-col-head">${esc(col.label)}<span class="n">${(col.cards || []).length}</span></div>`;
-      (col.cards || []).slice(0, 12).forEach((card) => {
+      const total = (col.cards || []).length;
+      const limit = col.key === 'found' ? 5 : 12; // Found shows only the top 5 most relevant (already sorted: your-move → fit → score)
+      const moreHint = (col.key === 'found' && total > 5) ? ` <span class="gc-col-more">top 5 of ${total}</span>` : '';
+      c.innerHTML = `<div class="gc-col-head">${esc(col.label)}<span class="n">${total}</span></div>${moreHint ? `<div class="gc-col-sub">${moreHint}</div>` : ''}`;
+      (col.cards || []).slice(0, limit).forEach((card) => {
         const el = document.createElement('div'); el.className = 'gc-card' + (card.inLane ? '' : ' out');
         const dd = daysTo(card.deadline);
         el.innerHTML = `<div class="gc-card-title">${esc(card.title)}</div>`
@@ -405,7 +406,9 @@
           + `${card.agency ? `<span>${esc(card.agency)}</span>` : ''}`
           + `${dd != null && dd >= 0 ? `<span>· ${dd}d</span>` : ''}`
           + `${whoChip(card.next)}</div>`;
-        if (card.url) { el.style.cursor = 'pointer'; el.title = 'Open on SAM.gov'; el.onclick = () => window.open(card.url, '_blank', 'noopener'); }
+        // EVERY card is clickable → opens the live opportunity on SAM.gov (build the URL from the notice id if needed)
+        const oppUrl = card.url || (card.noticeId ? `https://sam.gov/opp/${card.noticeId}/view` : '');
+        if (oppUrl) { el.style.cursor = 'pointer'; el.title = 'Open this opportunity on SAM.gov'; el.onclick = () => window.open(oppUrl, '_blank', 'noopener'); }
         c.appendChild(el);
       });
       if (!(col.cards || []).length) c.innerHTML += `<div class="gc-empty">—</div>`;

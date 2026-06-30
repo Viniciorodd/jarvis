@@ -121,6 +121,9 @@ body {
 .gc-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 4px; }
 .gc-col-head { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
 .gc-col-head .n { color: var(--ink); background: var(--panel-2); border-radius: 999px; padding: 0 7px; font-size: 11px; }
+.gc-col-sub { margin: -4px 0 6px; }
+.gc-col-more { font-size: 10px; color: var(--faint); }
+.gc-card { cursor: default; }
 .gc-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 8px; transition: .15s; }
 .gc-card:hover { border-color: var(--accent); transform: translateY(-1px); }
 .gc-card-title { font-size: 12.5px; font-weight: 600; line-height: 1.3; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -190,6 +193,8 @@ body {
 .gc-map .pin-glow { opacity: .28; }
 .gc-map .pin { cursor: pointer; }
 .gc-map .pin:hover .pin-dot { stroke: var(--ink); stroke-width: 1px; }
+.gc-map .spend-bubble { fill: #8b5cf6; opacity: .16; pointer-events: none; }
+.gc-map-legend .lg.spend { background: #8b5cf6; }
 .gc-map-empty { color: var(--muted); font-size: 13px; padding: 20px 2px; }
 .gc-map-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--muted); align-items: center; }
 .gc-map-legend .lg { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }

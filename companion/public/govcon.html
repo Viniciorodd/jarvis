@@ -108,7 +108,8 @@
             <span><i class="lg good"></i> strong fit</span>
             <span><i class="lg soon"></i> due ≤ 7d</span>
             <span><i class="lg ok"></i> tracking</span>
-            <span class="gc-map-hint"><kbd>⌘K</kbd> search</span>
+            <span><i class="lg spend"></i> federal $ (state)</span>
+            <span class="gc-map-hint" id="gcSpendTop"></span>
           </div>
         </section>
 
@@ -148,16 +149,6 @@
         <span><i class="lg" style="background:var(--faint)"></i> out-of-lane</span>
         <span class="gc-map-hint">click a node to open it</span>
       </div>
-    </section>
-
-    <!-- Federal spending heatmap (USASpending.gov, real obligations in our NAICS) -->
-    <section class="card gc-spend">
-      <h2 class="gc-h2">Federal spending in your space <span class="gc-h2-hint" id="gcSpendStat">where the money is</span></h2>
-      <div class="gc-spend-grid">
-        <div id="gcSpendMap" class="gc-map"></div>
-        <div id="gcSpendBars" class="gc-spend-bars"></div>
-      </div>
-      <p class="gc-genome-foot">Obligations by place of performance for NAICS 561720/561210/561730/561990 — source: USASpending.gov.</p>
     </section>
 
     <footer class="gc-foot">

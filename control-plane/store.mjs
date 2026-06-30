@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import { traceEvent } from './tracing.mjs';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
 const FILE = path.join(DIR, 'events.jsonl');
@@ -33,6 +34,7 @@ export function appendEvent(ev) {
     payload: ev.payload || {},
   };
   fs.appendFileSync(FILE, JSON.stringify(rec) + '\n');
+  traceEvent(rec); // optional Langfuse mirror — fire-and-forget, no-op unless LANGFUSE_* is configured
   return rec;
 }
 

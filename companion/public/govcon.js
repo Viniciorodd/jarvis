@@ -59,6 +59,7 @@
   function whoChip(next) { const who = (next && next.who) || 'jarvis'; return `<span class="gc-who ${who === 'you' ? 'you' : 'jarvis'}">${who === 'you' ? 'YOUR MOVE' : 'Jarvis'}</span>`; }
 
   let lastBoard = null; // shared with the ⌘K palette so search reflects current data
+  let focusOpp = null;  // the opportunity the genome + simulation act on
 
   // extract a 2-letter state from a card's "place" (e.g. "Malmstrom AFB, MT" → MT)
   function stateOf(card) {
@@ -166,6 +167,32 @@
     btn.onclick = () => apply(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
   }
 
+  // ── Simulation Mode: a source-selection panel red-teams the focus opportunity before submit ───────
+  const scoreCls = (n) => (n >= 75 ? 'score-hi' : n >= 50 ? 'score-mid' : 'score-lo');
+  function renderSim(r) {
+    const el = $('gcSimResult'); if (!el) return;
+    if (!r || !r.ok) { el.innerHTML = `<div class="gc-empty">Couldn’t run the panel: ${esc((r && r.reason) || 'unknown')}${r && /model/.test(r.reason || '') ? ' — the free local model may be loading / out of memory; works best with Claude available.' : ''}</div>`; return; }
+    const evals = (r.evaluators || []).map((e) => `<div class="gc-eval"><div class="er-top"><span class="er-role">${esc(e.role)}</span><span class="er-score ${scoreCls(e.score)}">${e.score}</span></div><div class="er-concern">⚠ ${esc(e.concern)}</div><div class="er-fix"><b>Fix:</b> ${esc(e.fix)}</div></div>`).join('');
+    const risks = (r.topRisks || []).map((x) => `<li>${esc(x)}</li>`).join('');
+    el.innerHTML = `<div class="gc-sim-overall"><div class="gc-sim-ring" style="--p:${r.overall}%"><span>${r.overall}</span></div><div><div class="lbl">Panel score</div><div style="font-size:13px;color:var(--muted);margin-top:4px">Win estimate ${r.pWin}% · via ${esc(r.provider || 'ai')}</div></div></div>`
+      + evals
+      + (risks ? `<div class="lbl" style="margin-top:14px">Top risks</div><ul class="gc-sim-risks">${risks}</ul>` : '')
+      + (r.recommendation ? `<div class="gc-sim-rec">▸ ${esc(r.recommendation)}</div>` : '');
+  }
+  function initSim() {
+    const ov = $('gcSim'); if (!ov) return;
+    const close = () => { ov.hidden = true; };
+    const btn = $('gcSimBtn'); if (btn) btn.onclick = () => { $('gcSimTitle').textContent = focusOpp ? `Red-team: ${focusOpp.title}` : 'Pre-submit simulation'; $('gcSimResult').innerHTML = ''; ov.hidden = false; };
+    const x = $('gcSimClose'); if (x) x.onclick = close;
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    const run = $('gcSimRun'); if (run) run.onclick = async () => {
+      run.disabled = true; const t = run.textContent; run.textContent = 'Convening the panel…';
+      $('gcSimResult').innerHTML = '<div class="gc-empty">The panel is reviewing… (uses your best available brain; ~10–20s)</div>';
+      let r; try { r = await (await fetch('/api/gov/simulate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ opportunity: focusOpp || {}, text: $('gcSimText').value || '' }) })).json(); } catch (e) { r = { ok: false, reason: e.message }; }
+      run.disabled = false; run.textContent = t; renderSim(r);
+    };
+  }
+
   function render(board, cockpit, finance) {
     $('gcDate').textContent = fmtDate();
     $('gcGreeting').textContent = greeting();
@@ -270,6 +297,7 @@
 
     // ── genome ──
     const focus = pickFocus(board);
+    focusOpp = focus;
     if (focus) {
       $('gcGenomeTitle').textContent = focus.title;
       const we = winEstimate(focus);
@@ -303,6 +331,7 @@
 
   initTheme();
   initPalette();
+  initSim();
   load();
   setInterval(load, 60000); // calm refresh
 })();

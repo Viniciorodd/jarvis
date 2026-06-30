@@ -44,6 +44,14 @@ async function getCouncil() {
   _councilMod = await import(pathToFileURL(path.join(__dirname, '..', 'pods', 'council.mjs')).href);
   return _councilMod;
 }
+// Simulation mode (ESM) — a federal source-selection panel red-teams a bid before submit.
+let _simMod = null;
+async function getSimulate() {
+  if (_simMod) return _simMod;
+  const { pathToFileURL } = require('node:url');
+  _simMod = await import(pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'simulate.mjs')).href);
+  return _simMod;
+}
 
 const PORT = Number(process.env.COMPANION_PORT || process.env.PORT || 8095);
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -2459,6 +2467,12 @@ const server = http.createServer(async (req, res) => {
     try { const { id } = await readBody(req); if (!id) return send(res, 400, JSON.stringify({ error: 'id required' }));
       const I = await getIdeaMiner(); return send(res, 200, JSON.stringify(I.setStatus(id, 'dismissed'))); }
     catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── SIMULATION MODE: a source-selection panel red-teams a bid BEFORE submit (finds weaknesses) ───
+  if (req.method === 'POST' && url.pathname === '/api/gov/simulate') {
+    try { const { opportunity, text } = await readBody(req);
+      const S = await getSimulate(); return send(res, 200, JSON.stringify(await S.simulate({ opportunity: opportunity || {}, proposalText: text || '' }))); }
+    catch (e) { return send(res, 500, JSON.stringify({ ok: false, reason: e.message })); }
   }
   // ── LLM COUNCIL: a panel of brains answer a hard question; the chairman synthesizes (free-first) ──
   if (req.method === 'POST' && url.pathname === '/api/council') {

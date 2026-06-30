@@ -103,6 +103,7 @@
           </div>
         </div>
         <div class="gc-dna" id="gcDna"></div>
+        <button class="gc-btn" id="gcSimBtn">🛡 Pre-submit red-team</button>
         <p class="gc-genome-foot">Derived from the scout's fit score + set-aside lane + trade. An estimate to prioritize — not a guarantee.</p>
       </section>
     </div>
@@ -113,6 +114,17 @@
     </footer>
   </main>
 </div>
+<!-- Simulation mode: pre-submit red-team panel -->
+<div id="gcSim" class="gc-sim" hidden>
+  <div class="gc-sim-box">
+    <div class="gc-sim-head"><b id="gcSimTitle">Pre-submit simulation</b><button id="gcSimClose" class="gc-toggle" aria-label="Close">✕</button></div>
+    <p class="gc-sim-note">A federal source-selection panel red-teams this bid to find the weaknesses before the government does.</p>
+    <textarea id="gcSimText" placeholder="(Optional) paste your proposal draft to red-team it directly — or leave blank for a bid-readiness go/no-go."></textarea>
+    <button id="gcSimRun" class="gc-btn">Run the panel ▸</button>
+    <div id="gcSimResult" class="gc-sim-result"></div>
+  </div>
+</div>
+
 <!-- ⌘K command palette -->
 <div id="gcPalette" class="gc-palette" hidden>
   <div class="gc-palette-box">

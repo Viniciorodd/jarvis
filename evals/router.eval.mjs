@@ -38,8 +38,15 @@ export default {
         return { pass: (a.includes('local') || a.includes('openrouter')) && b.length >= 1 && b.includes('local'), detail: `${a.join('›')} | ${b.join('›')}` };
       } },
 
-    { name: 'local model maps smart(draft) vs fast(cheap) distinctly',
-      run: () => { const big = modelForProvider('local', 'reflect'); const small = modelForProvider('local', 'cheap'); return { pass: !!big && !!small && big !== small, detail: `${big} vs ${small}` }; } },
+    { name: 'local maps draft→LOCAL_MODEL, cheap→LOCAL_MODEL_FAST (env-pinned, not .env-dependent)',
+      run: () => {
+        const sm = process.env.LOCAL_MODEL, fa = process.env.LOCAL_MODEL_FAST;
+        process.env.LOCAL_MODEL = 'SMART-X'; process.env.LOCAL_MODEL_FAST = 'FAST-Y';
+        const big = modelForProvider('local', 'reflect'); const small = modelForProvider('local', 'cheap');
+        if (sm === undefined) delete process.env.LOCAL_MODEL; else process.env.LOCAL_MODEL = sm;
+        if (fa === undefined) delete process.env.LOCAL_MODEL_FAST; else process.env.LOCAL_MODEL_FAST = fa;
+        return { pass: big === 'SMART-X' && small === 'FAST-Y', detail: `${big} / ${small}` };
+      } },
 
     { name: 'claude provider always resolves to a claude-* model',
       run: () => { const m = modelForProvider('claude', 'draft'); return { pass: /^claude/i.test(m), detail: m }; } },

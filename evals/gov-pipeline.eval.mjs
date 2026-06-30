@@ -43,6 +43,20 @@ export default {
         && deriveStage({ recommendation: 'bid' }, { hasProposal: true, hasPendingSubmit: false }) === 'submitted'
         && deriveStage({ recommendation: 'bid' }, { disposition: 'won' }) === 'closed') },
 
+    { name: 'a recorded submission forces Submitted even while a submit gate is still open (wizard proof)', run: () =>
+      ok(deriveStage({ recommendation: 'bid' }, { hasProposal: true, hasPendingSubmit: true, submitted: true }) === 'submitted'
+        && nextAction({ setAside: 'Total Small Business' }, 'submitted', { submission: { confirmation: 'ABC123' } }).text.includes('ABC123')) },
+
+    { name: 'buildBoard threads submissions → card.submitted + Submitted column', run: () => {
+      const board = buildBoard({
+        opportunities: [{ noticeId: 'A', title: 'Janitorial X', score: 82, recommendation: 'bid', setAside: 'Total Small Business', proposalFile: 'gov-drafts/a.md' }],
+        approvals: [{ pod: 'gov', action: 'submit', noticeId: 'A', file: 'gov-drafts/a.md' }],
+        submissions: { A: { method: 'portal', confirmation: 'SAM-9', date: '2026-06-30' } },
+      });
+      const sub = board.columns.find((c) => c.key === 'submitted').cards;
+      return ok(sub.length === 1 && sub[0].submitted === true && sub[0].submission.confirmation === 'SAM-9' && board.counts.responding === 0, JSON.stringify(board.counts));
+    } },
+
     { name: 'nextAction: drafted proposal awaiting a gate = YOUR move', run: () => {
       const a = nextAction({ setAside: 'Total Small Business' }, 'responding', { hasPendingSubmit: true });
       return ok(a.who === 'you' && /sign/i.test(a.text), JSON.stringify(a));

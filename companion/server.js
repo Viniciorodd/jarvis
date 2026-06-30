@@ -220,7 +220,8 @@ async function govBoardData() {
   let awards = []; try { awards = (JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'pods', 'gov', 'awards.json'), 'utf8')).awards) || []; } catch { /* none */ }
   const dispositions = loadGovState().dispositions || {};
   const P = await govPipeline();
-  return P.buildBoard({ opportunities: [...oppMap.values()], approvals, awards, dispositions, estimates: loadGovState().estimates || {} });
+  const gs = loadGovState();
+  return P.buildBoard({ opportunities: [...oppMap.values()], approvals, awards, dispositions, estimates: gs.estimates || {}, submissions: gs.submissions || {} });
 }
 // OpenAI key — used for Whisper voice transcription (Whisper API, ~$0.006/min)
 let OPENAI_KEY = process.env.OPENAI_API_KEY || '';
@@ -2579,6 +2580,57 @@ const server = http.createServer(async (req, res) => {
       saveGovState(st);
       fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'meta', actor: 'operator', pod: 'gov', action: 'estimate', rationale: `set $${v.toLocaleString()} value`, payload: { noticeId } }) }).catch(() => {});
       return send(res, 200, JSON.stringify({ ok: true, value: v }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── SUBMIT WIZARD: the dead-simple "opportunity → submitted" walkthrough (anyone can run it) ──────
+  // One-shot state for the wizard: the opportunity, a plain-English fit verdict, the proposal draft (if
+  // any), whether a submit gate is open, and the recorded submission (if done). The front-end drives the
+  // steps; it reuses /api/pursue, /api/compliance-check, /api/redraft, /api/email-proposal for the work.
+  if (req.method === 'GET' && url.pathname === '/api/gov/wizard') {
+    try {
+      const noticeId = url.searchParams.get('noticeId');
+      if (!noticeId) return send(res, 400, JSON.stringify({ error: 'noticeId required' }));
+      const board = await govBoardData().catch(() => ({ columns: [] }));
+      let card = null;
+      for (const col of (board.columns || [])) { const f = (col.cards || []).find((c) => c.noticeId === noticeId); if (f) { card = f; break; } }
+      // proposal draft file + open submit gate (from the control-plane event log + pending approvals)
+      const cp = (pth) => fetch(CP_URL + pth, { signal: AbortSignal.timeout(5000) }).then((r) => r.json()).catch(() => null);
+      const [ev, pending] = await Promise.all([cp('/events?pod=gov'), cp('/approvals/pending')]);
+      let draftFile = null;
+      for (const e of (Array.isArray(ev) ? ev : [])) if (e.action === 'proposal.draft' && e.payload && e.payload.noticeId === noticeId && e.payload.file) draftFile = e.payload.file;
+      const gate = (Array.isArray(pending) ? pending : []).find((a) => a.pod === 'gov' && /submit/i.test(a.action || '') && ((a.payload && a.payload.noticeId) === noticeId || (a.payload && a.payload.file) === draftFile));
+      const gs = loadGovState(); const submission = (gs.submissions || {})[noticeId] || null;
+      // plain-English fit verdict (no jargon) — in our lane? deadline still open?
+      const deadline = (card && card.deadline) || '';
+      const dl = deadline ? new Date(deadline) : null;
+      const daysLeft = dl && !isNaN(dl) ? Math.ceil((dl - Date.now()) / 864e5) : null;
+      const inLane = card ? card.inLane !== false : true;
+      const reasons = [];
+      if (card) reasons.push(inLane ? `It's in your lane — you can bid on this as a small disadvantaged business.` : `Not your lane (${card.setAside}) — this set-aside is reserved for a group Rodgate isn't certified in. Skip it.`);
+      if (daysLeft != null) reasons.push(daysLeft < 0 ? `The deadline has passed (${deadline.slice(0, 10)}).` : `You have ${daysLeft} day${daysLeft === 1 ? '' : 's'} until the deadline (${deadline.slice(0, 10)}).`);
+      const go = inLane && (daysLeft == null || daysLeft >= 0);
+      return send(res, 200, JSON.stringify({
+        ok: true, noticeId,
+        opp: card || { noticeId, title: 'Opportunity', deadline, inLane },
+        draftFile, gateId: gate ? gate.id : null, hasDraft: !!draftFile,
+        submitted: !!submission, submission,
+        fit: { go, reasons, daysLeft, inLane },
+      }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // Record the ACTUAL submission (proof) → advances the board to Submitted + closes any open submit gate.
+  if (req.method === 'POST' && url.pathname === '/api/gov/submit/record') {
+    try {
+      const { noticeId, method, confirmation, date, file, gateId } = await readBody(req);
+      if (!noticeId) return send(res, 400, JSON.stringify({ error: 'noticeId required' }));
+      const st = loadGovState(); st.submissions = st.submissions || {};
+      const submission = { method: method || 'portal', confirmation: confirmation || '', date: date || new Date().toISOString().slice(0, 10), file: file || null, recordedAt: new Date().toISOString() };
+      st.submissions[noticeId] = submission;
+      saveGovState(st);
+      // Close the open submit gate (approving a 'submit' approval fires NO executor — it just resolves it).
+      if (gateId) { try { await fetch(`${CP_URL}/approvals/${gateId}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: 'approve', pod: 'gov', note: 'submitted via wizard' }) }); } catch { /* */ } }
+      fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'action', actor: 'operator', pod: 'gov', action: 'proposal.submitted', reversible: false, rationale: `Submitted via ${submission.method}${submission.confirmation ? ' (conf #' + submission.confirmation + ')' : ''} on ${submission.date}`, payload: { noticeId, ...submission } }) }).catch(() => {});
+      return send(res, 200, JSON.stringify({ ok: true, submission }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   // Federal spending-by-state for our NAICS (USASpending.gov, cached) — powers the spending heatmap.

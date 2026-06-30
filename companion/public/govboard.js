@@ -31,6 +31,12 @@
     na.appendChild(el('span','gov-na-text', card.next.text));
     d.appendChild(na);
     var acts = el('div','gov-acts');
+    // The one-tap "do it with me" path: walk this opportunity to a submitted proposal, step by step.
+    if(card.inLane && card.stage!=='closed' && card.stage!=='submitted' && window.SubmitWizard){
+      var wz=el('button','gov-disp gov-wizard','📋 Submit step-by-step');
+      wz.addEventListener('click', function(){ window.SubmitWizard.open(card.noticeId); });
+      acts.appendChild(wz);
+    }
     if(card.url){ var a=el('a','gov-link','SAM ↗'); a.href=card.url; a.target='_blank'; a.rel='noreferrer'; acts.appendChild(a); }
     if(card.stage !== 'closed'){
       [['won','Won'],['lost','Lost'],['passed','Pass']].forEach(function(p){
@@ -53,7 +59,10 @@
       nx.appendChild(el('div','gov-next-text', b.yourNextAction.text));
       nx.appendChild(el('div','gov-next-sub', b.yourNextAction.title + (b.yourNextAction.deadline ? ' · due '+b.yourNextAction.deadline : '')));
       lastUrl = b.yourNextAction.url || '';
-      nx.onclick = function(){ if(lastUrl) window.open(lastUrl, '_blank', 'noreferrer'); };
+      var walk = el('button','gov-next-walk','▸ Walk me through submitting this');
+      walk.addEventListener('click', function(ev){ ev.stopPropagation(); if(window.SubmitWizard) window.SubmitWizard.open(b.yourNextAction.noticeId); });
+      nx.appendChild(walk);
+      nx.onclick = function(){ if(window.SubmitWizard){ window.SubmitWizard.open(b.yourNextAction.noticeId); } else if(lastUrl){ window.open(lastUrl, '_blank', 'noreferrer'); } };
     } else { nx.hidden=true; }
     var resp = (b.counts && b.counts.responding) || 0;
     $id('govStat').textContent = b.total + ' opportunities · ' + resp + ' awaiting your sign-off';
@@ -87,6 +96,9 @@
     fetch('/api/gov-board/disposition', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ noticeId:noticeId, stage:stage }) })
       .then(load).catch(function(){});
   }
+
+  // let the wizard refresh the board when it finishes
+  window.GovBoard = { reload: function(){ if(view && !view.hidden) load(); } };
 
   // wiring
   var btn=$id('govBtn'); if(btn) btn.addEventListener('click', open);

@@ -67,6 +67,7 @@ export const COLUMNS = [
 export function deriveStage(opp, ctx = {}) {
   if (ctx.disposition === 'won' || ctx.awarded) return 'closed';
   if (ctx.disposition === 'lost' || ctx.disposition === 'passed') return 'closed';
+  if (ctx.submitted) return 'submitted'; // operator confirmed the actual submission (proof recorded by the wizard)
   if (ctx.hasProposal && !ctx.hasPendingSubmit) return 'submitted';
   if (ctx.hasProposal && ctx.hasPendingSubmit) return 'responding';
   if (String(opp.recommendation || '').toLowerCase() === 'bid') return 'reviewing';
@@ -81,7 +82,10 @@ export function nextAction(opp, stage, ctx = {}) {
     if (ctx.disposition === 'lost') return { who: 'jarvis', text: 'Lost — logged for next time' };
     return { who: 'jarvis', text: 'Passed — off the board' };
   }
-  if (stage === 'submitted') return { who: 'jarvis', text: 'Submitted — awaiting the agency' };
+  if (stage === 'submitted') {
+    const conf = ctx.submission && ctx.submission.confirmation;
+    return { who: 'jarvis', text: conf ? `Submitted (#${conf}) — awaiting the agency` : 'Submitted — awaiting the agency' };
+  }
   if (stage === 'responding') {
     return ctx.hasPendingSubmit
       ? { who: 'you', text: 'Review, sign & submit the proposal' }
@@ -102,7 +106,7 @@ export function nextAction(opp, stage, ctx = {}) {
 // PURE: rough win-weight per stage, for an expected-revenue estimate (operator's $ × likelihood).
 export const STAGE_WEIGHT = { found: 0.05, reviewing: 0.15, responding: 0.45, submitted: 0.6, closed: 0 };
 
-export function buildBoard({ opportunities = [], approvals = [], awards = [], dispositions = {}, estimates = {} } = {}) {
+export function buildBoard({ opportunities = [], approvals = [], awards = [], dispositions = {}, estimates = {}, submissions = {} } = {}) {
   const pendingSubmitByNotice = new Set();
   const pendingSubmitByFile = new Set();
   for (const a of approvals) {
@@ -119,7 +123,8 @@ export function buildBoard({ opportunities = [], approvals = [], awards = [], di
     const hasPendingSubmit = pendingSubmitByNotice.has(o.noticeId) || (o.proposalFile && pendingSubmitByFile.has(o.proposalFile));
     const disposition = dispositions[o.noticeId] || null;
     const awarded = awardedNotices.has(o.noticeId);
-    const ctx = { hasProposal, hasPendingSubmit, disposition, awarded };
+    const submission = submissions[o.noticeId] || null;
+    const ctx = { hasProposal, hasPendingSubmit, disposition, awarded, submitted: !!submission, submission };
     const stage = deriveStage(o, ctx);
     const lane = inLane(o.setAside);
     const { trade, naics } = inferTrade(o.title);
@@ -139,6 +144,8 @@ export function buildBoard({ opportunities = [], approvals = [], awards = [], di
       next: nextAction(o, stage, ctx),
       url: o.url || '',
       value,
+      submitted: !!submission,
+      submission, // { method, confirmation, date } when the operator recorded the actual submission
     });
   }
 

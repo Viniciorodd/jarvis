@@ -185,6 +185,13 @@
     const btn = $('gcSimBtn'); if (btn) btn.onclick = () => { $('gcSimTitle').textContent = focusOpp ? `Red-team: ${focusOpp.title}` : 'Pre-submit simulation'; $('gcSimResult').innerHTML = ''; ov.hidden = false; };
     const x = $('gcSimClose'); if (x) x.onclick = close;
     ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    const valBtn = $('gcValBtn'); if (valBtn) valBtn.onclick = async () => {
+      if (!focusOpp || !focusOpp.noticeId) { alert('No opportunity selected to value.'); return; }
+      const input = window.prompt(`Estimated $ value for "${focusOpp.title}"\n(contract size — feeds Pipeline $ + Est. revenue):`, focusOpp.value || '');
+      if (input == null) return;
+      try { await fetch('/api/gov-board/estimate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ noticeId: focusOpp.noticeId, value: input }) }); } catch { /* */ }
+      load();
+    };
     const run = $('gcSimRun'); if (run) run.onclick = async () => {
       run.disabled = true; const t = run.textContent; run.textContent = 'Convening the panel…';
       $('gcSimResult').innerHTML = '<div class="gc-empty">The panel is reviewing… (uses your best available brain; ~10–20s)</div>';
@@ -251,6 +258,8 @@
       { v: counts.submitted || 0, label: 'Submitted', cls: '' },
       { v: won, label: 'Won', cls: 'ok' },
       winRate == null ? { v: '—', label: 'Win rate', sub: 'no decisions yet', raw: true } : { v: winRate, label: 'Win rate', suffix: '%', cls: 'ok' },
+      { v: (board.money && board.money.pipeline) || 0, label: 'Pipeline $', money: true, cls: 'accent', sub: (board.money && board.money.withValue) ? `${board.money.withValue} valued` : 'set $ on a bid →' },
+      { v: (board.money && board.money.estRevenue) || 0, label: 'Est. revenue', money: true, cls: 'ok', sub: '× win likelihood' },
       mtd == null ? { v: '—', label: 'Income MTD', sub: 'connect finance', raw: true } : { v: mtd, label: 'Income MTD', money: true, sub: `of ${fmtMoney(goal)} goal`, cls: 'warn' },
     ];
     const kEl = $('gcKpis'); kEl.innerHTML = '';

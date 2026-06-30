@@ -99,7 +99,10 @@ export function nextAction(opp, stage, ctx = {}) {
 // ── PURE: assemble the whole board from live data ─────────────────────────────────────────────────
 // opportunities: [{noticeId,title,score,recommendation,setAside,agency,place,placeState,deadline,url,proposalFile}]
 // approvals:     [{pod,action,noticeId,file,rationale}]   awards: [{...}]   dispositions: { [noticeId]: 'won'|'lost'|'passed' }
-export function buildBoard({ opportunities = [], approvals = [], awards = [], dispositions = {} } = {}) {
+// PURE: rough win-weight per stage, for an expected-revenue estimate (operator's $ × likelihood).
+export const STAGE_WEIGHT = { found: 0.05, reviewing: 0.15, responding: 0.45, submitted: 0.6, closed: 0 };
+
+export function buildBoard({ opportunities = [], approvals = [], awards = [], dispositions = {}, estimates = {} } = {}) {
   const pendingSubmitByNotice = new Set();
   const pendingSubmitByFile = new Set();
   for (const a of approvals) {
@@ -120,6 +123,7 @@ export function buildBoard({ opportunities = [], approvals = [], awards = [], di
     const stage = deriveStage(o, ctx);
     const lane = inLane(o.setAside);
     const { trade, naics } = inferTrade(o.title);
+    const value = Number(o.value) || Number(estimates[o.noticeId]) || 0; // SAM rarely gives $; operator estimates fill in
     cards.push({
       noticeId: o.noticeId,
       title: o.title || 'Untitled solicitation',
@@ -134,6 +138,7 @@ export function buildBoard({ opportunities = [], approvals = [], awards = [], di
       stage,
       next: nextAction(o, stage, ctx),
       url: o.url || '',
+      value,
     });
   }
 
@@ -148,10 +153,20 @@ export function buildBoard({ opportunities = [], approvals = [], awards = [], di
     .sort((a, b) => (order[a.stage] - order[b.stage]) || b.fit - a.fit || b.score - a.score);
   const yourNext = yours[0] || null;
 
+  // money roll-up from operator $ estimates (or any SAM value): Pipeline $ (active) + expected revenue (× stage likelihood).
+  const won = (c) => c.stage === 'closed' && /^won/i.test((c.next && c.next.text) || '');
+  const money = {
+    pipeline: cards.filter((c) => c.stage !== 'closed').reduce((s, c) => s + (c.value || 0), 0),
+    estRevenue: Math.round(cards.reduce((s, c) => s + (c.value || 0) * (c.stage === 'closed' ? (won(c) ? 1 : 0) : (STAGE_WEIGHT[c.stage] || 0)), 0)),
+    byStage: Object.fromEntries(COLUMNS.map((col) => [col.key, cards.filter((c) => c.stage === col.key).reduce((s, c) => s + (c.value || 0), 0)])),
+    withValue: cards.filter((c) => (c.value || 0) > 0).length,
+  };
+
   return {
     columns,
     counts: Object.fromEntries(columns.map((c) => [c.key, c.cards.length])),
     total: cards.length,
+    money,
     yourNextAction: yourNext && { noticeId: yourNext.noticeId, title: yourNext.title, text: yourNext.next.text, stage: yourNext.stage, deadline: yourNext.deadline, url: yourNext.url, fit: yourNext.fit },
   };
 }

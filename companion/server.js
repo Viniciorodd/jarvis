@@ -202,7 +202,7 @@ async function govBoardData() {
   let awards = []; try { awards = (JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'pods', 'gov', 'awards.json'), 'utf8')).awards) || []; } catch { /* none */ }
   const dispositions = loadGovState().dispositions || {};
   const P = await govPipeline();
-  return P.buildBoard({ opportunities: [...oppMap.values()], approvals, awards, dispositions });
+  return P.buildBoard({ opportunities: [...oppMap.values()], approvals, awards, dispositions, estimates: loadGovState().estimates || {} });
 }
 // OpenAI key — used for Whisper voice transcription (Whisper API, ~$0.006/min)
 let OPENAI_KEY = process.env.OPENAI_API_KEY || '';
@@ -2493,6 +2493,18 @@ const server = http.createServer(async (req, res) => {
       if (stage === 'reset') delete st.dispositions[noticeId]; else st.dispositions[noticeId] = stage;
       saveGovState(st);
       return send(res, 200, JSON.stringify({ ok: true }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // Operator sets a $ value estimate for an opportunity → drives Pipeline $ / Est. revenue (their numbers).
+  if (req.method === 'POST' && url.pathname === '/api/gov-board/estimate') {
+    try {
+      const { noticeId, value } = await readBody(req);
+      if (!noticeId) return send(res, 400, JSON.stringify({ error: 'noticeId required' }));
+      const v = Number(String(value).replace(/[^0-9.]/g, '')) || 0;
+      const st = loadGovState(); st.estimates = st.estimates || {};
+      if (v > 0) st.estimates[noticeId] = v; else delete st.estimates[noticeId];
+      saveGovState(st);
+      return send(res, 200, JSON.stringify({ ok: true, value: v }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 

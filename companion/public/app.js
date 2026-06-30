@@ -50,8 +50,14 @@ function addTyping() {
 let preferredVoice = null;
 function pickVoice() {
   const vs = speechSynthesis.getVoices();
-  preferredVoice = vs.find((v) => /en/i.test(v.lang) && /(female|samantha|zira|aria|jenny|libby)/i.test(v.name))
-    || vs.find((v) => /en/i.test(v.lang)) || vs[0] || null;
+  const en = vs.filter((v) => /en(-|_|$)/i.test(v.lang));
+  // 1) best: modern "natural/neural/online" voices (far less robotic than the default)
+  preferredVoice = en.find((v) => /(natural|neural|online)/i.test(v.name))
+    // 2) known-good named voices (Microsoft Aria/Jenny, Apple Samantha, Google)
+    || en.find((v) => /(aria|jenny|libby|samantha|google\s|microsoft\s)/i.test(v.name))
+    // 3) any female-ish english, then any english, then anything
+    || en.find((v) => /(female|samantha|zira)/i.test(v.name))
+    || en[0] || vs[0] || null;
 }
 if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 let curAudio = null;

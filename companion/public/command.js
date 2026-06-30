@@ -208,6 +208,11 @@
   if (/[?&]cmd=1/.test(window.location.search)) open();
   window.JarvisCommand = { open, close, brief };
 
+  // Open the cinematic wall display as the LANDING / main page (the way Jarvis used to greet you).
+  // Turn it off with localStorage 'jarvis-landing-command' = 'off'.
+  try { if (localStorage.getItem('jarvis-landing-command') !== 'off') setTimeout(open, 250); }
+  catch { setTimeout(open, 250); }
+
   setInterval(() => {
     try {
       if (localStorage.getItem('jarvis-brief-off') === '1') return;

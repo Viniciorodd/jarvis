@@ -173,3 +173,32 @@ body {
 .gc-agent .focus { font-size: 12.5px; color: var(--ink); margin-top: 8px; line-height: 1.4; }
 .gc-agent .dot { width: 7px; height: 7px; border-radius: 50%; margin-left: auto; }
 .gc-agent .dot.on { background: var(--ok); } .gc-agent .dot.idle { background: var(--faint); }
+
+/* ── living US opportunity map ───────────────────────────── */
+.gc-map { width: 100%; }
+.gc-map svg { width: 100%; height: auto; display: block; }
+.gc-map .us-state { fill: color-mix(in srgb, var(--accent) 9%, transparent); stroke: color-mix(in srgb, var(--accent) 38%, transparent); stroke-width: .7px; stroke-linejoin: round; }
+.gc-map .us-mesh { fill: none; stroke: color-mix(in srgb, var(--accent) 28%, transparent); stroke-width: .4px; }
+.gc-map .us-lbl { fill: var(--faint); font-size: 7px; text-anchor: middle; font-weight: 600; }
+.gc-map .pin-glow { opacity: .28; }
+.gc-map .pin { cursor: pointer; }
+.gc-map .pin:hover .pin-dot { stroke: var(--ink); stroke-width: 1px; }
+.gc-map-empty { color: var(--muted); font-size: 13px; padding: 20px 2px; }
+.gc-map-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--muted); align-items: center; }
+.gc-map-legend .lg { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.gc-map-legend .lg.good { background: var(--ok); } .gc-map-legend .lg.soon { background: var(--warn); } .gc-map-legend .lg.ok { background: var(--accent); }
+.gc-map-hint { margin-left: auto; }
+.gc-map-legend kbd, .gc-map-hint kbd { background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 11px; }
+
+/* ── ⌘K command palette ──────────────────────────────────── */
+.gc-palette { position: fixed; inset: 0; z-index: 50; background: rgba(2,6,18,.55); backdrop-filter: blur(3px); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+.gc-palette[hidden] { display: none; }
+.gc-palette-box { width: min(620px, 92vw); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-lg); overflow: hidden; }
+.gc-palette-box input { width: 100%; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 16px; padding: 16px 18px; outline: none; border-bottom: 1px solid var(--line); }
+.gc-palette-results { max-height: 52vh; overflow-y: auto; }
+.gc-pr { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; font-size: 14px; border-left: 2px solid transparent; }
+.gc-pr.sel { background: var(--accent-soft); border-left-color: var(--accent); }
+.gc-pr .pr-kind { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--panel-2); border-radius: 5px; padding: 2px 7px; flex-shrink: 0; }
+.gc-pr .pr-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gc-pr .pr-sub { color: var(--faint); font-size: 12px; margin-left: auto; flex-shrink: 0; white-space: nowrap; }
+.gc-palette-empty { padding: 18px; color: var(--muted); font-size: 13px; }

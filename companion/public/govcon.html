@@ -72,6 +72,18 @@
       <div class="gc-agents-row" id="gcAgents"></div>
     </section>
 
+    <!-- Living US opportunity map -->
+    <section class="card gc-mapwrap">
+      <h2 class="gc-h2">Opportunity map <span class="gc-h2-hint" id="gcMapStat">where the work is</span></h2>
+      <div id="gcMap" class="gc-map"></div>
+      <div class="gc-map-legend">
+        <span><i class="lg good"></i> strong fit</span>
+        <span><i class="lg soon"></i> due ≤ 7 days</span>
+        <span><i class="lg ok"></i> tracking</span>
+        <span class="gc-map-hint">press <kbd>⌘K</kbd> to search everything</span>
+      </div>
+    </section>
+
     <div class="gc-two-col">
       <!-- Kanban -->
       <section class="card gc-board-wrap">
@@ -101,6 +113,15 @@
     </footer>
   </main>
 </div>
+<!-- ⌘K command palette -->
+<div id="gcPalette" class="gc-palette" hidden>
+  <div class="gc-palette-box">
+    <input id="gcPaletteInput" type="text" placeholder="Search opportunities, agencies, NAICS/PSC, sections…  (Esc to close)" autocomplete="off" spellcheck="false">
+    <div id="gcPaletteResults" class="gc-palette-results"></div>
+  </div>
+</div>
+
+<script src="us-geo.js"></script>
 <script src="govcon.js"></script>
 </body>
 </html>

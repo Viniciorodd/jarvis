@@ -58,6 +58,75 @@
 
   function whoChip(next) { const who = (next && next.who) || 'jarvis'; return `<span class="gc-who ${who === 'you' ? 'you' : 'jarvis'}">${who === 'you' ? 'YOUR MOVE' : 'Jarvis'}</span>`; }
 
+  let lastBoard = null; // shared with the ⌘K palette so search reflects current data
+
+  // extract a 2-letter state from a card's "place" (e.g. "Malmstrom AFB, MT" → MT)
+  function stateOf(card) {
+    const p = String(card.place || '').toUpperCase();
+    const m = p.match(/,\s*([A-Z]{2})\b/) || p.match(/\b([A-Z]{2})\b/);
+    return m ? m[1] : null;
+  }
+
+  // ── Living US opportunity map (reuses window.US_GEO baked geometry — offline, no projection math) ──
+  function renderMap(board) {
+    const el = $('gcMap'); if (!el) return;
+    const G = window.US_GEO;
+    if (!G || !G.statesPath || !G.pins) { el.innerHTML = '<div class="gc-map-empty">Map geometry didn’t load.</div>'; return; }
+    const W = G.W || 640, H = G.H || 388;
+    const byState = {};
+    allCards(board).filter((c) => c.stage !== 'closed').forEach((c) => { const s = stateOf(c); if (s && G.pins[s]) (byState[s] = byState[s] || []).push(c); });
+    const labels = Object.entries(G.pins).map(([code, xy]) => `<text class="us-lbl" x="${xy[0].toFixed(1)}" y="${(xy[1] + 3).toFixed(1)}">${code}</text>`).join('');
+    const pins = Object.entries(byState).map(([s, list]) => {
+      const xy = G.pins[s];
+      const soon = list.some((c) => { const d = daysTo(c.deadline); return d != null && d >= 0 && d <= 7; });
+      const good = list.some((c) => c.inLane && c.fit >= 4);
+      const color = soon ? 'var(--warn)' : good ? 'var(--ok)' : 'var(--accent)';
+      const top = list.slice().sort((a, b) => b.fit - a.fit)[0];
+      const r = Math.min(5 + list.length * 1.4, 11);
+      return `<g class="pin" data-url="${esc(top.url || '')}" tabindex="0" role="button">`
+        + `<circle class="pin-glow" cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${(r + 5).toFixed(1)}" style="fill:${color}"/>`
+        + `<circle class="pin-dot" cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${r.toFixed(1)}" style="fill:${color}"><title>${esc(s)}: ${list.length} opportunit${list.length > 1 ? 'ies' : 'y'} — top: ${esc(top.title)}</title></circle></g>`;
+    }).join('');
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><path class="us-state" d="${G.statesPath}"/>${G.meshPath ? `<path class="us-mesh" d="${G.meshPath}"/>` : ''}${labels}${pins}</svg>`;
+    const stat = $('gcMapStat'); if (stat) { const n = Object.values(byState).reduce((a, l) => a + l.length, 0); const st = Object.keys(byState).length; stat.textContent = n ? `${n} live across ${st} state${st === 1 ? '' : 's'}` : 'no live opportunities to map'; }
+    el.querySelectorAll('.pin').forEach((g) => { const open = () => { const u = g.getAttribute('data-url'); if (u) window.open(u, '_blank', 'noopener'); }; g.onclick = open; g.onkeydown = (e) => { if (e.key === 'Enter') open(); }; });
+  }
+
+  // ── ⌘K command palette: search opportunities / agencies / codes / sections, jump to any ───────────
+  let palItems = [], palSel = 0;
+  function buildIndex() {
+    const out = [];
+    (lastBoard ? allCards(lastBoard) : []).forEach((c) => out.push({ kind: 'Opp', t: c.title, sub: [c.agency, stateOf(c)].filter(Boolean).join(' · '), url: c.url, hay: `${c.title} ${c.agency} ${c.trade} ${c.naics} ${c.setAside} ${stateOf(c) || ''}`.toLowerCase() }));
+    [['Mission today', 'gcMission'], ['Pipeline', 'gcFunnel'], ['Board', 'gcBoard'], ['Opportunity map', 'gcMap'], ['Your gov team', 'gcAgents'], ['Opportunity Genome', 'gcDna']].forEach(([t, id]) => out.push({ kind: 'Go', t, sub: 'jump to section', anchor: id, hay: t.toLowerCase() }));
+    return out;
+  }
+  function renderPalette(q) {
+    q = String(q || '').trim().toLowerCase();
+    const idx = buildIndex();
+    palItems = (q ? idx.filter((x) => x.hay.includes(q)) : idx).slice(0, 40); palSel = 0;
+    const res = $('gcPaletteResults');
+    res.innerHTML = palItems.length
+      ? palItems.map((x, i) => `<div class="gc-pr${i === 0 ? ' sel' : ''}" data-i="${i}"><span class="pr-kind">${x.kind}</span><span class="pr-t">${esc(x.t)}</span>${x.sub ? `<span class="pr-sub">${esc(x.sub)}</span>` : ''}</div>`).join('')
+      : '<div class="gc-palette-empty">No matches.</div>';
+    res.querySelectorAll('.gc-pr').forEach((d) => { d.onclick = () => choosePalette(Number(d.dataset.i)); });
+  }
+  function paintSel() { const res = $('gcPaletteResults'); [...res.querySelectorAll('.gc-pr')].forEach((d, i) => d.classList.toggle('sel', i === palSel)); const s = res.querySelector('.gc-pr.sel'); if (s) s.scrollIntoView({ block: 'nearest' }); }
+  function choosePalette(i) { const x = palItems[i]; if (!x) return; closePalette(); if (x.url) window.open(x.url, '_blank', 'noopener'); else if (x.anchor) { const t = document.getElementById(x.anchor); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
+  function openPalette() { const p = $('gcPalette'); if (!p) return; p.hidden = false; const i = $('gcPaletteInput'); i.value = ''; renderPalette(''); i.focus(); }
+  function closePalette() { const p = $('gcPalette'); if (p) p.hidden = true; }
+  function initPalette() {
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && String(e.key).toLowerCase() === 'k') { e.preventDefault(); const p = $('gcPalette'); p && p.hidden ? openPalette() : closePalette(); return; }
+      const p = $('gcPalette'); if (!p || p.hidden) return;
+      if (e.key === 'Escape') closePalette();
+      else if (e.key === 'ArrowDown') { e.preventDefault(); palSel = Math.min(palSel + 1, palItems.length - 1); paintSel(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); palSel = Math.max(palSel - 1, 0); paintSel(); }
+      else if (e.key === 'Enter') { e.preventDefault(); choosePalette(palSel); }
+    });
+    const inp = $('gcPaletteInput'); if (inp) inp.addEventListener('input', () => renderPalette(inp.value));
+    const p = $('gcPalette'); if (p) p.addEventListener('click', (e) => { if (e.target === p) closePalette(); });
+  }
+
   // ── Mission Today: the concrete things that need YOU (gates + your-move cards + due tasks) ────────
   function renderMission(board, cockpit) {
     const el = $('gcMission'); if (!el) return;
@@ -109,8 +178,10 @@
     const pendingGates = (cockpit && cockpit.approvals ? cockpit.approvals.length : 0);
     const total = board.total || cards.length;
 
+    lastBoard = board;
     renderMission(board, cockpit);
     renderAgents(board, counts, total);
+    renderMap(board);
 
     // ── briefing sub ──
     const bits = [`${total} opportunit${total === 1 ? 'y' : 'ies'} tracked`];
@@ -231,6 +302,7 @@
   }
 
   initTheme();
+  initPalette();
   load();
   setInterval(load, 60000); // calm refresh
 })();

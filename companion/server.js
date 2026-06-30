@@ -340,7 +340,7 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { prompt: { type: 'string', description: 'detailed image description' }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'], description: 'default 1024x1024; use 1536x1024 for YouTube thumbnails' }, quality: { type: 'string', enum: ['low', 'medium', 'high'], description: 'default medium' } }, required: ['prompt'] } },
   { name: 'read_hq', description: 'Read live JARVIS HQ status: lifetime earnings, XP, active agent operators on the floor, pending approvals, and recent activity.',
     input_schema: { type: 'object', properties: {} } },
-  { name: 'get_report', description: 'Get a real business report for a period: totals, what each department did, money/spend, KPIs, and what needs his approval. Use for "give me the daily/weekly/monthly/quarterly/yearly report" or "how did we do this week".',
+  { name: 'get_report', description: 'Get the FULL SYSTEM report for a period: gov pipeline + your next move, every business, income vs goal, what each agent/department did, spend, what needs your approval, and brain health. Use for "full report", "full rundown", "where do we stand", "status of everything", "give me the daily/weekly report", "how did we do".',
     input_schema: { type: 'object', properties: { period: { type: 'string', enum: ['day', 'week', 'month', 'quarter', 'year'], description: 'default week' } } } },
   { name: 'command_org', description: 'Send an instruction to the company — routes through the Chief of Staff to the right person/pod (e.g. "scan SAM.gov for janitorial work", "have Remy make a thumbnail of X", "ask the CFO Victor for a P&L"). Returns who got it and whether it needs his approval. Use whenever he tells you to DO something operational.',
     input_schema: { type: 'object', properties: { instruction: { type: 'string' } }, required: ['instruction'] } },
@@ -1064,12 +1064,29 @@ async function runTool(name, input) {
   }
   if (name === 'get_report') {
     const period = ['day', 'week', 'month', 'quarter', 'year'].includes(input.period) ? input.period : 'week';
-    const r = await fetch(`${CP_URL}/report?period=${period}`);
-    if (!r.ok) throw new Error(`reports unreachable (${r.status})`);
-    const rep = await r.json();
-    const pods = (rep.pods || []).map((p) => `${p.name}: ${p.actions} actions${p.drafts ? `, ${p.drafts} prepared` : ''}${p.errors ? `, ${p.errors} errors` : ''}`).join('; ') || 'quiet';
-    const needs = (rep.needs_you || []).map((n) => n.rationale || n.action).join('; ') || 'nothing';
-    return `${rep.text}\nBy department — ${pods}.\nNeeds your approval: ${needs}.`;
+    // A WHOLE-SYSTEM report: agent activity (control-plane) + gov pipeline + businesses + income + brain health.
+    const [rep, gov, hub, money, brain] = await Promise.all([
+      fetch(`${CP_URL}/report?period=${period}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      govBoardData().catch(() => null),
+      (async () => { try { const R = await bizRegistry(); return R.buildHub(await gatherBusinessRaw()); } catch { return null; } })(),
+      (async () => { try { const M = await moneyLedger(); return M.summarize(M.readLedger()); } catch { return null; } })(),
+      (async () => { try { const R = await getRouter(); return R.brainStatus(); } catch { return null; } })(),
+    ]);
+    const L = ['📊 FULL SYSTEM REPORT · last ' + period];
+    if (gov) {
+      const cz = gov.counts || {};
+      L.push(`• Gov pipeline: ${gov.total || 0} tracked (${['found', 'reviewing', 'responding', 'submitted', 'closed'].map((k) => `${cz[k] || 0} ${k}`).join(', ')}). Your next move: ${gov.yourNextAction ? `${gov.yourNextAction.text} — ${gov.yourNextAction.title}` : 'nothing pending'}.`);
+    } else { L.push('• Gov pipeline: control-plane offline — start it to see live pipeline.'); }
+    if (hub && hub.length) L.push('• Businesses: ' + hub.map((b) => `${b.name || b.id}${b.status ? ` — ${b.status}` : ''}`).join(' · '));
+    if (money) L.push(`• Income MTD: $${(money.mtd || 0).toLocaleString()} of $${(money.goal || 10000).toLocaleString()} goal (${money.pct || 0}%).`);
+    if (rep) {
+      const pods = (rep.pods || []).map((p) => `${p.name}: ${p.actions} actions${p.drafts ? `, ${p.drafts} prepared` : ''}${p.errors ? `, ⚠${p.errors} errors` : ''}`).join('; ') || 'quiet';
+      L.push(`• Agents (${period}): ${pods}. Spend $${rep.totals ? rep.totals.spend_usd : 0}.`);
+      const needs = (rep.needs_you || []).map((n) => n.rationale || n.action).join('; ');
+      L.push(`• Needs your approval: ${needs || 'nothing'}.`);
+    }
+    if (brain) L.push(`• Brain: ${brain.prefer} (Claude ${brain.have.claude ? '✓' : '✗'} · local ${brain.have.local ? '✓' : '✗'} · OpenRouter ${brain.have.openrouter ? '✓' : '✗'}).`);
+    return L.join('\n');
   }
   if (name === 'command_org') {
     const r = await fetch(`${CP_URL}/command`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: String(input.instruction), source: 'companion' }) });

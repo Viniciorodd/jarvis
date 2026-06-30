@@ -54,6 +54,7 @@
     body.innerHTML =
       `<div class="gc-opp-meta">${o.score != null ? `<span class="gc-opp-score">${o.score}/100</span>` : ''}${meta}</div>`
       + '<div class="gc-opp-actions">'
+      + ((o.inLane !== false && (dd == null || dd >= 0) && window.SubmitWizard) ? '<button class="gc-btn primary" data-act="wizard">📋 Submit step-by-step</button>' : '')
       + `<button class="gc-btn" data-act="approve"${lead ? '' : ' disabled title="No pending approval gate for this one"'}>✓ Approve</button>`
       + '<button class="gc-btn ghost" data-act="pass">Pass</button>'
       + '<button class="gc-btn ghost" data-act="pursue">🎯 Pursue (draft)</button>'
@@ -71,7 +72,9 @@
   async function oppAction(act, o, lead, prop) {
     const res = $('gcOppResult'); const say = (m, ok) => { if (res) { res.textContent = m; res.style.color = ok === false ? 'var(--danger)' : 'var(--ok)'; } };
     try {
-      if (act === 'approve') {
+      if (act === 'wizard') {
+        if (window.SubmitWizard) { closeOpp(); window.SubmitWizard.open(o.noticeId); } else { say('Wizard not loaded — reload the page.', false); }
+      } else if (act === 'approve') {
         if (!lead) return say('No pending gate to approve for this one.', false);
         const r = await postJSON('/api/approve', { id: lead.id, decision: 'approve' });
         say(r && r.error ? 'Error: ' + r.error : '✓ Approved — the executor is running it.', !(r && r.error)); refreshSoon();

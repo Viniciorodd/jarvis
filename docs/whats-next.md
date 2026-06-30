@@ -1,6 +1,46 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-06-29. Everything is committed + pushed to `origin/feat/core-infrastructure-v2`. Resume from here._
+_Updated 2026-06-30. Committed to `feat/core-infrastructure-v2` (NOT yet pushed — operator pushes when ready). Resume from here._
+
+### 🆕 2026-06-30 (newest) — closed the 5 open infra gaps + the "anyone can run it" GOV SUBMIT WIZARD
+A full pass through the doctrine's remaining gaps, in priority order, each eval-pinned (193 → 218 green):
+- **Gap #2 — vault least-privilege now ENFORCED at the point of use.** The ACL was eval-tested but only
+  the Anthropic key flowed through it; SAM/Places/Hunter/FAL read `process.env` directly. New
+  `pods/lib.mjs secret(agent,name)` broker; gov scout/discover/enrich + `scripts/studio-lib.mjs` route
+  through it; `CONNECT-01` granted SAM/Places/Hunter (its real job), still denied money/image keys.
+  `control-plane /vault/audit` (who-can-read-what, never values). Smoke-verified: the bid analyst is
+  denied the SAM key (returns '' + logs a security event), the scout gets it.
+- **Gap #3 — the autonomy ladder L0–L4 + promotion rule is REAL** (`control-plane/autonomy.mjs`). Per-
+  workflow level store; `canPromote()` = evals green AND human-edit-rate < threshold AND enough samples
+  (pure, eval-pinned); `humanEditRate()` derives the §10 Layer-2 metric from the event log. HARD floor:
+  send/submit/spend/pay/wire/deliver gate at EVERY level — the ladder can never auto-fire money or an
+  out-the-door action. Wired into the CoS router as a SAFE override (can only relax a promoted recoverable
+  workflow or tighten to Manual; levels never auto-raise). `/autonomy` + `/autonomy/level` + CLI report.
+- **Gap #4 — Research & Risk desk built** (`pods/research-risk/desk.mjs`, Dana). MONITOR + JOURNAL only,
+  ZERO execution: `assertMonitorOnly()` refuses every trade/buy/sell/order/wire verb in code; market data
+  treated as untrusted (directive #4). Wired into the router on a reversible "monitor" intent;
+  `/api/research/{watch,journal}`.
+- **Gap #5 — Langfuse visual-tracing shim** (`control-plane/tracing.mjs`) wired into `store.appendEvent`;
+  no-op unless `LANGFUSE_*` set (the JSONL log stays source of truth). `docs/langfuse.md` + a commented
+  compose service make turning it on a 3-env-var change. Container deploy = operator's call (new infra).
+- **Gap #1 — pod workers** were already substantially wired (router spawns gov/fiverr/saas/finance); the
+  R&R desk (above) was the one genuinely-missing worker.
+- **★ THE CAPSTONE — the Gov Submission Wizard** (`companion/public/submit-wizard.js`): a calm, one-screen-
+  at-a-time walkthrough that takes ONE opportunity all the way to a submitted proposal, simple enough for
+  a non-expert. 6 steps: fit verdict → Jarvis writes it → read/change in plain words → compliance "safety
+  check" (fix-it loop) → exactly where it goes (email w/ copy buttons, or SAM.gov w/ numbered steps +
+  copy/download) → record proof → 🎉 done. The irreversible submit stays with the human (§2 + "Vinicio
+  signs & submits"); nothing auto-sends. Backend: `GET /api/gov/wizard` (one-shot state + plain fit),
+  `POST /api/gov/submit/record` (saves proof, closes the open submit gate WITHOUT firing any executor,
+  advances the board); `pipeline.mjs` threads `submissions` so recorded proof forces the Submitted column.
+  Launches from the cockpit board cards + the Home "your next move" banner + the GovCon OS drawer.
+  **Verified LIVE in-browser on the iPhone viewport** against real NAS data: opened a real "Janitorial and
+  Carpet Cleaning Services" opp → fit verdict → loaded the real 6KB proposal, formatted; no horizontal
+  scroll, 52px tap targets, zero console errors. Plain-English operator guide:
+  [`docs/how-to-submit-a-gov-contract.md`](how-to-submit-a-gov-contract.md).
+- ⏭ **Open / next:** (a) operator does a real end-to-end submit through the wizard on a live opportunity;
+  (b) deploy Langfuse when ready (3 env vars); (c) consider promoting `gov.draft` once the human-edit-rate
+  on real proposals proves low; (d) Hermes + its full capabilities (parked by the operator for next time).
 
 ### 🆕 2026-06-29 (newest) — FREE compute layer: the model router ("Jarvis never goes dark")
 Directly fixes the pain "when I hit the Claude limit I'm not productive" + the absorb gotcha below (Pro ≠ API).

@@ -2,23 +2,25 @@
 
 > Honest scorecard of the vision (see [`operating-doctrine.md`](operating-doctrine.md) +
 > [`reference/jarvis-build-plan.md`](reference/jarvis-build-plan.md)) vs. what actually exists.
-> Last assessed: **2026-06-14**. Legend: ✅ done · 🟡 partial · ❌ missing.
+> Last assessed: **2026-06-30**. Legend: ✅ done · 🟡 partial · ❌ missing.
 
 ## Headline
-**Core infrastructure is DONE** — control-plane spine, evals + tracing, code-enforced caps, Vosk offline
-wake, real image generation all tested + working. Gov pod is strong (first federal proposal sent). The
-remaining weak spots are exactly what the doctrine calls out: **per-agent scoped credentials** (currently
-shared keys in .env), **Chief-of-Staff router** (comms-only Companion, not a classifying front door yet),
-and formal **autonomy ladder with promotion rules** (workflows are human-gated but levels not formalized).
+**Core infrastructure is DONE and the doctrine's old weak spots are now closed** (2026-06-30): per-agent
+**least-privilege is enforced** at the point of use, the **autonomy ladder L0–L4 + promotion rule** is
+real, the **Research & Risk desk** (monitor+journal, zero-execution) is built, and **Langfuse tracing** is
+wired (shim; container deploy pending). The Chief-of-Staff router classifies + routes + gates and pod
+workers execute. Gov pod is strong (first federal proposal sent) and now has a **"anyone can run it"
+Submission Wizard** (opportunity→submitted). Remaining: deploy Langfuse, encrypt the vault for production,
+and rack up real submit history so workflows can earn promotion up the ladder.
 
 ## Against the 5 prime directives
 | # | Directive | Status | Reality |
 |---|---|---|---|
 | 1 | LLM proposes, **code** disposes | ✅ | **`control-plane/spend.mjs` deterministic spend guard built + unit-tested** (per-action + per-day caps; `/spend/check` denies over-limit). HQ money/XP also in code. Markup math still to move into code. |
 | 2 | Gate every irreversible action | ✅ | dry-run→`--send` (gov), dry-run→`--execute` (inbox), Telegram/HQ approval buttons. Solid. Per-workflow autonomy levels not yet formalized. |
-| 3 | Least privilege, one cred/agent, vault | 🟡 | Secrets in `.env` (not a vault). One shared Anthropic key; shared Gmail app-passwords. Not per-agent. |
-| 4 | External content = untrusted data | 🟡 | Stated in prompts (email-triage, companion). No structural fencing/sanitization layer. |
-| 5 | **Evals + tracing from agent #1** | 🟡 | **Eval harness built + green** (`evals/run.mjs` + spend-guard suite, 8/8 pass, exits non-zero on fail). **Tracing = the append-only event store** (`control-plane/`); every `/events` write is a trace. Remaining: a suite per agent + Langfuse for visual tracing. |
+| 3 | Least privilege, one cred/agent, vault | ✅ | **Vault ACL now ENFORCED at the point of use** (2026-06-30): `pods/lib.mjs secret(agent,name)` broker routes every scoped read (SAM/Places/Hunter/FAL/Stripe/Anthropic) through `control-plane/vault.mjs`, which denies + logs anything off-ACL. `/vault/audit` surfaces who-can-read-what. `vault.enc` (AES-256-GCM) optional for production; `.env` still the dev value source. |
+| 4 | External content = untrusted data | 🟡 | Stated in prompts (email-triage, companion); R&R desk fences market data as data (directive #4). Still no global structural sanitization layer. |
+| 5 | **Evals + tracing from agent #1** | ✅ | **Eval harness green (218/218)**, exits non-zero on fail, suites per agent (vault/router/autonomy/research-risk/tracing/gov-*/finance/…). **Tracing = the append-only event store** + an optional **Langfuse visual-tracing shim** (`control-plane/tracing.mjs`, wired into `store.appendEvent`, no-op until `LANGFUSE_*` set). Remaining: deploy the Langfuse container (operator). |
 
 ## Against the stack
 | Piece | Status | Notes |
@@ -59,11 +61,14 @@ The real `operating-doctrine.md` (now canonical) asks for more than the 5 direct
   aggregates back. ✅ BUILT (`pods/chief-of-staff/`): `/command` → Claude (Haiku) classifies → deterministic
   gate decision (irreversibles → approval.request) → routes to the pod registry, logs every step with
   rationale, mirrors the agent onto the HQ floor. 18/18 evals green (incl. the gate-decision regression).
-- **Autonomy ladder L0–L4 + promotion rule** (§8) — promote a workflow only when evals pass AND
-  human-edit-rate < threshold. Not implemented; autonomy is informal. ❌
-- **Two-layer KPIs** (§10) — Layer-2 system metrics (autonomy ratio, **human-edit rate**, escalation
-  rate, cost/task, **ROIC of compute**, eval coverage/drift) are not tracked. ❌
-- **Langfuse self-hosted tracing** (§11) — named explicitly; not deployed. ❌
+- **Autonomy ladder L0–L4 + promotion rule** (§8) — ✅ BUILT (`control-plane/autonomy.mjs`, 2026-06-30):
+  per-workflow level store; `canPromote()` = evals green AND human-edit-rate < threshold AND enough
+  samples; HARD floor keeps send/submit/spend gated at every level; wired into the router as a safe
+  override; `/autonomy` + CLI. Levels never auto-raise (operator grants autonomy). 13 evals.
+- **Two-layer KPIs** (§10) — partial: `autonomy.mjs` now computes **human-edit-rate** per workflow + an
+  **autonomy ratio** from the event log; `control-plane/kpis.mjs` has the rest. ROIC-of-compute still TODO. 🟡
+- **Langfuse self-hosted tracing** (§11) — 🟡 shim built + wired (`control-plane/tracing.mjs`); container
+  deploy pending (3-env-var flip, `docs/langfuse.md`).
 - **Idempotency + kill switch + global hard spend cap** (§9 constitution) — kill switch ≈ n8n master
   toggle exists; idempotency + a global code-enforced daily cap are not built. 🟡
 
@@ -97,10 +102,17 @@ The real `operating-doctrine.md` (now canonical) asks for more than the 5 direct
    codename + reports-to + model tier). Resolves "ask the CFO" → person; has `scan now` + `full report`
    verbs; gate logic eval-pinned. ✅ Conservative SCHEDULER (`control-plane/scheduler.mjs` + `schedule.json`):
    working-hours window, gov 1 scan/day, order polls that REST (zero LLM) when idle — eval-pinned (dueJobs).
-   Remaining: wire the actual pod WORKERS (the router routes/queues; pods don't execute the work yet) and
-   formalize L0→L1 promotion (evals + human-edit-rate threshold).
-6. ❌ **Per-agent scoped credentials + a vault** (directive #3) — split shared keys; secrets out of `.env`.
-7. ❌ **Research-&-Risk desk — monitor + journal ONLY**, zero execution (§7).
+   ✅ Pod WORKERS now execute (gov scout→score→draft→compliance→gate; fiverr/saas/finance; + the new R&R
+   desk) and ✅ L0→L4 promotion is formalized (`control-plane/autonomy.mjs`, evals + human-edit-rate).
+6. ✅ **Per-agent scoped credentials ENFORCED** (directive #3, 2026-06-30) — `secret(agent,name)` broker
+   routes scoped reads through the vault ACL; off-ACL reads denied + logged; `/vault/audit`. Encrypt to
+   `vault.enc` for production (CLI exists).
+7. ✅ **Research-&-Risk desk — monitor + journal ONLY** (`pods/research-risk/desk.mjs`, Dana). Zero
+   execution by construction (`assertMonitorOnly` refuses every trade/order/wire verb); eval-pinned (§7).
+10. ✅ **Gov Submission Wizard (2026-06-30)** — `companion/public/submit-wizard.js`: opportunity→submitted
+    in 6 plain-English screens, simple enough for a non-expert; the irreversible submit stays human.
+    `/api/gov/wizard` + `/api/gov/submit/record`; launches from the cockpit board + Home banner + GovCon
+    drawer. Operator guide: `docs/how-to-submit-a-gov-contract.md`. Verified live on the iPhone viewport.
 8. ✅ **Offline wake word (Vosk)** — built + model downloaded + served (hasVosk:true verified). Porcupine
    dropped (Picovoice gates on a company email); Vosk runs 100% locally, audio never leaves the PC.
    Files: `scripts/get-vosk-model.mjs`, `companion/public/vosk-wake.js`, wired in `app.js` as the

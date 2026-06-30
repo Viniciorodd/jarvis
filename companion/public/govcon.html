@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en" data-theme="dark">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Rodgate · GovCon OS</title>
 <meta name="theme-color" content="#0F172A">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -10,11 +10,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="govcon.css">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem('govcon-theme')||'dark'}catch(e){}</script>
+<!-- Theme is shared with the whole Jarvis app: 'light' → light, anything else (mono/teal/dark/arc) → dark. -->
+<script>try{document.documentElement.dataset.theme=(localStorage.getItem('jarvis-theme')==='light')?'light':'dark';}catch(e){}</script>
 </head>
 <body>
 <div class="gc-app">
-  <!-- Top bar -->
+  <!-- Top bar (full width) -->
   <header class="gc-top">
     <div class="gc-brand">
       <span class="gc-logo">▣</span>
@@ -24,89 +25,96 @@
     <div class="gc-top-right">
       <span class="gc-live"><span class="gc-dot"></span> Live</span>
       <span class="gc-date" id="gcDate">—</span>
-      <button class="gc-toggle" id="gcTheme" title="Toggle light / dark" aria-label="Toggle theme">☾</button>
+      <button class="gc-toggle" id="gcTheme" title="Toggle light / dark (applies across Jarvis)" aria-label="Toggle theme">☾</button>
       <a class="gc-back" href="/" title="Back to the JARVIS cockpit">← Jarvis</a>
     </div>
   </header>
 
   <main class="gc-main">
-    <!-- CEO Briefing hero -->
-    <section class="gc-briefing card" id="gcBriefing">
-      <div class="gc-briefing-head">
-        <div>
-          <h1 id="gcGreeting">Good morning.</h1>
-          <p class="gc-sub" id="gcBriefSub">Pulling your pipeline together…</p>
-        </div>
-        <div class="gc-health" id="gcHealth" title="Business health — derived from pipeline movement, open gates, and income pace.">
-          <div class="gc-health-ring" id="gcHealthRing"><span id="gcHealthScore">—</span></div>
-          <span class="gc-health-label">Health</span>
-        </div>
-      </div>
-      <div class="gc-nextmove" id="gcNextMove">
-        <span class="gc-nextmove-label">Your next move</span>
-        <span class="gc-nextmove-text" id="gcNextText">—</span>
-        <span class="gc-nextmove-meta" id="gcNextMeta"></span>
-      </div>
-      <ul class="gc-priorities" id="gcPriorities"></ul>
-    </section>
-
-    <!-- Mission Today -->
-    <section class="card gc-mission">
-      <h2 class="gc-h2">Mission today <span class="gc-h2-hint">clear the board</span></h2>
-      <div class="gc-mission-list" id="gcMission"></div>
-      <div class="gc-mission-progress"><i id="gcMissionBar" style="width:0%"></i></div>
-    </section>
-
-    <!-- KPI cards -->
+    <!-- KPI strip — full width across the top -->
     <section class="gc-kpis" id="gcKpis"></section>
 
-    <!-- Pipeline funnel -->
-    <section class="card gc-funnel">
-      <h2 class="gc-h2">Pipeline</h2>
-      <div class="gc-funnel-bars" id="gcFunnel"></div>
-    </section>
+    <!-- 3 columns: LEFT (you + missions) · MID (pipeline + board) · RIGHT (map + genome) -->
+    <div class="gc-grid">
 
-    <!-- Your gov team (agents) -->
-    <section class="card gc-agents">
-      <h2 class="gc-h2">Your gov team <span class="gc-h2-hint">who's on it</span></h2>
-      <div class="gc-agents-row" id="gcAgents"></div>
-    </section>
-
-    <!-- Living US opportunity map -->
-    <section class="card gc-mapwrap">
-      <h2 class="gc-h2">Opportunity map <span class="gc-h2-hint" id="gcMapStat">where the work is</span></h2>
-      <div id="gcMap" class="gc-map"></div>
-      <div class="gc-map-legend">
-        <span><i class="lg good"></i> strong fit</span>
-        <span><i class="lg soon"></i> due ≤ 7 days</span>
-        <span><i class="lg ok"></i> tracking</span>
-        <span class="gc-map-hint">press <kbd>⌘K</kbd> to search everything</span>
-      </div>
-    </section>
-
-    <div class="gc-two-col">
-      <!-- Kanban -->
-      <section class="card gc-board-wrap">
-        <h2 class="gc-h2">Board <span class="gc-h2-hint">your move first</span></h2>
-        <div class="gc-board" id="gcBoard"></div>
-      </section>
-
-      <!-- Opportunity Genome -->
-      <section class="card gc-genome">
-        <h2 class="gc-h2">Opportunity Genome</h2>
-        <p class="gc-genome-title" id="gcGenomeTitle">—</p>
-        <div class="gc-winprob">
-          <div class="gc-winprob-ring" id="gcWinRing"><span id="gcWinPct">—</span></div>
-          <div class="gc-winprob-why">
-            <span class="gc-winprob-label">Win estimate</span>
-            <ul id="gcWinWhy"></ul>
+      <!-- ── LEFT ── -->
+      <div class="gc-col">
+        <section class="gc-briefing card" id="gcBriefing">
+          <div class="gc-briefing-head">
+            <div>
+              <h1 id="gcGreeting">Good morning.</h1>
+              <p class="gc-sub" id="gcBriefSub">Pulling your pipeline together…</p>
+            </div>
+            <div class="gc-health" id="gcHealth" title="Business health — derived from pipeline movement, open gates, and income pace.">
+              <div class="gc-health-ring" id="gcHealthRing"><span id="gcHealthScore">—</span></div>
+              <span class="gc-health-label">Health</span>
+            </div>
           </div>
-        </div>
-        <div class="gc-dna" id="gcDna"></div>
-        <button class="gc-btn" id="gcSimBtn">🛡 Pre-submit red-team</button>
-        <button class="gc-btn" id="gcValBtn" style="margin-left:8px">💲 Set $ value</button>
-        <p class="gc-genome-foot">Derived from the scout's fit score + set-aside lane + trade. An estimate to prioritize — not a guarantee.</p>
-      </section>
+          <div class="gc-nextmove" id="gcNextMove">
+            <span class="gc-nextmove-label">Your next move</span>
+            <span class="gc-nextmove-text" id="gcNextText">—</span>
+            <span class="gc-nextmove-meta" id="gcNextMeta"></span>
+          </div>
+          <ul class="gc-priorities" id="gcPriorities"></ul>
+        </section>
+
+        <section class="card gc-mission">
+          <h2 class="gc-h2">Mission today <span class="gc-h2-hint">clear the board</span></h2>
+          <div class="gc-mission-list" id="gcMission"></div>
+          <div class="gc-mission-progress"><i id="gcMissionBar" style="width:0%"></i></div>
+        </section>
+
+        <section class="card gc-agents">
+          <h2 class="gc-h2">Your gov team <span class="gc-h2-hint">who's on it</span></h2>
+          <div class="gc-agents-row" id="gcAgents"></div>
+        </section>
+      </div>
+
+      <!-- ── MID ── -->
+      <div class="gc-col">
+        <section class="card gc-funnel">
+          <h2 class="gc-h2">Pipeline</h2>
+          <div class="gc-funnel-bars" id="gcFunnel"></div>
+        </section>
+
+        <section class="card gc-board-wrap">
+          <h2 class="gc-h2">Board <span class="gc-h2-hint">your move first</span></h2>
+          <div class="gc-board" id="gcBoard"></div>
+        </section>
+      </div>
+
+      <!-- ── RIGHT ── -->
+      <div class="gc-col">
+        <section class="card gc-mapwrap">
+          <h2 class="gc-h2">Opportunity map <span class="gc-h2-hint" id="gcMapStat">where the work is</span></h2>
+          <div id="gcMap" class="gc-map"></div>
+          <div class="gc-map-legend">
+            <span><i class="lg good"></i> strong fit</span>
+            <span><i class="lg soon"></i> due ≤ 7d</span>
+            <span><i class="lg ok"></i> tracking</span>
+            <span class="gc-map-hint"><kbd>⌘K</kbd> search</span>
+          </div>
+        </section>
+
+        <section class="card gc-genome">
+          <h2 class="gc-h2">Opportunity Genome</h2>
+          <p class="gc-genome-title" id="gcGenomeTitle">—</p>
+          <div class="gc-winprob">
+            <div class="gc-winprob-ring" id="gcWinRing"><span id="gcWinPct">—</span></div>
+            <div class="gc-winprob-why">
+              <span class="gc-winprob-label">Win estimate</span>
+              <ul id="gcWinWhy"></ul>
+            </div>
+          </div>
+          <div class="gc-dna" id="gcDna"></div>
+          <div class="gc-genome-actions">
+            <button class="gc-btn" id="gcSimBtn">🛡 Pre-submit red-team</button>
+            <button class="gc-btn" id="gcValBtn">💲 Set $ value</button>
+          </div>
+          <p class="gc-genome-foot">Derived from the scout's fit score + set-aside lane + trade. An estimate to prioritize — not a guarantee.</p>
+        </section>
+      </div>
+
     </div>
 
     <footer class="gc-foot">
@@ -115,6 +123,7 @@
     </footer>
   </main>
 </div>
+
 <!-- Simulation mode: pre-submit red-team panel -->
 <div id="gcSim" class="gc-sim" hidden>
   <div class="gc-sim-box">

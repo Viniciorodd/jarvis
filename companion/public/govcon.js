@@ -162,9 +162,16 @@
   // ── light / dark theme toggle (persists; default dark) ────────────────────────────────────────────
   function initTheme() {
     const btn = $('gcTheme'); if (!btn) return;
-    const apply = (t) => { document.documentElement.dataset.theme = t; try { localStorage.setItem('govcon-theme', t); } catch { /* */ } btn.textContent = t === 'light' ? '☀' : '☾'; };
-    apply(document.documentElement.dataset.theme || 'dark');
-    btn.onclick = () => apply(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+    // Theme is shared with the whole Jarvis app via localStorage 'jarvis-theme'. GovCon's CSS only has
+    // light/dark, so map: 'light' → light, any dark theme (mono/teal/dark/arc) → dark.
+    const paint = (light) => { document.documentElement.dataset.theme = light ? 'light' : 'dark'; btn.textContent = light ? '☀' : '☾'; };
+    let isLight = false; try { isLight = localStorage.getItem('jarvis-theme') === 'light'; } catch { /* */ }
+    paint(isLight);
+    btn.onclick = () => {
+      const goLight = document.documentElement.dataset.theme !== 'light';
+      try { if (goLight) localStorage.setItem('jarvis-theme', 'light'); else if (localStorage.getItem('jarvis-theme') === 'light') localStorage.setItem('jarvis-theme', 'mono'); } catch { /* */ }
+      paint(goLight);
+    };
   }
 
   // ── Simulation Mode: a source-selection panel red-teams the focus opportunity before submit ───────

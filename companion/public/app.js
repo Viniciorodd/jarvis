@@ -410,7 +410,7 @@ async function toggleRecord() {
 
 // ── settings: theme swatches (pick by mood) + open/close ─────────────────────
 function applyTheme(name) {
-  const ok = ['teal', 'mono', 'dark', 'arc'].includes(name) ? name : 'mono';
+  const ok = ['teal', 'mono', 'dark', 'arc', 'light'].includes(name) ? name : 'mono';
   document.documentElement.dataset.theme = ok;
   document.querySelectorAll('.theme-swatch').forEach((s) => s.classList.toggle('on', s.dataset.theme === ok));
   try { localStorage.setItem('jarvis-theme', ok); } catch { /* private mode */ }

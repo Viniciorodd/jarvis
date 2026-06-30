@@ -215,6 +215,11 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
   if (c.pod === 'saas' && !gate.gate && /\b(ticket|support|bug|reply|respond|triage|customer|crash|error|issue)\b/i.test(txt)) {
     import('../saas/worker.mjs').then((m) => m.runTriage({ ticket: txt })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'RECON-DEV', pod: 'saas', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
   }
+  // Research & Risk desk (Dana): MONITOR + JOURNAL only (doctrine §7). Only spawns on a reversible monitor
+  // intent — any trade/execute verb is gated above and never reaches here, and the desk itself refuses it.
+  if (c.pod === 'research-risk' && !gate.gate && /\b(monitor|watch|watchlist|check .*(market|stocks?|tickers?)|unusual volume|how .*(market|stocks?)|journal the)\b/i.test(txt)) {
+    import('../research-risk/desk.mjs').then((m) => m.runWatch({ source: 'router' })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'WATCHTOWER-01', pod: 'research-risk', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });
+  }
   // Operator (Sloane): post-award progress reports / CPARS / milestone reviews.
   if (c.pod === 'gov' && !gate.gate && /\b(progress report|cpars|status update|post-award|milestone)\b/i.test(txt)) {
     import('../gov/operator.mjs').then((m) => m.runOps({ source: 'router' })).catch((e) => { store.appendEvent({ kind: 'trace', actor: 'OPERATOR-01', pod: 'gov', action: 'worker.error', status: 'error', rationale: String(e && e.message || e) }); });

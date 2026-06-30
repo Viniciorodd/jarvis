@@ -71,3 +71,6 @@ pods/gov/.spending-cache.json
 # Kokoro local-voice model files (~340MB binaries — download once, not committed)
 kokoro-v1.0.onnx
 voices-v1.0.bin
+
+# Research & Risk desk runtime journal
+pods/research-risk/journal.md

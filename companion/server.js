@@ -1943,6 +1943,16 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ summary, open: openMarked, closed: closed.slice(0, 30), predictions: paper.predictions.slice(0, 30) }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // ── RESEARCH & RISK desk (Dana / WATCHTOWER-01): MONITOR + JOURNAL only, never executes (§7) ─────
+  if (req.method === 'POST' && url.pathname === '/api/research/watch') {
+    try { const D = await import('../pods/research-risk/desk.mjs'); return send(res, 200, JSON.stringify(await D.runWatch({ source: 'cockpit' }))); }
+    catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/research/journal') {
+    try { const j = fs.readFileSync(path.join(__dirname, '..', 'pods', 'research-risk', 'journal.md'), 'utf8'); return send(res, 200, JSON.stringify({ ok: true, journal: j.slice(-8000) })); }
+    catch { return send(res, 200, JSON.stringify({ ok: true, journal: '' })); }
+  }
+
   // ── PERSONAL OS: knowledge base (notes, journal, voice, todos, people, search) ──────────────────
   // All data is plain Markdown / JSON under KNOWLEDGE_DIR — NAS-mountable, no lock-in.
 

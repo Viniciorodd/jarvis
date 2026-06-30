@@ -1470,6 +1470,17 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(await r.json()));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // Send an operator instruction through the Chief-of-Staff router (proxy to the control-plane). Used by
+  // the GovCon detail drawer's Pursue / Email / Ask actions, so a click actually dispatches an agent.
+  if (req.method === 'POST' && url.pathname === '/api/command') {
+    try {
+      const { text } = await readBody(req);
+      if (!text || !String(text).trim()) return send(res, 400, JSON.stringify({ error: 'text required' }));
+      const r = await fetch(`${CP_URL}/command`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: String(text), source: 'govcon' }), signal: AbortSignal.timeout(25000) });
+      const d = await r.json();
+      return send(res, 200, JSON.stringify({ ok: true, reply: (d.routing && d.routing.reply) || 'Sent to the Chief of Staff.', routing: d.routing }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // ── FLOOR: the org as rooms (from the roster) with each agent's live state (from HQ) ──
   if (req.method === 'GET' && url.pathname === '/api/floor') {
     try {

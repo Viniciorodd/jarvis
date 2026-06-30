@@ -20,6 +20,95 @@
   function ring(el, pct) { el.style.setProperty('--p', clamp(pct, 0, 100) + '%'); }
 
   async function getJSON(url) { try { const r = await fetch(url); return await r.json(); } catch { return null; } }
+  async function postJSON(url, body) { try { const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) }); return await r.json(); } catch (e) { return { error: e.message }; } }
+
+  // ── Opportunity detail drawer: click anything → full detail + the old Operations actions ──────────
+  let opsData = null;
+  async function loadOps(force) { if (opsData && !force) return opsData; opsData = await getJSON('/api/operations'); return opsData; }
+  function oppFromAnywhere(noticeId) {
+    const o = opsData && (opsData.opportunities || []).find((x) => x.noticeId === noticeId);
+    if (o) return o;
+    const c = lastBoard ? allCards(lastBoard).find((x) => x.noticeId === noticeId) : null;
+    return c ? { noticeId: c.noticeId, title: c.title, agency: c.agency, score: c.score, setAside: c.setAside, deadline: c.deadline, url: c.url, place: c.place, estimatedValue: c.value } : null;
+  }
+  const leadForNotice = (n) => (opsData && (opsData.leads || []).find((l) => l.noticeId === n)) || null;
+  function propForNotice(n) {
+    if (!opsData) return null;
+    const p = (opsData.proposals || []).find((x) => x.noticeId === n);
+    const o = (opsData.opportunities || []).find((x) => x.noticeId === n);
+    return p || (o && o.proposalFile ? { file: o.proposalFile, noticeId: n } : null);
+  }
+  function closeOpp() { const ov = $('gcOpp'); if (ov) ov.hidden = true; }
+  function refreshSoon() { setTimeout(() => { opsData = null; load(); }, 700); }
+  async function openOppDrawer(noticeId) {
+    if (!noticeId) return;
+    const ov = $('gcOpp'), body = $('gcOppBody'); if (!ov || !body) return;
+    ov.hidden = false; body.innerHTML = '<div class="gc-empty">loading…</div>';
+    await loadOps();
+    const o = oppFromAnywhere(noticeId);
+    if (!o) { body.innerHTML = '<div class="gc-empty">Couldn’t find that opportunity in the live data.</div>'; return; }
+    $('gcOppTitle').textContent = o.title || 'Opportunity';
+    const lead = leadForNotice(noticeId), prop = propForNotice(noticeId), dd = daysTo(o.deadline);
+    const val = o.estimatedValue ? (typeof o.estimatedValue === 'number' ? fmtMoney(o.estimatedValue) : o.estimatedValue) : '';
+    const meta = [o.agency, o.setAside, o.place, dd != null ? (dd >= 0 ? `due in ${dd}d` : 'closed') : '', val ? '💰 ' + val : ''].filter(Boolean).map((x) => `<span>${esc(x)}</span>`).join('');
+    body.innerHTML =
+      `<div class="gc-opp-meta">${o.score != null ? `<span class="gc-opp-score">${o.score}/100</span>` : ''}${meta}</div>`
+      + '<div class="gc-opp-actions">'
+      + `<button class="gc-btn" data-act="approve"${lead ? '' : ' disabled title="No pending approval gate for this one"'}>✓ Approve</button>`
+      + '<button class="gc-btn ghost" data-act="pass">Pass</button>'
+      + '<button class="gc-btn ghost" data-act="pursue">🎯 Pursue (draft)</button>'
+      + '<button class="gc-btn ghost" data-act="email">📧 Email</button>'
+      + '<button class="gc-btn ghost" data-act="value">💲 Set $</button>'
+      + '<button class="gc-btn ghost" data-act="redteam">🛡 Red-team</button>'
+      + (o.url ? `<a class="gc-btn ghost" href="${esc(o.url)}" target="_blank" rel="noopener">RFP on SAM ↗</a>` : '')
+      + '</div><div class="gc-opp-result" id="gcOppResult"></div>'
+      + '<div class="gc-opp-sec"><button class="gc-btn ghost" data-act="docs">📎 Load RFP documents + CO contact</button><div id="gcOppDocs"></div></div>'
+      + (prop ? '<div class="gc-opp-sec"><button class="gc-btn ghost" data-act="readprop">📝 Read the drafted proposal</button><div id="gcOppProp"></div></div>' : '')
+      + '<div class="gc-opp-sec"><div class="gc-h2">Ask Jarvis about this</div><form id="gcOppAsk"><input id="gcOppAskIn" placeholder="key requirements? do we qualify? competitors?"><button class="gc-btn" type="submit">Ask</button></form><div id="gcOppAskOut"></div></div>';
+    body.querySelectorAll('button[data-act]').forEach((b) => { b.onclick = () => oppAction(b.dataset.act, o, lead, prop); });
+    const f = $('gcOppAsk'); if (f) f.onsubmit = (e) => { e.preventDefault(); oppAction('ask', o, lead, prop); };
+  }
+  async function oppAction(act, o, lead, prop) {
+    const res = $('gcOppResult'); const say = (m, ok) => { if (res) { res.textContent = m; res.style.color = ok === false ? 'var(--danger)' : 'var(--ok)'; } };
+    try {
+      if (act === 'approve') {
+        if (!lead) return say('No pending gate to approve for this one.', false);
+        const r = await postJSON('/api/approve', { id: lead.id, decision: 'approve' });
+        say(r && r.error ? 'Error: ' + r.error : '✓ Approved — the executor is running it.', !(r && r.error)); refreshSoon();
+      } else if (act === 'pass') {
+        await postJSON('/api/gov-board/disposition', { noticeId: o.noticeId, stage: 'passed' }); say('Passed — moved off the board.'); refreshSoon();
+      } else if (act === 'pursue') {
+        const r = await postJSON('/api/command', { text: `pursue the opportunity "${o.title}" — have Patricia draft the proposal` }); say((r && r.reply) || 'Sent to draft.');
+      } else if (act === 'email') {
+        const r = await postJSON('/api/command', { text: `draft the submission / outreach email for "${o.title}"` }); say((r && r.reply) || 'Drafting the email (gated before it sends).');
+      } else if (act === 'value') {
+        const v = window.prompt(`Estimated $ value for "${o.title}":`, o.estimatedValue || ''); if (v == null) return;
+        await postJSON('/api/gov-board/estimate', { noticeId: o.noticeId, value: v }); say('Saved $ value.'); refreshSoon();
+      } else if (act === 'redteam') {
+        focusOpp = o; closeOpp(); const b = $('gcSimBtn'); if (b) b.click();
+      } else if (act === 'docs') {
+        const box = $('gcOppDocs'); box.innerHTML = '<div class="gc-empty">loading RFP documents…</div>';
+        const d = await getJSON('/api/opp-docs?noticeId=' + encodeURIComponent(o.noticeId));
+        const docs = (d && d.documents) || [], contact = (d && d.contact) || [];
+        box.innerHTML = (docs.length ? docs.map((x) => `<div class="gc-opp-doc"><a href="${esc(x.url || x.link || '#')}" target="_blank" rel="noopener">${esc(x.name || x.title || x.url || 'document')}</a></div>`).join('') : `<div class="gc-empty">${esc((d && d.error) || 'No documents listed — open the RFP on SAM.')}</div>`)
+          + (contact.length ? `<div class="gc-opp-doc">CO contact: ${contact.map((c) => esc(c.fullName || c.name || c.email || '')).filter(Boolean).join(', ')}</div>` : '');
+      } else if (act === 'readprop') {
+        const box = $('gcOppProp'); box.innerHTML = '<div class="gc-empty">loading the draft…</div>';
+        const d = await getJSON('/api/proposal?file=' + encodeURIComponent(prop.file));
+        box.innerHTML = `<div class="gc-opp-prop">${esc((d && (d.content || d.text || d.body)) || (d && d.error) || 'Could not read the draft.')}</div>`;
+      } else if (act === 'ask') {
+        const inp = $('gcOppAskIn'), out = $('gcOppAskOut'); const q = inp ? inp.value.trim() : ''; if (!q) return;
+        out.textContent = 'Asking Jarvis…';
+        const r = await postJSON('/api/command', { text: `${q} (about the gov opportunity "${o.title}")` });
+        out.textContent = (r && r.reply) || 'Routed to the team.';
+      }
+    } catch (e) { say('Error: ' + e.message, false); }
+  }
+  function initOpp() {
+    const oc = $('gcOppClose'); if (oc) oc.onclick = closeOpp;
+    const ov = $('gcOpp'); if (ov) ov.addEventListener('click', (e) => { if (e.target === ov) closeOpp(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeOpp(); });
+  }
 
   // ── focus opportunity + win estimate (transparent, deterministic) ──────────────────────────────
   function allCards(board) { return (board.columns || []).flatMap((c) => c.cards || []); }
@@ -92,13 +181,13 @@
       const color = soon ? 'var(--warn)' : good ? 'var(--ok)' : 'var(--accent)';
       const top = list.slice().sort((a, b) => b.fit - a.fit)[0];
       const r = Math.min(5 + list.length * 1.4, 11);
-      return `<g class="pin" data-url="${esc(top.url || '')}" tabindex="0" role="button">`
+      return `<g class="pin" data-notice="${esc(top.noticeId || '')}" tabindex="0" role="button">`
         + `<circle class="pin-glow" cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${(r + 5).toFixed(1)}" style="fill:${color}"/>`
         + `<circle class="pin-dot" cx="${xy[0].toFixed(1)}" cy="${xy[1].toFixed(1)}" r="${r.toFixed(1)}" style="fill:${color}"><title>${esc(s)}: ${list.length} opportunit${list.length > 1 ? 'ies' : 'y'} — top: ${esc(top.title)}</title></circle></g>`;
     }).join('');
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><path class="us-state" d="${G.statesPath}"/>${G.meshPath ? `<path class="us-mesh" d="${G.meshPath}"/>` : ''}${spend}${labels}${pins}</svg>`;
     const stat = $('gcMapStat'); if (stat) { const n = Object.values(byState).reduce((a, l) => a + l.length, 0); const st = Object.keys(byState).length; stat.textContent = n ? `${n} live across ${st} state${st === 1 ? '' : 's'}` : 'no live opportunities to map'; }
-    el.querySelectorAll('.pin').forEach((g) => { const open = () => { const u = g.getAttribute('data-url'); if (u) window.open(u, '_blank', 'noopener'); }; g.onclick = open; g.onkeydown = (e) => { if (e.key === 'Enter') open(); }; });
+    el.querySelectorAll('.pin').forEach((g) => { const open = () => openOppDrawer(g.getAttribute('data-notice')); g.onclick = open; g.onkeydown = (e) => { if (e.key === 'Enter') open(); }; });
   }
 
   // ── ⌘K command palette: search opportunities / agencies / codes / sections, jump to any ───────────
@@ -141,13 +230,16 @@
     const el = $('gcMission'); if (!el) return;
     const cards = allCards(board);
     const items = [];
-    (cockpit && cockpit.approvals || []).forEach((a) => items.push(`Approve: ${a.title || a.action}`));
-    cards.filter((c) => c.next && c.next.who === 'you' && c.inLane && c.stage !== 'closed').forEach((c) => items.push(`${c.next.text} — ${c.title}`));
-    (cockpit && cockpit.tasks && cockpit.tasks.dueToday || []).forEach((t) => items.push(t.text));
-    const seen = new Set(); const uniq = items.filter((t) => { const k = String(t).slice(0, 60); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 7);
+    // match an approval's title to a board card so "Approve: Range Maintenance" can open that opportunity
+    const byTitle = {}; cards.forEach((c) => { byTitle[String(c.title || '').toLowerCase().slice(0, 40)] = c.noticeId; });
+    (cockpit && cockpit.approvals || []).forEach((a) => { const ti = a.title || a.action; items.push({ text: `Approve: ${ti}`, notice: byTitle[String(ti).toLowerCase().slice(0, 40)] || null }); });
+    cards.filter((c) => c.next && c.next.who === 'you' && c.inLane && c.stage !== 'closed').forEach((c) => items.push({ text: `${c.next.text} — ${c.title}`, notice: c.noticeId }));
+    (cockpit && cockpit.tasks && cockpit.tasks.dueToday || []).forEach((t) => items.push({ text: t.text, notice: null }));
+    const seen = new Set(); const uniq = items.filter((it) => { const k = it.text.slice(0, 60); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 7);
     el.innerHTML = uniq.length
-      ? uniq.map((t) => `<div class="gc-mission-item you"><span class="box">▢</span><span>${esc(t)}</span><span class="who you">your move</span></div>`).join('')
-      : `<div class="gc-mission-empty">✓ Nothing needs you right now — Jarvis has the board.</div>`;
+      ? uniq.map((it) => `<div class="gc-mission-item you"${it.notice ? ` data-notice="${esc(it.notice)}" style="cursor:pointer"` : ''}><span class="box">▢</span><span>${esc(it.text)}</span><span class="who you">your move</span></div>`).join('')
+      : '<div class="gc-mission-empty">✓ Nothing needs you right now — Jarvis has the board.</div>';
+    el.querySelectorAll('[data-notice]').forEach((d) => { d.onclick = () => openOppDrawer(d.getAttribute('data-notice')); });
     const active = cards.filter((c) => c.stage !== 'closed');
     const handled = active.filter((c) => c.next && c.next.who === 'jarvis').length;
     const pct = active.length ? Math.round(handled / active.length * 100) : 100;
@@ -406,9 +498,8 @@
           + `${card.agency ? `<span>${esc(card.agency)}</span>` : ''}`
           + `${dd != null && dd >= 0 ? `<span>· ${dd}d</span>` : ''}`
           + `${whoChip(card.next)}</div>`;
-        // EVERY card is clickable → opens the live opportunity on SAM.gov (build the URL from the notice id if needed)
-        const oppUrl = card.url || (card.noticeId ? `https://sam.gov/opp/${card.noticeId}/view` : '');
-        if (oppUrl) { el.style.cursor = 'pointer'; el.title = 'Open this opportunity on SAM.gov'; el.onclick = () => window.open(oppUrl, '_blank', 'noopener'); }
+        // EVERY card is clickable → opens the full detail drawer (RFP, proposal, approve/pass/pursue/email/ask)
+        if (card.noticeId) { el.style.cursor = 'pointer'; el.title = 'Open details'; el.onclick = () => openOppDrawer(card.noticeId); }
         c.appendChild(el);
       });
       if (!(col.cards || []).length) c.innerHTML += `<div class="gc-empty">—</div>`;
@@ -420,7 +511,7 @@
     focusOpp = focus;
     const _vR = $('slValR'); if (_vR && focus && focus.value > 0) { _vR.value = Math.max(25000, Math.min(1500000, focus.value)); _vR.dispatchEvent(new Event('input')); }
     if (focus) {
-      $('gcGenomeTitle').textContent = focus.title;
+      const gt = $('gcGenomeTitle'); gt.textContent = focus.title; gt.style.cursor = 'pointer'; gt.title = 'Open full details'; gt.onclick = () => openOppDrawer(focus.noticeId);
       const we = winEstimate(focus);
       ring($('gcWinRing'), we.pct); countUp($('gcWinPct'), we.pct, '%');
       $('gcWinWhy').innerHTML = we.why.map((w) => `<li>${w}</li>`).join('');
@@ -456,6 +547,7 @@
   initPalette();
   initSim();
   initSimulator();
+  initOpp();
   load();
   setInterval(load, 60000); // calm refresh
 })();

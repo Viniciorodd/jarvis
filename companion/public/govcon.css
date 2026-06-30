@@ -249,3 +249,19 @@ body {
 .gc-simu-out > div { background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px; padding: 13px; text-align: center; }
 .gc-simu-out .lbl { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
 .gc-simu-out b { font-size: 22px; font-weight: 800; }
+
+/* ── AI coach (nudges) ───────────────────────────────────── */
+.gc-coach-list { display: flex; flex-direction: column; gap: 8px; }
+.gc-coach-item { display: flex; align-items: flex-start; gap: 9px; font-size: 13.5px; padding: 9px 11px; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--line); line-height: 1.4; }
+.gc-coach-item .ci-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.gc-coach-item.warn .ci-dot { background: var(--warn); } .gc-coach-item.info .ci-dot { background: var(--accent); } .gc-coach-item.good .ci-dot { background: var(--ok); }
+.gc-coach-item[data-anchor] { cursor: pointer; } .gc-coach-item[data-anchor]:hover { border-color: var(--accent); }
+
+/* ── decision journal (timeline) ─────────────────────────── */
+.gc-journal-list { display: flex; flex-direction: column; max-height: 360px; overflow-y: auto; }
+.gc-journal-item { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.gc-journal-item:last-child { border-bottom: 0; }
+.gc-journal-item .ji-when { color: var(--faint); font-size: 11px; white-space: nowrap; flex-shrink: 0; width: 64px; }
+.gc-journal-item .ji-kind { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 5px; background: var(--panel-2); color: var(--muted); flex-shrink: 0; height: fit-content; }
+.gc-journal-item .ji-text { color: var(--ink); line-height: 1.4; }
+.gc-journal-empty { color: var(--muted); font-size: 13px; padding: 8px 0; }

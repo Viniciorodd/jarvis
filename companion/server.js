@@ -2492,6 +2492,7 @@ const server = http.createServer(async (req, res) => {
       const st = loadGovState(); st.dispositions = st.dispositions || {};
       if (stage === 'reset') delete st.dispositions[noticeId]; else st.dispositions[noticeId] = stage;
       saveGovState(st);
+      if (stage !== 'reset') fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'meta', actor: 'operator', pod: 'gov', action: 'disposition', rationale: `marked ${stage}`, payload: { noticeId } }) }).catch(() => {});
       return send(res, 200, JSON.stringify({ ok: true }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
@@ -2504,8 +2505,21 @@ const server = http.createServer(async (req, res) => {
       const st = loadGovState(); st.estimates = st.estimates || {};
       if (v > 0) st.estimates[noticeId] = v; else delete st.estimates[noticeId];
       saveGovState(st);
+      fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'meta', actor: 'operator', pod: 'gov', action: 'estimate', rationale: `set $${v.toLocaleString()} value`, payload: { noticeId } }) }).catch(() => {});
       return send(res, 200, JSON.stringify({ ok: true, value: v }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // Decision journal — the gov pod's timeline from the control-plane event store (scored/drafted/gated/decided/valued).
+  if (req.method === 'GET' && url.pathname === '/api/gov/journal') {
+    try {
+      const ev = await fetch(CP_URL + '/events?pod=gov', { signal: AbortSignal.timeout(4500) }).then((r) => r.json()).catch(() => []);
+      const KIND = { 'bid.score': 'scored', 'proposal.draft': 'drafted', 'approval.request': 'gate', 'disposition': 'decided', 'estimate': 'valued', 'send': 'sent' };
+      const items = (Array.isArray(ev) ? ev : [])
+        .filter((e) => e.action && e.action !== 'rest' && e.action !== 'trace')
+        .map((e) => ({ ts: e.ts, kind: KIND[e.action] || String(e.action).split('.').pop().slice(0, 9), text: (e.payload && e.payload.title) || (e.rationale || '').slice(0, 90) || e.action }))
+        .sort((a, b) => new Date(b.ts) - new Date(a.ts)).slice(0, 40);
+      return send(res, 200, JSON.stringify({ items }));
+    } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
   let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname.replace(/^\/+/, '');

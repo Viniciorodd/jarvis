@@ -222,6 +222,36 @@
     calc();
   }
 
+  // ── AI Coach: nudges derived from the live board (real signals, no fabrication) ───────────────────
+  function renderCoach(board, cockpit) {
+    const el = $('gcCoach'); if (!el) return;
+    const cards = allCards(board); const money = board.money || {}; const counts = board.counts || {};
+    const tips = [];
+    const unrev = cards.filter((c) => c.stage === 'found' && c.inLane).length;
+    if (unrev) tips.push({ t: `${unrev} in-lane opportunit${unrev > 1 ? 'ies' : 'y'} not reviewed yet`, s: 'warn', a: 'gcBoard' });
+    const soon = cards.filter((c) => { const d = daysTo(c.deadline); return d != null && d >= 0 && d <= 7 && c.stage !== 'closed'; }).length;
+    if (soon) tips.push({ t: `${soon} bid${soon > 1 ? 's' : ''} due within 7 days — prioritize`, s: 'warn', a: 'gcMap' });
+    const gates = (cockpit && cockpit.approvals || []).length;
+    if (gates) tips.push({ t: `${gates} item${gates > 1 ? 's' : ''} awaiting your sign-off`, s: 'warn', a: 'gcMission' });
+    const outLane = cards.filter((c) => !c.inLane && c.stage !== 'closed').length;
+    if (outLane) tips.push({ t: `${outLane} tracked ${outLane > 1 ? 'bids are' : 'bid is'} out of your lane — subcontract only`, s: 'info' });
+    if ((money.withValue || 0) === 0) tips.push({ t: 'No $ estimates set — Pipeline $ is blank. Value a bid →', s: 'info', a: 'gcGenomeTitle' });
+    if (counts.responding) tips.push({ t: `${counts.responding} in drafting — submit early; quality scores rise`, s: 'info', a: 'gcBoard' });
+    if (!tips.length) tips.push({ t: "You're on top of it — nothing flagged right now.", s: 'good' });
+    el.innerHTML = tips.slice(0, 5).map((x) => `<div class="gc-coach-item ${x.s}"${x.a ? ` data-anchor="${x.a}"` : ''}><span class="ci-dot"></span><span>${esc(x.t)}</span></div>`).join('');
+    el.querySelectorAll('[data-anchor]').forEach((d) => { d.onclick = () => { const t = document.getElementById(d.dataset.anchor); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'center' }); }; });
+  }
+
+  // ── Decision journal: the gov pod's timeline from the control-plane event store ───────────────────
+  async function loadJournal() {
+    const el = $('gcJournal'); if (!el) return;
+    const r = await getJSON('/api/gov/journal');
+    const items = (r && r.items) || [];
+    el.innerHTML = items.length
+      ? items.map((i) => { const d = new Date(i.ts); const when = isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); return `<div class="gc-journal-item"><span class="ji-when">${when}</span><span class="ji-kind">${esc(i.kind)}</span><span class="ji-text">${esc(i.text)}</span></div>`; }).join('')
+      : '<div class="gc-journal-empty">No gov activity logged yet — it fills as you scout, draft, value, and decide.</div>';
+  }
+
   function render(board, cockpit, finance) {
     $('gcDate').textContent = fmtDate();
     $('gcGreeting').textContent = greeting();
@@ -236,6 +266,7 @@
 
     lastBoard = board;
     renderMission(board, cockpit);
+    renderCoach(board, cockpit);
     renderAgents(board, counts, total);
     renderMap(board);
 
@@ -359,6 +390,7 @@
     if (!board) { $('gcBriefSub').textContent = 'Could not reach the gov board API.'; $('gcFootStatus').textContent = 'Offline'; return; }
     try { render(board, cockpit || {}, finance || {}); }
     catch (e) { $('gcFootStatus').textContent = 'Render error: ' + e.message; }
+    loadJournal();
   }
 
   initTheme();

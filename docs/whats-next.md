@@ -61,7 +61,21 @@ Directly fixes the pain "when I hit the Claude limit I'm not productive" + the a
   gradient hero if CDN/WebGL fail. All capability data preserved (UEI/CAGE/NAICS/PSC/contact). Verified
   loads with no console errors + globe initializes. NOT deployed — operator reviews, then deploy.
 
-### ✅ Everything above committed. Session complete — the free-compute build + 4 surfaces + 3D site are in.
+- ✅ **GovCon OS — built out to the ChatGPT vision** (`/govcon`, `companion/public/govcon.*`):
+  **full-screen 3-column** layout (left: briefing/coach/mission/team/bid-simulator · mid: pipeline+board ·
+  right: map/genome/journal) + full-width **relationship graph**. Features: CEO briefing + health ring,
+  Mission Today, agent team, KPI strip, pipeline funnel, whose-move board, **living US map**, Opportunity
+  Genome + win-estimate, **Simulation Mode** (red-team, `/api/gov/simulate`), **$ figures** (operator
+  estimates → Pipeline $/Est. revenue, `/api/gov-board/estimate`), **bid simulator** (margin sliders),
+  **AI Coach** (board-derived nudges), **Decision journal** (`/api/gov/journal` from the event store),
+  **relationship graph** (RODGATE→agencies→opps), and **⌘K command palette**. All read live data, no
+  fabrication. Still data-blocked: **agency-spending heatmap** (needs a USASpending/FPDS feed).
+- ✅ **App-wide light/"white" theme** (`[data-theme=light]` in style.css + Settings swatch + applyTheme
+  allow-list); GovCon shares the same `jarvis-theme` (its ☾/☀ toggle drives the whole app).
+
+### ✅ Everything above committed + pushed (main + feat). The free-compute build, 5 phases, the 3D site,
+### and the full GovCon OS (3-column, themed) are all live. Next ideas: agency-spending heatmap (needs a
+### USASpending data feed); win-rate trend once enough won/lost history accrues.
 - ⚠️ **Security to-dos (operator):** rotate the OpenRouter key pasted in chat; vault the plaintext Telegram
   bot token in `openclaw.json` (`openclaw secrets configure`).
 

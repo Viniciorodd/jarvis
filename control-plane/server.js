@@ -144,6 +144,22 @@ const server = http.createServer(async (req, res) => {
       const vault = await import('./vault.mjs');
       return send(res, 200, vault.auditAcl());
     }
+    // Autonomy ladder (doctrine §8): each workflow's level + metrics + promotion recommendation.
+    if (req.method === 'GET' && p === '/autonomy') {
+      const auto = await import('./autonomy.mjs');
+      let evalsByAgent = {};
+      try { const r = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'evals', '.results.json'), 'utf8')); for (const x of r.agents || []) evalsByAgent[x.agent] = { pass: x.pass, total: x.total }; } catch { /* */ }
+      return send(res, 200, auto.autonomyReport(store.readEvents(), evalsByAgent));
+    }
+    // Operator sets a workflow's autonomy level (the deliberate act of granting/revoking autonomy).
+    if (req.method === 'POST' && p === '/autonomy/level') {
+      const b = await readBody(req);
+      const auto = await import('./autonomy.mjs');
+      const lvl = auto.setLevel(b.id, b.level);
+      if (lvl == null) return send(res, 400, { error: 'unknown workflow id' });
+      store.appendEvent({ kind: 'meta', actor: 'operator', pod: 'system', action: 'autonomy.set', rationale: `${b.id} → L${lvl}`, payload: { id: b.id, level: lvl } });
+      return send(res, 200, { ok: true, id: b.id, level: lvl });
+    }
 
     if (req.method === 'GET' && p === '/roster') {
       const org = await import('../pods/org.mjs');

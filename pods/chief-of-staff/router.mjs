@@ -5,6 +5,7 @@
 // Dependency-free: raw fetch to Anthropic, with a deterministic classifier fallback (also eval-pinned).
 
 import { ROSTER, POD_IDS, matchPerson, peopleInPod, findPerson, modelFor } from '../org.mjs';
+import { workflowFor, findWorkflow, getLevel, HARD_GATE_KINDS } from '../../control-plane/autonomy.mjs';
 
 const ELLE = findPerson('MAILROOM-01'); // the default routee (Chief of Staff)
 
@@ -148,6 +149,26 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
   const FIVERR_POLL_RE = /\b(check (?:fiverr )?orders?|new fiverr order came in|any new (?:fiverr )?(?:gig|order)s?|fiverr inbox|prepare it for delivery|scan .*fiverr)\b/i;
   if (c.pod === 'fiverr' && FIVERR_POLL_RE.test(String(text))) { c.reversible = true; c.action_kind = 'scan'; c.intent = 'fiverr_poll'; }
   const gate = decideGate(c);
+  // Autonomy ladder (doctrine §8): the operator's per-workflow trust level can RELAX a gate — but only
+  // for a workflow they deliberately promoted to Trusted (L3+) AND only when it's irreversible-but-
+  // recoverable (never a hard-gate kind: send/submit/spend/... always gate). It can also TIGHTEN back to a
+  // gate if they dialed the workflow to Manual (L0). The level is NEVER auto-raised — code never grants
+  // itself new autonomy (CLAUDE.md). So this can only make things safer or honor an explicit operator choice.
+  try {
+    const wfId = workflowFor(c);
+    const w = wfId ? findWorkflow(wfId) : null;
+    if (w) {
+      const lvl = getLevel(wfId);
+      gate.workflow = wfId; gate.level = lvl;
+      if (gate.gate) {
+        if (w.irreversible && !HARD_GATE_KINDS.has(String(w.kind).toLowerCase()) && lvl >= 3) {
+          gate.gate = false; gate.reason = `Trusted (L${lvl}) — auto-running this recoverable step; you're notified (doctrine §8).`;
+        }
+      } else if (lvl <= 0) {
+        gate.gate = true; gate.reason = 'Manual (L0) — you chose to approve this workflow yourself.';
+      }
+    }
+  } catch { /* ladder optional — fall back to decideGate's decision */ }
   const actor = c.person ? c.person.codename : 'chief-of-staff';
 
   store.appendEvent({

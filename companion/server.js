@@ -103,6 +103,16 @@ try {
   if (!ELEVEN_KEY) { const m = e.match(/^ELEVENLABS_API_KEY=(.+)$/m); if (m) ELEVEN_KEY = m[1].trim(); }
   const v = e.match(/^ELEVENLABS_VOICE_ID=(.+)$/m); if (v) ELEVEN_VOICE = v[1].trim();
 } catch { /* none */ }
+// Free local voice (Kokoro): /api/tts prefers this — no key, no monthly fee. provider: auto|local|eleven.
+let TTS_PROVIDER = (process.env.TTS_PROVIDER || '').toLowerCase();
+let KOKORO_TTS_URL = process.env.KOKORO_TTS_URL || '';
+try {
+  const e = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8');
+  if (!TTS_PROVIDER) { const m = e.match(/^TTS_PROVIDER=(.+)$/m); if (m) TTS_PROVIDER = m[1].trim().toLowerCase(); }
+  if (!KOKORO_TTS_URL) { const m = e.match(/^KOKORO_TTS_URL=(.+)$/m); if (m) KOKORO_TTS_URL = m[1].trim(); }
+} catch { /* none */ }
+if (!TTS_PROVIDER) TTS_PROVIDER = 'auto';
+if (!KOKORO_TTS_URL) KOKORO_TTS_URL = 'http://127.0.0.1:8880/tts';
 
 // Optional Deepgram speech-to-text — better/cross-browser voice-in; else the browser's own STT.
 let DEEPGRAM_KEY = process.env.DEEPGRAM_API_KEY || '';
@@ -1264,7 +1274,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.method === 'GET' && url.pathname === '/api/info') {
-    return send(res, 200, JSON.stringify({ root: PRIMARY, roots: ROOTS, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY, hasNotion: !!NOTION_KEY, hasStt: !!DEEPGRAM_KEY, hasVosk: fs.existsSync(VOSK_MODEL) }));
+    return send(res, 200, JSON.stringify({ root: PRIMARY, roots: ROOTS, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY || (TTS_PROVIDER !== 'eleven'), hasNotion: !!NOTION_KEY, hasStt: !!DEEPGRAM_KEY, hasVosk: fs.existsSync(VOSK_MODEL) }));
   }
   if (req.method === 'POST' && url.pathname === '/api/stt') {
     if (!DEEPGRAM_KEY) return send(res, 501, JSON.stringify({ error: 'no Deepgram key' }));
@@ -1285,20 +1295,36 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   if (req.method === 'POST' && url.pathname === '/api/tts') {
-    if (!ELEVEN_KEY) return send(res, 501, JSON.stringify({ error: 'no ElevenLabs key' }));
-    try {
-      const { text } = await readBody(req);
-      if (!text) return send(res, 400, JSON.stringify({ error: 'text required' }));
-      const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE}`, {
-        method: 'POST',
-        headers: { 'xi-api-key': ELEVEN_KEY, 'content-type': 'application/json', accept: 'audio/mpeg' },
-        body: JSON.stringify({ text: String(text).slice(0, 1500), model_id: 'eleven_turbo_v2_5' }),
-      });
-      if (!r.ok) return send(res, 502, JSON.stringify({ error: 'ElevenLabs ' + r.status }));
-      const buf = Buffer.from(await r.arrayBuffer());
-      res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' });
-      return res.end(buf);
-    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+    const { text } = await readBody(req);
+    if (!text) return send(res, 400, JSON.stringify({ error: 'text required' }));
+    const provider = TTS_PROVIDER; // auto | local | eleven
+    // 1) FREE local Kokoro voice first (no key, offline, no monthly fee).
+    if (provider !== 'eleven') {
+      try {
+        const r = await fetch(KOKORO_TTS_URL, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text: String(text).slice(0, 1200) }), signal: AbortSignal.timeout(20000),
+        });
+        if (r.ok && (r.headers.get('content-type') || '').includes('audio')) {
+          const buf = Buffer.from(await r.arrayBuffer());
+          res.writeHead(200, { 'content-type': r.headers.get('content-type'), 'cache-control': 'no-store' });
+          return res.end(buf);
+        }
+      } catch { /* local TTS not running → fall through */ }
+    }
+    // 2) ElevenLabs (only if configured + not forced local) — optional premium.
+    if (provider !== 'local' && ELEVEN_KEY) {
+      try {
+        const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE}`, {
+          method: 'POST',
+          headers: { 'xi-api-key': ELEVEN_KEY, 'content-type': 'application/json', accept: 'audio/mpeg' },
+          body: JSON.stringify({ text: String(text).slice(0, 1500), model_id: 'eleven_turbo_v2_5' }),
+        });
+        if (r.ok) { const buf = Buffer.from(await r.arrayBuffer()); res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' }); return res.end(buf); }
+      } catch { /* fall through */ }
+    }
+    // 3) nothing server-side → client falls back to the (improved) browser voice.
+    return send(res, 501, JSON.stringify({ error: 'no local Kokoro server + no ElevenLabs — using browser voice' }));
   }
   if (req.method === 'GET' && url.pathname === '/api/dashboard') {
     try {

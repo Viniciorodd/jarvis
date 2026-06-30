@@ -67,3 +67,7 @@ scripts/.absorb-done.json
 
 # USASpending agency-spending cache (regenerated; refreshed on a TTL)
 pods/gov/.spending-cache.json
+
+# Kokoro local-voice model files (~340MB binaries — download once, not committed)
+kokoro-v1.0.onnx
+voices-v1.0.bin

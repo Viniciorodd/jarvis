@@ -37,8 +37,8 @@
   <!-- Main scrollable views -->
   <div class="j-main">
 
-    <!-- ── HOME VIEW (default) ── -->
-    <div class="j-view active" id="jHomeView">
+    <!-- ── HOME VIEW (cockpit — reachable from the Home tab) ── -->
+    <div class="j-view" id="jHomeView">
 
       <!-- Rolling approvals ticker (like a stock crawl) — filled by today.js -->
       <div class="j-ticker" id="jTicker" hidden title="What's waiting on you — tap to review">
@@ -153,8 +153,8 @@
       </div>
     </div>
 
-    <!-- ── TALK VIEW (chat + orb) ── -->
-    <div class="j-view" id="jTalkView">
+    <!-- ── TALK VIEW (voice-first home: audio-reactive orb + today's to-dos + recent activity) ── -->
+    <div class="j-view active" id="jTalkView">
       <div class="j-stage">
         <canvas id="orb"></canvas>
         <div class="orb-center" id="orbCenter">
@@ -168,6 +168,11 @@
           </div>
           <div class="visual-body" id="visualBody"></div>
         </div>
+      </div>
+      <!-- Glance: what's mine to do today + recent activity (filled by talkhome.js) -->
+      <div class="j-talk-glance" id="jTalkGlance">
+        <div class="tg-col" id="jtTasks"></div>
+        <div class="tg-col" id="jtFeed"></div>
       </div>
       <div class="j-transcript" id="transcript"></div>
     </div>
@@ -544,6 +549,7 @@
 <script src="home.js"></script>
 <script src="nav.js"></script>
 <script src="today.js"></script>
+<script src="talkhome.js"></script>
 <script src="govboard.js"></script>
 <script src="businesses.js"></script>
 <script src="calendar.js"></script>

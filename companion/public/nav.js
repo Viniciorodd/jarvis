@@ -126,7 +126,8 @@ if(mic){
 /* ── Escape always backs you out of any overlay (consistent exit everywhere) ── */
 document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeAllOverlays(); });
 
-/* ── Start on home ── */
-showView('home');
+/* ── Start on Talk (voice-first home): orb + today's to-dos + recent activity ── */
+showView('talk');
+setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 60); /* let the orb canvas measure */
 
 })();

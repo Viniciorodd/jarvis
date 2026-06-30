@@ -180,6 +180,18 @@ body{ background:var(--ink); color:var(--cream); font-family:'Space Grotesk', ui
 .j-transcript::-webkit-scrollbar{ width:3px; }
 .j-transcript::-webkit-scrollbar-thumb{ background:var(--dim); border-radius:3px; }
 
+/* voice-first glance under the orb: today's to-dos + recent activity */
+.j-talk-glance{ flex:0 0 auto; display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:14px 18px; border-top:1px solid rgba(var(--teal-rgb),.1); }
+@media(max-width:560px){ .j-talk-glance{ grid-template-columns:1fr; gap:10px; } }
+.tg-col{ min-width:0; }
+.tg-h{ font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
+.tg-onething{ background:rgba(var(--teal-rgb),.06); border:1px solid rgba(var(--teal-rgb),.18); border-radius:10px; padding:9px 12px; margin-bottom:12px; font-size:13px; color:var(--cream); }
+.tg-ot-l{ display:block; font-size:9px; letter-spacing:.12em; color:var(--teal); margin-bottom:3px; }
+.tg-task, .tg-feed{ font-size:13px; color:var(--cream); padding:5px 0; border-bottom:1px solid rgba(var(--teal-rgb),.07); display:flex; gap:8px; align-items:baseline; }
+.tg-task:last-child, .tg-feed:last-child{ border-bottom:0; }
+.tg-feed-ic{ flex:none; }
+.tg-empty{ font-size:12px; color:var(--dim); padding:5px 0; }
+
 /* ══════════════════════════════════════════ MORE VIEW ══ */
 .j-more-list{ padding:6px 0; }
 .j-more-item{

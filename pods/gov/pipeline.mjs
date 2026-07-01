@@ -53,6 +53,38 @@ export function inferTrade(title) {
   return { trade: '', naics: '' };
 }
 
+// ── PURE: days until a deadline (null if unknown/unparseable) ──────────────────────────────────────
+export function daysUntil(deadline, now = Date.now()) {
+  if (!deadline) return null;
+  const d = new Date(deadline); if (isNaN(d)) return null;
+  return Math.ceil((d - now) / 864e5);
+}
+
+// ── PURE: transparent win-chance % (a rough estimate, NOT a promise). Shared with the GovCon estimate. ──
+// Driven by fit (1–5), whether we can even prime it (lane), and how far along it is. Eval-pinned.
+export function winChance(card = {}) {
+  const fit = Number(card.fit) || 0;
+  let pct = fit * 14 + (card.inLane === false ? -30 : 14);
+  if (card.stage === 'responding' || card.stage === 'submitted') pct += 10;
+  else if (card.stage === 'reviewing') pct += 5;
+  return Math.max(4, Math.min(92, Math.round(pct)));
+}
+
+// ── PURE: a concrete pursuit strategy from the known facts — always available (no LLM, doctrine #1). ──
+// This is the "how we go get it" the operator asked for: specific, not generic, driven by real fields.
+export function pursuitStrategy(card = {}) {
+  const sa = card.setAside || '';
+  if (card.inLane === false) return `Out of your lane (${sa}). Only pursue as a SUBCONTRACTOR to a qualified prime — do not bid as prime.`;
+  const parts = [];
+  const canPrime = /small business|sdb|disadvantaged|unrestricted/i.test(sa) || !sa;
+  parts.push(`Lead with Rodgate's SDB / minority / Hispanic-owned status${canPrime ? ` — this ${sa || 'small-business'} set-aside is one you can prime` : ''}.`);
+  if (card.subNeeded !== false) parts.push(`Line up a local ${(card.trade || 'service').toLowerCase()} crew for the labor (Jarvis can source a sub) and respect the 50% self-performance rule.`);
+  const dd = daysUntil(card.deadline);
+  if (dd != null) parts.push(dd < 0 ? `Deadline has passed — skip unless it reopens.` : dd <= 7 ? `Deadline is in ${dd} day${dd === 1 ? '' : 's'} — pursue THIS WEEK.` : `Deadline in ${dd} days — draft it in the next few days.`);
+  parts.push(`As a newer prime, emphasize PA/NJ/FL registrations + the sub's past performance.`);
+  return parts.join(' ');
+}
+
 // ── PURE: the five columns, in order ──────────────────────────────────────────────────────────────
 export const COLUMNS = [
   { key: 'found',      label: 'Found',      hint: 'Scout flagged it · scored' },

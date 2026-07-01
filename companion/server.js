@@ -2558,6 +2558,11 @@ const server = http.createServer(async (req, res) => {
     try { return send(res, 200, JSON.stringify(await govBoardData())); }
     catch (e) { return send(res, 200, JSON.stringify({ error: e.message, columns: [], counts: {}, total: 0 })); }
   }
+  // Curated top-N opportunity BRIEFS (a few quality ones w/ what-they-want + fit + win-chance + strategy).
+  if (req.method === 'GET' && url.pathname === '/api/gov/briefs') {
+    try { const B = await import('../pods/gov/briefs.mjs'); return send(res, 200, JSON.stringify(await B.buildBriefs({ topN: Number(url.searchParams.get('n')) || 3, cpUrl: CP_URL }))); }
+    catch (e) { return send(res, 200, JSON.stringify({ briefs: [], text: '', error: e.message })); }
+  }
   if (req.method === 'POST' && url.pathname === '/api/gov-board/disposition') {
     try {
       const { noticeId, stage } = await readBody(req);

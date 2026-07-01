@@ -12,6 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, DRAFTS, env, secret, profile, emit, mirror, hqApproval, gateApproval, claude } from './lib.mjs';
+import { notifyTelegram } from '../lib.mjs';
 import { maybeConnect } from './connector.mjs';
 import { procurementPath } from './replies.mjs';
 import { checkCompliance } from './compliance.mjs';
@@ -102,7 +103,7 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
   for (const op of opps) {
     const sc = await score(op, prof); spend += sc._cost || 0;
     scored.push({ op, sc });
-    await emit({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'bid.score', cost_usd: sc._cost || 0, rationale: `${op.title} — ${sc.match_score}/100 (${sc.recommendation})`, payload: { noticeId: op.noticeId, title: op.title, score: sc.match_score, recommendation: sc.recommendation, set_aside_fit: sc.set_aside_fit, setAside: op.setAside, subcontractor_needed: sc.subcontractor_needed, place: op.place, placeState: op.placeState, deadline: op.deadline, url: op.url, agency: op.agency } });
+    await emit({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'bid.score', cost_usd: sc._cost || 0, rationale: `${op.title} — ${sc.match_score}/100 (${sc.recommendation})`, payload: { noticeId: op.noticeId, title: op.title, score: sc.match_score, recommendation: sc.recommendation, set_aside_fit: sc.set_aside_fit, setAside: op.setAside, subcontractor_needed: sc.subcontractor_needed, place: op.place, placeState: op.placeState, deadline: op.deadline, url: op.url, agency: op.agency, description: (op.description || '').slice(0, 400), rationale_fit: sc.rationale } });
   }
   scored.sort((a, b) => (b.sc.match_score || 0) - (a.sc.match_score || 0));
 
@@ -137,6 +138,20 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
 
   await mirror('GOV-ANALYST', drafted.length ? 'need' : 'idle', drafted.length ? `${drafted.length} proposal(s) ready for your review` : 'No bid-worthy opportunities this scan');
   if (spend > 0) await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'spend.log', cost_usd: 0, status: 'done', rationale: `gov scan AI spend ~$${spend.toFixed(4)}`, payload: { ai_spend_usd: Number(spend.toFixed(4)) } });
+
+  // Send the operator a FEW quality opportunities (not a flood) — the curated top-3 digest to his phone,
+  // with what-they-want + fit + win-chance + a pursuit strategy. This is what he asked for. Best-effort.
+  const bidWorthy = scored.filter((s) => s.sc.recommendation === 'bid').length;
+  if (bidWorthy > 0) {
+    try {
+      const B = await import('./briefs.mjs');
+      const { text: digest, briefs } = await B.buildBriefs({ topN: 3 });
+      if (briefs.length) {
+        notifyTelegram(digest);
+        await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'briefs.push', status: 'done', rationale: `Sent the top ${briefs.length} opportunities to your phone`, payload: { count: briefs.length, source } });
+      }
+    } catch { /* digest is best-effort — the board still has everything */ }
+  }
 
   const top = scored[0];
   return {

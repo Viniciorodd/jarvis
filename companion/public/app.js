@@ -87,7 +87,7 @@ function meterAudioEl(el) {                 // HER ElevenLabs voice → reactive
   } catch { /* best-effort; audio still plays */ }
 }
 let micMeterStop = null;
-function meterMicStream(stream) {            // YOUR voice → reactive orb + barge-in
+function meterMicStream(stream, onLevel) {   // YOUR voice → reactive orb + barge-in (+ optional level cb for VAD)
   const ctx = ac(); if (!ctx) return null;
   try {
     const src = ctx.createMediaStreamSource(stream);
@@ -102,6 +102,7 @@ function meterMicStream(stream) {            // YOUR voice → reactive orb + ba
       const lvl = Math.min(1, (s / data.length) / 85);
       if (window.Orb) Orb.setLevel(lvl);
       if (lvl > 0.17 && curAudio && !curAudio.paused && !curAudio.ended) stopSpeaking(); // talk over her
+      if (onLevel) { try { onLevel(lvl); } catch {} }
       requestAnimationFrame(tick);
     })();
     return () => { stopped = true; if (window.Orb) { Orb.setLevel(0); Orb.setVoice(null); } };
@@ -389,19 +390,42 @@ $('voiceBtn').addEventListener('click', () => {
 });
 $('voiceBtn').classList.add('on');
 
-// ── Deepgram push-to-talk ────────────────────────────────────────────────────
-let mediaRec = null, recChunks = [], recording = false;
+// ── Deepgram push-to-talk with hands-free AUTO-STOP ──────────────────────────
+// Tap the mic once and just talk — when you PAUSE (go quiet for ~1.4s) Jarvis knows you're done and
+// sends it automatically. No second click needed. (You can still tap the mic again to send early, and a
+// safety cap stops a runaway recording.) This is the fix for "I have to click again for her to know I'm
+// done." VAD = simple silence detection off the same mic-level meter that drives the orb.
+let mediaRec = null, recChunks = [], recording = false, recTimer = null;
+const VAD_SPEAK = 0.08;     // mic level above this = you're talking
+const VAD_SILENCE_MS = 1400; // this much quiet AFTER you've spoken = you're done → auto-send
+const VAD_MIN_MS = 500;      // ignore the first moment so it can't stop before you start
+const VAD_MAX_MS = 30000;    // hard safety cap on one utterance
 async function toggleRecord() {
-  if (recording && mediaRec) { mediaRec.stop(); return; }
+  if (recording && mediaRec) { try { mediaRec.stop(); } catch {} return; }  // tap-again = send now
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
   catch { addMsg('err', 'Mic blocked — allow microphone access.'); return; }
   mediaRec = new MediaRecorder(stream, MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : {});
-  recChunks = []; recording = true; setState('listening', 'listening · tap mic to send');
-  micMeterStop = meterMicStream(stream);    // orb reacts to your voice + lets you talk over her
+  recChunks = []; recording = true; setState('listening', 'listening · just pause when you’re done');
+  const startedAt = Date.now(); let hasSpoken = false, silenceSince = 0;
+  const finish = () => { try { if (mediaRec && mediaRec.state === 'recording') mediaRec.stop(); } catch {} };
+  // VAD off the orb meter's level callback (no second AudioContext); auto-send on a natural pause.
+  micMeterStop = meterMicStream(stream, (lvl) => {
+    if (!recording) return;
+    const now = Date.now();
+    if (now - startedAt > VAD_MAX_MS) return finish();
+    if (lvl > VAD_SPEAK) { hasSpoken = true; silenceSince = 0; }
+    else if (hasSpoken && now - startedAt > VAD_MIN_MS) {
+      if (!silenceSince) silenceSince = now;
+      else if (now - silenceSince > VAD_SILENCE_MS) finish();
+    }
+  });
+  // Safety cap even if the level meter isn't available (e.g. no AudioContext): stop after VAD_MAX_MS.
+  recTimer = setTimeout(finish, VAD_MAX_MS + 500);
   mediaRec.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
   mediaRec.onstop = async () => {
-    recording = false; if (micMeterStop) { micMeterStop(); micMeterStop = null; } stream.getTracks().forEach((t) => t.stop());
+    recording = false; if (recTimer) { clearTimeout(recTimer); recTimer = null; }
+    if (micMeterStop) { micMeterStop(); micMeterStop = null; } stream.getTracks().forEach((t) => t.stop());
     setState('thinking', 'transcribing…');
     try {
       const blob = new Blob(recChunks, { type: 'audio/webm' });

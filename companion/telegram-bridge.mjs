@@ -41,8 +41,20 @@ async function askJarvis(text) {
 
 async function handle(chat, text) {
   text = (text || '').trim();
-  if (/^\/start/.test(text)) return send(chat, `Jarvis here. Text me anything — ask, draft, decide. Commands: /brief · /capture <thought> · /money.\n\nYour chat id is ${chat} — put it in .env as TELEGRAM_CHAT_ID to lock the bot to this phone.`);
+  if (/^\/start/.test(text)) return send(chat, `Jarvis here. Text me anything — ask, draft, decide. Commands: /opps (top gov opportunities) · /brief · /capture <thought> · /money.\n\nYour chat id is ${chat} — put it in .env as TELEGRAM_CHAT_ID to lock the bot to this phone.`);
   if (/^\/brief/.test(text)) { const b = await get('/api/brief'); return send(chat, b.text || b.error || 'no brief yet'); }
+  // The curated few — "send me the opportunities with detail." /opps or "opportunities"/"opps".
+  if (/^\/opps/.test(text) || /^(opps|opportunities|what.?s good|any (good )?opportunities)\b/i.test(text)) {
+    const b = await get('/api/gov/briefs?n=3'); return send(chat, (b && b.text) || b.error || 'No opportunities to show yet.');
+  }
+  // "pursue 1" (or 2/3) from the last /opps list → draft that proposal.
+  const pur = text.match(/^pursue\s+([1-3])\b/i);
+  if (pur) {
+    const b = await get('/api/gov/briefs?n=3'); const pick = (b && b.briefs || [])[Number(pur[1]) - 1];
+    if (!pick) return send(chat, 'I don\'t have that one on the current list — send /opps first.');
+    await fetch(COMPANION + '/api/pursue', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ noticeId: pick.noticeId, op: pick }) }).catch(() => {});
+    return send(chat, `On it — drafting the proposal for "${pick.title}". Open the Submit Wizard in the app to review, sign & submit.`);
+  }
   if (/^\/money/.test(text)) { const b = await get('/api/business?id=finance'); const m = b.money || {}; return send(chat, `Income ${m.month || 'this month'}: $${(m.mtd || 0).toLocaleString()} / $${(m.goal || 10000).toLocaleString()} (${m.pct || 0}%) · $${(m.remaining || 0).toLocaleString()} to go.`); }
   const cap = text.match(/^\/capture\s+([\s\S]+)/i);
   if (cap) { await fetch(COMPANION + '/api/cockpit/capture', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: cap[1] }) }).catch(() => {}); return send(chat, '✓ captured to your vault'); }

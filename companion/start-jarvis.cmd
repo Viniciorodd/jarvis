@@ -11,5 +11,9 @@ start "JARVIS Scheduler" /min cmd /c "node ..\control-plane\scheduler.mjs"
 REM Free local voice (Kokoro) — Jarvis's voice with no API key / no monthly fee. Harmless if not installed.
 start "JARVIS Voice" /min cmd /c "python ..\scripts\tts-kokoro.py"
 start "JARVIS Slack Bridge" cmd /c "node slack-bridge.mjs"
+REM Telegram bridge — text Jarvis from your phone (needs TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID in .env).
+REM NOTE: if OpenClaw also polls the SAME Telegram bot, they conflict (Telegram allows one listener per
+REM bot) — give OpenClaw its own separate bot token, or don't run both on the same bot.
+start "JARVIS Telegram Bridge" /min cmd /c "node telegram-bridge.mjs"
 start "" http://localhost:8095
 node server.js

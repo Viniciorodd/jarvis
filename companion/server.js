@@ -114,6 +114,27 @@ try {
 if (!TTS_PROVIDER) TTS_PROVIDER = 'auto';
 if (!KOKORO_TTS_URL) KOKORO_TTS_URL = 'http://127.0.0.1:8880/tts';
 
+// Auto-start the FREE local Kokoro voice if it isn't already running — so Jarvis's NATURAL voice works
+// whether you launch the desktop app OR start-jarvis.cmd (the Electron shell only spawns this server, not
+// Kokoro, which is why the voice went robotic when ElevenLabs ran out). Best-effort: if python/kokoro
+// isn't set up it silently stays on ElevenLabs/browser. Only spawns when Kokoro isn't already answering.
+function ensureKokoro() {
+  if (TTS_PROVIDER === 'eleven') return; // operator explicitly forced ElevenLabs
+  const healthUrl = KOKORO_TTS_URL.replace(/\/(tts|v1\/audio\/speech)\/?$/, '') + '/health';
+  fetch(healthUrl, { signal: AbortSignal.timeout(1500) })
+    .then((r) => { if (!r.ok) throw 0; }) // already running — nothing to do
+    .catch(() => {
+      try {
+        const script = path.join(__dirname, '..', 'scripts', 'tts-kokoro.py');
+        if (!fs.existsSync(script)) return;
+        const c = spawn(process.env.PYTHON_BIN || 'python', [script], { detached: true, stdio: 'ignore', cwd: path.join(__dirname, '..') });
+        c.on('error', () => { /* python missing — natural voice will fall back */ });
+        c.unref();
+        console.log('  starting free local voice (Kokoro) on 8880…');
+      } catch { /* best-effort */ }
+    });
+}
+
 // Optional Deepgram speech-to-text — better/cross-browser voice-in; else the browser's own STT.
 let DEEPGRAM_KEY = process.env.DEEPGRAM_API_KEY || '';
 if (!DEEPGRAM_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^DEEPGRAM_API_KEY=(.+)$/m); if (m) DEEPGRAM_KEY = m[1].trim(); } catch { /* */ } }
@@ -2666,4 +2687,5 @@ server.listen(PORT, () => {
   console.log(`JARVIS Companion on http://localhost:${PORT}`);
   console.log(`  areas: ${ROOTS.join('  |  ')}`);
   if (!API_KEY) console.log('  (no API key — chat disabled until ANTHROPIC_API_KEY is set)');
+  ensureKokoro(); // bring up the free local natural voice if it isn't already running
 });

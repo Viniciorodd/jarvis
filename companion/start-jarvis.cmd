@@ -8,8 +8,7 @@ start "JARVIS Control-Plane" /min cmd /c "node ..\control-plane\server.js"
 REM Scheduler — wakes the agents on their cadence (working-hours only, conservative; idle polls rest).
 REM This is what makes the AI agents actually RUN the work on their own.
 start "JARVIS Scheduler" /min cmd /c "node ..\control-plane\scheduler.mjs"
-REM Free local voice (Kokoro) — Jarvis's voice with no API key / no monthly fee. Harmless if not installed.
-start "JARVIS Voice" /min cmd /c "python ..\scripts\tts-kokoro.py"
+REM Free local voice (Kokoro) is auto-started by the companion server now (works for the desktop app too).
 start "JARVIS Slack Bridge" cmd /c "node slack-bridge.mjs"
 REM Telegram bridge — text Jarvis from your phone (needs TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID in .env).
 REM NOTE: if OpenClaw also polls the SAME Telegram bot, they conflict (Telegram allows one listener per

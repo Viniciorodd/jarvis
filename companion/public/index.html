@@ -169,10 +169,11 @@
           <div class="visual-body" id="visualBody"></div>
         </div>
       </div>
-      <!-- Glance: what's mine to do today + recent activity (filled by talkhome.js) -->
+      <!-- Voice-first home glance: greeting + THE ONE THING, then today's to-dos + recent activity -->
+      <div class="j-talk-top" id="jTalkTop"></div>
       <div class="j-talk-glance" id="jTalkGlance">
-        <div class="tg-col" id="jtTasks"></div>
-        <div class="tg-col" id="jtFeed"></div>
+        <div class="tg-col"><div class="tg-h">Today</div><div id="jtTasks"></div></div>
+        <div class="tg-col"><div class="tg-h">Latest</div><div id="jtFeed"></div></div>
       </div>
       <div class="j-transcript" id="transcript"></div>
     </div>

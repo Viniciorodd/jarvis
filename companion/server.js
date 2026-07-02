@@ -1298,6 +1298,18 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/info') {
     return send(res, 200, JSON.stringify({ root: PRIMARY, roots: ROOTS, hasKey: !!API_KEY, hqUrl: HQ_URL, hasVoice: !!ELEVEN_KEY || (TTS_PROVIDER !== 'eleven'), hasNotion: !!NOTION_KEY, hasStt: !!DEEPGRAM_KEY, hasVosk: fs.existsSync(VOSK_MODEL) }));
   }
+  // Health — can THIS companion reach the control-plane (approvals/commands/gov-board proxy there)?
+  // The UI pings this so a dead/unreachable brain shows as an explicit red pill instead of silently
+  // loading a shell where nothing responds (the recurring "Jarvis isn't working" signal).
+  if (req.method === 'GET' && url.pathname === '/api/health') {
+    const t0 = Date.now();
+    let cp = false, status = 0, err = null;
+    try {
+      const r = await fetch(CP_URL + '/state', { signal: AbortSignal.timeout(4000) });
+      status = r.status; cp = r.ok;
+    } catch (e) { err = e.name === 'TimeoutError' ? 'timeout' : (e.message || 'unreachable'); }
+    return send(res, 200, JSON.stringify({ companion: true, controlPlane: cp, cpUrl: CP_URL, cpStatus: status, ms: Date.now() - t0, error: err }));
+  }
   if (req.method === 'POST' && url.pathname === '/api/stt') {
     if (!DEEPGRAM_KEY) return send(res, 501, JSON.stringify({ error: 'no Deepgram key' }));
     try {

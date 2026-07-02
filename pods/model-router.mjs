@@ -81,7 +81,38 @@ export function modelForProvider(provider, tier) {
   // claude: honor the operator's MODEL_* override if it points at a claude model, else a sane default
   const m = modelFor(tier);
   if (/^claude/i.test(m)) return m;
-  return ({ cheap: 'claude-haiku-4-5', draft: 'claude-sonnet-4-6', reflect: 'claude-opus-4-8' })[tier] || 'claude-haiku-4-5';
+  return ({ cheap: 'claude-haiku-4-5', draft: 'claude-sonnet-5', reflect: 'claude-opus-4-8' })[tier] || 'claude-haiku-4-5';
+}
+
+// ── PURE: real Claude pricing, $ per 1M tokens [input, output]. Eval-pinned — the spend guard
+// (control-plane/spend.mjs) only works if these numbers are right. Longest-prefix match so dated or
+// suffixed model IDs still resolve; unknown claude models fall back to Opus pricing (overestimate,
+// never underestimate — directive #1). Cache writes bill at 1.25x input, cache reads at 0.1x.
+const CLAUDE_PRICES = [
+  ['claude-fable-5', [10, 50]],
+  ['claude-opus', [5, 25]],
+  ['claude-sonnet', [3, 15]],
+  ['claude-haiku', [1, 5]],
+];
+export function claudeCost(model, u = {}) {
+  const hit = CLAUDE_PRICES.find(([prefix]) => String(model).startsWith(prefix));
+  const [inp, out] = hit ? hit[1] : [5, 25];
+  return ((u.input_tokens || 0) * inp
+    + (u.cache_creation_input_tokens || 0) * inp * 1.25
+    + (u.cache_read_input_tokens || 0) * inp * 0.1
+    + (u.output_tokens || 0) * out) / 1e6;
+}
+
+// ── PURE: thinking config per model + tier. Eval-pinned. ───────────────────────────────────────────
+// reflect (weekly strategy / hard reasoning) gets adaptive thinking on models that support it — the
+// single cheapest quality upgrade for the highest-stakes calls. Sonnet 5 runs adaptive BY DEFAULT when
+// the param is omitted, so cheap/draft calls must send an explicit "disabled" or thinking tokens eat
+// the small max_tokens budgets. Fable 5 rejects any thinking config (always on) — omit entirely.
+export function thinkingFor(model, tier) {
+  if (/^claude-fable/.test(model)) return undefined;
+  if (tier === 'reflect' && /^claude-(opus-4-[678]|sonnet-(4-6|5))/.test(model)) return { type: 'adaptive' };
+  if (/^claude-sonnet-5/.test(model)) return { type: 'disabled' };
+  return undefined;
 }
 
 // ── Ollama availability + optional autostart (it's a silent background service with no window) ───────
@@ -108,17 +139,26 @@ async function callClaude({ system, user, tier, maxTokens, agent }) {
   catch (e) { return { ok: false, error: 'vault: ' + e.message }; }
   if (!key) return { ok: false, error: 'no anthropic key' };
   const model = modelForProvider('claude', tier);
+  const thinking = thinkingFor(model, tier);
+  // adaptive thinking spends from max_tokens — give reflect calls headroom so the answer isn't truncated
+  const max = thinking && thinking.type === 'adaptive' ? Math.max(maxTokens, 8000) : maxTokens;
+  const body = { model, max_tokens: max, messages: [{ role: 'user', content: user }] };
+  // cache the system prompt (operator profile etc.) — the stable prefix repeated across every agent call
+  // in a pipeline run. Below the model's minimum prefix it silently doesn't cache; above it, repeat calls
+  // within the 5-min TTL bill at ~0.1x. claudeCost() accounts for write premium + read discount.
+  if (system) body.system = [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }];
+  if (thinking) body.thinking = thinking;
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }),
-      signal: AbortSignal.timeout(60000),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(thinking && thinking.type === 'adaptive' ? 300000 : 60000),
     });
     if (!r.ok) return { ok: false, status: r.status, error: `anthropic ${r.status}` };
     const data = await r.json();
     const text = (data.content || []).map((c) => c.text || '').join('');
     const u = data.usage || {};
-    const cost = ((u.input_tokens || 0) * 0.8 + (u.output_tokens || 0) * 4) / 1e6; // rough $/1M (matches lib.mjs)
+    const cost = claudeCost(model, u);
     return { ok: !!text.trim(), text, cost, usage: u, model, provider: 'claude', ...(text.trim() ? {} : { error: 'empty' }) };
   } catch (e) { return { ok: false, error: e.message }; }
 }

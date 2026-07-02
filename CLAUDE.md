@@ -48,7 +48,7 @@ iPhone/iPad — nothing is exposed to the public internet.
 - **XP/money rules**: HQ only increments lifetime earnings via explicit `money` events or
   approved approvals with an `amount`. Never award XP for agent runs/tokens — only for money
   banked, deliverables shipped, approvals handled, streaks, quests.
-- Model IDs in use: `claude-haiku-4-5`, `claude-sonnet-4-6`, `claude-opus-4-8`.
+- Model IDs in use: `claude-haiku-4-5` (cheap), `claude-sonnet-5` (draft), `claude-opus-4-8` (reflect, adaptive thinking). Real per-model pricing + cache-aware cost math live in `pods/model-router.mjs` (`claudeCost`, eval-pinned).
 
 ## Where things live
 

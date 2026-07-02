@@ -3,7 +3,7 @@
 // start leaking private work to the cloud or break the "never go dark" fallback. Pure functions only;
 // no network, no Ollama spawn.
 
-import { pickChain, modelForProvider } from '../pods/model-router.mjs';
+import { pickChain, modelForProvider, claudeCost, thinkingFor } from '../pods/model-router.mjs';
 
 const ALL = { claude: true, openrouter: true, local: true };
 
@@ -50,5 +50,45 @@ export default {
 
     { name: 'claude provider always resolves to a claude-* model',
       run: () => { const m = modelForProvider('claude', 'draft'); return { pass: /^claude/i.test(m), detail: m }; } },
+
+    // ── claudeCost: the spend guard is only as good as these numbers (directive #1) ──────────────────
+    { name: 'cost: opus 4.8 = $5/$25 per 1M (was underestimated ~6x by the old flat rate)',
+      run: () => { const c = claudeCost('claude-opus-4-8', { input_tokens: 1e6, output_tokens: 1e6 }); return { pass: c === 30, detail: `$${c}` }; } },
+
+    { name: 'cost: haiku 4.5 = $1/$5, sonnet = $3/$15 per 1M',
+      run: () => {
+        const h = claudeCost('claude-haiku-4-5', { input_tokens: 1e6, output_tokens: 1e6 });
+        const s = claudeCost('claude-sonnet-5', { input_tokens: 1e6, output_tokens: 1e6 });
+        return { pass: h === 6 && s === 18, detail: `haiku $${h} / sonnet $${s}` };
+      } },
+
+    { name: 'cost: cache reads bill at 0.1x input, writes at 1.25x',
+      run: () => {
+        const read = claudeCost('claude-opus-4-8', { cache_read_input_tokens: 1e6 });
+        const write = claudeCost('claude-opus-4-8', { cache_creation_input_tokens: 1e6 });
+        return { pass: read === 0.5 && write === 6.25, detail: `read $${read} / write $${write}` };
+      } },
+
+    { name: 'cost: unknown claude model falls back to opus pricing (overestimate, never under)',
+      run: () => { const c = claudeCost('claude-future-9', { input_tokens: 1e6 }); return { pass: c === 5, detail: `$${c}` }; } },
+
+    // ── thinkingFor: adaptive on reflect, sonnet-5 default-adaptive tamed, fable omitted ─────────────
+    { name: 'thinking: reflect on opus 4.8 gets adaptive (quality upgrade for strategy calls)',
+      run: () => { const t = thinkingFor('claude-opus-4-8', 'reflect'); return { pass: t && t.type === 'adaptive', detail: JSON.stringify(t) }; } },
+
+    { name: 'thinking: sonnet-5 on cheap/draft is explicitly DISABLED (else adaptive-by-default eats small max_tokens)',
+      run: () => {
+        const a = thinkingFor('claude-sonnet-5', 'cheap'); const b = thinkingFor('claude-sonnet-5', 'draft');
+        return { pass: a && a.type === 'disabled' && b && b.type === 'disabled', detail: JSON.stringify([a, b]) };
+      } },
+
+    { name: 'thinking: fable-5 NEVER gets a thinking param (API rejects any config; always-on)',
+      run: () => {
+        const a = thinkingFor('claude-fable-5', 'reflect'); const b = thinkingFor('claude-fable-5', 'cheap');
+        return { pass: a === undefined && b === undefined, detail: JSON.stringify([a, b]) };
+      } },
+
+    { name: 'thinking: haiku / older models untouched (no param sent)',
+      run: () => { const t = thinkingFor('claude-haiku-4-5', 'cheap'); return { pass: t === undefined, detail: JSON.stringify(t) }; } },
   ],
 };

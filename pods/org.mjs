@@ -59,7 +59,7 @@ export const ROSTER = [
 // Cost rises vs all-Haiku, but the control-plane spend cap (per-action + per-day) still bounds it.
 export const MODEL_TIERS = {
   cheap: process.env.MODEL_CHEAP || 'claude-haiku-4-5',      // scans, classification, idle polls
-  draft: process.env.MODEL_DRAFT || 'claude-sonnet-4-6',     // proposals, replies, analysis — expert tier
+  draft: process.env.MODEL_DRAFT || 'claude-sonnet-5',       // proposals, replies, analysis — expert tier (intro $2/$10 per MTok through 2026-08-31, then $3/$15 — same sticker as sonnet-4-6)
   reflect: process.env.MODEL_REFLECT || 'claude-opus-4-8',   // weekly strategy / hard reasoning — top tier
 };
 export const modelFor = (tier) => MODEL_TIERS[tier] || MODEL_TIERS.cheap;

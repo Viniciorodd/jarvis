@@ -27,7 +27,7 @@ and rack up real submit history so workflows can earn promotion up the ladder.
 |---|---|---|
 | Self-hosted NAS + Docker | ✅ | Live on UGREEN ThanesKeep (192.168.6.121). |
 | n8n orchestration | ✅ | 7 workflows exported + deployed (`n8n/workflows/`). |
-| Claude API tiered (Haiku/Sonnet/Opus) | ✅ | Models used + **free compute layer** (`pods/model-router.mjs`, 2026-06-29): every call routes local Ollama → OpenRouter (free) → Claude, auto-falling-back so Jarvis never goes dark when tokens run out; privacy→local-only; eval-pinned. Remaining cost saver: prompt caching + Batch API not yet wired. |
+| Claude API tiered (Haiku/Sonnet/Opus) | ✅ | Models used + **free compute layer** (`pods/model-router.mjs`, 2026-06-29): every call routes local Ollama → OpenRouter (free) → Claude, auto-falling-back so Jarvis never goes dark when tokens run out; privacy→local-only; eval-pinned. **2026-07-02: real per-model pricing (`claudeCost`, cache-aware — old flat rate underestimated Opus ~6x), prompt caching on the system block, draft tier → Sonnet 5 (intro $2/$10 through 2026-08-31), reflect tier → adaptive thinking on Opus 4.8. All eval-pinned + live-smoke-tested.** Remaining cost saver: Batch API (50% off) for scheduler/overnight jobs — not yet wired. |
 | Control-plane API + append-only event store as system of record | 🟡 | HQ (`hq/server.js`) has `/api/event`, `/api/approval`, `/api/state` + an events feed — closest thing, but it's a **game dashboard, not a rigorous append-only ledger** treated as the system of record. |
 | Tailscale private access | ✅ | Per NAS deploy. |
 | Slack/Mattermost as comms-only | ✅ | Slack bridge (Socket Mode) + Telegram; comms clients, not source of truth. |

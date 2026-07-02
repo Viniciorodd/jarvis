@@ -11,7 +11,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, DRAFTS, env, secret, profile, emit, mirror, hqApproval, gateApproval, claude } from './lib.mjs';
+import { ROOT, DRAFTS, env, secret, profile, emit, mirror, hqApproval, gateApproval, claude, claudeBatch } from './lib.mjs';
 import { notifyTelegram } from '../lib.mjs';
 import { maybeConnect } from './connector.mjs';
 import { procurementPath } from './replies.mjs';
@@ -67,13 +67,12 @@ export async function scout() {
 }
 
 // ── B. STRATEGIST — bid/no-bid score against the firm profile ───────────────────────────────────
-async function score(op, prof) {
-  const sys = `You are the GovCon Bid Analyst for this firm. Score one opportunity for bid/no-bid. Respond ONLY with JSON: {"match_score": 0-100, "recommendation": "bid"|"watch"|"no-bid", "rationale": "<=200 chars", "set_aside_fit": "strong"|"eligible"|"ineligible", "subcontractor_needed": boolean, "gaps": ["..."], "required_certs": ["..."]}. Be conservative and accurate: only claim set-aside fit the firm actually qualifies for. Firm profile:\n${prof}`;
-  const r = await claude(sys, JSON.stringify(op), { tier: 'cheap', maxTokens: 400, agent: 'GOV-ANALYST' });
-  let j = { match_score: 50, recommendation: 'watch', rationale: 'auto-scored (no model)', set_aside_fit: 'eligible', subcontractor_needed: true, gaps: [], required_certs: [] };
-  const m = r.text && r.text.match(/\{[\s\S]*\}/);
-  if (m) { try { j = { ...j, ...JSON.parse(m[0]) }; } catch { /* keep default */ } }
-  return { ...j, _cost: r.cost || 0 };
+const scoreSys = (prof) => `You are the GovCon Bid Analyst for this firm. Score one opportunity for bid/no-bid. Respond ONLY with JSON: {"match_score": 0-100, "recommendation": "bid"|"watch"|"no-bid", "rationale": "<=200 chars", "set_aside_fit": "strong"|"eligible"|"ineligible", "subcontractor_needed": boolean, "gaps": ["..."], "required_certs": ["..."]}. Be conservative and accurate: only claim set-aside fit the firm actually qualifies for. Firm profile:\n${prof}`;
+const SCORE_FALLBACK = { match_score: 50, recommendation: 'watch', rationale: 'auto-scored (no model)', set_aside_fit: 'eligible', subcontractor_needed: true, gaps: [], required_certs: [] };
+export function parseScore(text) {
+  const m = text && text.match(/\{[\s\S]*\}/);
+  if (m) { try { return { ...SCORE_FALLBACK, ...JSON.parse(m[0]) }; } catch { /* keep fallback */ } }
+  return { ...SCORE_FALLBACK };
 }
 
 // ── D. CLOSER — draft the proposal (FAR/DFARS-aware, leads with SDB/minority, 50% sub rule) ──────
@@ -96,12 +95,21 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
   await emit({ kind: 'action', actor: 'SAM-SCOUT', pod: 'gov', action: 'scan.done', status: 'done', rationale: `${opps.length} opportunities from ${feed}`, payload: { count: opps.length, feed } });
   await mirror('SAM-SCOUT', 'idle', `Found ${opps.length} (${feed}). Handing to Patricia.`);
 
-  // B. score each (cheap tier)
+  // B. score each (cheap tier) — ONE Message Batches call for the whole feed (50% off + processed in
+  // parallel server-side, vs the old one-at-a-time loop). The same system prompt repeats per item, and
+  // anything the batch can't serve falls back to the normal per-op chain inside claudeBatch. The 10-min
+  // timeout keeps a manual "scan now" bounded: on timeout the batch is cancelled (unfinished = unbilled)
+  // and the stragglers are scored live.
   await mirror('GOV-ANALYST', 'work', `Scoring ${opps.length} opportunities for bid/no-bid…`);
+  const sys = scoreSys(prof);
+  const results = await claudeBatch(opps.map((op) => ({ system: sys, user: JSON.stringify(op) })), { tier: 'cheap', maxTokens: 400, agent: 'GOV-ANALYST', timeoutMs: 10 * 60000 });
   const scored = [];
   let spend = 0;
-  for (const op of opps) {
-    const sc = await score(op, prof); spend += sc._cost || 0;
+  for (let i = 0; i < opps.length; i++) {
+    const op = opps[i];
+    const r = results[i] || {};
+    const sc = { ...parseScore(r.text), _cost: r.cost || 0 };
+    spend += sc._cost;
     scored.push({ op, sc });
     await emit({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'bid.score', cost_usd: sc._cost || 0, rationale: `${op.title} — ${sc.match_score}/100 (${sc.recommendation})`, payload: { noticeId: op.noticeId, title: op.title, score: sc.match_score, recommendation: sc.recommendation, set_aside_fit: sc.set_aside_fit, setAside: op.setAside, subcontractor_needed: sc.subcontractor_needed, place: op.place, placeState: op.placeState, deadline: op.deadline, url: op.url, agency: op.agency, description: (op.description || '').slice(0, 400), rationale_fit: sc.rationale } });
   }

@@ -3,7 +3,7 @@
 // start leaking private work to the cloud or break the "never go dark" fallback. Pure functions only;
 // no network, no Ollama spawn.
 
-import { pickChain, modelForProvider, claudeCost, thinkingFor } from '../pods/model-router.mjs';
+import { pickChain, modelForProvider, claudeCost, thinkingFor, claudeBody, buildBatchRequests, BATCH_DISCOUNT } from '../pods/model-router.mjs';
 
 const ALL = { claude: true, openrouter: true, local: true };
 
@@ -90,5 +90,42 @@ export default {
 
     { name: 'thinking: haiku / older models untouched (no param sent)',
       run: () => { const t = thinkingFor('claude-haiku-4-5', 'cheap'); return { pass: t === undefined, detail: JSON.stringify(t) }; } },
+
+    // ── claudeBody: the ONE request builder (live + batch share it) ──────────────────────────────────
+    { name: 'body: system prompt goes in as a cache_control block (prompt caching wired)',
+      run: () => {
+        const b = claudeBody({ system: 'SYS', user: 'hi', tier: 'cheap', maxTokens: 100 });
+        const s = b.system && b.system[0];
+        return { pass: Array.isArray(b.system) && s.text === 'SYS' && s.cache_control && s.cache_control.type === 'ephemeral', detail: JSON.stringify(b.system) };
+      } },
+
+    { name: 'body: empty system → no system field; user lands as the one message',
+      run: () => {
+        const b = claudeBody({ user: 'hi', tier: 'cheap', maxTokens: 100 });
+        return { pass: !('system' in b) && b.messages.length === 1 && b.messages[0].content === 'hi', detail: JSON.stringify(b.messages) };
+      } },
+
+    { name: 'body: reflect gets adaptive thinking + max_tokens floored to 8000 (no truncated strategy)',
+      run: () => {
+        const b = claudeBody({ user: 'plan', tier: 'reflect', maxTokens: 700 });
+        return { pass: b.thinking && b.thinking.type === 'adaptive' && b.max_tokens === 8000, detail: `max_tokens=${b.max_tokens} thinking=${JSON.stringify(b.thinking)}` };
+      } },
+
+    // ── batch: 50%-off fan-outs, custom_id aligned to input order ────────────────────────────────────
+    { name: 'batch: custom_ids align to input index, per-item tier/maxTokens overrides honored',
+      run: () => {
+        const reqs = buildBatchRequests([{ system: 'S', user: 'a' }, { user: 'b', tier: 'reflect', maxTokens: 9000 }], { tier: 'cheap', maxTokens: 400 });
+        const ok = reqs.length === 2 && reqs[0].custom_id === 'req-0' && reqs[1].custom_id === 'req-1'
+          && reqs[0].params.max_tokens === 400 && /^claude-haiku/.test(reqs[0].params.model)
+          && reqs[1].params.max_tokens === 9000 && /^claude-opus/.test(reqs[1].params.model);
+        return { pass: ok, detail: reqs.map((r) => `${r.custom_id}:${r.params.model}@${r.params.max_tokens}`).join(' | ') };
+      } },
+
+    { name: 'batch: bills at exactly half the live price (the whole point)',
+      run: () => {
+        const live = claudeCost('claude-haiku-4-5', { input_tokens: 1e6, output_tokens: 1e6 });
+        const batch = live * BATCH_DISCOUNT;
+        return { pass: BATCH_DISCOUNT === 0.5 && batch === 3, detail: `live $${live} → batch $${batch}` };
+      } },
   ],
 };

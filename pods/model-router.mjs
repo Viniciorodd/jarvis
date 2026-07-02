@@ -115,6 +115,23 @@ export function thinkingFor(model, tier) {
   return undefined;
 }
 
+// ── PURE: build one Claude Messages request body — shared by the live call AND the Batch API. ──────
+// Eval-pinned. The system prompt goes in as a cache_control block (the operator profile is the stable
+// prefix repeated across a pipeline run; repeat calls within the 5-min TTL bill at ~0.1x input — below
+// the model's minimum prefix it silently doesn't cache, no harm). Adaptive thinking spends from
+// max_tokens, so reflect calls get an 8K floor so the answer isn't truncated mid-strategy.
+export function claudeBody({ system = '', user = '', tier = 'cheap', maxTokens = 700 } = {}) {
+  const model = modelForProvider('claude', tier);
+  const thinking = thinkingFor(model, tier);
+  const max = thinking && thinking.type === 'adaptive' ? Math.max(maxTokens, 8000) : maxTokens;
+  const body = { model, max_tokens: max, messages: [{ role: 'user', content: user }] };
+  if (system) body.system = [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }];
+  if (thinking) body.thinking = thinking;
+  return body;
+}
+
+const claudeHeaders = (key) => ({ 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' });
+
 // ── Ollama availability + optional autostart (it's a silent background service with no window) ───────
 let ollamaTried = false;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -138,28 +155,19 @@ async function callClaude({ system, user, tier, maxTokens, agent }) {
   try { key = agent ? getSecret(agent, 'ANTHROPIC_API_KEY') : env('ANTHROPIC_API_KEY'); }
   catch (e) { return { ok: false, error: 'vault: ' + e.message }; }
   if (!key) return { ok: false, error: 'no anthropic key' };
-  const model = modelForProvider('claude', tier);
-  const thinking = thinkingFor(model, tier);
-  // adaptive thinking spends from max_tokens — give reflect calls headroom so the answer isn't truncated
-  const max = thinking && thinking.type === 'adaptive' ? Math.max(maxTokens, 8000) : maxTokens;
-  const body = { model, max_tokens: max, messages: [{ role: 'user', content: user }] };
-  // cache the system prompt (operator profile etc.) — the stable prefix repeated across every agent call
-  // in a pipeline run. Below the model's minimum prefix it silently doesn't cache; above it, repeat calls
-  // within the 5-min TTL bill at ~0.1x. claudeCost() accounts for write premium + read discount.
-  if (system) body.system = [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }];
-  if (thinking) body.thinking = thinking;
+  const body = claudeBody({ system, user, tier, maxTokens });
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      method: 'POST', headers: claudeHeaders(key),
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(thinking && thinking.type === 'adaptive' ? 300000 : 60000),
+      signal: AbortSignal.timeout(body.thinking && body.thinking.type === 'adaptive' ? 300000 : 60000),
     });
     if (!r.ok) return { ok: false, status: r.status, error: `anthropic ${r.status}` };
     const data = await r.json();
     const text = (data.content || []).map((c) => c.text || '').join('');
     const u = data.usage || {};
-    const cost = claudeCost(model, u);
-    return { ok: !!text.trim(), text, cost, usage: u, model, provider: 'claude', ...(text.trim() ? {} : { error: 'empty' }) };
+    const cost = claudeCost(body.model, u);
+    return { ok: !!text.trim(), text, cost, usage: u, model: body.model, provider: 'claude', ...(text.trim() ? {} : { error: 'empty' }) };
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
@@ -219,6 +227,84 @@ export async function llm({ system = '', user = '', tier = 'cheap', maxTokens = 
     lastErr = res.error || ('status ' + res.status);
   }
   return { text: '', cost: 0, provider: null, error: lastErr || 'all providers failed', attempts };
+}
+
+// ── BATCH: Anthropic Message Batches — 50% off ALL token usage for non-latency-sensitive fan-outs ───
+// (scheduler scans, overnight jobs: N independent prompts → ONE batch call). Claude-only; anything the
+// batch can't serve (no key, privacy item, operator prefers another brain, submit/poll failure, per-item
+// error, timeout) falls back to the normal llm() chain PER ITEM — batching never makes Jarvis go dark;
+// worst case it costs exactly what it costs today. Disable globally with LLM_BATCH=0.
+export const BATCH_DISCOUNT = 0.5; // batch usage bills at 50% of standard prices
+
+// PURE: the batch payload — one Messages body per item, custom_id aligned to the input index. Eval-pinned.
+export function buildBatchRequests(items, { tier = 'cheap', maxTokens = 700 } = {}) {
+  return items.map((it, i) => ({
+    custom_id: 'req-' + i,
+    params: claudeBody({ system: it.system || '', user: it.user || '', tier: it.tier || tier, maxTokens: it.maxTokens || maxTokens }),
+  }));
+}
+
+const BATCH_URL = 'https://api.anthropic.com/v1/messages/batches';
+
+// Submit → poll until 'ended' → collect JSONL results into { 'req-i': {text,cost,usage,model} }.
+// Returns null on any transport-level failure (caller falls back). On timeout we CANCEL the batch and
+// still collect what finished — canceled/unprocessed requests aren't billed, misses get the llm() chain.
+async function runClaudeBatch(items, { tier, maxTokens, agent, pollMs, timeoutMs }) {
+  let key;
+  try { key = agent ? getSecret(agent, 'ANTHROPIC_API_KEY') : env('ANTHROPIC_API_KEY'); } catch { return null; }
+  if (!key) return null;
+  const requests = buildBatchRequests(items, { tier, maxTokens });
+  const sub = await fetch(BATCH_URL, { method: 'POST', headers: claudeHeaders(key), body: JSON.stringify({ requests }), signal: AbortSignal.timeout(60000) });
+  if (!sub.ok) return null;
+  let batch = await sub.json();
+  const deadline = Date.now() + timeoutMs;
+  let cancelled = false;
+  while (batch.processing_status !== 'ended') {
+    if (!cancelled && Date.now() > deadline) {
+      cancelled = true;
+      try { await fetch(`${BATCH_URL}/${batch.id}/cancel`, { method: 'POST', headers: claudeHeaders(key), signal: AbortSignal.timeout(30000) }); } catch { /* best effort */ }
+    }
+    if (Date.now() > deadline + 5 * 60000) return null; // cancel isn't converging — give up, fall back
+    await sleep(pollMs);
+    const r = await fetch(`${BATCH_URL}/${batch.id}`, { headers: claudeHeaders(key), signal: AbortSignal.timeout(30000) });
+    if (!r.ok) return null;
+    batch = await r.json();
+  }
+  if (!batch.results_url) return null;
+  const res = await fetch(batch.results_url, { headers: claudeHeaders(key), signal: AbortSignal.timeout(120000) });
+  if (!res.ok) return null;
+  const out = {};
+  for (const line of (await res.text()).split('\n')) {
+    if (!line.trim()) continue;
+    let row; try { row = JSON.parse(line); } catch { continue; }
+    if (!row || !row.result || row.result.type !== 'succeeded') continue; // errored/canceled/expired → llm() fills the gap
+    const msg = row.result.message || {};
+    const text = (msg.content || []).map((c) => c.text || '').join('');
+    if (!text.trim()) continue;
+    out[row.custom_id] = { text, cost: claudeCost(msg.model || '', msg.usage || {}) * BATCH_DISCOUNT, usage: msg.usage || {}, model: msg.model, provider: 'claude-batch' };
+  }
+  return out;
+}
+
+// The batch entrypoint. items: [{ system, user, tier?, maxTokens?, privacy? }] → array (input order) of
+// the same shape llm() returns. ONE Claude batch for everything it can serve, then llm() fills the gaps.
+export async function llmBatch(items = [], { tier = 'cheap', maxTokens = 700, agent = null, pollMs = 10000, timeoutMs = 45 * 60000 } = {}) {
+  const out = new Array(items.length).fill(null);
+  const prefer = getPrefer();
+  const batchable = String(env('LLM_BATCH', '1')) !== '0' && items.length >= 2
+    && !items.some((it) => it && it.privacy)                 // privacy work NEVER leaves the PC
+    && (prefer === 'auto' || prefer === 'claude')            // honor the operator's brain chip
+    && haveClaude(agent);
+  if (batchable) {
+    try {
+      const res = await runClaudeBatch(items, { tier, maxTokens, agent, pollMs, timeoutMs });
+      if (res) for (let i = 0; i < items.length; i++) if (res['req-' + i]) out[i] = res['req-' + i];
+    } catch { /* fall through — llm() fills everything below */ }
+  }
+  for (let i = 0; i < items.length; i++) {
+    if (!out[i]) out[i] = await llm({ system: items[i].system || '', user: items[i].user || '', tier: items[i].tier || tier, maxTokens: items[i].maxTokens || maxTokens, agent, privacy: !!items[i].privacy });
+  }
+  return out;
 }
 
 // ── status for the UI chip / /api/brain ─────────────────────────────────────────────────────────────

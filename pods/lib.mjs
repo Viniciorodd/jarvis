@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { llm } from './model-router.mjs';
+import { llm, llmBatch } from './model-router.mjs';
 import { getSecret } from '../control-plane/vault.mjs';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // pods/ -> repo root
@@ -75,4 +75,15 @@ export async function claude(system, user, { tier = 'cheap', maxTokens = 700, ag
   const r = await llm({ system, user, tier, maxTokens, agent, privacy, provider });
   if (!r.text && r.error) return { text: '', cost: 0, error: r.error, provider: r.provider || null };
   return { text: r.text, cost: r.cost || 0, usage: r.usage || {}, provider: r.provider, model: r.model };
+}
+
+// Fan-out variant of claude() for N INDEPENDENT prompts (scan scoring, bulk classification): one
+// Message Batches call at 50% off instead of N sequential live calls. Anything the batch can't serve
+// falls back to the normal per-item chain inside llmBatch — same "never go dark" guarantee. Results
+// come back in input order with the same shape claude() returns. items: [{ system, user, ... }].
+export async function claudeBatch(items, { tier = 'cheap', maxTokens = 700, agent = null, timeoutMs = null } = {}) {
+  const rs = await llmBatch(items, { tier, maxTokens, agent, ...(timeoutMs ? { timeoutMs } : {}) });
+  return rs.map((r) => ((!r.text && r.error)
+    ? { text: '', cost: 0, error: r.error, provider: r.provider || null }
+    : { text: r.text, cost: r.cost || 0, usage: r.usage || {}, provider: r.provider, model: r.model }));
 }

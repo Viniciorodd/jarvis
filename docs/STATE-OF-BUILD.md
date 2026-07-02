@@ -119,6 +119,28 @@ The real `operating-doctrine.md` (now canonical) asks for more than the 5 direct
    preferred wake path. Only the live mic test is on the user.
 9. **Refactor HQ + Companion to be control-plane clients**; deploy Langfuse + move event store to NAS Postgres.
 
+## The middleman pipeline — ✅ MADE LINEAR (2026-07-02)
+The operator's core complaint ("my gov business feels off, non-linear — subs aren't reached, SOW isn't
+pulled, quotes aren't captured, too much in the air before a submission") is now closed in code:
+- **Root cause found + fixed:** SAM v2's `description` field is a URL, not prose — scoring/drafting were
+  literally reading a link string. `pods/gov/sow.mjs` now fetches the REAL description + attachment list
+  before scoring; the drafter answers the actual SOW (`sow.pull` events, `gov-drafts/sow/`).
+- **Deal ledger** (`pods/gov/deals.mjs`): one explicit record per notice on the linear line
+  scouted→scored→sow_pulled→outreach_drafted→outreach_sent→quotes_in→priced→proposal_ready→submitted→closed.
+  `dealGaps()` = the deterministic "what's still in the air" checklist; `whoseMove()` = you/sub/jarvis/agency.
+  Writers: worker (score/SOW/draft), connector (outreach drafted), sender (outreach SENT on real SMTP
+  success), replies (quotes in → **priced in CODE**), submit wizard (submitted).
+- **Middleman money in code** (`pods/gov/pricing.mjs`): parseQuote ("$4,200/mo" → amount+period) +
+  middlemanPrice (quote × markup → bid/profit/margin; GOV_MARKUP_PCT default 18%, clamped 5–60%).
+  The proposal drafter is TOLD the code-computed bid — it never invents pricing (directive #1).
+- **Deal Room UI** (`companion/public/dealroom.html` → `/dealroom`, `/api/deals` + control-plane `/deals`):
+  executive dark/champagne board — KPIs (pipeline $ / projected profit / waiting-on-you), the "Your move"
+  queue, the stage rail, per-deal cards with ✓/○ checklists + bid/profit/quote. Verified live (desktop+mobile).
+- **Inbox triage actually runs** (`pods/inbox/triage.mjs` + `/maintenance/inbox-triage` + schedule.json
+  07:00 job): deterministic presort (no tokens on obvious noise) + ONE claudeBatch call for the rest →
+  Telegram digest (what needs a reply) + gated cleanup approval. Personal + Rodgate accounts.
+- 18 new eval cases (`evals/deals.eval.mjs`); suite green (257/257).
+
 ## The image/video quality problem — ✅ SOLVED for thumbnails (2026-06-19)
 **Thumbnails are done** via the hybrid engine (photo subject + code-composited text — see build #4 above).
 The original problem (Claude-SVG draws people as crude silhouettes; FLUX mangles text) is sidestepped by

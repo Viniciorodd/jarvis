@@ -2579,6 +2579,12 @@ const server = http.createServer(async (req, res) => {
     try { return send(res, 200, JSON.stringify(await govBoardData())); }
     catch (e) { return send(res, 200, JSON.stringify({ error: e.message, columns: [], counts: {}, total: 0 })); }
   }
+  // The DEAL LEDGER (pods/gov/deals.mjs) — the Deal Room's feed: per-deal stage on the linear middleman
+  // line, what's still in the air (gaps), whose move it is, and the code-priced bid + profit.
+  if (req.method === 'GET' && url.pathname === '/api/deals') {
+    try { const D = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'deals.mjs')).href); return send(res, 200, JSON.stringify(D.dealsBoard())); }
+    catch (e) { return send(res, 200, JSON.stringify({ deals: [], counts: {}, needsYou: 0, pipeline: 0, profit: 0, error: e.message })); }
+  }
   // Curated top-N opportunity BRIEFS (a few quality ones w/ what-they-want + fit + win-chance + strategy).
   if (req.method === 'GET' && url.pathname === '/api/gov/briefs') {
     try { const B = await import('../pods/gov/briefs.mjs'); return send(res, 200, JSON.stringify(await B.buildBriefs({ topN: Number(url.searchParams.get('n')) || 3, cpUrl: CP_URL }))); }
@@ -2656,6 +2662,8 @@ const server = http.createServer(async (req, res) => {
       // Close the open submit gate (approving a 'submit' approval fires NO executor — it just resolves it).
       if (gateId) { try { await fetch(`${CP_URL}/approvals/${gateId}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: 'approve', pod: 'gov', note: 'submitted via wizard' }) }); } catch { /* */ } }
       fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'action', actor: 'operator', pod: 'gov', action: 'proposal.submitted', reversible: false, rationale: `Submitted via ${submission.method}${submission.confirmation ? ' (conf #' + submission.confirmation + ')' : ''} on ${submission.date}`, payload: { noticeId, ...submission } }) }).catch(() => {});
+      // Deal ledger: the real submission is the finish line — advance the deal so the Deal Room agrees.
+      try { const D = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'deals.mjs')).href); D.upsertDeal(noticeId, { stage: 'submitted', pendingSubmit: false, stageNote: `submitted via ${submission.method}` }); } catch { /* ledger best-effort */ }
       return send(res, 200, JSON.stringify({ ok: true, submission }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
@@ -2677,7 +2685,7 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
-  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname.replace(/^\/+/, '');
+  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));

@@ -186,6 +186,19 @@ const server = http.createServer(async (req, res) => {
       store.appendEvent({ kind: 'action', actor: 'EXEC-01', pod: 'exec', action: 'daily.logged', status: synced.ok ? 'done' : 'error', rationale: `EOD log${synced.ok ? ' → Notion' : ' (Notion skip)'}: ${rep.text}`, payload: { day: today, synced, totals: rep.totals, needsYou: rep.needs_you.length } });
       return send(res, 200, { ok: true, day: today, report: rep.text, synced });
     }
+    // Inbox triage → read + classify recent mail (ONE claudeBatch call), digest to the phone, gated cleanup.
+    if (req.method === 'POST' && p === '/maintenance/inbox-triage') {
+      const b = await readBody(req);
+      let result;
+      try { const t = await import('../pods/inbox/triage.mjs'); result = await t.runTriage({ account: b.account || 'personal', max: Number(b.max) || 40 }); }
+      catch (e) { result = { ok: false, note: e.message }; }
+      return send(res, 200, result);
+    }
+    // Deals — the gov middleman DEAL LEDGER (Deal Room UI reads this: stages, gaps, pricing, whose move).
+    if (req.method === 'GET' && p === '/deals') {
+      try { const D = await import('../pods/gov/deals.mjs'); return send(res, 200, D.dealsBoard()); }
+      catch (e) { return send(res, 200, { deals: [], error: e.message }); }
+    }
     // Deadline radar → remind before a pursued bid's response deadline closes (idempotent; reminder = event).
     if (req.method === 'POST' && p === '/maintenance/deadline-check') {
       const b = await readBody(req);

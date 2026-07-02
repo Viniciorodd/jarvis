@@ -74,3 +74,6 @@ voices-v1.0.bin
 
 # Research & Risk desk runtime journal
 pods/research-risk/journal.md
+
+# generated deal ledger (per-machine data, like the CRM volume)
+pods/gov/deals.json

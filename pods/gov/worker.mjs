@@ -16,6 +16,8 @@ import { notifyTelegram } from '../lib.mjs';
 import { maybeConnect } from './connector.mjs';
 import { procurementPath } from './replies.mjs';
 import { checkCompliance } from './compliance.mjs';
+import { isDescriptionUrl, fetchDescription, pullScopeOfWork, sowPath } from './sow.mjs';
+import * as deals from './deals.mjs';
 
 // ── A. SCOUT — find opportunities (real SAM.gov, fallback to a realistic simulated feed) ────────
 function simulatedFeed() {
@@ -50,13 +52,19 @@ export async function scout() {
         if (!o.noticeId || seen.has(o.noticeId)) continue;
         seen.add(o.noticeId);
         const pop = o.placeOfPerformance || {};
+        // SAM v2's `description` is a URL to the noticedesc endpoint, NOT prose — keep it as a URL and
+        // let runScan fetch the real text before scoring (the old code scored off a link string).
+        const desc = String(o.description || '');
         opps.push({
           noticeId: o.noticeId, title: o.title, naics: o.naicsCode,
           setAside: o.typeOfSetAsideDescription || o.typeOfSetAside || 'none',
           agency: (o.fullParentPathName || '').split('.')[0] || o.organizationType || '',
           deadline: o.responseDeadLine || '', place: (pop.city || {}).name || '',
           placeState: (pop.state || {}).code || (pop.state || {}).name || '',
-          url: o.uiLink || '', description: (o.description || '').slice(0, 600),
+          url: o.uiLink || '',
+          description: isDescriptionUrl(desc) ? '' : desc.slice(0, 600),
+          descriptionUrl: isDescriptionUrl(desc) ? desc : '',
+          resourceLinks: Array.isArray(o.resourceLinks) ? o.resourceLinks.slice(0, 12) : [],
           contactEmail: (o.pointOfContact && o.pointOfContact[0] && o.pointOfContact[0].email) || '', type: o.type || '',
         });
       }
@@ -78,10 +86,18 @@ export function parseScore(text) {
 // ── D. CLOSER — draft the proposal (FAR/DFARS-aware, leads with SDB/minority, 50% sub rule) ──────
 async function draft(op, sc, prof) {
   const sys = `You are the GovCon Proposal Writer for this firm. Draft a proposal RESPONSE for the opportunity. Elite, compliant, concise. Sections: 1) Cover/Compliance summary (cite the set-aside and the firm's SDB/Minority/Hispanic status as the win theme), 2) Technical Approach, 3) Management Plan & Staffing, 4) Past Performance (note: new prime — emphasize PA registrations + disaster registry; if a subcontractor's past performance is provided below, cite it), 5) Subcontracting Plan (respect the 50% limit-on-subcontracting on small-business set-aside services; if a selected subcontractor + quote is provided, name them and reflect the quote in pricing/management), 6) FAR/DFARS compliance checklist (list the key clauses to verify, e.g. 52.219-14 Limitations on Subcontracting, 52.222 labor standards). End with "[HUMAN REVIEW REQUIRED — Vinicio signs & submits]". Markdown. Firm profile:\n${prof}`;
-  // Fold in Hector's procurement package (selected sub + quote + past performance) if one was gathered.
+  // Fold in Hector's procurement package (selected sub + quote + past performance + CODE-priced bid).
   let extra = '';
-  try { const pkg = JSON.parse(fs.readFileSync(procurementPath(op), 'utf8')); extra = `\n\nSELECTED SUBCONTRACTOR (cite their past performance + use their quote): ${pkg.sub} — quote: ${pkg.quote || 'TBD'}; past performance: ${pkg.past_performance || 'pending'}`; } catch { /* none gathered yet */ }
-  const r = await claude(sys, `OPPORTUNITY:\n${JSON.stringify(op, null, 2)}\n\nSCORE/ANALYSIS:\n${JSON.stringify(sc, null, 2)}${extra}`, { tier: 'draft', maxTokens: 1800, agent: 'GOV-ANALYST' });
+  try {
+    const pkg = JSON.parse(fs.readFileSync(procurementPath(op), 'utf8'));
+    extra = `\n\nSELECTED SUBCONTRACTOR (cite their past performance + use their quote): ${pkg.sub} — quote: ${pkg.quote || 'TBD'}; past performance: ${pkg.past_performance || 'pending'}`;
+    if (pkg.pricing) extra += `\nBID PRICE (computed in code — use THIS number, do not invent pricing): ${pkg.pricing.line || `$${pkg.pricing.bid}`}`;
+  } catch { /* none gathered yet */ }
+  // Fold in the REAL scope of work if the scout pulled it — the proposal must answer the requirement.
+  let sowTxt = '';
+  try { sowTxt = fs.readFileSync(sowPath(op), 'utf8').slice(0, 6000); } catch { /* not pulled */ }
+  const sowBlock = sowTxt ? `\n\nSCOPE OF WORK (pulled from SAM — answer THIS, not the headline):\n${sowTxt}` : '';
+  const r = await claude(sys, `OPPORTUNITY:\n${JSON.stringify(op, null, 2)}\n\nSCORE/ANALYSIS:\n${JSON.stringify(sc, null, 2)}${extra}${sowBlock}`, { tier: 'draft', maxTokens: 1800, agent: 'GOV-ANALYST' });
   return { md: r.text || '# (no draft — model unavailable)\n', cost: r.cost || 0 };
 }
 
@@ -93,6 +109,19 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
 
   const { opps, source: feed } = await scout();
   await emit({ kind: 'action', actor: 'SAM-SCOUT', pod: 'gov', action: 'scan.done', status: 'done', rationale: `${opps.length} opportunities from ${feed}`, payload: { count: opps.length, feed } });
+
+  // Fill in REAL descriptions before anyone scores anything — SAM v2's `description` is a URL, and until
+  // this step the analysts were literally scoring a link string. Free SAM fetches, 5 at a time.
+  const samKey = secret('SAM-SCOUT', 'SAM_API_KEY');
+  if (samKey) {
+    const need = opps.filter((o) => o.descriptionUrl && !o.description);
+    for (let i = 0; i < need.length; i += 5) {
+      await Promise.all(need.slice(i, i + 5).map(async (o) => {
+        const d = await fetchDescription(o, samKey);
+        if (d.text) o.description = d.text.slice(0, 1500);
+      }));
+    }
+  }
   await mirror('SAM-SCOUT', 'idle', `Found ${opps.length} (${feed}). Handing to Patricia.`);
 
   // B. score each (cheap tier) — ONE Message Batches call for the whole feed (50% off + processed in
@@ -114,6 +143,31 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     await emit({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'bid.score', cost_usd: sc._cost || 0, rationale: `${op.title} — ${sc.match_score}/100 (${sc.recommendation})`, payload: { noticeId: op.noticeId, title: op.title, score: sc.match_score, recommendation: sc.recommendation, set_aside_fit: sc.set_aside_fit, setAside: op.setAside, subcontractor_needed: sc.subcontractor_needed, place: op.place, placeState: op.placeState, deadline: op.deadline, url: op.url, agency: op.agency, description: (op.description || '').slice(0, 400), rationale_fit: sc.rationale } });
   }
   scored.sort((a, b) => (b.sc.match_score || 0) - (a.sc.match_score || 0));
+
+  // The DEAL LEDGER: every scored opp gets an explicit deal record on the linear middleman line, so the
+  // operator can always answer "where does this one stand and what's missing?" (deals.dealGaps).
+  for (const { op, sc } of scored) {
+    try {
+      deals.upsertDeal(op.noticeId, {
+        title: op.title, agency: op.agency, place: op.place, placeState: op.placeState,
+        deadline: op.deadline, url: op.url, setAside: op.setAside, naics: op.naics,
+        score: sc.match_score, recommendation: sc.recommendation, subNeeded: sc.subcontractor_needed !== false,
+        stage: 'scored', stageNote: `${sc.match_score}/100 (${sc.recommendation})`,
+      });
+    } catch { /* ledger is best-effort — the scan never fails on bookkeeping */ }
+  }
+
+  // Pull the REAL scope of work (full description + attachment list) for the bid-worthy BEFORE drafting,
+  // so proposals answer the actual requirement, not the headline. Free SAM fetches, top 5 per scan.
+  if (samKey) {
+    for (const { op } of scored.filter((s) => s.sc.recommendation === 'bid').slice(0, 5)) {
+      const sow = await pullScopeOfWork(op, samKey);
+      if (sow.ok) {
+        try { deals.upsertDeal(op.noticeId, { stage: 'sow_pulled', stageNote: sow.file, sow: { pulled: true, file: sow.file, attachments: sow.attachments.length } }); } catch { /* */ }
+        await emit({ kind: 'action', actor: 'SAM-SCOUT', pod: 'gov', action: 'sow.pull', status: 'done', reversible: true, rationale: `SOW pulled for ${op.title} (${sow.attachments.length} attachment(s))`, payload: { noticeId: op.noticeId, file: sow.file, attachments: sow.attachments.length } });
+      }
+    }
+  }
 
   // Mirror the actionable pipeline (bid + watch) into the Notion company brain. Fire-and-forget, sequential
   // to respect Notion's rate limit, capped, and graceful (no key / page not shared → skips silently).
@@ -139,6 +193,7 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     await gateApproval(
       { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: `Proposal drafted for ${op.title} (score ${sc.match_score}). Compliance: ${comp.verdict}. Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: sc.subcontractor_needed, compliance: comp.verdict } },
       { pod: 'Gov War Room', title: `Review & submit: ${op.title}`, detail: `Score ${sc.match_score}/100 · 🛡 ${comp.verdict}${comp.summary ? ' (' + comp.summary + ')' : ''} · deadline ${op.deadline} · ${file}${sc.subcontractor_needed ? ' · needs a local subcontractor' : ''}`, xp: 50, verb: 'Open draft' });
+    try { deals.upsertDeal(op.noticeId, { stage: 'proposal_ready', proposalFile: file, pendingSubmit: true, stageNote: 'proposal drafted — awaiting your sign-off' }); } catch { /* ledger best-effort */ }
     // Connector (Hector): if this bid needs subcontracted labor, draft the outreach now (you send it).
     if (sc.subcontractor_needed) { try { await maybeConnect({ op, sc }); } catch { /* connector best-effort */ } }
     drafted.push({ op, sc, file });
@@ -194,6 +249,7 @@ export async function pursueOpportunity({ op = {}, sc = null } = {}) {
   await gateApproval(
     { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: `Proposal drafted for ${op.title} (you pursued it). Compliance: ${comp.verdict}. Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: scoreObj.subcontractor_needed, compliance: comp.verdict } },
     { pod: 'Gov War Room', title: `Review & submit: ${op.title}`, detail: `Pursued by you · 🛡 ${comp.verdict}${comp.summary ? ' (' + comp.summary + ')' : ''} · draft ${file}`, xp: 50, verb: 'Open draft' });
+  try { deals.upsertDeal(op.noticeId, { title: op.title, agency: op.agency, deadline: op.deadline, url: op.url, setAside: op.setAside, score: scoreObj.match_score, recommendation: 'bid', subNeeded: scoreObj.subcontractor_needed !== false, stage: 'proposal_ready', proposalFile: file, pendingSubmit: true, stageNote: 'pursued by you — proposal drafted' }); } catch { /* ledger best-effort */ }
   if (scoreObj.subcontractor_needed) { try { await maybeConnect({ op, sc: scoreObj }); } catch { /* connector best-effort */ } }
   await mirror('GOV-ANALYST', 'need', `Proposal drafted (pursued): ${op.title} — review & submit`);
   return { ok: true, file, noticeId: op.noticeId };

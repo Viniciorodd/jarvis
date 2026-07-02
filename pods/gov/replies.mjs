@@ -69,6 +69,15 @@ export async function gatherSubResponses({ op = null } = {}) {
     if (parsed.past_performance) sub.past_performance_notes = parsed.past_performance;
     sub.status = 'quoted'; sub.last_reply = m.date;
     updated++; found.push({ sub: sub.name, quote: sub.quote || '(none)', past_performance: parsed.past_performance || '' });
+    // Deal ledger: record the quote on every deal that reached out to this sub — code prices the bid
+    // (quote × markup) the moment the quote lands, and the deal advances quotes_in → priced.
+    if (parsed.quote) {
+      try {
+        const D = await import('./deals.mjs');
+        const touched = D.recordQuoteBySub({ subId: sub.id, email: m.from, name: sub.name }, parsed.quote);
+        for (const t of touched) if (t.pricing) await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'deal.priced', reversible: true, rationale: `${t.title || t.noticeId}: bid $${t.pricing.bid} (${t.pricing.markupPct}% over $${t.pricing.subQuote} — profit $${t.pricing.profit})`, payload: { noticeId: t.noticeId, pricing: t.pricing } });
+      } catch { /* ledger best-effort */ }
+    }
     await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.reply.parsed', reversible: true, rationale: `${sub.name}: quote ${sub.quote || 'n/a'}; ${parsed.can_perform ? 'can perform' : 'capability unclear'}`, payload: { sub: sub.id, quote: sub.quote, past_performance: parsed.past_performance } });
   }
   saveSubs(subs);
@@ -78,7 +87,15 @@ export async function gatherSubResponses({ op = null } = {}) {
     if (quoted.length) {
       fs.mkdirSync(DRAFTS, { recursive: true });
       const best = quoted[0];
-      fs.writeFileSync(procurementPath(op), JSON.stringify({ sub: best.name, quote: best.quote, past_performance: best.past_performance_notes || '', noticeId: op.noticeId, captured: new Date().toISOString() }, null, 2));
+      // Price the bid IN CODE (doctrine #1) so the drafter cites a real number, never an invented one.
+      let pricing = null;
+      try {
+        const P = await import('./pricing.mjs');
+        const q = P.parseQuote(best.quote);
+        const mm = q && P.middlemanPrice({ quote: q.amount });
+        if (mm) pricing = { ...mm, period: q.period, line: P.pricingLine(mm, q.period) };
+      } catch { /* pricing best-effort */ }
+      fs.writeFileSync(procurementPath(op), JSON.stringify({ sub: best.name, quote: best.quote, past_performance: best.past_performance_notes || '', pricing, noticeId: op.noticeId, captured: new Date().toISOString() }, null, 2));
     }
   }
   await mirror('CONNECT-01', updated ? 'need' : 'idle', updated ? `${updated} sub repl${updated === 1 ? 'y' : 'ies'} parsed — quotes + past performance captured for the proposal` : 'No new sub replies in the Rodgate inbox');

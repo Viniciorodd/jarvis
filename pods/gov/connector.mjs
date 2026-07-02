@@ -120,6 +120,9 @@ export async function maybeConnect({ op, sc }) {
   await gateApproval(
     { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send ${trade} outreach (SOW + ask for past performance + quote) for ${op.title}.`, payload: { noticeId: op.noticeId, trade, file, shortlist } },
     { pod: 'Gov War Room', title: `Send ${trade} outreach: ${op.title}`, detail, xp: 20, verb: 'Review & send' });
+  // Deal ledger: the outreach now EXISTS but has NOT gone out — the Deal Room shows it as your move
+  // until the send is approved (this is the "researchers aren't reaching out" fix: it can't float).
+  try { const D = await import('./deals.mjs'); D.recordOutreach(op.noticeId, { file, sub: top ? top.id : null, trade }); } catch { /* ledger best-effort */ }
   await mirror('CONNECT-01', 'need', shortlist.length ? `Shortlisted ${shortlist.length} ${trade} sub(s) — outreach ready to send` : `Need a ${trade} vendor — outreach ready`);
   return { trade, shortlist, top: top ? top.id : null, file };
 }

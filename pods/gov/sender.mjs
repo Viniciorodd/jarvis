@@ -88,6 +88,9 @@ export async function sendGovEmail({ file, toSelf = false, dryRun = false, slack
     await transport.verify();
     const info = await transport.sendMail({ from: `"Rodgate, LLC" <${USER}>`, to, cc: ccAddr || undefined, replyTo: REPLY_TO, subject, text: body });
     if (slack) await slackPreview('✅ SENT', to, subject, body);
+    // Deal ledger: a REAL send just happened — if this was a sub outreach, advance its deal to
+    // outreach_sent so the Deal Room stops showing it as hanging (matched by file basename).
+    try { const D = await import('./deals.mjs'); D.markOutreachSentByFile(file); } catch { /* ledger best-effort */ }
     return { ok: true, sent: true, to, subject, from: USER, messageId: info.messageId, accepted: info.accepted || [] };
   } catch (e) { return { ok: false, sent: false, to, subject, reason: 'SMTP: ' + e.message }; }
 }

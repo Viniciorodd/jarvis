@@ -34,10 +34,22 @@
         <span style="font-size:11px;opacity:.45;">${data.count} thing${data.count === 1 ? '' : 's'}</span>
       </div>
       ${rows}
-      <div style="text-align:right;margin-top:8px;">
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
+        <button id="catchupSay" type="button" title="Hear it in Jarvis's voice" style="background:none;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:99px;padding:5px 14px;font-size:12px;color:var(--ink,#e8e4da);cursor:pointer;">🔊 Brief me</button>
         <button id="catchupDone" type="button" style="background:none;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:99px;padding:5px 16px;font-size:12px;color:var(--ink,#e8e4da);cursor:pointer;">Caught up ✓</button>
       </div>`;
     home.insertBefore(card, home.firstChild);
+    // 🔊 the Trillion touch: the catch-up SPOKEN, brief and direct, in her voice (app.js's speak()).
+    document.getElementById('catchupSay').addEventListener('click', () => {
+      const needs = data.items.filter((i) => i.kind === 'needs-you');
+      const parts = [`While you were away: ${data.count} thing${data.count === 1 ? '' : 's'}.`];
+      if (needs.length) parts.push(`${needs.length} need${needs.length === 1 ? 's' : ''} you: ${needs.slice(0, 3).map((i) => i.text).join('. ')}.`);
+      const rest = data.items.filter((i) => i.kind !== 'needs-you').slice(0, 3).map((i) => i.text);
+      if (rest.length) parts.push(rest.join('. ') + '.');
+      const say = parts.join(' ');
+      if (typeof window.speak === 'function') window.speak(say);
+      else if ('speechSynthesis' in window) speechSynthesis.speak(new SpeechSynthesisUtterance(say));
+    });
     document.getElementById('catchupDone').addEventListener('click', async () => {
       try { await fetch('/api/catchup/seen', { method: 'POST' }); } catch { /* dismiss anyway */ }
       card.style.transition = 'opacity .25s'; card.style.opacity = '0';

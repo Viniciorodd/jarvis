@@ -77,3 +77,6 @@ pods/research-risk/journal.md
 
 # generated deal ledger (per-machine data, like the CRM volume)
 pods/gov/deals.json
+
+# self-learned lessons (personal, like the operator profile)
+prompts/lessons/

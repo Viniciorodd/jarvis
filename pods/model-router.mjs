@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { getSecret } from '../control-plane/vault.mjs';
 import { modelFor } from './org.mjs';
+import { brainContext } from './lessons.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // pods/ -> repo root
 const BRAIN_FILE = path.join(ROOT, 'control-plane', 'brain-mode.json'); // runtime toggle (UI writes it)
@@ -125,7 +126,15 @@ export function claudeBody({ system = '', user = '', tier = 'cheap', maxTokens =
   const thinking = thinkingFor(model, tier);
   const max = thinking && thinking.type === 'adaptive' ? Math.max(maxTokens, 8000) : maxTokens;
   const body = { model, max_tokens: max, messages: [{ role: 'user', content: user }] };
-  if (system) body.system = [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }];
+  // Fable-grade operating discipline for the BIG-work tiers: the doctrine (prompts/doctrine.md) + the
+  // self-learned lessons (pods/lessons.mjs) ride the cached system prefix on draft/reflect calls only
+  // — cheap/scan calls stay lean. See the vault note "Jarvis - Fable Doctrine (how Opus should think)".
+  let sys = system;
+  if (TIERS_BIG.has(tier)) {
+    const ctx = brainContext();
+    if (ctx) sys = sys ? ctx + '\n\n---\n\n' + sys : ctx;
+  }
+  if (sys) body.system = [{ type: 'text', text: sys, cache_control: { type: 'ephemeral' } }];
   if (thinking) body.thinking = thinking;
   return body;
 }

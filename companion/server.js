@@ -1310,6 +1310,20 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { err = e.name === 'TimeoutError' ? 'timeout' : (e.message || 'unreachable'); }
     return send(res, 200, JSON.stringify({ companion: true, controlPlane: cp, cpUrl: CP_URL, cpStatus: status, ms: Date.now() - t0, error: err }));
   }
+  // Self-learning: record a lesson ("remember: never quote hourly to federal POCs"). One lesson per
+  // file (pods/lessons.mjs); injected into every draft/reflect brain call from then on. GET lists them.
+  if (url.pathname === '/api/lesson') {
+    try {
+      const L = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'lessons.mjs')).href);
+      if (req.method === 'GET') return send(res, 200, JSON.stringify({ lessons: L.loadLessons() }));
+      if (req.method === 'POST') {
+        const b = await readBody(req);
+        if (!b.text) return send(res, 400, JSON.stringify({ error: 'text required' }));
+        return send(res, 200, JSON.stringify(L.recordLesson({ text: b.text, why: b.why || '', pod: b.pod || '' })));
+      }
+      if (req.method === 'DELETE') { const b = await readBody(req); return send(res, 200, JSON.stringify(L.removeLesson(b.id))); }
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
   if (req.method === 'POST' && url.pathname === '/api/stt') {
     if (!DEEPGRAM_KEY) return send(res, 501, JSON.stringify({ error: 'no Deepgram key' }));
     try {

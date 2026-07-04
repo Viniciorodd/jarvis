@@ -4,6 +4,7 @@
 // no network, no Ollama spawn.
 
 import { pickChain, modelForProvider, claudeCost, thinkingFor, claudeBody, buildBatchRequests, BATCH_DISCOUNT } from '../pods/model-router.mjs';
+import { normKey, lessonsBlock } from '../pods/lessons.mjs';
 
 const ALL = { claude: true, openrouter: true, local: true };
 
@@ -126,6 +127,31 @@ export default {
         const live = claudeCost('claude-haiku-4-5', { input_tokens: 1e6, output_tokens: 1e6 });
         const batch = live * BATCH_DISCOUNT;
         return { pass: BATCH_DISCOUNT === 0.5 && batch === 3, detail: `live $${live} → batch $${batch}` };
+      } },
+
+    // ── doctrine + self-learned lessons (the Fable operating layer) ──────────────────────────────────
+    { name: 'doctrine: draft/reflect calls carry the operating doctrine; cheap calls stay lean',
+      run: () => {
+        const draft = claudeBody({ system: 'CALLER', user: 'x', tier: 'draft', maxTokens: 100 });
+        const cheap = claudeBody({ system: 'CALLER', user: 'x', tier: 'cheap', maxTokens: 100 });
+        const dTxt = draft.system && draft.system[0].text;
+        const cTxt = cheap.system && cheap.system[0].text;
+        return { pass: /<operating_doctrine>/.test(dTxt) && /CALLER$/.test(dTxt) && cTxt === 'CALLER', detail: `draft ${dTxt.length} chars, cheap ${cTxt.length}` };
+      } },
+
+    { name: 'lessons: normKey makes "update, don\'t duplicate" work (same lesson → same key)',
+      run: () => {
+        const a = normKey('Never quote HOURLY to federal POCs!');
+        const b = normKey('never quote hourly to federal POCs');
+        return { pass: a === b && a.length > 0, detail: a };
+      } },
+
+    { name: 'lessons: lessonsBlock caps entries, tags the pod, and is empty when there are none',
+      run: () => {
+        const many = Array.from({ length: 20 }, (_, i) => ({ text: 'lesson ' + i, pod: i === 0 ? 'gov' : '', why: i === 0 ? 'it cost us' : '' }));
+        const block = lessonsBlock(many, { cap: 12 });
+        const lines = block.split('\n').filter((l) => l.startsWith('- '));
+        return { pass: lines.length === 12 && /\[gov\] lesson 0 — why: it cost us/.test(block) && lessonsBlock([]) === '', detail: `${lines.length} lines` };
       } },
   ],
 };

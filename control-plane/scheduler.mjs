@@ -80,6 +80,12 @@ const logRest = (job) => post('/events', { kind: 'trace', actor: job.person, pod
 const fire = (job) => job.endpoint ? post(job.endpoint, { source: 'scheduler:' + job.id }) : post('/command', { text: job.command, source: 'scheduler:' + job.id });
 
 export async function tick(now = new Date()) {
+  // KILL SWITCH (doctrine §9 / Trillion Tier 6): when the operator pauses proactive behavior, the
+  // scheduler fires NOTHING — no jobs, no LLM spend — until resume (or the pause's auto-expiry).
+  try {
+    const { getPause, pauseActive } = await import('../pods/pause.mjs');
+    if (pauseActive(getPause(), now.getTime())) return [];
+  } catch { /* pause module optional — never let the kill switch kill the scheduler itself */ }
   const policy = loadPolicy();
   const state = loadState();
   const due = dueJobs(policy, now, state.lastRuns);

@@ -186,6 +186,17 @@ const server = http.createServer(async (req, res) => {
       store.appendEvent({ kind: 'action', actor: 'EXEC-01', pod: 'exec', action: 'daily.logged', status: synced.ok ? 'done' : 'error', rationale: `EOD log${synced.ok ? ' → Notion' : ' (Notion skip)'}: ${rep.text}`, payload: { day: today, synced, totals: rep.totals, needsYou: rep.needs_you.length } });
       return send(res, 200, { ok: true, day: today, report: rep.text, synced });
     }
+    // Kill switch — pause/resume ALL proactive behavior (the scheduler checks this every tick).
+    if (p === '/pause') {
+      const P = await import('../pods/pause.mjs');
+      if (req.method === 'GET') { const cur = P.getPause(); return send(res, 200, { ...cur, active: P.pauseActive(cur) }); }
+      if (req.method === 'POST') {
+        const b = await readBody(req);
+        const rec = P.setPause({ paused: !!b.paused, minutes: Number(b.minutes) || 0 });
+        store.appendEvent({ kind: 'meta', actor: 'operator', pod: 'exec', action: rec.paused ? 'proactive.pause' : 'proactive.resume', status: 'done', rationale: rec.paused ? `Proactive behavior PAUSED${rec.until ? ' until ' + rec.until : ''} (kill switch)` : 'Proactive behavior resumed', payload: rec });
+        return send(res, 200, { ...rec, active: P.pauseActive(rec) });
+      }
+    }
     // Inbox triage → read + classify recent mail (ONE claudeBatch call), digest to the phone, gated cleanup.
     if (req.method === 'POST' && p === '/maintenance/inbox-triage') {
       const b = await readBody(req);

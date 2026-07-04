@@ -80,3 +80,6 @@ pods/gov/deals.json
 
 # self-learned lessons (personal, like the operator profile)
 prompts/lessons/
+
+# companion local state (last-seen for catch-up)
+companion/data/

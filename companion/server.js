@@ -1310,6 +1310,38 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { err = e.name === 'TimeoutError' ? 'timeout' : (e.message || 'unreachable'); }
     return send(res, 200, JSON.stringify({ companion: true, controlPlane: cp, cpUrl: CP_URL, cpStatus: status, ms: Date.now() - t0, error: err }));
   }
+  // Kill switch — proxy to the control-plane's /pause. If the control-plane runs old code (404),
+  // report needsDeploy instead of pretending — the chip shows grey with a "deploy latest" tooltip.
+  if (url.pathname === '/api/pause') {
+    try {
+      const opts = req.method === 'POST'
+        ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(await readBody(req)), signal: AbortSignal.timeout(5000) }
+        : { signal: AbortSignal.timeout(5000) };
+      const r = await fetch(CP_URL + '/pause', opts);
+      if (r.status === 404) return send(res, 200, JSON.stringify({ ok: false, needsDeploy: true, note: 'control-plane is running old code — deploy the latest (scripts/update-nas.sh)' }));
+      return send(res, 200, JSON.stringify(await r.json()));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+  // Held notices — "While you were away": everything noteworthy since the operator last looked,
+  // held and shown on return (Trillion Tier 5: catch-up-on-return, never deliver-once-and-lose-it).
+  if (req.method === 'GET' && url.pathname === '/api/catchup') {
+    try {
+      const seenFile = path.join(__dirname, 'data', 'seen.json');
+      let lastSeen = null; try { lastSeen = JSON.parse(fs.readFileSync(seenFile, 'utf8')).lastSeen; } catch { /* first run */ }
+      const ev = await fetch(CP_URL + '/events', { signal: AbortSignal.timeout(5000) }).then((r) => r.json()).catch(() => []);
+      const C = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'catchup.mjs')).href);
+      const items = C.catchupItems(Array.isArray(ev) ? ev : [], lastSeen, { cap: 10 });
+      return send(res, 200, JSON.stringify({ since: lastSeen, count: items.length, items }));
+    } catch (e) { return send(res, 200, JSON.stringify({ since: null, count: 0, items: [], error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/catchup/seen') {
+    try {
+      const seenFile = path.join(__dirname, 'data', 'seen.json');
+      fs.mkdirSync(path.dirname(seenFile), { recursive: true });
+      fs.writeFileSync(seenFile, JSON.stringify({ lastSeen: new Date().toISOString() }, null, 2));
+      return send(res, 200, JSON.stringify({ ok: true }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
   // Self-learning: record a lesson ("remember: never quote hourly to federal POCs"). One lesson per
   // file (pods/lessons.mjs); injected into every draft/reflect brain call from then on. GET lists them.
   if (url.pathname === '/api/lesson') {

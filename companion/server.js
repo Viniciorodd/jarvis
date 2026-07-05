@@ -1375,6 +1375,7 @@ const server = http.createServer(async (req, res) => {
       const audio = Buffer.concat(chunks);
       const r = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true', {
         method: 'POST', headers: { Authorization: 'Token ' + DEEPGRAM_KEY, 'content-type': req.headers['content-type'] || 'audio/webm' }, body: audio,
+        signal: AbortSignal.timeout(20000), // a hung Deepgram call must never freeze the mic UI
       });
       if (!r.ok) return send(res, 502, JSON.stringify({ error: 'Deepgram ' + r.status }));
       const d = await r.json();

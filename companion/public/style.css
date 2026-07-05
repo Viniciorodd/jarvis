@@ -1075,3 +1075,14 @@ body.dock-open .j-dock-fab{ display:none; }
 .ps-brain-folder{ font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-on-accent);
   background:var(--teal); border-radius:5px; padding:2px 8px; font-weight:600; flex:none; }
 .ps-brain-path{ font-size:11px; color:var(--dim); font-family:ui-monospace,Menlo,monospace; margin-left:auto; }
+
+/* ══ DESKTOP POLISH (2026-07-05) — the app is phone-first; on a big screen, center it, give it air,
+   and let the neural map breathe at the edges instead of stretching cards wall-to-wall. ══ */
+@media (min-width: 1024px){
+  .j-view{ padding-left:24px; padding-right:24px; }
+  .j-view > *{ max-width:1120px; margin-left:auto !important; margin-right:auto !important; }
+  .j-composer{ max-width:880px; margin:0 auto; }
+  .j-nav{ justify-content:center; gap:44px; }
+  .j-more-list{ max-width:640px; }
+  #jTalkView #transcript{ width:min(860px, 80vw); }
+}

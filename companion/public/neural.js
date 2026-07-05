@@ -6,7 +6,13 @@
 //   • it FLARES when agents are actually working (polls /api/skills; live skill = gold surge).
 // Battery-aware: pauses when the tab is hidden, caps DPR at 2, honors prefers-reduced-motion.
 (function () {
+  // Windows very commonly ships with "Animation effects" OFF, which sets prefers-reduced-motion —
+  // that froze the brain to one dim frame on the PC while the iPhone animated. Reduced motion now
+  // means CALM (half frame rate, slower drift), not dead. True kill switch: localStorage jarvis-motion=off.
   const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MOTION_OFF = (() => { try { return localStorage.getItem('jarvis-motion') === 'off'; } catch { return false; } })();
+  const SPEED = REDUCED ? 0.45 : 1;   // calm mode: slower drift
+  let frameSkip = false;              // calm mode: ~30fps instead of 60
   const N = 300;                 // particles
   const TEAL = [45, 212, 168];   // the Trillion palette: teal cloud…
   const PURPLE = [167, 139, 250]; // …with purple context nodes
@@ -51,7 +57,8 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) start(); });
     hookOrb();
     pollActivity(); setInterval(pollActivity, 30000);
-    if (REDUCED) { draw(0); return; } // one calm static frame — no motion
+    console.log(`neural: ${N} particles · motion ${MOTION_OFF ? 'OFF (jarvis-motion)' : REDUCED ? 'calm (OS reduced-motion)' : 'full'}`);
+    if (MOTION_OFF) { draw(0); return; } // explicit opt-out only — one static frame
     start();
   }
 
@@ -61,7 +68,7 @@
     H = canvas.height = innerHeight * DPR;
     canvas.style.width = innerWidth + 'px';
     canvas.style.height = innerHeight + 'px';
-    if (REDUCED && ctx) draw(0);
+    if (MOTION_OFF && ctx) draw(0);
   }
 
   // breathe with her voice: wrap the existing Orb.setLevel (app.js drives it while she speaks)
@@ -132,11 +139,12 @@
   }
 
   function start() {
-    if (running || REDUCED) return;
+    if (running || MOTION_OFF) return;
     running = true;
     const loop = (time) => {
       if (document.hidden) { running = false; return; } // battery: stop cold when not visible
-      t = time; draw(time);
+      if (REDUCED) { frameSkip = !frameSkip; if (frameSkip) { requestAnimationFrame(loop); return; } } // ~30fps calm
+      t = time; draw(time * SPEED);
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);

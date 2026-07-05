@@ -41,6 +41,16 @@
   /* only the current exchange lives on the wall — history stays in the dock/log */
   #jTalkView #transcript .msg:not(:nth-last-child(-n+3)) { display:none; }
   @keyframes wallIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+  /* the JARVIS tab is the hub: when she pulls up files / data / maps / results (the tool visual
+     panel), it floats as a glass card over the brain — readable, closable, never a buried box */
+  #jTalkView .visual{
+    position:fixed !important; left:50% !important; top:auto !important; bottom:190px !important;
+    transform:translateX(-50%); width:min(680px,94vw); max-height:46vh; overflow:auto; z-index:4;
+    background:rgba(14,17,24,.92) !important; border:1px solid rgba(201,168,98,.35) !important;
+    border-radius:14px !important; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    box-shadow:0 18px 60px rgba(0,0,0,.55); pointer-events:auto;
+  }
+  #jTalkView .visual img{ max-width:100%; border-radius:10px; }
   /* the open-conversation chip */
   #handsFreeChip {
     position:fixed; right:14px; bottom:132px; z-index:3;
@@ -82,17 +92,19 @@
   }
 
   // OPEN CONVERSATION: afterSpeak() fires on BOTH voice paths (Kokoro/Eleven audio end + browser TTS
-  // end). Function declarations are mutable global bindings, so wrapping it here affects app.js's own
-  // calls. A short delay keeps her last syllable out of the next capture; app.js's don't-transcribe-
-  // while-speaking guard and barge-in stay in force.
+  // end). We re-open the mic THROUGH THE MIC BUTTON's own handler — that's the router that picks the
+  // right capture path per device (Deepgram record→VAD on PC/Brave/Electron where browser speech
+  // doesn't exist; browser speech elsewhere). The old startListen() call was browser-speech-only,
+  // which is why open conversation worked on the iPhone and broke on the PC.
+  // A short delay keeps her last syllable out of the next capture; barge-in stays in force.
   function hookAfterSpeak() {
     const tryHook = () => {
       if (typeof window.afterSpeak === 'function' && !window.afterSpeak._wall) {
         const orig = window.afterSpeak;
         window.afterSpeak = function () {
           orig();
-          if (enabled && !document.hidden && typeof window.startListen === 'function') {
-            setTimeout(() => { try { window.startListen(false); } catch { /* mic busy/denied — chip still shows state */ } }, 450);
+          if (enabled && !document.hidden) {
+            setTimeout(() => { try { const m = document.getElementById('mic'); if (m) m.click(); } catch { /* mic denied — chip still shows state */ } }, 600);
           }
         };
         window.afterSpeak._wall = true;

@@ -399,7 +399,7 @@ let mediaRec = null, recChunks = [], recording = false, recTimer = null;
 const VAD_SPEAK = 0.08;     // mic level above this = you're talking
 const VAD_SILENCE_MS = 1400; // this much quiet AFTER you've spoken = you're done → auto-send
 const VAD_MIN_MS = 500;      // ignore the first moment so it can't stop before you start
-const VAD_MAX_MS = 30000;    // hard safety cap on one utterance
+const VAD_MAX_MS = 15000;    // hard safety cap on one utterance (was 30s — long blobs = slow transcribes)
 async function toggleRecord() {
   if (recording && mediaRec) { try { mediaRec.stop(); } catch {} return; }  // tap-again = send now
   let stream;
@@ -429,10 +429,11 @@ async function toggleRecord() {
     setState('thinking', 'transcribing…');
     try {
       const blob = new Blob(recChunks, { type: 'audio/webm' });
-      const r = await fetch('/api/stt', { method: 'POST', headers: { 'content-type': 'audio/webm' }, body: blob });
+      // 15s hard timeout — "stays transcribing for a long time" was a hung STT request with no cap
+      const r = await fetch('/api/stt', { method: 'POST', headers: { 'content-type': 'audio/webm' }, body: blob, signal: AbortSignal.timeout(15000) });
       const d = await r.json();
       if (d.text && d.text.trim()) sendToJarvis(d.text.trim()); else setState('idle', 'standby');
-    } catch { setState('idle', 'standby'); }
+    } catch { addMsg('err', 'Transcription timed out — say it again.'); setState('idle', 'standby'); }
   };
   mediaRec.start();
 }

@@ -85,8 +85,8 @@ if(navBtns.more){
 
 /* ── More menu items ── */
 var moreItems = {
-  jMoreGov:     function(){ triggerGhost('govBtn'); },
-  jMoreGovcon:  function(){ window.location.href = '/govcon'; }, /* parallel GovCon OS preview surface */
+  /* Gov Pipeline + Ops gov + GovCon merged into ONE surface (2026-07-05): everything gov → /govcon */
+  jMoreGovcon:  function(){ window.location.href = '/govcon'; },
   jMoreIdeas:   function(){ window.location.href = '/ideas'; },  /* proactive vault idea-miner inbox */
   jMoreMap:     function(){ triggerGhost('mapBtn'); },
   jMoreFloor:   function(){ triggerGhost('floorBtn'); },

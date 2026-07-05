@@ -185,6 +185,45 @@
   </div>
 </div>
 
+<!-- ── PIPELINE — the live board, merged INTO GovCon OS (was: More→Gov Pipeline + Ops→Gov Pipeline;
+     one gov surface since 2026-07-05). Reads /api/gov-board (vault-synced) + the deal ledger;
+     the Deal Room is the money drill-down. ── -->
+<section class="card" id="gcBoardCard" style="margin:14px;padding:16px 18px;">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;">
+    <h2 style="margin:0;font-size:16px;">Pipeline — live board</h2>
+    <span style="display:flex;gap:10px;align-items:baseline;">
+      <span id="gcBoardMoney" style="font-size:12px;opacity:.7;"></span>
+      <a class="gc-btn" href="/dealroom" style="text-decoration:none;">Deal Room ▸</a>
+    </span>
+  </div>
+  <div id="gcBoardCols" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px;"></div>
+</section>
+<script>
+(async () => {
+  try {
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const [board, deals] = await Promise.all([
+      fetch('/api/gov-board').then((r) => r.json()),
+      fetch('/api/deals').then((r) => r.json()).catch(() => null),
+    ]);
+    if (deals && (deals.pipeline || deals.profit)) {
+      document.getElementById('gcBoardMoney').textContent =
+        '$' + Number(deals.pipeline).toLocaleString() + ' priced · $' + Number(deals.profit).toLocaleString() + ' projected profit';
+    }
+    const dl = (d) => { if (!d) return ''; const n = Math.ceil((new Date(d) - Date.now()) / 864e5); return isNaN(n) ? '' : n < 0 ? ' · passed' : ' · ' + n + 'd'; };
+    document.getElementById('gcBoardCols').innerHTML = (board.columns || []).map((col) => `
+      <div style="border:1px solid rgba(128,128,128,.2);border-radius:10px;padding:10px 12px;min-height:70px;">
+        <div style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;opacity:.6;margin-bottom:6px;">${esc(col.label)} · ${col.cards.length}</div>
+        ${col.cards.slice(0, 4).map((c) => `
+          <div style="font-size:12.5px;line-height:1.4;padding:4px 0;border-top:1px solid rgba(128,128,128,.12);">
+            ${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">${esc(c.title)}</a>` : esc(c.title)}
+            <div style="font-size:10.5px;opacity:.55;">${c.next && c.next.who === 'you' ? '⭑ ' : ''}${esc((c.next && c.next.text) || '')}${dl(c.deadline)}</div>
+          </div>`).join('')}
+        ${col.cards.length > 4 ? `<div style="font-size:10.5px;opacity:.5;padding-top:4px;">+${col.cards.length - 4} more</div>` : ''}
+      </div>`).join('');
+  } catch (e) { document.getElementById('gcBoardCols').innerHTML = '<span style="opacity:.6;font-size:12px;">Board unavailable: ' + e.message + '</span>'; }
+})();
+</script>
 <script src="us-geo.js"></script>
 <script src="submit-wizard.js"></script>
 <script src="govcon.js"></script>

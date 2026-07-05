@@ -9,14 +9,17 @@ import { llm, llmBatch } from './model-router.mjs';
 import { getSecret } from '../control-plane/vault.mjs';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // pods/ -> repo root
-export const CP_URL = (process.env.CONTROL_PLANE_URL || 'http://localhost:8787').replace(/\/$/, '');
-export const HQ_URL = (process.env.HQ_URL || '').replace(/\/$/, '');
 
 export function env(k, d = '') {
   if (process.env[k]) return process.env[k];
   try { const m = fs.readFileSync(path.join(ROOT, '.env'), 'utf8').match(new RegExp('^' + k + '=(.+)$', 'm')); if (m) return m[1].trim(); } catch { /* */ }
   return d;
 }
+
+// CP/HQ resolve through env() (process.env OR .env) — the old process.env-only read meant pod workers
+// launched outside compose (this PC) silently emitted their audit events to an empty localhost.
+export const CP_URL = env('CONTROL_PLANE_URL', 'http://localhost:8787').replace(/\/$/, '');
+export const HQ_URL = env('HQ_URL', '').replace(/\/$/, '');
 
 // secret(agent, name) — the LEAST-PRIVILEGE way a pod reads a scoped credential (doctrine directive #3).
 // Routes through the vault broker, which enforces the per-agent ACL and LOGS any unauthorized request.

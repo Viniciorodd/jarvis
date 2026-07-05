@@ -5,6 +5,8 @@
 import { pauseActive } from '../pods/pause.mjs';
 import { catchupItems, line } from '../pods/catchup.mjs';
 import { skillsFromEvents, labelFor, ago } from '../pods/skills.mjs';
+import { isGovAlert, alertText } from '../pods/gov/inbox-watch.mjs';
+import { parseProposals, matchNotice } from '../pods/gov/vault-sync.mjs';
 
 const NOW = new Date('2026-07-04T12:00:00Z').getTime();
 const ts = (min) => new Date(NOW - min * 60000).toISOString();
@@ -110,6 +112,54 @@ export default {
       run: () => {
         const r = [ago(NOW - 10000, NOW), ago(NOW - 5 * 60000, NOW), ago(NOW - 3 * 3600000, NOW), ago(NOW - 2 * 86400000, NOW)].join(',');
         return { pass: r === 'now,5m,3h,2d', detail: r };
+      } },
+
+    // ── gov inbox watch: the 4-day-miss fix ───────────────────────────────────────────────────────
+    { name: 'gov-watch: .mil and .gov (incl. state .gov) senders alert; gmail does not; test tag does',
+      run: () => {
+        const mil = isGovAlert({ from: 'duron.j.smith.civ@army.mil' });
+        const gov = isGovAlert({ from: 'buyer@gsa.gov' });
+        const st = isGovAlert({ from: 'officer@pa.gov' });
+        const no = isGovAlert({ from: 'newsletter@shopgov.com' });     // .com that CONTAINS "gov" — no
+        const g2 = isGovAlert({ from: 'vinicio@gmail.com' });
+        const tt = isGovAlert({ from: 'vinicio@gmail.com', subject: 'hello [TEST-GOV-WATCH] ping' });
+        return { pass: mil && gov && st && !no && !g2 && tt, detail: `${mil}/${gov}/${st}/${no}/${g2}/${tt}` };
+      } },
+
+    { name: 'gov-watch: the push is brief, names the sender, and demands a same-day reply',
+      run: () => {
+        const t = alertText({ from: 'duron@army.mil', fromName: 'Duron', subject: 'W911SD — solicitation posted' });
+        return { pass: /🚨 GOV MAIL/.test(t) && /Duron <duron@army.mil>/.test(t) && /reply TODAY/.test(t), detail: t.split('\n')[0] };
+      } },
+
+    // ── vault-sync: Proposals.md is the source of truth the board READS ──────────────────────────
+    { name: 'vault-sync: parses Sent/Staged sections; SS-link IDs extracted; plain bullets kept',
+      run: () => {
+        const md = [
+          '# Proposals', '',
+          '## Sent',
+          '- [[SS — W15QKN-26-Q-A144 — Salem VA Custodial (99th RD)]] — SENT 7/5 ✅',
+          '- [[SS — W911SD06102026 — West Point Cleaning & Haul-Away]] — sent 6/14',
+          '',
+          '## Staged / Responding',
+          '- **West Point rates reply to Duron** — ON HOLD',
+          '- [[SS — 50cdb2a2 — Janitorial & Carpet Cleaning (USACE)]] — due 7/13',
+        ].join('\n');
+        const p = parseProposals(md);
+        return {
+          pass: p.sent.length === 2 && p.sent[0].id === 'W15QKN-26-Q-A144' && p.sent[1].id === 'W911SD06102026'
+            && p.staged.length === 2 && p.staged[0].id === '' && p.staged[1].id === '50cdb2a2',
+          detail: `sent=[${p.sent.map((x) => x.id)}] staged=[${p.staged.map((x) => x.id || '(note)')}]`,
+        };
+      } },
+
+    { name: 'vault-sync: notice matching — exact + ≥8-char prefixes both ways; short fragments never',
+      run: () => {
+        const a = matchNotice('50cdb2a2ed1840dba7b4bb33208bb623', '50cdb2a2'); // vault holds the prefix
+        const b = matchNotice('W911SD06102026', 'W911SD06102026');             // exact
+        const c = matchNotice('50cdb2a2ed1840dba7b4bb33208bb623', '50cd');     // too short — collision risk
+        const d = matchNotice('', 'x') || matchNotice('x', '');
+        return { pass: a && b && !c && !d, detail: `${a}/${b}/${c}/${d}` };
       } },
   ],
 };

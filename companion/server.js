@@ -242,7 +242,15 @@ async function govBoardData() {
   const dispositions = loadGovState().dispositions || {};
   const P = await govPipeline();
   const gs = loadGovState();
-  return P.buildBoard({ opportunities: [...oppMap.values()], approvals, awards, dispositions, estimates: gs.estimates || {}, submissions: gs.submissions || {} });
+  // THREE-PLACE RULE: the vault's Proposals.md is the source of truth — anything it lists under
+  // "## Sent" shows Submitted on the board, whether or not anyone clicked anything in Jarvis.
+  let submissions = { ...(gs.submissions || {}) };
+  try {
+    const VS = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'vault-sync.mjs')).href);
+    const fromVault = VS.vaultSubmissions([...oppMap.keys()]);
+    submissions = { ...fromVault, ...submissions }; // an explicit in-app record still wins on detail
+  } catch { /* vault not on this machine → board falls back to its own records */ }
+  return P.buildBoard({ opportunities: [...oppMap.values()], approvals, awards, dispositions, estimates: gs.estimates || {}, submissions });
 }
 // OpenAI key — used for Whisper voice transcription (Whisper API, ~$0.006/min)
 let OPENAI_KEY = process.env.OPENAI_API_KEY || '';

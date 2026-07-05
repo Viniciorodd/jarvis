@@ -23,6 +23,34 @@
   --cream:#eaf4fb; --dim:#7088a0; --glow:rgba(var(--teal-rgb),.5); --ink-on-accent:#03222e;
   --warn:#ffce6e; --warn-ink:#241803; --err:#ff8f87; --active:#65d6c0;
 }
+/* ══ EXECUTIVE — the Deal Room skin for the WHOLE app (charcoal · champagne gold · ivory · serif).
+   The one structural difference from every other theme: PANELS ARE TRANSLUCENT, so the neural-map
+   brain (neural.js, z-index:-1) reads through every screen — the Trillion look, everywhere. ══ */
+[data-theme="exec"]{
+  --ink:#0a0d12; --ink2:#10141b; --panel:#141924;
+  --teal:#c9a862; --teal-rgb:201,168,98; --teal-dim:#6e5c33;
+  --cream:#e8e4da; --dim:#8a8fa0; --glow:rgba(var(--teal-rgb),.38); --ink-on-accent:#1c1508;
+  --warn:#f0b45c; --warn-ink:#1c1305; --err:#d98a7e; --active:#6fbf8f;
+  /* vars the newer chips/panels (strip, buckets, catchup, rail) already use */
+  --bg:#0a0d12; --line:rgba(255,255,255,.08); --accent:#c9a862; --muted:#8a8fa0;
+  --ok:#6fbf8f; --danger:#d98a7e; --panel2:#12161f;
+}
+/* translucency layer: the brain must show through — cards float ON it, they don't wall it off */
+[data-theme="exec"] .card, [data-theme="exec"] .hm,
+[data-theme="exec"] .j-ticker, [data-theme="exec"] .j-more-item,
+[data-theme="exec"] .j-talk-glance, [data-theme="exec"] .j-talk-top{
+  background:rgba(16,20,27,.78) !important; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border-color:rgba(255,255,255,.07);
+}
+[data-theme="exec"] .j-view, [data-theme="exec"] .j-main{ background:transparent !important; }
+[data-theme="exec"] .j-top{ background:rgba(10,13,18,.72) !important; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-bottom:1px solid rgba(255,255,255,.06); }
+[data-theme="exec"] .j-nav, [data-theme="exec"] .j-composer-bar{ background:rgba(10,13,18,.82) !important; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-top:1px solid rgba(255,255,255,.06); }
+[data-theme="exec"] .j-composer{ background:rgba(20,25,36,.85); border:1px solid rgba(255,255,255,.1); }
+/* the executive voice: serif display instead of the pixel brand font */
+[data-theme="exec"] .px{ font-family:Georgia,'Times New Roman',serif; letter-spacing:.22em; }
+[data-theme="exec"] h1, [data-theme="exec"] h2, [data-theme="exec"] h3{ font-family:Georgia,'Times New Roman',serif; font-weight:400; }
+.sw-exec{ background:linear-gradient(135deg,#0a0d12 55%,#c9a862 55%); }
+
 /* Light / white theme — bg/text roles inverted; accent darkened for contrast on white. */
 [data-theme="light"]{
   --ink:#eef2f8; --ink2:#e3e9f2; --panel:#ffffff;

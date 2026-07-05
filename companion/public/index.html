@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="today.css">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem('jarvis-theme')||'mono'}catch(e){}</script>
+<script>try{var _t=localStorage.getItem('jarvis-theme');if(!localStorage.getItem('jarvis-theme-execd')&&_t!=='light'){_t='exec';localStorage.setItem('jarvis-theme','exec');localStorage.setItem('jarvis-theme-execd','1');}document.documentElement.dataset.theme=_t||'exec';}catch(e){}</script>
 </head>
 <body>
 
@@ -436,7 +436,8 @@
     <div class="set-sec">
       <div class="set-h">Theme</div>
       <div class="theme-swatches">
-        <button class="theme-swatch" data-theme="arc"><span class="sw sw-arc"></span>Arc · obsidian glass <span class="sw-new">NEW</span></button>
+        <button class="theme-swatch" data-theme="exec"><span class="sw sw-exec"></span>Executive · Deal Room <span class="sw-new">NEW</span></button>
+        <button class="theme-swatch" data-theme="arc"><span class="sw sw-arc"></span>Arc · obsidian glass</button>
         <button class="theme-swatch" data-theme="teal"><span class="sw sw-teal"></span>Teal</button>
         <button class="theme-swatch" data-theme="mono"><span class="sw sw-mono"></span>Mono</button>
         <button class="theme-swatch" data-theme="dark"><span class="sw sw-dark"></span>Full dark</button>

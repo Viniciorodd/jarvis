@@ -1588,6 +1588,48 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
   }
   // ── FLOOR: the org as rooms (from the roster) with each agent's live state (from HQ) ──
+  // TEAM buckets (Trillion top-bar pattern): every agent with live state + model tier + what they're
+  // on + any approvals waiting in their pod — one glance, one tap to approve. Data = roster ⊕ HQ floor
+  // states ⊕ pending gates; nothing new to maintain.
+  if (req.method === 'GET' && url.pathname === '/api/team') {
+    try {
+      const [rosterR, hqR, pending] = await Promise.all([
+        fetch(CP_URL + '/roster', { signal: AbortSignal.timeout(4000) }).then((r) => r.json()).catch(() => ({ roster: [] })),
+        fetch(HQ_URL + '/api/state', { signal: AbortSignal.timeout(4000) }).then((r) => r.json()).catch(() => ({})),
+        fetch(CP_URL + '/approvals/pending', { signal: AbortSignal.timeout(4000) }).then((r) => r.json()).catch(() => []),
+      ]);
+      let ops = hqR.operators || hqR.agents || [];
+      if (ops && !Array.isArray(ops)) ops = Object.values(ops);
+      const liveBy = {};
+      for (const o of (Array.isArray(ops) ? ops : [])) { const k = String((o && (o.agent || o.codename || o.name)) || '').toUpperCase(); if (k) liveBy[k] = { state: o.state, text: o.text }; }
+      const gatesByActor = {}; const gatesByPod = {};
+      for (const a of (Array.isArray(pending) ? pending : [])) {
+        const g = { id: a.id, action: a.action, rationale: (a.rationale || '').slice(0, 120) };
+        if (a.actor) (gatesByActor[String(a.actor).toUpperCase()] = gatesByActor[String(a.actor).toUpperCase()] || []).push(g);
+        else if (a.pod) (gatesByPod[a.pod] = gatesByPod[a.pod] || []).push(g);
+      }
+      const TIER_LABEL = { reflect: 'Opus', draft: 'Sonnet', cheap: 'Haiku' };
+      const team = (rosterR.roster || []).map((p) => {
+        const live = liveBy[String(p.codename).toUpperCase()] || {};
+        const approvals = [...(gatesByActor[String(p.codename).toUpperCase()] || []), ...(gatesByPod[p.pod] || [])].slice(0, 4);
+        const state = approvals.length ? 'need' : (live.state || 'idle');
+        return { codename: p.codename, nickname: p.nickname, title: p.title, pod: p.pod, does: p.does || '', model: TIER_LABEL[p.tier] || p.tier || '', state, text: live.text || '', approvals };
+      });
+      const order = { need: 0, work: 1, idle: 2 };
+      team.sort((a, b) => (order[a.state] ?? 2) - (order[b.state] ?? 2));
+      return send(res, 200, JSON.stringify({ team, needs: team.reduce((s, t) => s + t.approvals.length, 0) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ team: [], needs: 0, error: e.message })); }
+  }
+  // SKILLS rail (Trillion left-panel pattern): the system's real capabilities, derived from the event
+  // log, lighting up as they're invoked. Pure reduction lives in pods/skills.mjs (eval-pinned).
+  if (req.method === 'GET' && url.pathname === '/api/skills') {
+    try {
+      const ev = await fetch(CP_URL + '/events', { signal: AbortSignal.timeout(5000) }).then((r) => r.json()).catch(() => []);
+      const S = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'skills.mjs')).href);
+      const skills = S.skillsFromEvents(Array.isArray(ev) ? ev : []).map((s) => ({ ...s, agoText: S.ago(s.lastTs) }));
+      return send(res, 200, JSON.stringify({ skills }));
+    } catch (e) { return send(res, 200, JSON.stringify({ skills: [], error: e.message })); }
+  }
   if (req.method === 'GET' && url.pathname === '/api/floor') {
     try {
       const [rosterR, hqR] = await Promise.all([

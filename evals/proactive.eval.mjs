@@ -4,6 +4,7 @@
 
 import { pauseActive } from '../pods/pause.mjs';
 import { catchupItems, line } from '../pods/catchup.mjs';
+import { skillsFromEvents, labelFor, ago } from '../pods/skills.mjs';
 
 const NOW = new Date('2026-07-04T12:00:00Z').getTime();
 const ts = (min) => new Date(NOW - min * 60000).toISOString();
@@ -70,6 +71,45 @@ export default {
         const long = line({ rationale: 'y'.repeat(200) });
         const fb = line({ action: 'proposal.draft' });
         return { pass: /profit \$756/.test(short) && long.length <= 150 && long.endsWith('…') && fb === 'proposal draft', detail: `${long.length} chars, fb=${fb}` };
+      } },
+
+    // ── skills rail: the real capability set, lighting up as it runs ─────────────────────────────
+    { name: 'skills: groups by pod+action, counts invocations, newest timestamp wins',
+      run: () => {
+        const ev = [
+          { ts: ts(30), pod: 'gov', action: 'bid.score', actor: 'GOV-ANALYST' },
+          { ts: ts(1), pod: 'gov', action: 'bid.score', actor: 'GOV-ANALYST' },
+          { ts: ts(5), pod: 'fiverr', action: 'thumbnail', actor: 'STUDIO-01' },
+        ];
+        const s = skillsFromEvents(ev, NOW);
+        const bid = s.find((x) => x.action === 'bid.score');
+        return { pass: s.length === 2 && bid.count === 2 && bid.lastTs === new Date(ts(1)).getTime() && s[0].action === 'bid.score', detail: s.map((x) => `${x.action}×${x.count}`).join(',') };
+      } },
+
+    { name: 'skills: live (<2m) pulses, recent (<15m) bright, noise + meta never shown',
+      run: () => {
+        const ev = [
+          { ts: ts(1), pod: 'gov', action: 'sow.pull' },
+          { ts: ts(10), pod: 'gov', action: 'proposal.draft' },
+          { ts: ts(200), pod: 'gov', action: 'scan.done' },
+          { ts: ts(1), pod: 'exec', action: 'rest' },
+          { ts: ts(1), pod: 'exec', action: 'proactive.pause', kind: 'meta' },
+        ];
+        const s = skillsFromEvents(ev, NOW);
+        const flags = s.map((x) => `${x.action}:${x.live ? 'L' : x.recent ? 'R' : '-'}`).join(',');
+        return { pass: s.length === 3 && flags === 'sow.pull:L,proposal.draft:R,scan.done:-', detail: flags };
+      } },
+
+    { name: 'skills: friendly labels from the dictionary; unknown actions humanized',
+      run: () => {
+        const a = labelFor('deal.priced'), b = labelFor('foo.bar_baz');
+        return { pass: a === 'Price the bid (markup)' && b === 'Foo bar baz', detail: `${a} / ${b}` };
+      } },
+
+    { name: 'skills: age stamps read like a human ("now", "5m", "3h", "2d")',
+      run: () => {
+        const r = [ago(NOW - 10000, NOW), ago(NOW - 5 * 60000, NOW), ago(NOW - 3 * 3600000, NOW), ago(NOW - 2 * 86400000, NOW)].join(',');
+        return { pass: r === 'now,5m,3h,2d', detail: r };
       } },
   ],
 };

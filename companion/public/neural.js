@@ -14,9 +14,17 @@
   const SPEED = REDUCED ? 0.45 : 1;   // calm mode: slower drift
   let frameSkip = false;              // calm mode: ~30fps instead of 60
   const N = 300;                 // particles
-  const TEAL = [45, 212, 168];   // the Trillion palette: teal cloud…
-  const PURPLE = [167, 139, 250]; // …with purple context nodes
-  const GOLD = [245, 178, 60];   // activity flare
+  // ── selectable brain palettes (Settings → "Brain · 3D map") — main cloud / context nodes / work flare ──
+  const PALETTES = {
+    trillion:  { main: [45, 212, 168],  node: [167, 139, 250], flare: [245, 178, 60] },  // teal · purple · gold
+    champagne: { main: [201, 168, 98],  node: [232, 228, 218], flare: [245, 200, 90] },  // the Deal Room in 3D
+    ice:       { main: [95, 217, 255],  node: [220, 240, 255], flare: [140, 255, 240] }, // arctic blue
+    ember:     { main: [255, 122, 89],  node: [245, 178, 60],  flare: [255, 220, 120] }, // fire
+    matrix:    { main: [56, 224, 122],  node: [160, 255, 190], flare: [235, 255, 245] }, // green rain
+    violet:    { main: [167, 139, 250], node: [244, 164, 214], flare: [245, 178, 60] },  // royal
+  };
+  let PAL = (() => { try { return PALETTES[localStorage.getItem('jarvis-neural')] || PALETTES.trillion; } catch { return PALETTES.trillion; } })();
+  let TEAL = PAL.main, PURPLE = PAL.node, GOLD = PAL.flare;
 
   let canvas, ctx, W, H, DPR;
   let level = 0;      // voice level 0..1 (fed by Orb hook)
@@ -150,6 +158,40 @@
     requestAnimationFrame(loop);
   }
 
-  window.Neural = { pulse: () => { flare = 1; }, tick: () => draw(performance.now()) };
+  window.Neural = {
+    pulse: () => { flare = 1; },
+    tick: () => draw(performance.now()),
+    setPalette: (name) => {
+      const p = PALETTES[name]; if (!p) return false;
+      PAL = p; TEAL = p.main; PURPLE = p.node; GOLD = p.flare;
+      try { localStorage.setItem('jarvis-neural', name); } catch { /* */ }
+      if (MOTION_OFF) draw(0);
+      return true;
+    },
+    palettes: Object.keys(PALETTES),
+  };
+
+  // Settings → a "Brain · 3D map" palette row, injected under the theme swatches
+  function mountPicker() {
+    const anyswatch = document.querySelector('.theme-swatch');
+    if (!anyswatch || document.getElementById('neuralPick')) return;
+    const row = document.createElement('div');
+    row.id = 'neuralPick';
+    row.style.cssText = 'margin:14px 0 4px;';
+    const cur = (() => { try { return localStorage.getItem('jarvis-neural') || 'trillion'; } catch { return 'trillion'; } })();
+    row.innerHTML = '<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim,#8a8fa0);margin-bottom:8px;">Brain · 3D map</div>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      + Object.entries(PALETTES).map(([name, p]) => `
+        <button type="button" class="neural-sw" data-pal="${name}" title="${name}" style="display:inline-flex;align-items:center;gap:6px;border:1px solid ${name === cur ? 'var(--teal,#c9a862)' : 'rgba(128,128,128,.3)'};border-radius:99px;padding:5px 12px;background:none;color:var(--cream,#e8e4da);font-size:12px;cursor:pointer;text-transform:capitalize;">
+          <span style="width:10px;height:10px;border-radius:50%;background:rgb(${p.main});box-shadow:0 0 6px rgba(${p.main},.8);"></span>${name}
+        </button>`).join('')
+      + '</div>';
+    anyswatch.parentElement.appendChild(row);
+    row.querySelectorAll('.neural-sw').forEach((b) => b.addEventListener('click', () => {
+      window.Neural.setPalette(b.dataset.pal);
+      row.querySelectorAll('.neural-sw').forEach((x) => { x.style.borderColor = x === b ? 'var(--teal,#c9a862)' : 'rgba(128,128,128,.3)'; });
+    }));
+  }
+  if (document.readyState !== 'loading') mountPicker(); else document.addEventListener('DOMContentLoaded', mountPicker);
   if (document.readyState !== 'loading') mount(); else document.addEventListener('DOMContentLoaded', mount);
 })();

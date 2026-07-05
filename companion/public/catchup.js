@@ -25,7 +25,7 @@
     const rows = data.items.map((it) => `
       <div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;font-size:13px;line-height:1.45;">
         <span style="opacity:.7;${it.kind === 'needs-you' ? 'color:var(--warn,#f59e0b);' : it.kind === 'error' ? 'color:var(--danger,#e44);' : ''}">${ICON[it.kind] || '·'}</span>
-        <span style="flex:1;color:var(--ink,#e8e4da);">${esc(it.text)}</span>
+        <span style="flex:1;color:var(--cream,#e8e4da);">${esc(it.text)}</span>
         <span style="opacity:.45;font-size:11px;white-space:nowrap;">${AGO(it.ts)}</span>
       </div>`).join('');
     card.innerHTML = `
@@ -35,8 +35,8 @@
       </div>
       ${rows}
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
-        <button id="catchupSay" type="button" title="Hear it in Jarvis's voice" style="background:none;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:99px;padding:5px 14px;font-size:12px;color:var(--ink,#e8e4da);cursor:pointer;">🔊 Brief me</button>
-        <button id="catchupDone" type="button" style="background:none;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:99px;padding:5px 16px;font-size:12px;color:var(--ink,#e8e4da);cursor:pointer;">Caught up ✓</button>
+        <button id="catchupSay" type="button" title="Hear it in Jarvis's voice" style="background:none;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:99px;padding:5px 14px;font-size:12px;color:var(--cream,#e8e4da);cursor:pointer;">🔊 Brief me</button>
+        <button id="catchupDone" type="button" style="background:none;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:99px;padding:5px 16px;font-size:12px;color:var(--cream,#e8e4da);cursor:pointer;">Caught up ✓</button>
       </div>`;
     home.insertBefore(card, home.firstChild);
     // 🔊 the Trillion touch: the catch-up SPOKEN, brief and direct, in her voice (app.js's speak()).

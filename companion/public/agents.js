@@ -27,7 +27,7 @@
     const hue = POD_HUE[a.pod] || '#8a8fa0';
     const glow = a.state === 'need' ? `box-shadow:0 0 10px 2px rgba(245,158,11,.45);` : '';
     const pulse = a.state === 'work' ? 'animation:agPulse 2.2s ease-in-out infinite;' : '';
-    return `<button class="agent-av" data-cn="${esc(a.codename)}" title="${esc(a.nickname)} — ${esc(a.title)}" type="button" style="position:relative;flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1.5px solid ${hue};${glow}${pulse}background:var(--panel,rgba(255,255,255,.05));color:var(--ink,#e8e4da);font:600 13px Georgia,serif;cursor:pointer;">
+    return `<button class="agent-av" data-cn="${esc(a.codename)}" title="${esc(a.nickname)} — ${esc(a.title)}" type="button" style="position:relative;flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1.5px solid ${hue};${glow}${pulse}background:var(--panel,rgba(255,255,255,.05));color:var(--cream,#e8e4da);font:600 13px Georgia,serif;cursor:pointer;">
       ${esc((a.nickname || '?')[0])}
       <span style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:${DOT[a.state] || DOT.idle};border:2px solid var(--bg,#0a0d12);"></span>
     </button>`;
@@ -58,7 +58,7 @@
       + 'background:var(--panel2,#12161f);border:1px solid var(--line,rgba(255,255,255,.1));border-radius:14px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,.5);';
     const gates = (a.approvals || []).map((g) => `
       <div style="border-top:1px solid var(--line,rgba(255,255,255,.08));padding:8px 0 4px;">
-        <div style="font-size:12px;line-height:1.4;color:var(--ink,#e8e4da);margin-bottom:6px;">⭑ ${esc(g.rationale || g.action)}</div>
+        <div style="font-size:12px;line-height:1.4;color:var(--cream,#e8e4da);margin-bottom:6px;">⭑ ${esc(g.rationale || g.action)}</div>
         <div style="display:flex;gap:6px;">
           <button data-id="${esc(g.id)}" data-d="approve" class="ag-gate" type="button" style="flex:1;border:1px solid rgba(16,185,129,.5);color:var(--ok,#10b981);background:none;border-radius:8px;padding:4px 0;font-size:11.5px;cursor:pointer;">Approve</button>
           <button data-id="${esc(g.id)}" data-d="reject" class="ag-gate" type="button" style="flex:1;border:1px solid var(--line,rgba(255,255,255,.15));color:var(--muted,#8a8fa0);background:none;border-radius:8px;padding:4px 0;font-size:11.5px;cursor:pointer;">Deny</button>
@@ -66,9 +66,9 @@
       </div>`).join('');
     card.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-        <span style="width:34px;height:34px;border-radius:50%;border:1.5px solid ${hue};display:inline-flex;align-items:center;justify-content:center;font:600 14px Georgia,serif;color:var(--ink,#e8e4da);">${esc((a.nickname || '?')[0])}</span>
+        <span style="width:34px;height:34px;border-radius:50%;border:1.5px solid ${hue};display:inline-flex;align-items:center;justify-content:center;font:600 14px Georgia,serif;color:var(--cream,#e8e4da);">${esc((a.nickname || '?')[0])}</span>
         <div style="flex:1;">
-          <div style="font:400 15px Georgia,serif;color:var(--ink,#e8e4da);">${esc(a.nickname)} <span style="opacity:.5;font-size:12px;">· ${esc(a.title)}</span></div>
+          <div style="font:400 15px Georgia,serif;color:var(--cream,#e8e4da);">${esc(a.nickname)} <span style="opacity:.5;font-size:12px;">· ${esc(a.title)}</span></div>
           <div style="font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#8a8fa0);">${esc(a.pod)} · ${esc(a.model)}${a.state === 'work' ? ' · working' : a.state === 'need' ? ' · needs you' : ''}</div>
         </div>
       </div>

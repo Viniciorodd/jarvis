@@ -8,6 +8,8 @@ import { CATEGORIES, validCategory, toCents as ledgerToCents, entryHash, makeEnt
 import { parseCapture, ruleCategory, pickCategoryId } from '../pods/tax/capture.mjs';
 import { splitIncome, bucketState, nudgeLine } from '../pods/tax/savings.mjs';
 import { paymentsDue, payoffPlan, codIncome } from '../pods/tax/debt.mjs';
+import { buildStatus } from '../pods/tax/status.mjs';
+import { matchPerson } from '../pods/org.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -277,5 +279,23 @@ export default {
     { name: 'codIncome: settle $18,244 for $6,000 → $12,244 of 1099-C income to plan tax on',
       run: () => ({ pass: codIncome({ balanceCents: 1824400, settlementCents: 600000 }) === 1224400,
         detail: String(codIncome({ balanceCents: 1824400, settlementCents: 600000 })) }) },
+
+    { name: 'buildStatus: one line has set-aside %, bucket target, next voucher; unverified consts warned',
+      run: () => {
+        const entries = [
+          makeEntry({ dateISO: '2026-02-01', amount: 1000, payee: 'Agency', entity: 'rodgate', category: 'income:gross-receipts', source: 'capture' }),
+        ];
+        const s = buildStatus({ entries, registry: REG, debts: [], C, todayISO: '2026-07-05' });
+        return { pass: s.setAsidePct > 0 && typeof s.headline === 'string' && /set aside/i.test(s.headline)
+          && s.nextVoucher && s.nextVoucher.due === '2026-09-15' && s.warnings.length > 0,
+          detail: s.headline };
+      } },
+
+    { name: 'org: "the tax guy" and "what do i owe" resolve to TAX-01 Sage under Victor',
+      run: () => {
+        const a = matchPerson('ask the tax guy'), b = matchPerson('what do i owe this quarter');
+        return { pass: a && a.codename === 'TAX-01' && b && b.codename === 'TAX-01'
+          && a.reports_to === 'LEDGER-01', detail: (a && a.nickname) || 'no match' };
+      } },
   ],
 };

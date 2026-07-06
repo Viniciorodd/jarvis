@@ -1,0 +1,26 @@
+{
+  "taxYear": 2026,
+  "filingStatus": "single",
+  "localEitRatePct": { "value": 1.0, "verified": false, "note": "SETUP: enter your municipality's earned-income tax rate (%)" },
+  "splits": { "taxPct": "auto", "debtPct": 10, "emergencyPct": 5, "investPct": 5 },
+  "entities": [
+    { "id": "rodgate",      "name": "Rodgate LLC",          "kind": "schC", "aliases": ["rodgate", "gov", "govcon", "contracting"] },
+    { "id": "sidehustles",  "name": "Side hustles",         "kind": "schC", "aliases": ["fiverr", "web", "music", "studio", "thumbnail"] },
+    { "id": "brickave-llc", "name": "2135 Brick Ave, LLC",  "kind": "partnership", "ownershipPct": 19,
+      "note": "operator 19% / mother 81% - LLC files Form 1065, issues K-1s; ONLY the 19% share enters his estimate",
+      "aliases": ["brick ave llc", "rental llc"] },
+    { "id": "mom",          "name": "Mother (operational only)", "kind": "excluded", "aliases": [] }
+  ],
+  "properties": [
+    { "id": "brick-ave",  "address": "2135 Brick Ave, Scranton PA",           "entity": "brickave-llc", "aliases": ["brick"],
+      "basisCents": null, "inService": null, "setup": "needs basis (HUD + rehab receipts) + in-service date" },
+    { "id": "second-463", "address": "463 2nd Street, Plymouth PA",           "entity": "brickave-llc", "aliases": ["463"],
+      "basisCents": null, "inService": null, "setup": "needs basis + in-service date" },
+    { "id": "second-465", "address": "465 2nd Street, Plymouth PA",           "entity": "brickave-llc", "aliases": ["465"],
+      "basisCents": null, "inService": null, "setup": "needs basis + in-service date" },
+    { "id": "ridge-1",    "address": "218 W Ridge St (1st Fl), Nanticoke PA", "entity": "mom", "aliases": ["ridge"],
+      "excludedFromTax": true },
+    { "id": "ridge-2",    "address": "218 W Ridge St (2nd Fl), Nanticoke PA", "entity": "mom", "aliases": ["ridge 2"],
+      "excludedFromTax": true }
+  ]
+}

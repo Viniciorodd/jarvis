@@ -1,8 +1,32 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-06-30. Committed to `feat/core-infrastructure-v2` (NOT yet pushed — operator pushes when ready). Resume from here._
+_Updated 2026-07-06. Committed to `feat/core-infrastructure-v2` (NOT yet pushed — operator pushes when ready). Resume from here._
 
-### 🆕 2026-06-30 (newest) — closed the 5 open infra gaps + the "anyone can run it" GOV SUBMIT WIZARD
+### 🆕 2026-07-06 (newest) — Tax & Wealth pod (Sage/TAX-01) Phase 1 shipped, 10 TDD tasks
+Built per `docs/superpowers/specs/2026-07-05-tax-pod-design.md`, reports to Victor/LEDGER-01:
+- **`pods/tax/`**: TY2026 constants (each param verified-flagged; unverified ⚠ warn at runtime), pure
+  eval-pinned tax engine (SE tax, federal brackets, QBI, PA 3.07% + local EIT, 27.5y mid-month depreciation,
+  19%/81% K-1 split for 2135 Brick Ave, LLC with K-1 **losses excluded + flagged** — never silently
+  subtracted, safe-harbor quarterlies), append-only ledger (`tax-ledger/<year>.jsonl`, fixed form-line
+  taxonomy so the LLM can never invent a category, hash dedupe), capture (code-parsed amounts + keyword
+  rules + LLM fallback gated to the taxonomy, `needs_review` queue), savings splitter (exact-sum
+  largest-remainder, tax% auto from the estimator, debt/emergency/invest buckets), debt desk
+  (`pods/tax/debts.seed.json` from the 2026-04-27 myFICO report — 3 Chase + SBA paying, 4 charge-offs,
+  2 disputed collections — payment reminders, avalanche/snowball payoff plans, 1099-C cancellation-of-debt
+  income anticipation), status assembler (headline + warnings). Routes `/api/tax/status|capture|paid`;
+  cockpit Home glance gained a 💰 line. **Eval harness green: 316/316** (tax-wealth suite added).
+- **Operator setup homework (not yet done):** set the local EIT rate in `pods/tax/entities.json`; enter
+  SBA loan terms + the 3 Chase payment-plan amounts/due days (`debts.seed.json` → `debts.json` on first
+  run, then edit `debts.json`); property basis + in-service dates for depreciation (from the Z:\Real Estate
+  HUD + rehab receipts); export Jan–Jun 2026 bank CSVs ahead of the Phase 2 backfill. **Top judgment call:**
+  confirm whether Form 1065 partnership returns were ever filed for 2135 Brick Ave, LLC (2024/2025).
+- ⏭ **Phase 2 (outlined, not built):** `pods/tax/importer.mjs` CSV drop-folder + saved bank-column
+  profiles, `claudeBatch()` classification + weekly review gate, Jan–Jun backfill, scheduler reminders.
+  **Phase 3 (outlined, not built):** docs indexer (link Z:\Real Estate + gov/Fiverr docs to ledger
+  entries), FreeTaxUSA-interview-ordered filing pack, deadline wiring (1040-ES/1099-NEC/1065), 1099-NEC
+  contractor tracking.
+
+### 🆕 2026-06-30 — closed the 5 open infra gaps + the "anyone can run it" GOV SUBMIT WIZARD
 A full pass through the doctrine's remaining gaps, in priority order, each eval-pinned (193 → 218 green):
 - **Gap #2 — vault least-privilege now ENFORCED at the point of use.** The ACL was eval-tested but only
   the Anthropic key flowed through it; SAM/Places/Hunter/FAL read `process.env` directly. New

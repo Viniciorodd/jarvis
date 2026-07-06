@@ -3,6 +3,7 @@
 
 import { TY2026 } from '../pods/tax/constants-2026.mjs';
 import { seTax, federalIncomeTax, qbiDeduction, paTax, localEit, annualDepreciation, k1Share, estimate, quarterlies } from '../pods/tax/engine.mjs';
+import { CATEGORIES, validCategory, toCents as ledgerToCents, entryHash, makeEntry, dedupe, summarize } from '../pods/tax/ledger.mjs';
 const C = TY2026;
 
 export default {
@@ -111,6 +112,51 @@ export default {
         const q = quarterlies({ C, projectedTaxCents: 9000000, priorYearTaxCents: 2000000,
           priorAgiCents: 20000000, paidCents: 0, todayISO: '2026-07-05' });
         return { pass: q.requiredAnnualCents === 2200000, detail: String(q.requiredAnnualCents) };
+      } },
+
+    { name: 'taxonomy: real form lines exist; junk category rejected (LLM can never invent one)',
+      run: () => ({ pass: validCategory('schC:supplies') && validCategory('schE:repairs')
+        && validCategory('income:hap') && !validCategory('schC:vibes') && !validCategory(''),
+        detail: Object.keys(CATEGORIES).length + ' categories' }) },
+
+    { name: 'ledger toCents: "$1,234.56" → 123456; junk/zero/negative/oversize → null',
+      run: () => ({ pass: ledgerToCents('$1,234.56') === 123456 && ledgerToCents('43') === 4300
+        && ledgerToCents('nope') === null && ledgerToCents(0) === null && ledgerToCents(-5) === null
+        && ledgerToCents(2000000) === null,
+        detail: String(ledgerToCents('$1,234.56')) }) },
+
+    { name: 'makeEntry: valid in → entry with hash + status; bad category or amount → error',
+      run: () => {
+        const ok = makeEntry({ dateISO: '2026-07-05', amount: '43', payee: 'Home Depot',
+          entity: 'brickave-llc', property: 'brick-ave', category: 'schE:repairs', source: 'capture' });
+        const badCat = makeEntry({ dateISO: '2026-07-05', amount: '43', payee: 'X', entity: 'rodgate',
+          category: 'schC:vibes', source: 'capture' });
+        const badAmt = makeEntry({ dateISO: '2026-07-05', amount: 'soon', payee: 'X', entity: 'rodgate',
+          category: 'schC:supplies', source: 'capture' });
+        return { pass: ok.cents === 4300 && typeof ok.hash === 'string' && ok.status === 'confirmed'
+          && badCat.error && badAmt.error, detail: ok.hash };
+      } },
+
+    { name: 'dedupe: identical (date, cents, payee, entity) collapses — re-import cannot double-count',
+      run: () => {
+        const e = { dateISO: '2026-07-05', amount: 43, payee: 'HD', entity: 'rodgate',
+          category: 'schC:supplies', source: 'csv' };
+        const a = makeEntry(e), b = makeEntry(e);
+        return { pass: dedupe([a, b]).length === 1, detail: `${a.hash}==${b.hash}` };
+      } },
+
+    { name: 'summarize: entries roll up per entity; LLC books separate; est-tax payments totaled',
+      run: () => {
+        const reg = { entities: [{ id: 'rodgate', kind: 'schC' }, { id: 'brickave-llc', kind: 'partnership', ownershipPct: 19 }] };
+        const es = [
+          makeEntry({ dateISO: '2026-02-01', amount: 1000, payee: 'Agency', entity: 'rodgate', category: 'income:gross-receipts', source: 'capture' }),
+          makeEntry({ dateISO: '2026-03-01', amount: 200, payee: 'Staples', entity: 'rodgate', category: 'schC:supplies', source: 'capture' }),
+          makeEntry({ dateISO: '2026-03-05', amount: 1850, payee: 'HAP', entity: 'brickave-llc', property: 'brick-ave', category: 'income:hap', source: 'capture' }),
+          makeEntry({ dateISO: '2026-04-10', amount: 300, payee: 'IRS', entity: 'rodgate', category: 'meta:est-tax-payment', source: 'capture' }),
+        ];
+        const s = summarize(es, reg);
+        return { pass: s.schCByEntity.rodgate.netCents === 80000 && s.llcBooks.incomeCents === 185000
+          && s.estPaidCents === 30000, detail: JSON.stringify(s.schCByEntity.rodgate) };
       } },
   ],
 };

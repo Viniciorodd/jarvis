@@ -4,8 +4,14 @@
 
 export function splitIncome(cents, { taxPct = 0, debtPct = 0, emergencyPct = 0, investPct = 0 }) {
   const total = Math.max(0, Math.round(cents || 0));
-  const raw = { tax: total * taxPct / 100, debt: total * debtPct / 100,
-    emergency: total * emergencyPct / 100, invest: total * investPct / 100 };
+  // Sanitize rates (money math validates its inputs — directive #1): negatives → 0; if the
+  // four rates sum past 100%, scale them down proportionally so `keep` can never go negative.
+  let r = { tax: Math.max(0, taxPct || 0), debt: Math.max(0, debtPct || 0),
+    emergency: Math.max(0, emergencyPct || 0), invest: Math.max(0, investPct || 0) };
+  const rateSum = r.tax + r.debt + r.emergency + r.invest;
+  if (rateSum > 100) { const f = 100 / rateSum; r = Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v * f])); }
+  const raw = { tax: total * r.tax / 100, debt: total * r.debt / 100,
+    emergency: total * r.emergency / 100, invest: total * r.invest / 100 };
   const parts = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Math.floor(v)]));
   // largest-remainder: hand out the flooring dust so parts + keep === total exactly
   let dust = Object.values(raw).reduce((s, v) => s + v, 0) - Object.values(parts).reduce((s, v) => s + v, 0);

@@ -201,6 +201,15 @@ export default {
         return { pass: sum === 10001 && s.tax === 2700 && s.debt === 1000, detail: JSON.stringify(s) };
       } },
 
+    { name: 'splitIncome guards: negative rate → 0; rates summing >100% scale down, keep never negative',
+      run: () => {
+        const a = splitIncome(10000, { taxPct: -10, debtPct: 10, emergencyPct: 0, investPct: 0 });
+        const b = splitIncome(10000, { taxPct: 60, debtPct: 30, emergencyPct: 20, investPct: 10 });
+        const bSum = b.tax + b.debt + b.emergency + b.invest + b.keep;
+        return { pass: a.tax === 0 && a.debt === 1000 && b.keep >= 0 && bSum === 10000 && b.tax === 5000,
+          detail: JSON.stringify(b) };
+      } },
+
     { name: 'bucketState: targets accrue from income; moved subtracts; due never negative',
       run: () => {
         const st = bucketState({

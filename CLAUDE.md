@@ -69,6 +69,7 @@ iPhone/iPad — nothing is exposed to the public internet.
   is injected into every agent run; its template is `prompts/operator-profile-template.md`.
   The real filled-in profile is `prompts/operator-profile.md` (gitignored — contains personal data).
 - Tax & Wealth pod (Sage/TAX-01): pods/tax/ → /api/tax/status|capture|paid; ledger tax-ledger/<year>.jsonl; TY constants pods/tax/constants-<year>.mjs (verified-flagged); spec docs/superpowers/specs/2026-07-05-tax-pod-design.md.
+  Phase 2 (bank-CSV importer): pods/tax/importer.mjs + accounts.mjs (per-account column-map profiles) + review.mjs (needs_review resolution); /api/tax/review(/resolve); tax-inbox/ drop folder + `node pods/tax/importer.mjs --backfill`; spec docs/superpowers/specs/2026-07-06-tax-pod-phase2-importer-design.md.
 
 ## Status / next steps
 

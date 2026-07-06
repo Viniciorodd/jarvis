@@ -102,7 +102,7 @@ export function finalizeItems(items) {
 // ── fs wrapper (not eval-tested; smoked against a synthetic CSV) ──────────────────────────────────
 const INBOX = (dir) => dir || path.join(ROOT, 'tax-inbox');
 
-export async function importInbox({ dir, apply = true } = {}) {
+export async function importInbox({ dir, apply = true, ledgerDir } = {}) {
   const inbox = INBOX(dir);
   const summaries = [];
   let files = [];
@@ -127,7 +127,7 @@ export async function importInbox({ dir, apply = true } = {}) {
 
     const firstDateRaw = dataRows.length ? applyMap(dataRows[0], account.columnMap) : null;
     const year = (firstDateRaw && firstDateRaw.dateISO) ? Number(firstDateRaw.dateISO.slice(0, 4)) : new Date().getUTCFullYear();
-    const existingEntries = readLedger(year);
+    const existingEntries = readLedger(year, ledgerDir);
     const todayISO = new Date().toLocaleDateString('en-CA');
 
     const { prepared, failedRows } = classifyDedup({ rows: dataRows, account, existingEntries, todayISO });
@@ -168,20 +168,44 @@ export async function importInbox({ dir, apply = true } = {}) {
     }
 
     const entries = finalizeItems(prepared);
-    let filed = 0, queued = 0;
+    let filed = 0, queued = 0, deductionCents = 0;
     if (apply) {
       for (const entry of entries) {
-        appendEntry(entry);
+        appendEntry(entry, ledgerDir);
         entry.status === 'confirmed' ? filed++ : queued++;
+        if (entry.status === 'confirmed' && !entry.category.startsWith('income:')) deductionCents += entry.cents;
       }
     } else {
-      for (const entry of entries) entry.status === 'confirmed' ? filed++ : queued++;
+      for (const entry of entries) {
+        entry.status === 'confirmed' ? filed++ : queued++;
+        if (entry.status === 'confirmed' && !entry.category.startsWith('income:')) deductionCents += entry.cents;
+      }
     }
 
     await emit({ kind: 'action', actor: 'TAX-01', pod: 'exec', action: 'tax.import', reversible: true,
       payload: { file, filed, queued, failed: failedRows.length } });
-    summaries.push({ file, status: 'imported', filed, queued, failed: failedRows.length });
+    summaries.push({ file, status: 'imported', filed, queued, failed: failedRows.length, deductionCents });
   }
 
   return summaries;
+}
+
+// ── backfill CLI ───────────────────────────────────────────────────────────────────────────────────
+if (process.argv[1] && process.argv[1].endsWith('importer.mjs')) {
+  if (process.argv.includes('--backfill')) {
+    importInbox({ dir: path.join(ROOT, 'tax-inbox') }).then((summaries) => {
+      let filed = 0, queued = 0, quarantined = 0, deductionCents = 0;
+      for (const s of summaries) {
+        if (s.status === 'imported') { filed += s.filed; queued += s.queued; deductionCents += s.deductionCents || 0; }
+        else if (s.status === 'quarantined') quarantined += 1;
+      }
+      console.log(`${summaries.length} files · ${filed} filed · ${queued} queued · ${quarantined} quarantined · $${(deductionCents / 100).toFixed(2)} deductions found`);
+      for (const s of summaries) {
+        if (s.status === 'needs-mapping') {
+          console.log(`  "${s.file}" needs an account + column-map registered before it can import — see pods/tax/accounts.mjs (saveProfile) / accounts.local.json.`);
+        }
+      }
+      process.exit(0);
+    }).catch((err) => { console.error(err); process.exit(1); });
+  }
 }

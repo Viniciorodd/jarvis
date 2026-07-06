@@ -1,0 +1,31 @@
+{
+  "asOf": "2026-04-27",
+  "source": "myFICO 3-bureau report",
+  "scores": { "equifax": 501, "transunion": 498, "experian": 545 },
+  "debts": [
+    { "id": "chase-1",  "creditor": "Chase (JPMCB) card 1", "kind": "card", "status": "paying",
+      "balanceCents": 124400, "aprPct": 0, "monthlyPaymentCents": null, "dueDay": null,
+      "setup": "enter your payment-plan amount + due day" },
+    { "id": "chase-2",  "creditor": "Chase (JPMCB) card 2", "kind": "card", "status": "paying",
+      "balanceCents": 154100, "aprPct": 0, "monthlyPaymentCents": null, "dueDay": null,
+      "setup": "enter your payment-plan amount + due day" },
+    { "id": "chase-3",  "creditor": "Chase (JPMCB) card 3", "kind": "card", "status": "paying",
+      "balanceCents": 106900, "aprPct": 0, "monthlyPaymentCents": null, "dueDay": null,
+      "setup": "enter your payment-plan amount + due day" },
+    { "id": "sba",      "creditor": "SBA loan", "kind": "loan", "status": "paying",
+      "balanceCents": null, "aprPct": null, "monthlyPaymentCents": null, "dueDay": null,
+      "deductibleInterest": true, "setup": "enter balance, rate, payment, due day (not on consumer report)" },
+    { "id": "amex-1",   "creditor": "American Express 1", "kind": "card", "status": "charged-off",
+      "balanceCents": 908300, "aprPct": 0 },
+    { "id": "amex-2",   "creditor": "American Express 2", "kind": "card", "status": "charged-off",
+      "balanceCents": 313400, "aprPct": 0 },
+    { "id": "discover", "creditor": "Discover", "kind": "card", "status": "charged-off",
+      "balanceCents": 233100, "aprPct": 0 },
+    { "id": "apple",    "creditor": "Apple Card (GS Bank)", "kind": "card", "status": "charged-off",
+      "balanceCents": 1824400, "aprPct": 0 },
+    { "id": "coll-allstate", "creditor": "Allstate (collection)", "kind": "collection", "status": "disputed",
+      "balanceCents": 21700 },
+    { "id": "coll-geico",    "creditor": "Geico (collection)", "kind": "collection", "status": "disputed",
+      "balanceCents": 25700 }
+  ]
+}

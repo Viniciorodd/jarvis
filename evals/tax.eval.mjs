@@ -7,6 +7,7 @@ import { seTax, federalIncomeTax, qbiDeduction, paTax, localEit, annualDepreciat
 import { CATEGORIES, validCategory, toCents as ledgerToCents, entryHash, makeEntry, dedupe, summarize } from '../pods/tax/ledger.mjs';
 import { parseCapture, ruleCategory, pickCategoryId } from '../pods/tax/capture.mjs';
 import { splitIncome, bucketState, nudgeLine } from '../pods/tax/savings.mjs';
+import { paymentsDue, payoffPlan, codIncome } from '../pods/tax/debt.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -227,5 +228,43 @@ export default {
         return { pass: /\$412(\.00)? .*tax/i.test(s) && /\$200(\.00)? .*debt/i.test(s) && !/invest/i.test(s),
           detail: s };
       } },
+
+    { name: 'paymentsDue: only status=paying debts, sorted by days until due',
+      run: () => {
+        const debts = [
+          { id: 'chase-1', creditor: 'Chase 1', status: 'paying', monthlyPaymentCents: 5000, dueDay: 10 },
+          { id: 'sba', creditor: 'SBA', status: 'paying', monthlyPaymentCents: 12000, dueDay: 28 },
+          { id: 'apple', creditor: 'Apple Card', status: 'charged-off', monthlyPaymentCents: null, dueDay: null },
+        ];
+        const due = paymentsDue({ debts, todayISO: '2026-07-05' });
+        return { pass: due.length === 2 && due[0].id === 'chase-1' && due[0].daysUntil === 5
+          && due[1].daysUntil === 23, detail: JSON.stringify(due.map((d) => d.id)) };
+      } },
+
+    { name: 'payoffPlan snowball: smallest balance dies first; leftover rolls to the next debt',
+      run: () => {
+        const debts = [
+          { id: 'A', status: 'charged-off', balanceCents: 25000, aprPct: 0 },
+          { id: 'B', status: 'charged-off', balanceCents: 15000, aprPct: 0 },
+        ];
+        const p = payoffPlan({ debts, monthlyBudgetCents: 10000, strategy: 'snowball' });
+        const B = p.schedule.find((s) => s.id === 'B'), A = p.schedule.find((s) => s.id === 'A');
+        return { pass: p.order[0] === 'B' && B.paidOffMonth === 2 && A.paidOffMonth === 4 && p.months === 4,
+          detail: JSON.stringify(p.schedule) };
+      } },
+
+    { name: 'payoffPlan avalanche: highest APR first regardless of balance',
+      run: () => {
+        const debts = [
+          { id: 'lowRate', status: 'paying', balanceCents: 10000, aprPct: 5 },
+          { id: 'highRate', status: 'paying', balanceCents: 90000, aprPct: 24 },
+        ];
+        const p = payoffPlan({ debts, monthlyBudgetCents: 20000, strategy: 'avalanche' });
+        return { pass: p.order[0] === 'highRate', detail: p.order.join(',') };
+      } },
+
+    { name: 'codIncome: settle $18,244 for $6,000 → $12,244 of 1099-C income to plan tax on',
+      run: () => ({ pass: codIncome({ balanceCents: 1824400, settlementCents: 600000 }) === 1224400,
+        detail: String(codIncome({ balanceCents: 1824400, settlementCents: 600000 })) }) },
   ],
 };

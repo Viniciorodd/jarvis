@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { TY2026 } from '../pods/tax/constants-2026.mjs';
 import { seTax, federalIncomeTax, qbiDeduction, paTax, localEit, annualDepreciation, k1Share, estimate, quarterlies } from '../pods/tax/engine.mjs';
 import { CATEGORIES, validCategory, toCents as ledgerToCents, entryHash, makeEntry, dedupe, summarize } from '../pods/tax/ledger.mjs';
-import { parseCapture, ruleCategory } from '../pods/tax/capture.mjs';
+import { parseCapture, ruleCategory, pickCategoryId } from '../pods/tax/capture.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -184,6 +184,13 @@ export default {
         const b = ruleCategory({ payee: 'Staples', memo: 'printer ink', entity: 'rodgate', property: null, registry: REG });
         const c = ruleCategory({ payee: 'Mystery Vendor', memo: '???', entity: 'rodgate', property: null, registry: REG });
         return { pass: a === 'schE:repairs' && b === 'schC:supplies' && c === null, detail: `${a}/${b}/${c}` };
+      } },
+
+    { name: 'pickCategoryId: valid id passes; invented id, wrong-half id, and UNSURE → null',
+      run: () => {
+        const a = pickCategoryId('schE:repairs', true), b = pickCategoryId('schC:vibes', false),
+          c = pickCategoryId('UNSURE', false), d = pickCategoryId('schE:repairs', false);
+        return { pass: a === 'schE:repairs' && b === null && c === null && d === null, detail: `${a}/${b}/${c}/${d}` };
       } },
   ],
 };

@@ -34,10 +34,31 @@ export function secret(agent, name) {
 export async function emit(ev) {
   try { const r = await fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(ev) }); return await r.json().catch(() => ({})); } catch { return {}; }
 }
+// PURE: the identity of a gate — (pod, action, noticeId|file). Two gates with the same key are the SAME
+// pending decision. Returns '' when there's no stable identity (then we never dedup — always a fresh gate).
+export function gateKey(ev) {
+  if (!ev) return '';
+  const id = (ev.payload && (ev.payload.noticeId || ev.payload.file)) || '';
+  if (!id) return '';
+  return `${ev.pod || ''}:${String(ev.action || '').toLowerCase()}:${id}`;
+}
+
 // Create a GATED approval the right way: record it on the control-plane (system of record) AND surface it
 // on the HQ floor WITH a callback to that control-plane id — so approving ONLINE (HQ over Tailscale) fires
 // the very same executor the companion does, instead of being a dead end. Returns the control-plane record.
+//
+// IDEMPOTENT per (pod, action, noticeId/file): the gov worker re-drafts + re-gates the same notice on
+// every rescan, which stacked 27 open gates for 4 opps. If an OPEN gate with the same identity already
+// awaits you, reuse it instead of nagging again. Best-effort — any error falls through and creates the gate.
 export async function gateApproval(approvalEvent, hq = {}) {
+  const key = gateKey(approvalEvent);
+  if (key) {
+    try {
+      const pending = await fetch(CP_URL + '/approvals/pending', { signal: AbortSignal.timeout(4000) }).then((r) => r.json());
+      const dup = (Array.isArray(pending) ? pending : []).find((a) => gateKey(a) === key);
+      if (dup) return dup; // already gated + awaiting your decision — don't create a duplicate
+    } catch { /* dedup is best-effort; fall through and create the gate */ }
+  }
   const rec = await emit(approvalEvent);
   const callback = rec && rec.id ? `${CP_URL}/approvals/${rec.id}` : undefined;
   await hqApproval({ ...hq, callback });

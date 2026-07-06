@@ -54,6 +54,15 @@ and rack up real submit history so workflows can earn promotion up the ladder.
   wired into `docker-compose.yml` (nginx proxies `/hq` + `/cp`); installable on iPhone/iPad over Tailscale.
 - ✅ **HQ reskinned** to the companion's dark/teal palette — HQ + the Jarvis AI now read as one product.
 - ✅ **Control-plane Dockerfile** added (was missing) + `control-plane` service in compose.
+- ✅ **Tax & Wealth pod (Sage/TAX-01, reports to Victor/LEDGER-01), Phase 1 (2026-07-06)** — `pods/tax/`:
+  TY2026 constants (each param verified-flagged, unverified ones surface as ⚠), pure eval-pinned engine
+  (SE tax, federal brackets, QBI, PA 3.07%+local EIT, 27.5y mid-month depreciation, 19% K-1 share for
+  2135 Brick Ave LLC with K-1 losses excluded+flagged, safe-harbor quarterlies), append-only ledger
+  (`tax-ledger/<year>.jsonl`, hash dedupe), capture + savings splitter + debt desk (myFICO-seeded,
+  avalanche/snowball, 1099-C anticipation), routes `/api/tax/status|capture|paid`, cockpit Home 💰 line.
+  Eval harness green (316/316). Phase 2 (CSV importer/backfill) + Phase 3 (docs index/filing pack) not built —
+  operator setup pending (EIT rate, SBA/Chase terms, property basis, 1065 filing status). Spec:
+  `docs/superpowers/specs/2026-07-05-tax-pod-design.md`.
 
 ## Extra gaps the FULL doctrine surfaces (beyond the 5 directives)
 The real `operating-doctrine.md` (now canonical) asks for more than the 5 directives:

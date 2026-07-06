@@ -63,6 +63,17 @@
     if(o.deadline) meta.appendChild(el('span','j-ot-due','due '+o.deadline));
   }
 
+  function renderTax(t){
+    var old = $id('jTaxLine'); if(old) old.remove();
+    if(!t || !t.headline) return;
+    var ticker = $id('jTicker'); if(!ticker || !ticker.parentNode) return;
+    var el2 = document.createElement('div');
+    el2.id = 'jTaxLine'; el2.className = 'j-tax-line';
+    el2.textContent = '💰 ' + t.headline + (t.paymentsDue ? ' · ' + t.paymentsDue + ' payment(s) coming up' : '');
+    el2.style.cssText = 'font-size:12px;opacity:.85;padding:6px 10px;cursor:default;';
+    ticker.parentNode.insertBefore(el2, ticker);
+  }
+
   function renderHomeTasks(tasks){
     var wrap = $id('jTodayTasks'), cnt = $id('jTodayCount');
     if(!wrap) return;
@@ -97,6 +108,7 @@
     if(!d) return;
     renderTicker(d.approvals || []);
     renderOneThing(d.oneThing);
+    renderTax(d.tax);
     renderHomeTasks(d.tasks);
     renderTodayTab(d);
   }

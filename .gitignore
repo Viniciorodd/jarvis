@@ -86,3 +86,10 @@ companion/data/
 
 # runtime logs from run-loop.cmd
 logs/
+
+# Tax & Wealth pod runtime data (personal financial data — never commit)
+tax-ledger/
+tax-docs/
+tax-inbox/
+filing-pack/
+pods/tax/debts.json

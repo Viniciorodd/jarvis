@@ -1,0 +1,31 @@
+{
+  "asOf": null,
+  "source": "myFICO 3-bureau report",
+  "scores": { "equifax": null, "transunion": null, "experian": null },
+  "debts": [
+    { "id": "chase-1",  "creditor": "Chase (JPMCB) card 1", "kind": "card", "status": "paying",
+      "balanceCents": null, "aprPct": null, "monthlyPaymentCents": null, "dueDay": null,
+      "setup": "enter your current balance from your latest statement/report + your payment-plan amount + due day" },
+    { "id": "chase-2",  "creditor": "Chase (JPMCB) card 2", "kind": "card", "status": "paying",
+      "balanceCents": null, "aprPct": null, "monthlyPaymentCents": null, "dueDay": null,
+      "setup": "enter your current balance from your latest statement/report + your payment-plan amount + due day" },
+    { "id": "chase-3",  "creditor": "Chase (JPMCB) card 3", "kind": "card", "status": "paying",
+      "balanceCents": null, "aprPct": null, "monthlyPaymentCents": null, "dueDay": null,
+      "setup": "enter your current balance from your latest statement/report + your payment-plan amount + due day" },
+    { "id": "sba",      "creditor": "SBA loan", "kind": "loan", "status": "paying",
+      "balanceCents": null, "aprPct": null, "monthlyPaymentCents": null, "dueDay": null,
+      "deductibleInterest": true, "setup": "enter your current balance, rate, payment, due day (not on consumer report)" },
+    { "id": "amex-1",   "creditor": "American Express 1", "kind": "card", "status": "charged-off",
+      "balanceCents": null, "aprPct": null, "setup": "enter your current balance from your latest statement/report" },
+    { "id": "amex-2",   "creditor": "American Express 2", "kind": "card", "status": "charged-off",
+      "balanceCents": null, "aprPct": null, "setup": "enter your current balance from your latest statement/report" },
+    { "id": "discover", "creditor": "Discover", "kind": "card", "status": "charged-off",
+      "balanceCents": null, "aprPct": null, "setup": "enter your current balance from your latest statement/report" },
+    { "id": "apple",    "creditor": "Apple Card (GS Bank)", "kind": "card", "status": "charged-off",
+      "balanceCents": null, "aprPct": null, "setup": "enter your current balance from your latest statement/report" },
+    { "id": "coll-allstate", "creditor": "Allstate (collection)", "kind": "collection", "status": "disputed",
+      "balanceCents": null, "setup": "enter your current balance from your latest statement/report" },
+    { "id": "coll-geico",    "creditor": "Geico (collection)", "kind": "collection", "status": "disputed",
+      "balanceCents": null, "setup": "enter your current balance from your latest statement/report" }
+  ]
+}

@@ -68,6 +68,7 @@ iPhone/iPad — nothing is exposed to the public internet.
 - All agent prompts in `prompts/`. The Operator Profile (the user's distilled goals/voice/rules)
   is injected into every agent run; its template is `prompts/operator-profile-template.md`.
   The real filled-in profile is `prompts/operator-profile.md` (gitignored — contains personal data).
+- Tax & Wealth pod (Sage/TAX-01): pods/tax/ → /api/tax/status|capture|paid; ledger tax-ledger/<year>.jsonl; TY constants pods/tax/constants-<year>.mjs (verified-flagged); spec docs/superpowers/specs/2026-07-05-tax-pod-design.md.
 
 ## Status / next steps
 

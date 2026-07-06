@@ -6,6 +6,7 @@ import { TY2026 } from '../pods/tax/constants-2026.mjs';
 import { seTax, federalIncomeTax, qbiDeduction, paTax, localEit, annualDepreciation, k1Share, estimate, quarterlies } from '../pods/tax/engine.mjs';
 import { CATEGORIES, validCategory, toCents as ledgerToCents, entryHash, makeEntry, dedupe, summarize } from '../pods/tax/ledger.mjs';
 import { parseCapture, ruleCategory, pickCategoryId } from '../pods/tax/capture.mjs';
+import { splitIncome, bucketState, nudgeLine } from '../pods/tax/savings.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -191,6 +192,31 @@ export default {
         const a = pickCategoryId('schE:repairs', true), b = pickCategoryId('schC:vibes', false),
           c = pickCategoryId('UNSURE', false), d = pickCategoryId('schE:repairs', false);
         return { pass: a === 'schE:repairs' && b === null && c === null && d === null, detail: `${a}/${b}/${c}/${d}` };
+      } },
+
+    { name: 'splitIncome: parts are integers and sum EXACTLY to income (largest-remainder)',
+      run: () => {
+        const s = splitIncome(10001, { taxPct: 27, debtPct: 10, emergencyPct: 5, investPct: 5 });
+        const sum = s.tax + s.debt + s.emergency + s.invest + s.keep;
+        return { pass: sum === 10001 && s.tax === 2700 && s.debt === 1000, detail: JSON.stringify(s) };
+      } },
+
+    { name: 'bucketState: targets accrue from income; moved subtracts; due never negative',
+      run: () => {
+        const st = bucketState({
+          incomeEvents: [{ cents: 100000 }, { cents: 50000 }],
+          movedEvents: [{ bucket: 'tax', cents: 30000 }],
+          rates: { taxPct: 27, debtPct: 10, emergencyPct: 5, investPct: 5 },
+        });
+        return { pass: st.target.tax === 40500 && st.due.tax === 10500 && st.due.debt === 15000
+          && st.due.emergency === 7500, detail: JSON.stringify(st.due) };
+      } },
+
+    { name: 'nudgeLine: says what to move this week in plain English',
+      run: () => {
+        const s = nudgeLine({ due: { tax: 41200, debt: 20000, emergency: 15000, invest: 0 } });
+        return { pass: /\$412(\.00)? .*tax/i.test(s) && /\$200(\.00)? .*debt/i.test(s) && !/invest/i.test(s),
+          detail: s };
       } },
   ],
 };

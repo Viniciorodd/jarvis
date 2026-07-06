@@ -46,7 +46,8 @@ export async function recordPayment({ debtId, amount, interestAmount = null, dat
   const entry = makeEntry({ dateISO, amount, payee: d.creditor, memo: `payment on ${d.id}`,
     entity: d.deductibleInterest ? 'rodgate' : 'sidehustles', category: 'meta:debt-payment', source: 'debt' });
   if (entry.error) return entry;
-  appendEntry(entry, dir);
+  const appended = appendEntry(entry, dir);
+  if (appended.deduped) return { ...entry, deduped: true }; // replayed payment — ledger already had it; do NOT decrement twice
   if (interestAmount != null && d.deductibleInterest) {
     const i = makeEntry({ dateISO, amount: interestAmount, payee: d.creditor, memo: `interest on ${d.id}`,
       entity: 'rodgate', category: 'schC:interest', source: 'debt' });
@@ -55,7 +56,7 @@ export async function recordPayment({ debtId, amount, interestAmount = null, dat
   d.lastPaid = dateISO;
   if (typeof d.balanceCents === 'number') d.balanceCents = Math.max(0, d.balanceCents - entry.cents); // overpay → 0, never desync
   saveDebts(store);
-  await emit({ kind: 'tax.debt.payment', pod: 'exec', agent: 'TAX-01', action: 'debt-payment',
+  await emit({ kind: 'action', actor: 'TAX-01', pod: 'exec', action: 'tax.debt.payment', reversible: true,
     payload: { debtId, cents: entry.cents } });
   return entry;
 }

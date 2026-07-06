@@ -182,6 +182,12 @@ export default {
         return { pass: p.entity === 'mom' && p.property === 'ridge-1', detail: `${p.entity}/${p.property}` };
       } },
 
+    { name: 'parseCapture: the dollar amount digits never match a property alias (no misfile)',
+      run: () => {
+        const p = parseCapture('$465 lumber for the shop', REG);
+        return { pass: p.property === null && p.entity !== 'brickave-llc', detail: JSON.stringify({ property: p.property, entity: p.entity }) };
+      } },
+
     { name: 'ruleCategory: repair words + rental property → schE:repairs; gov supplies → schC; else null',
       run: () => {
         const a = ruleCategory({ payee: 'Home Depot', memo: 'repair', entity: 'brickave-llc', property: 'brick-ave', registry: REG });
@@ -299,6 +305,24 @@ export default {
         const s2 = buildStatus({ entries: [confirmed, pending], registry: REG, debts: [], C, todayISO: '2026-07-05' });
         return { pass: s2.buckets.target.tax === s1.buckets.target.tax && s1.buckets.target.tax > 0,
           detail: `${s1.buckets.target.tax}==${s2.buckets.target.tax}` };
+      } },
+
+    { name: 'buildStatus: depreciation uses the books tax year, not todays date (filing-season safe)',
+      run: () => {
+        const reg = { ...REG, properties: [{ id: 'p', entity: 'brickave-llc', basisCents: 10000000, inService: '2026-03-15' }],
+          entities: REG.entities };
+        const entries = [makeEntry({ dateISO: '2026-06-01', amount: 5000, payee: 'HAP', entity: 'brickave-llc', property: 'p', category: 'income:hap', source: 'capture' })];
+        const filed2027 = buildStatus({ entries, registry: reg, debts: [], C, todayISO: '2027-02-15', taxYear: 2026 });
+        const during2026 = buildStatus({ entries, registry: reg, debts: [], C, todayISO: '2026-07-05', taxYear: 2026 });
+        return { pass: filed2027.estimate.totalCents === during2026.estimate.totalCents,
+          detail: `${filed2027.estimate.totalCents} vs ${during2026.estimate.totalCents}` };
+      } },
+
+    { name: 'buildStatus: needs_review entries are counted + warned (never silently dropped)',
+      run: () => {
+        const pending = makeEntry({ dateISO: '2026-03-01', amount: 500, payee: '?', entity: 'rodgate', category: 'meta:personal', source: 'capture', status: 'needs_review' });
+        const s = buildStatus({ entries: [pending], registry: REG, debts: [], C, todayISO: '2026-07-05', taxYear: 2026 });
+        return { pass: s.needsReview === 1 && s.warnings.some((w) => /need a quick review/i.test(w)), detail: `needsReview=${s.needsReview}` };
       } },
 
     { name: 'org: "the tax guy" and "what do i owe" resolve to TAX-01 Sage under Victor',

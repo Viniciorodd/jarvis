@@ -24,16 +24,19 @@ export function parseCapture(text, registry) {
   const amount = m[1].replace(/,/g, '');
   if (toCents(amount) == null) return { error: `amount "${m[1]}" out of range` };
   const rest = t.slice(m.index + m[0].length).trim();
-  const lower = t.toLowerCase();
+  // Search haystack EXCLUDES the amount token itself — otherwise digits like "465" in "$465" can
+  // false-match a property alias ("465") and misfile the entry (directive #1: code disposes correctly).
+  const hay = (t.slice(0, m.index) + ' ' + rest).toLowerCase();
+  const hit = (n) => { const s = String(n).toLowerCase().trim(); return s && new RegExp('(^|\\W)' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\W|$)').test(hay); };
   let property = null, entity = null;
   for (const p of registry.properties || []) {
-    const names = [p.id, ...(p.aliases || [])].map((s) => String(s).toLowerCase());
-    if (names.some((n) => n && lower.includes(n))) { property = p.id; entity = p.entity; break; }
+    const names = [p.id, ...(p.aliases || [])];
+    if (names.some((n) => hit(n))) { property = p.id; entity = p.entity; break; }
   }
   if (!entity) {
     for (const e of registry.entities || []) {
-      const names = [e.id, ...(e.aliases || [])].map((s) => String(s).toLowerCase());
-      if (names.some((n) => n && lower.includes(n))) { entity = e.id; break; }
+      const names = [e.id, ...(e.aliases || [])];
+      if (names.some((n) => hit(n))) { entity = e.id; break; }
     }
   }
   const payee = (rest.split(/,| for | at | on /i)[0] || '').trim().slice(0, 60) || 'unknown';
@@ -105,7 +108,7 @@ export async function capture(text, { dir } = {}) {
     entity: p.entity, property: p.property, category, source: 'capture', status });
   if (entry.error) return entry;
   const r = appendEntry(entry, dir);
-  await emit({ kind: 'tax.capture', pod: 'exec', agent: 'TAX-01', action: 'capture',
+  await emit({ kind: 'action', actor: 'TAX-01', pod: 'exec', action: 'tax.capture', reversible: true,
     payload: { hash: entry.hash, cents: entry.cents, category, status } });
   return { ...entry, deduped: r.deduped };
 }

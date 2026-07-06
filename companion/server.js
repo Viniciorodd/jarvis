@@ -2533,7 +2533,7 @@ const server = http.createServer(async (req, res) => {
     else if (tasks.active && tasks.active[0]) oneThing = { text: tasks.active[0].text, kind: 'task', id: tasks.active[0].id };
     let tax = null;
     try { const { taxStatus } = await import('../pods/tax/status.mjs'); const s = await taxStatus();
-      tax = { headline: s.headline, paymentsDue: s.paymentsDue.filter((p) => !p.paidThisMonth).length, warnings: s.warnings.length }; }
+      tax = { headline: s.headline, paymentsDue: s.paymentsDue.filter((p) => !p.paidThisMonth).length, warnings: s.warnings.length, needsReview: s.needsReview }; }
     catch { /* tax pod optional — cockpit never breaks because of it */ }
     return send(res, 200, JSON.stringify({ date: todayStr, oneThing, govNextAction, todayCalendar, week, tasks, approvals, calError, hasGoogle: google.googleConfigured(), tax }));
   }

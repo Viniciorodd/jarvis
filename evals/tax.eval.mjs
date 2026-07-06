@@ -417,6 +417,22 @@ export default {
         return { pass: r.prepared.length === 0 && r.failedRows.length === 1, detail: JSON.stringify(r.failedRows[0]) };
       } },
 
+    { name: 'classifyDedup: EXACTLY 3 days apart, equal cents → suspected-dup (±3 boundary is inclusive)',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const manual = makeEntry({ dateISO: '2026-03-02', amount: 43, payee: 'HD', entity: 'rodgate', category: 'schC:supplies', source: 'capture' });
+        const r = classifyDedup({ rows: [['03/05/2026','HD','-43.00']], account: acct, existingEntries: [manual], todayISO: '2026-07-05' });
+        return { pass: r.prepared[0].reviewKind === 'suspected-dup', detail: JSON.stringify(r.prepared[0]) };
+      } },
+    { name: 'classifyDedup: a VOIDED (rejected) prior entry does not trigger a false suspected-dup',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const rejected = makeEntry({ dateISO: '2026-03-04', amount: 43, payee: 'HD', entity: 'rodgate', category: 'schC:supplies', source: 'capture', status: 'needs_review' });
+        const voidRes = makeResolution({ target: rejected.hash, action: 'void', dateISO: '2026-03-04' });
+        const r = classifyDedup({ rows: [['03/05/2026','HOME DEPOT','-43.00']], account: acct, existingEntries: [rejected, voidRes], todayISO: '2026-07-05' });
+        return { pass: r.prepared.length === 1 && r.prepared[0].reviewKind !== 'suspected-dup', detail: JSON.stringify(r.prepared[0]) };
+      } },
+
     { name: 'parseCsv: quote-aware — a quoted field with a comma stays ONE field; normal row still splits',
       run: () => {
         const rows = parseCsv('Date,Description,Amount\n2026-03-05,"HOME DEPOT, SCRANTON",-43.00\n2026-03-06,HAP DEPOSIT,1850.00\n');
@@ -451,6 +467,19 @@ export default {
         const item = { direction: 'out', payee: 'MYSTERY VENDOR XYZ', entity: 'rodgate', property: null };
         const out = assignCategory(item, { registry: REG });
         return { pass: out.category === null, detail: String(out.category) };
+      } },
+
+    { name: 'assignCategory: a non-rent/HAP inbound row (card payment/refund) → needs_review, never auto-confirmed income',
+      run: () => {
+        const item = { direction: 'in', payee: 'PAYMENT THANK YOU', entity: 'rodgate', status: 'confirmed' };
+        const r = assignCategory(item, { registry: REG });
+        return { pass: r.category === 'income:gross-receipts' && r.status === 'needs_review' && r.reviewKind === 'unconfirmed-income', detail: JSON.stringify(r) };
+      } },
+    { name: 'assignCategory: a clear HAP inbound row stays confirmed income:hap',
+      run: () => {
+        const item = { direction: 'in', payee: 'HAP DEPOSIT SECTION 8', entity: 'brickave-llc', status: 'confirmed' };
+        const r = assignCategory(item, { registry: REG });
+        return { pass: r.category === 'income:hap' && r.status !== 'needs_review', detail: JSON.stringify(r) };
       } },
 
     { name: 'finalizeItems: a null-category item becomes needs_review + meta:personal placeholder (never off-taxonomy)',

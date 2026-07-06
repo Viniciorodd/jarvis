@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { applyMap, loadAccounts, resolveProfile } from './accounts.mjs';
-import { entryHash, makeEntry, appendEntry, readLedger } from './ledger.mjs';
+import { entryHash, makeEntry, appendEntry, readLedger, resolveLedger } from './ledger.mjs';
 import { ruleCategory, pickCategoryId, loadRegistry } from './capture.mjs';
 import { CATEGORIES } from './ledger.mjs';
 import { claudeBatch, emit, ROOT } from '../lib.mjs';
@@ -19,6 +19,7 @@ export function classifyDedup({ rows, account, existingEntries = [], todayISO })
   const map = account.columnMap || {};
   const prepared = [], failedRows = []; let deduped = 0;
   const existingHashes = new Set(existingEntries.filter((e) => e && e.hash).map((e) => e.hash));
+  const live = resolveLedger(existingEntries); // cross-source dup only against entries still alive (a rejected one shouldn't flag)
   for (const row of rows) {
     const parsed = applyMap(row, map);
     if (parsed.error) { failedRows.push({ row, error: parsed.error }); continue; }
@@ -28,8 +29,7 @@ export function classifyDedup({ rows, account, existingEntries = [], todayISO })
     if (existingHashes.has(h)) { deduped += 1; continue; }        // exact re-drop
     const item = { dateISO: parsed.dateISO, cents: parsed.cents, direction: parsed.direction,
       payee, entity, status: 'confirmed' };
-    const dup = existingEntries.find((e) => e && e.cents === parsed.cents && e.status !== 'void'
-      && daysBetween(e.dateISO, parsed.dateISO) <= 3);
+    const dup = live.find((e) => e && e.cents === parsed.cents && daysBetween(e.dateISO, parsed.dateISO) <= 3);
     if (dup) { item.status = 'needs_review'; item.reviewKind = 'suspected-dup'; item.dupOf = dup.hash; }
     prepared.push(item);
   }
@@ -70,9 +70,12 @@ export function parseCsv(text) {
 export function assignCategory(item, { registry }) {
   if (item.direction === 'in') {
     const payee = String(item.payee || '');
-    if (/hap|section 8/i.test(payee)) item.category = 'income:hap';
+    if (/hap|section\s*8/i.test(payee)) item.category = 'income:hap';
     else if (/rent|tenant/i.test(payee)) item.category = 'income:rent';
-    else item.category = 'income:gross-receipts';
+    else { // ambiguous inbound (card payment, refund, transfer) — never auto-confirm as income
+      item.category = 'income:gross-receipts';
+      if (item.status !== 'needs_review') { item.status = 'needs_review'; item.reviewKind = 'unconfirmed-income'; }
+    }
     return item;
   }
   const cat = ruleCategory({ payee: item.payee, memo: item.payee, entity: item.entity,
@@ -109,6 +112,7 @@ export async function importInbox({ dir, apply = true, ledgerDir } = {}) {
   try { files = fs.readdirSync(inbox).filter((f) => f.toLowerCase().endsWith('.csv')); } catch { files = []; }
 
   const registry = loadRegistry();
+  const entityIds = new Set(registry.entities.map((e) => e.id));
   const { accounts } = loadAccounts();
 
   for (const file of files) {
@@ -124,6 +128,11 @@ export async function importInbox({ dir, apply = true, ledgerDir } = {}) {
       continue;
     }
     const account = { ...profile.account, columnMap: profile.columnMap };
+
+    if (!entityIds.has(account.defaultEntity)) {
+      summaries.push({ file, status: 'bad-account', defaultEntity: account.defaultEntity });
+      continue;
+    }
 
     const firstDateRaw = dataRows.length ? applyMap(dataRows[0], account.columnMap) : null;
     const year = (firstDateRaw && firstDateRaw.dateISO) ? Number(firstDateRaw.dateISO.slice(0, 4)) : new Date().getUTCFullYear();

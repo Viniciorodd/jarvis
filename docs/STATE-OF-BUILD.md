@@ -67,10 +67,11 @@ and rack up real submit history so workflows can earn promotion up the ladder.
   taxonomy-gated `claudeBatch` classify fallback (rules first, LLM only picks from the fixed
   Schedule C/E list, never invents a category), whole-file quarantine to `tax-inbox/failed/` when >20%
   of rows are unparseable. Review queue + cockpit screen for `needs_review` items (accept /
-  recategorize / merge / keep-both / reject), append-only resolution deltas in the ledger (never mutate
+  recategorize / merge / keep-both — `reject` exists in the API but has no button in the UI yet),
+  append-only resolution deltas in the ledger (never mutate
   history). Backfill CLI: `node pods/tax/importer.mjs --backfill` runs the drop-folder
   (`tax-inbox/`) once and prints `N files · X filed · Y queued · Z quarantined · $D deductions found`.
-  Eval harness green: **348/348** (run `node evals/run.mjs` for the current count). Known limitations:
+  Eval harness green (run `node evals/run.mjs` for the current count). Known limitations:
   in-UI column-map confirm is deferred to the CLI/`accounts.local.json` (no first-import wizard yet in
   the cockpit); per-row property attribution is entity-level only (no per-row property inference); the
   review routes read the current tax year only (no cross-year review queue). Spec:

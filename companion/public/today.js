@@ -69,8 +69,14 @@
     var ticker = $id('jTicker'); if(!ticker || !ticker.parentNode) return;
     var el2 = document.createElement('div');
     el2.id = 'jTaxLine'; el2.className = 'j-tax-line';
-    el2.textContent = '💰 ' + t.headline + (t.paymentsDue ? ' · ' + t.paymentsDue + ' payment(s) coming up' : '');
     el2.style.cssText = 'font-size:12px;opacity:.85;padding:6px 10px;cursor:default;';
+    el2.appendChild(document.createTextNode('💰 ' + t.headline + (t.paymentsDue ? ' · ' + t.paymentsDue + ' payment(s) coming up' : '')));
+    if(t.needsReview > 0){
+      var reviewLink = el('span','j-tax-review-link', ' · ' + t.needsReview + ' to review');
+      reviewLink.style.cssText = 'cursor:pointer;text-decoration:underline;';
+      reviewLink.addEventListener('click', function(){ if(window.TaxReview) window.TaxReview.open(); });
+      el2.appendChild(reviewLink);
+    }
     ticker.parentNode.insertBefore(el2, ticker);
   }
 
@@ -176,6 +182,9 @@
     var more = $id('jTodayMore'); if(more) more.addEventListener('click', function(e){ e.preventDefault(); var b = $id('jNavToday'); if(b) b.click(); });
     var ticker = $id('jTicker'); if(ticker) ticker.addEventListener('click', function(){ var b = $id('opsBtn'); if(b) b.click(); });
   }
+
+  // let other screens (tax-review.js) ask the Home glance to refresh after they change data
+  window.TodayCockpit = { reload: load };
 
   wire();
   load();

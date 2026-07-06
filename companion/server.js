@@ -2498,6 +2498,35 @@ const server = http.createServer(async (req, res) => {
       return send(res, r.error ? 400 : 200, JSON.stringify(r));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  if (req.method === 'GET' && url.pathname === '/api/tax/review') {
+    try {
+      const { readLedger } = await import('../pods/tax/ledger.mjs');
+      const { listPending } = await import('../pods/tax/review.mjs');
+      const { CATEGORIES } = await import('../pods/tax/ledger.mjs');
+      const year = new Date().getFullYear();
+      const pending = listPending(readLedger(year));
+      const categories = Object.entries(CATEGORIES).map(([id, c]) => ({ id, label: c.label, form: c.form }));
+      return send(res, 200, JSON.stringify({ pending, categories }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/tax/review/resolve') {
+    try {
+      const { hash, decision, entity, category } = await readBody(req);
+      if (!hash || !decision) return send(res, 400, JSON.stringify({ error: 'hash and decision required' }));
+      const { readLedger, appendResolution } = await import('../pods/tax/ledger.mjs');
+      const { resolve, listPending } = await import('../pods/tax/review.mjs');
+      const year = new Date().getFullYear();
+      const records = readLedger(year);
+      const entry = records.find((e) => e && e.hash === hash && e.status === 'needs_review');
+      if (!entry) return send(res, 404, JSON.stringify({ error: 'pending entry not found' }));
+      const r = resolve(entry, { type: decision, entity, category });
+      if (r.error) return send(res, 400, JSON.stringify(r));
+      for (const rec of r.resolutions) appendResolution(rec, undefined);
+      try { const { emit } = await import('../pods/lib.mjs'); await emit({ kind: 'action', actor: 'TAX-01', pod: 'exec', action: 'tax.review.resolve', reversible: true, payload: { hash, decision } }); } catch { /* best-effort */ }
+      const remaining = listPending(readLedger(year)).length;
+      return send(res, 200, JSON.stringify({ ok: true, remaining }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
 
   // ── COCKPIT: the one calm screen (🎯 Today · ✅ Tasks · 📅 Week · ⚡ Capture · approvals strip) ────
   if (req.method === 'GET' && url.pathname === '/api/cockpit') {

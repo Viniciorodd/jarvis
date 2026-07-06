@@ -2,7 +2,7 @@
 // known-answer scenarios. Pure functions only — no network, no disk.
 
 import { TY2026 } from '../pods/tax/constants-2026.mjs';
-import { seTax, federalIncomeTax, qbiDeduction, paTax, localEit } from '../pods/tax/engine.mjs';
+import { seTax, federalIncomeTax, qbiDeduction, paTax, localEit, annualDepreciation, k1Share, estimate, quarterlies } from '../pods/tax/engine.mjs';
 const C = TY2026;
 
 export default {
@@ -60,5 +60,57 @@ export default {
     { name: 'paTax 3.07% + localEit: $80,000 → $2,456.00 PA, $800 at 1%',
       run: () => ({ pass: paTax(8000000, C) === 245600 && localEit(8000000, 1.0) === 80000,
         detail: `${paTax(8000000, C)}/${localEit(8000000, 1.0)}` }) },
+
+    { name: 'depreciation: $100k basis, in service 2026-03, 27.5y mid-month → $2,878.79 year 1',
+      run: () => {
+        const y1 = annualDepreciation({ basisCents: 10000000, inServiceISO: '2026-03-15', taxYear: 2026, C });
+        const later = annualDepreciation({ basisCents: 10000000, inServiceISO: '2024-03-15', taxYear: 2026, C });
+        const missing = annualDepreciation({ basisCents: null, inServiceISO: null, taxYear: 2026, C });
+        return { pass: y1 === 287879 && later === 363636 && missing === 0, detail: `${y1}/${later}/${missing}` };
+      } },
+
+    { name: 'k1Share: 19% + 81% of any net sums to exactly 100% (no lost cents)',
+      run: () => {
+        const a = k1Share(1000001, 19), b = 1000001 - k1Share(1000001, 19); // mother's share = remainder
+        return { pass: a === 190000 && a + b === 1000001, detail: `${a}+${b}` };
+      } },
+
+    { name: 'estimate: $80k Sch C, no K-1 → fed 5,343.82 + SE 11,303.64 + PA 2,456 + local 800 (1%)',
+      run: () => {
+        const e = estimate({ C, schCNetCents: [{ id: 'rodgate', netCents: 8000000 }], k1NetCents: 0,
+          otherIncomeCents: 0, localEitRatePct: 1.0, estPaidCents: 0 });
+        const pass = e.se.totalCents === 1130364 && e.federalCents === 534382
+          && e.paCents === 245600 && e.localCents === 80000
+          && e.totalCents === 1130364 + 534382 + 245600 + 80000
+          && e.setAsidePct >= 24 && e.setAsidePct <= 26;
+        return { pass, detail: `total=${e.totalCents} setAside=${e.setAsidePct}` };
+      } },
+
+    { name: 'estimate: K-1 LOSS is excluded + flagged (passive-loss caution), never subtracted silently',
+      run: () => {
+        const e = estimate({ C, schCNetCents: [{ id: 'rodgate', netCents: 8000000 }], k1NetCents: -5000000,
+          otherIncomeCents: 0, localEitRatePct: 1.0, estPaidCents: 0 });
+        const base = estimate({ C, schCNetCents: [{ id: 'rodgate', netCents: 8000000 }], k1NetCents: 0,
+          otherIncomeCents: 0, localEitRatePct: 1.0, estPaidCents: 0 });
+        return { pass: e.totalCents === base.totalCents && e.flags.includes('k1-loss-excluded'),
+          detail: e.flags.join(',') };
+      } },
+
+    { name: 'quarterlies: lesser of 90% current vs 100% prior, spread over remaining due dates',
+      run: () => {
+        const q = quarterlies({ C, projectedTaxCents: 2000000, priorYearTaxCents: 1500000,
+          priorAgiCents: 9000000, paidCents: 400000, todayISO: '2026-07-05' });
+        return { pass: q.requiredAnnualCents === 1500000 && q.basis === 'prior-year'
+          && q.remaining.length === 2 && q.remaining[0].due === '2026-09-15'
+          && q.remaining[0].amountCents === 550000 && q.remaining[1].amountCents === 550000,
+          detail: JSON.stringify(q.remaining) };
+      } },
+
+    { name: 'quarterlies: prior AGI > $150k uses the 110% prior-year target',
+      run: () => {
+        const q = quarterlies({ C, projectedTaxCents: 9000000, priorYearTaxCents: 2000000,
+          priorAgiCents: 20000000, paidCents: 0, todayISO: '2026-07-05' });
+        return { pass: q.requiredAnnualCents === 2200000, detail: String(q.requiredAnnualCents) };
+      } },
   ],
 };

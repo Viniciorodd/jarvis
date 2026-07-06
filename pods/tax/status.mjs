@@ -4,7 +4,7 @@
 
 import { TY2026 } from './constants-2026.mjs';
 import { estimate, quarterlies, k1Share, annualDepreciation } from './engine.mjs';
-import { readLedger, summarize } from './ledger.mjs';
+import { readLedger, summarize, resolveLedger } from './ledger.mjs';
 import { bucketState, nudgeLine } from './savings.mjs';
 import { loadDebts, paymentsDue } from './debt.mjs';
 import { loadRegistry } from './capture.mjs';
@@ -13,6 +13,7 @@ const usd = (c) => '$' + Math.round(c / 100).toLocaleString('en-US');
 
 export function buildStatus({ entries, registry, debts, C, todayISO, taxYear }) {
   const bookYear = taxYear || Number(String(todayISO).slice(0, 4));
+  const live = resolveLedger(entries);
   const sum = summarize(entries, registry);
   const llcEntity = (registry.entities || []).find((e) => e.kind === 'partnership') || { ownershipPct: 0 };
   // Depreciation is a real LLC-book expense (per property, from basis + in-service). Properties
@@ -33,11 +34,11 @@ export function buildStatus({ entries, registry, debts, C, todayISO, taxYear }) 
   const rates = { ...registry.splits, taxPct: registry.splits.taxPct === 'auto' ? est.setAsidePct : registry.splits.taxPct };
   // needs_review entries are excluded here for the SAME reason summarize() skips them — the bucket
   // nudge and the tax estimate must always agree on which entries counted.
-  const incomeEvents = entries.filter((e) => e && !e.error && e.status !== 'needs_review' && e.category && e.category.startsWith('income:'))
+  const incomeEvents = live.filter((e) => e && !e.error && e.status !== 'needs_review' && e.category && e.category.startsWith('income:'))
     .map((e) => ({ cents: e.cents }));
   const buckets = bucketState({ incomeEvents, movedEvents: [], rates });
   const due = paymentsDue({ debts, todayISO });
-  const needsReview = entries.filter((e) => e && !e.error && e.status === 'needs_review').length;
+  const needsReview = live.filter((e) => e && !e.error && e.status === 'needs_review').length;
   const warnings = [];
   for (const k of C.unverified()) warnings.push(`TY${C.year} constant "${k}" not yet verified against the official source`);
   if (registry.localEitRatePct && registry.localEitRatePct.verified === false) warnings.push('local EIT rate is a placeholder — set your municipality rate in entities.json');

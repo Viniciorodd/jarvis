@@ -4,12 +4,15 @@
 import fs from 'node:fs';
 import { TY2026 } from '../pods/tax/constants-2026.mjs';
 import { seTax, federalIncomeTax, qbiDeduction, paTax, localEit, annualDepreciation, k1Share, estimate, quarterlies } from '../pods/tax/engine.mjs';
-import { CATEGORIES, validCategory, toCents as ledgerToCents, entryHash, makeEntry, dedupe, summarize } from '../pods/tax/ledger.mjs';
+import { CATEGORIES, validCategory, toCents as ledgerToCents, entryHash, makeEntry, dedupe, summarize, resolveLedger, makeResolution } from '../pods/tax/ledger.mjs';
 import { parseCapture, ruleCategory, pickCategoryId } from '../pods/tax/capture.mjs';
 import { splitIncome, bucketState, nudgeLine } from '../pods/tax/savings.mjs';
 import { paymentsDue, payoffPlan, codIncome } from '../pods/tax/debt.mjs';
 import { buildStatus } from '../pods/tax/status.mjs';
 import { matchPerson } from '../pods/org.mjs';
+import { headerHash, applyMap, resolveProfile } from '../pods/tax/accounts.mjs';
+import { classifyDedup, assignCategory, finalizeItems, parseCsv } from '../pods/tax/importer.mjs';
+import { listPending, resolve } from '../pods/tax/review.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -330,6 +333,280 @@ export default {
         const a = matchPerson('ask the tax guy'), b = matchPerson('what do i owe this quarter');
         return { pass: a && a.codename === 'TAX-01' && b && b.codename === 'TAX-01'
           && a.reports_to === 'LEDGER-01', detail: (a && a.nickname) || 'no match' };
+      } },
+
+    { name: 'headerHash: stable + case/space-insensitive',
+      run: () => {
+        const a = headerHash(['Date', 'Amount', ' Description ']);
+        const b = headerHash(['date', 'amount', 'description']);
+        return { pass: a === b && a.length === 12, detail: a };
+      } },
+
+    { name: 'applyMap signed: negative amount = money out, positive = in; parses cents + ISO date',
+      run: () => {
+        const map = { dateCol: 0, amountCol: 2, descCol: 1, signConvention: 'signed' };
+        const out = applyMap(['03/05/2026', 'HOME DEPOT #4021', '-43.00'], map);
+        const inc = applyMap(['03/06/2026', 'HAP DEPOSIT', '1850.00'], map);
+        return { pass: out.cents === 4300 && out.direction === 'out' && out.dateISO === '2026-03-05'
+          && inc.cents === 185000 && inc.direction === 'in', detail: JSON.stringify(out) };
+      } },
+
+    { name: 'applyMap: an out-of-range date (month 13, day 45, Feb 30) → error, never a garbage ISO string',
+      run: () => {
+        const map = { dateCol: 0, amountCol: 2, descCol: 1, signConvention: 'signed' };
+        const m13 = applyMap(['13/05/2026', 'X', '-10.00'], map);
+        const d45 = applyMap(['03/45/2026', 'X', '-10.00'], map);
+        const feb30 = applyMap(['02/30/2026', 'X', '-10.00'], map);
+        const good = applyMap(['03/05/2026', 'X', '-10.00'], map);
+        return { pass: !!m13.error && !!d45.error && !!feb30.error && good.dateISO === '2026-03-05',
+          detail: `${m13.error?'err':m13.dateISO} / ${d45.error?'err':d45.dateISO} / ${feb30.error?'err':feb30.dateISO}` };
+      } },
+
+    { name: 'applyMap debit-credit: separate columns; a junk amount → error (never a bad cents value)',
+      run: () => {
+        const map = { dateCol: 0, descCol: 1, debitCol: 2, creditCol: 3, signConvention: 'debit-credit' };
+        const debit = applyMap(['2026-03-05', 'Staples', '20.00', ''], map);
+        const credit = applyMap(['2026-03-06', 'Refund', '', '15.00'], map);
+        const bad = applyMap(['2026-03-06', 'X', 'NaN', ''], map);
+        return { pass: debit.cents === 2000 && debit.direction === 'out' && credit.cents === 1500
+          && credit.direction === 'in' && !!bad.error, detail: JSON.stringify(credit) };
+      } },
+
+    { name: 'resolveProfile: matches saved header hash → columnMap; unknown header → needsMapping',
+      run: () => {
+        const accounts = [{ id: 'chase-biz', defaultEntity: 'rodgate', headerHash: headerHash(['Date','Desc','Amount']),
+          columnMap: { dateCol: 0, descCol: 1, amountCol: 2, signConvention: 'signed' } }];
+        const known = resolveProfile(accounts, ['Date', 'Desc', 'Amount']);
+        const unknown = resolveProfile(accounts, ['Posted', 'Merchant', 'Debit', 'Credit']);
+        return { pass: known.columnMap.amountCol === 2 && unknown.needsMapping === true, detail: JSON.stringify(known.columnMap) };
+      } },
+
+    { name: 'classifyDedup: exact re-drop is skipped (idempotent)',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const existing = [makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT #4021', entity: 'rodgate', category: 'schC:supplies', source: 'csv' })];
+        const rows = [['03/05/2026', 'HOME DEPOT #4021', '-43.00']];
+        const r = classifyDedup({ rows, account: acct, existingEntries: existing, todayISO: '2026-07-05' });
+        return { pass: r.prepared.length === 0 && r.deduped === 1, detail: JSON.stringify(r) };
+      } },
+
+    { name: 'classifyDedup cross-source: equal cents within 3 days of a manual capture → suspected-dup queued',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const manual = makeEntry({ dateISO: '2026-03-03', amount: 43, payee: 'Home Depot', entity: 'rodgate', category: 'schC:supplies', source: 'capture' });
+        const rows = [['03/05/2026', 'HOMEDEPOT #4021 SCRANTON', '-43.00']]; // 2 days later, same $43
+        const r = classifyDedup({ rows, account: acct, existingEntries: [manual], todayISO: '2026-07-05' });
+        return { pass: r.prepared.length === 1 && r.prepared[0].status === 'needs_review'
+          && r.prepared[0].reviewKind === 'suspected-dup' && r.prepared[0].dupOf === manual.hash, detail: JSON.stringify(r.prepared[0]) };
+      } },
+
+    { name: 'classifyDedup: same cents but 4 days apart → NOT a dup, filed separately',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const manual = makeEntry({ dateISO: '2026-03-01', amount: 43, payee: 'Home Depot', entity: 'rodgate', category: 'schC:supplies', source: 'capture' });
+        const rows = [['03/05/2026', 'HOME DEPOT', '-43.00']]; // 4 days later
+        const r = classifyDedup({ rows, account: acct, existingEntries: [manual], todayISO: '2026-07-05' });
+        return { pass: r.prepared.length === 1 && r.prepared[0].reviewKind !== 'suspected-dup', detail: JSON.stringify(r.prepared[0]) };
+      } },
+
+    { name: 'classifyDedup: unparseable row → failedRows, never a bad entry',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const rows = [['notadate', 'X', 'NaN']];
+        const r = classifyDedup({ rows, account: acct, existingEntries: [], todayISO: '2026-07-05' });
+        return { pass: r.prepared.length === 0 && r.failedRows.length === 1, detail: JSON.stringify(r.failedRows[0]) };
+      } },
+
+    { name: 'classifyDedup: EXACTLY 3 days apart, equal cents → suspected-dup (±3 boundary is inclusive)',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const manual = makeEntry({ dateISO: '2026-03-02', amount: 43, payee: 'HD', entity: 'rodgate', category: 'schC:supplies', source: 'capture' });
+        const r = classifyDedup({ rows: [['03/05/2026','HD','-43.00']], account: acct, existingEntries: [manual], todayISO: '2026-07-05' });
+        return { pass: r.prepared[0].reviewKind === 'suspected-dup', detail: JSON.stringify(r.prepared[0]) };
+      } },
+    { name: 'classifyDedup: a VOIDED (rejected) prior entry does not trigger a false suspected-dup',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const rejected = makeEntry({ dateISO: '2026-03-04', amount: 43, payee: 'HD', entity: 'rodgate', category: 'schC:supplies', source: 'capture', status: 'needs_review' });
+        const voidRes = makeResolution({ target: rejected.hash, action: 'void', dateISO: '2026-03-04' });
+        const r = classifyDedup({ rows: [['03/05/2026','HOME DEPOT','-43.00']], account: acct, existingEntries: [rejected, voidRes], todayISO: '2026-07-05' });
+        return { pass: r.prepared.length === 1 && r.prepared[0].reviewKind !== 'suspected-dup', detail: JSON.stringify(r.prepared[0]) };
+      } },
+
+    { name: 'parseCsv: quote-aware — a quoted field with a comma stays ONE field; normal row still splits',
+      run: () => {
+        const rows = parseCsv('Date,Description,Amount\n2026-03-05,"HOME DEPOT, SCRANTON",-43.00\n2026-03-06,HAP DEPOSIT,1850.00\n');
+        return { pass: rows.length === 3 && rows[1].length === 3 && rows[1][1] === 'HOME DEPOT, SCRANTON'
+          && rows[2].length === 3 && rows[2][1] === 'HAP DEPOSIT',
+          detail: JSON.stringify(rows) };
+      } },
+
+    { name: 'parseCsv: strips a UTF-8 BOM on the first cell and skips blank lines',
+      run: () => {
+        const rows = parseCsv('﻿Date,Description,Amount\n2026-03-05,HD,-43.00\n\n2026-03-06,HAP,1850.00\n');
+        return { pass: rows.length === 3 && rows[0][0] === 'Date' && rows[2][0] === '2026-03-06',
+          detail: JSON.stringify(rows) };
+      } },
+
+    { name: 'assignCategory: income direction — HAP-looking payee → income:hap',
+      run: () => {
+        const item = { direction: 'in', payee: 'HAP DEPOSIT SECTION 8', entity: 'brickave-llc', property: 'brick-ave' };
+        const out = assignCategory(item, { registry: REG });
+        return { pass: out.category === 'income:hap', detail: out.category };
+      } },
+
+    { name: 'assignCategory: expense direction — Home Depot on an LLC rental property → schE (via ruleCategory)',
+      run: () => {
+        const item = { direction: 'out', payee: 'HOME DEPOT #4021', entity: 'brickave-llc', property: 'brick-ave' };
+        const out = assignCategory(item, { registry: REG });
+        return { pass: out.category === 'schE:repairs', detail: out.category };
+      } },
+
+    { name: 'assignCategory: unmatched expense → category stays null (left for the claudeBatch step)',
+      run: () => {
+        const item = { direction: 'out', payee: 'MYSTERY VENDOR XYZ', entity: 'rodgate', property: null };
+        const out = assignCategory(item, { registry: REG });
+        return { pass: out.category === null, detail: String(out.category) };
+      } },
+
+    { name: 'assignCategory: a non-rent/HAP inbound row (card payment/refund) → needs_review, never auto-confirmed income',
+      run: () => {
+        const item = { direction: 'in', payee: 'PAYMENT THANK YOU', entity: 'rodgate', status: 'confirmed' };
+        const r = assignCategory(item, { registry: REG });
+        return { pass: r.category === 'income:gross-receipts' && r.status === 'needs_review' && r.reviewKind === 'unconfirmed-income', detail: JSON.stringify(r) };
+      } },
+    { name: 'assignCategory: a clear HAP inbound row stays confirmed income:hap',
+      run: () => {
+        const item = { direction: 'in', payee: 'HAP DEPOSIT SECTION 8', entity: 'brickave-llc', status: 'confirmed' };
+        const r = assignCategory(item, { registry: REG });
+        return { pass: r.category === 'income:hap' && r.status !== 'needs_review', detail: JSON.stringify(r) };
+      } },
+
+    { name: 'finalizeItems: a null-category item becomes needs_review + meta:personal placeholder (never off-taxonomy)',
+      run: () => {
+        const items = [{ dateISO: '2026-03-05', cents: 4300, payee: 'MYSTERY VENDOR', entity: 'rodgate', property: null, category: null, status: 'confirmed' }];
+        const entries = finalizeItems(items);
+        return { pass: entries.length === 1 && entries[0].status === 'needs_review' && entries[0].category === 'meta:personal',
+          detail: JSON.stringify(entries[0]) };
+      } },
+
+    { name: 'finalizeItems: a suspected-dup item keeps its reviewKind/dupOf through to the entry',
+      run: () => {
+        const items = [{ dateISO: '2026-03-05', cents: 4300, payee: 'HOME DEPOT', entity: 'rodgate', property: null,
+          category: 'schC:supplies', status: 'needs_review', reviewKind: 'suspected-dup', dupOf: 'abc123' }];
+        const entries = finalizeItems(items);
+        return { pass: entries.length === 1 && entries[0].reviewKind === 'suspected-dup' && entries[0].dupOf === 'abc123'
+          && entries[0].status === 'needs_review', detail: JSON.stringify(entries[0]) };
+      } },
+
+    { name: 'review.resolve accept → one confirm resolution targeting entry.hash',
+      run: () => {
+        const entry = { hash: 'abc123', dateISO: '2026-03-05' };
+        const out = resolve(entry, { type: 'accept' });
+        const r = out.resolutions;
+        return { pass: r.length === 1 && r[0].target === 'abc123' && r[0].action === 'confirm', detail: JSON.stringify(r) };
+      } },
+
+    { name: 'review.resolve recategorize: bad category → error; good category → one recategorize resolution with entity/category',
+      run: () => {
+        const entry = { hash: 'abc123', dateISO: '2026-03-05' };
+        const bad = resolve(entry, { type: 'recategorize', category: 'schC:vibes' });
+        const good = resolve(entry, { type: 'recategorize', entity: 'sidehustles', category: 'schC:software' });
+        const r = good.resolutions;
+        const pass = !!bad.error && r.length === 1 && r[0].action === 'recategorize' && r[0].target === 'abc123'
+          && r[0].entity === 'sidehustles' && r[0].category === 'schC:software';
+        return { pass, detail: `bad=${JSON.stringify(bad)} good=${JSON.stringify(r)}` };
+      } },
+
+    { name: 'review.resolve merge → confirm(entry.hash) + void(entry.dupOf)',
+      run: () => {
+        const entry = { hash: 'bankhash1', dupOf: 'manualhash1', dateISO: '2026-03-05' };
+        const out = resolve(entry, { type: 'merge' });
+        const r = out.resolutions;
+        return { pass: r.length === 2 && r[0].action === 'confirm' && r[0].target === 'bankhash1'
+          && r[1].action === 'void' && r[1].target === 'manualhash1', detail: JSON.stringify(r) };
+      } },
+
+    { name: 'review.resolve reject → void(entry.hash)',
+      run: () => {
+        const entry = { hash: 'abc123', dateISO: '2026-03-05' };
+        const out = resolve(entry, { type: 'reject' });
+        const r = out.resolutions;
+        return { pass: r.length === 1 && r[0].action === 'void' && r[0].target === 'abc123', detail: JSON.stringify(r) };
+      } },
+
+    { name: 'resolveLedger: confirmed income A + void-resolution(A) → A absent from output',
+      run: () => {
+        const a = makeEntry({ dateISO: '2026-03-05', amount: 1000, payee: 'Client', entity: 'rodgate', category: 'income:gross-receipts' });
+        const voidRes = makeResolution({ target: a.hash, action: 'void', dateISO: '2026-03-06' });
+        const out = resolveLedger([a, voidRes]);
+        return { pass: out.length === 0, detail: JSON.stringify(out) };
+      } },
+
+    { name: 'resolveLedger: needs_review X + confirm-resolution(X) → X present as confirmed, reviewKind/dupOf stripped',
+      run: () => {
+        const x = makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT', entity: 'rodgate', category: 'schC:supplies', status: 'needs_review' });
+        x.reviewKind = 'suspected-dup'; x.dupOf = 'someOtherHash';
+        const confirmRes = makeResolution({ target: x.hash, action: 'confirm', dateISO: '2026-03-06' });
+        const out = resolveLedger([x, confirmRes]);
+        const found = out.find((e) => e.hash === x.hash);
+        return { pass: out.length === 1 && !!found && found.status === 'confirmed' && !('reviewKind' in found) && !('dupOf' in found),
+          detail: JSON.stringify(found) };
+      } },
+
+    { name: 'resolveLedger recategorize: schC:supplies → schC:software after resolution',
+      run: () => {
+        const e = makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT', entity: 'rodgate', category: 'schC:supplies' });
+        const recatRes = makeResolution({ target: e.hash, action: 'recategorize', category: 'schC:software', dateISO: '2026-03-06' });
+        const out = resolveLedger([e, recatRes]);
+        return { pass: out.length === 1 && out[0].category === 'schC:software', detail: JSON.stringify(out[0]) };
+      } },
+
+    { name: 'summarize backward-compat: no resolutions → same totals as before ($1000 income + $200 expense → net $800)',
+      run: () => {
+        const income = makeEntry({ dateISO: '2026-03-05', amount: 1000, payee: 'Client', entity: 'rodgate', category: 'income:gross-receipts' });
+        const expense = makeEntry({ dateISO: '2026-03-05', amount: 200, payee: 'Office Depot', entity: 'rodgate', category: 'schC:office' });
+        const sum = summarize([income, expense], REG);
+        return { pass: sum.schCByEntity.rodgate.netCents === 80000 && sum.incomeCents === 100000,
+          detail: JSON.stringify(sum.schCByEntity.rodgate) };
+      } },
+
+    { name: 'summarize honors void: a voided income entry is not counted',
+      run: () => {
+        const income = makeEntry({ dateISO: '2026-03-05', amount: 1000, payee: 'Client', entity: 'rodgate', category: 'income:gross-receipts' });
+        const voidRes = makeResolution({ target: income.hash, action: 'void', dateISO: '2026-03-06' });
+        const sum = summarize([income, voidRes], REG);
+        return { pass: sum.incomeCents === 0 && (sum.schCByEntity.rodgate === undefined || sum.schCByEntity.rodgate.incomeCents === 0),
+          detail: JSON.stringify(sum) };
+      } },
+
+    { name: 'listPending: needs_review entries listed; one with a confirm-resolution is not',
+      run: () => {
+        const x = makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT', entity: 'rodgate', category: 'schC:supplies', status: 'needs_review' });
+        const y = makeEntry({ dateISO: '2026-03-06', amount: 99, payee: 'MYSTERY VENDOR', entity: 'rodgate', category: 'meta:personal', status: 'needs_review' });
+        const confirmRes = makeResolution({ target: x.hash, action: 'confirm', dateISO: '2026-03-06' });
+        const pending = listPending([x, y, confirmRes]);
+        return { pass: pending.length === 1 && pending[0].hash === y.hash, detail: JSON.stringify(pending) };
+      } },
+
+    { name: 'resolveLedger tie-break: on equal ts, the LAST-appended resolution wins',
+      run: () => {
+        const e = makeEntry({ dateISO: '2026-03-01', amount: 100, payee: 'A', entity: 'rodgate', category: 'income:gross-receipts', source: 'csv' });
+        const ts = '2026-07-06T00:00:00.000Z';
+        const rejectThenAccept = [e, { ...makeResolution({ target: e.hash, action: 'void', dateISO: '2026-03-01' }), ts }, { ...makeResolution({ target: e.hash, action: 'confirm', dateISO: '2026-03-01' }), ts }];
+        const live = resolveLedger(rejectThenAccept);
+        return { pass: live.length === 1 && live[0].status === 'confirmed', detail: JSON.stringify(live.map(x => x.status)) };
+      } },
+
+    { name: 'resolve: recategorize with neither entity nor category → error (no silent accept)',
+      run: () => { const r = resolve({ hash: 'h', dateISO: '2026-03-01' }, { type: 'recategorize' }); return { pass: !!r.error, detail: r.error || 'no error' }; } },
+
+    { name: 'resolveLedger: an invalid recategorize category is ignored, entry keeps its category',
+      run: () => {
+        const e = makeEntry({ dateISO: '2026-03-01', amount: 50, payee: 'X', entity: 'rodgate', category: 'schC:supplies', source: 'csv' });
+        const bad = { ...makeResolution({ target: e.hash, action: 'recategorize', category: 'schC:supplies', dateISO: '2026-03-01' }), category: 'not:real' };
+        const live = resolveLedger([e, bad]);
+        return { pass: live[0].category === 'schC:supplies' && live[0].status === 'confirmed', detail: live[0].category };
       } },
   ],
 };

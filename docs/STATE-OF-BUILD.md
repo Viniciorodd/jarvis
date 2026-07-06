@@ -60,9 +60,22 @@ and rack up real submit history so workflows can earn promotion up the ladder.
   2135 Brick Ave LLC with K-1 losses excluded+flagged, safe-harbor quarterlies), append-only ledger
   (`tax-ledger/<year>.jsonl`, hash dedupe), capture + savings splitter + debt desk (myFICO-seeded,
   avalanche/snowball, 1099-C anticipation), routes `/api/tax/status|capture|paid`, cockpit Home 💰 line.
-  Eval harness green (316/316). Phase 2 (CSV importer/backfill) + Phase 3 (docs index/filing pack) not built —
-  operator setup pending (EIT rate, SBA/Chase terms, property basis, 1065 filing status). Spec:
-  `docs/superpowers/specs/2026-07-05-tax-pod-design.md`.
+  Eval harness green (316/316). Spec: `docs/superpowers/specs/2026-07-05-tax-pod-design.md`.
+- ✅ **Tax & Wealth pod Phase 2 — bank-CSV importer (2026-07-06)** — `pods/tax/importer.mjs` +
+  `accounts.mjs` + `review.mjs`: per-account column maps (header-hash profiles, one-time Claude-proposed
+  map, operator confirms before any row files), cross-source ±3-day dedup on top of exact hash re-drop,
+  taxonomy-gated `claudeBatch` classify fallback (rules first, LLM only picks from the fixed
+  Schedule C/E list, never invents a category), whole-file quarantine to `tax-inbox/failed/` when >20%
+  of rows are unparseable. Review queue + cockpit screen for `needs_review` items (accept /
+  recategorize / merge / keep-both — `reject` exists in the API but has no button in the UI yet),
+  append-only resolution deltas in the ledger (never mutate
+  history). Backfill CLI: `node pods/tax/importer.mjs --backfill` runs the drop-folder
+  (`tax-inbox/`) once and prints `N files · X filed · Y queued · Z quarantined · $D deductions found`.
+  Eval harness green (run `node evals/run.mjs` for the current count). Known limitations:
+  in-UI column-map confirm is deferred to the CLI/`accounts.local.json` (no first-import wizard yet in
+  the cockpit); per-row property attribution is entity-level only (no per-row property inference); the
+  review routes read the current tax year only (no cross-year review queue). Spec:
+  `docs/superpowers/specs/2026-07-06-tax-pod-phase2-importer-design.md`.
 
 ## Extra gaps the FULL doctrine surfaces (beyond the 5 directives)
 The real `operating-doctrine.md` (now canonical) asks for more than the 5 directives:

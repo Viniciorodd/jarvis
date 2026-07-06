@@ -20,7 +20,7 @@ var navBtns = {
 var currentView = 'home';
 
 /* ── every full-screen overlay. One place so the bottom nav can always close them ── */
-var OVERLAY_IDS = ['bizView','ops','mapView','floorView','commandView','activityView','hqView','settingsView','personalView','govView'];
+var OVERLAY_IDS = ['bizView','ops','mapView','floorView','commandView','activityView','hqView','settingsView','personalView','govView','taxReviewView'];
 function closeAllOverlays(){
   OVERLAY_IDS.forEach(function(id){ var o = document.getElementById(id); if(o && !o.hidden) o.hidden = true; });
 }

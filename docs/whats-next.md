@@ -2,7 +2,44 @@
 
 _Updated 2026-07-06. Committed to `feat/core-infrastructure-v2` (NOT yet pushed — operator pushes when ready). Resume from here._
 
-### 🆕 2026-07-06 (newest) — Tax & Wealth pod (Sage/TAX-01) Phase 1 shipped, 10 TDD tasks
+### 🆕 2026-07-06 (newest) — Tax & Wealth pod (Sage/TAX-01) Phase 2 shipped: bank-CSV importer
+Built per `docs/superpowers/specs/2026-07-06-tax-pod-phase2-importer-design.md`, branch
+`feat/tax-phase2-importer`, 6 TDD tasks:
+- **`pods/tax/importer.mjs`** (parse + dedup + classify + fs drop-folder wrapper), **`accounts.mjs`**
+  (account registry, header-hash column-map profiles), **`review.mjs`** (resolution of `needs_review`
+  items) + the append-only void/supersede support added to `ledger.mjs`. Routes:
+  `/api/tax/review` (list) and `/api/tax/review/resolve` (accept/recategorize/merge/keep-both/reject),
+  plus a cockpit review screen.
+- **Backfill CLI**: `node pods/tax/importer.mjs --backfill` drains `tax-inbox/` once, prints
+  `N files · X filed · Y queued · Z quarantined · $D deductions found`, and flags any file still
+  `needs-mapping` (register that account + confirm its column map first).
+- **Fix carried from review**: `importInbox` now takes a `ledgerDir` override (passed through to
+  `readLedger`/`appendEntry`) so tests/smokes can run against a temp ledger without ever touching the
+  operator's real `tax-ledger/`. Verified via a synthetic end-to-end smoke (temp inbox + temp ledger):
+  a clean row filed, a cross-source duplicate queued as `suspected-dup`, a >20%-garbage file
+  quarantined to `failed/`, and the real ledger confirmed byte-for-byte unchanged before/after.
+- **Eval harness green: 348/348** (`node evals/run.mjs`).
+- **Known limitations:** the in-UI column-map confirm (first-import wizard) is deferred — for now the
+  operator registers accounts + column maps via `accounts.local.json` / `saveProfile()`; per-row
+  property attribution is entity-level only (no per-row property inference from CSV text); the review
+  routes read the current tax year's ledger only.
+- **Operator homework (do this to make Phase 2 real):**
+  1. Register each bank/card account once — an `id`, a `label`, and its `defaultEntity`
+     (`rodgate` | `sidehustles` | `brickave-llc`) in `pods/tax/accounts.local.json` (copies from the
+     `accounts.json` template on first run) — then confirm its column map on the first CSV import for
+     that account (Claude proposes the map from the header; you confirm before anything files).
+  2. Export Jan–Jun 2026 CSVs from each account into `tax-inbox/`, then run
+     `node pods/tax/importer.mjs --backfill`. Anything it can't confidently classify lands in
+     `needs_review` for the cockpit review screen, not silently guessed.
+  3. The standing items carried from Phase 1: set the local EIT rate (`pods/tax/entities.json`), enter
+     SBA loan terms + the 3 Chase payment-plan amounts/due days (`debts.json`), property basis +
+     in-service dates for depreciation (from the Z:\Real Estate HUD + rehab receipts), and confirm
+     whether Form 1065 partnership returns were ever filed for 2135 Brick Ave, LLC (2024/2025).
+- ⏭ **Next build ideas:** scheduler jobs for payment reminders + a weekly bucket-nudge digest;
+  **Phase 3** (docs indexer linking Z:\Real Estate + gov/Fiverr docs to ledger entries,
+  FreeTaxUSA-interview-ordered filing pack, deadline wiring for 1040-ES/1099-NEC/1065).
+
+### 2026-07-06 — Tax & Wealth pod (Sage/TAX-01) Phase 1 shipped, 10 TDD tasks
 Built per `docs/superpowers/specs/2026-07-05-tax-pod-design.md`, reports to Victor/LEDGER-01:
 - **`pods/tax/`**: TY2026 constants (each param verified-flagged; unverified ⚠ warn at runtime), pure
   eval-pinned tax engine (SE tax, federal brackets, QBI, PA 3.07% + local EIT, 27.5y mid-month depreciation,

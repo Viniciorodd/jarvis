@@ -89,13 +89,49 @@ export const dedupe = (entries) => {
   return entries.filter((e) => e && e.hash && !seen.has(e.hash) && seen.add(e.hash));
 };
 
+// A review resolution is an append-only DELTA keyed by a target entry's hash — not a duplicate entry
+// (the content hash can't change on accept/recategorize). action: 'confirm' | 'recategorize' | 'void'.
+export function isResolution(rec) { return !!(rec && rec.kind === 'tax.resolution' && rec.target); }
+
+export function makeResolution({ target, action, entity = null, category = null, dateISO }) {
+  const rec = { kind: 'tax.resolution', target, action,
+    dateISO: dateISO || new Date().toLocaleDateString('en-CA'), ts: new Date().toISOString() };
+  if (entity) rec.entity = entity;
+  if (category) rec.category = category;
+  rec.hash = crypto.createHash('sha256').update(`res|${target}|${action}|${rec.ts}`).digest('hex').slice(0, 16);
+  return rec;
+}
+
+// PURE: fold resolution deltas into a record list → the LIVE entries. Latest resolution per target wins.
+// Backward-compatible: a log with NO resolutions returns its real entries unchanged.
+export function resolveLedger(records) {
+  const resolutions = new Map(); // target hash → latest resolution by ts
+  for (const r of records || []) if (isResolution(r)) {
+    const prev = resolutions.get(r.target);
+    if (!prev || r.ts >= prev.ts) resolutions.set(r.target, r); // >= so the LAST-appended resolution wins on an exact-ts tie (a later operator correction beats an earlier one)
+  }
+  const out = [];
+  for (const e of records || []) {
+    if (!e || isResolution(e) || !e.hash) continue; // resolution markers are not entries
+    const res = resolutions.get(e.hash);
+    if (!res) { out.push(e); continue; }
+    if (res.action === 'void') continue; // dropped
+    const merged = { ...e, status: 'confirmed' };
+    delete merged.reviewKind; delete merged.dupOf;
+    if (res.action === 'recategorize') { if (res.entity) merged.entity = res.entity; if (res.category && validCategory(res.category)) merged.category = res.category; } // never let an off-taxonomy category into the live view, even from a hand-built resolution
+    out.push(merged);
+  }
+  return out;
+}
+
 // Roll entries up for the estimator + status view. Income categories add, expenses subtract.
 // Partnership entities keep separate books (LLC net gets the 19% k1Share later — engine's job).
 export function summarize(entries, registry) {
   const kinds = Object.fromEntries((registry.entities || []).map((e) => [e.id, e.kind]));
   const schCByEntity = {}, llcBooks = { incomeCents: 0, expenseCents: 0, netCents: 0 };
   let incomeCents = 0, estPaidCents = 0;
-  for (const e of entries) {
+  const live = resolveLedger(entries);
+  for (const e of live) {
     if (!e || e.error || e.status === 'needs_review') continue;
     const isIncome = e.category.startsWith('income:');
     if (e.category === 'meta:est-tax-payment') { estPaidCents += e.cents; continue; }
@@ -125,6 +161,15 @@ export function appendEntry(entry, dir) {
   if (existing.some((x) => x.hash === entry.hash)) return { ok: true, deduped: true, hash: entry.hash };
   fs.appendFileSync(file, JSON.stringify(entry) + '\n');
   return { ok: true, deduped: false, hash: entry.hash };
+}
+// Append a resolution DELTA record (from review.resolve) to the year's ledger file. Unlike appendEntry,
+// this NEVER hash-dedupes — resolutions are intentional deltas, and two distinct ones must both persist.
+export function appendResolution(rec, dir) {
+  const d = LDIR(dir);
+  fs.mkdirSync(d, { recursive: true });
+  const file = path.join(d, String(rec.dateISO).slice(0, 4) + '.jsonl');
+  fs.appendFileSync(file, JSON.stringify(rec) + '\n');
+  return { ok: true, hash: rec.hash };
 }
 export function readLedger(year, dir) {
   try {

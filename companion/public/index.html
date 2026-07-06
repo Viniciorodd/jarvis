@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="today.css">
+<link rel="stylesheet" href="tax-review.css">
 <script>try{var _t=localStorage.getItem('jarvis-theme');if(!localStorage.getItem('jarvis-theme-execd')&&_t!=='light'){_t='exec';localStorage.setItem('jarvis-theme','exec');localStorage.setItem('jarvis-theme-execd','1');}document.documentElement.dataset.theme=_t||'exec';}catch(e){}</script>
 </head>
 <body>
@@ -332,6 +333,17 @@
   <div class="gov-board" id="govBoard"><div class="ops-empty">loading…</div></div>
 </div>
 
+<!-- TAX REVIEW QUEUE -->
+<div class="taxreviewview" id="taxReviewView" hidden>
+  <div class="ops-head">
+    <span class="px ops-brand">Tax Review</span>
+    <span class="map-stat" id="trCount">loading…</span>
+    <button class="ops-refresh" id="trRefresh" title="Refresh">⟳</button>
+    <button class="ops-x" id="trX" title="Close">✕</button>
+  </div>
+  <div class="tr-list" id="trList"><div class="ops-empty">loading…</div></div>
+</div>
+
 <!-- MAP -->
 <div class="mapview" id="mapView" hidden>
   <div class="ops-head">
@@ -556,6 +568,7 @@
 <script src="home.js"></script>
 <script src="nav.js"></script>
 <script src="today.js"></script>
+<script src="tax-review.js"></script>
 <script src="talkhome.js"></script>
 <script src="submit-wizard.js"></script>
 <script src="govboard.js"></script>

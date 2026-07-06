@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import { TY2026 } from '../pods/tax/constants-2026.mjs';
 import { seTax, federalIncomeTax, qbiDeduction, paTax, localEit, annualDepreciation, k1Share, estimate, quarterlies } from '../pods/tax/engine.mjs';
-import { CATEGORIES, validCategory, toCents as ledgerToCents, entryHash, makeEntry, dedupe, summarize } from '../pods/tax/ledger.mjs';
+import { CATEGORIES, validCategory, toCents as ledgerToCents, entryHash, makeEntry, dedupe, summarize, resolveLedger, makeResolution } from '../pods/tax/ledger.mjs';
 import { parseCapture, ruleCategory, pickCategoryId } from '../pods/tax/capture.mjs';
 import { splitIncome, bucketState, nudgeLine } from '../pods/tax/savings.mjs';
 import { paymentsDue, payoffPlan, codIncome } from '../pods/tax/debt.mjs';
@@ -12,6 +12,7 @@ import { buildStatus } from '../pods/tax/status.mjs';
 import { matchPerson } from '../pods/org.mjs';
 import { headerHash, applyMap, resolveProfile } from '../pods/tax/accounts.mjs';
 import { classifyDedup, assignCategory, finalizeItems, parseCsv } from '../pods/tax/importer.mjs';
+import { listPending, resolve } from '../pods/tax/review.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -467,6 +468,96 @@ export default {
         const entries = finalizeItems(items);
         return { pass: entries.length === 1 && entries[0].reviewKind === 'suspected-dup' && entries[0].dupOf === 'abc123'
           && entries[0].status === 'needs_review', detail: JSON.stringify(entries[0]) };
+      } },
+
+    { name: 'review.resolve accept → one confirm resolution targeting entry.hash',
+      run: () => {
+        const entry = { hash: 'abc123', dateISO: '2026-03-05' };
+        const out = resolve(entry, { type: 'accept' });
+        const r = out.resolutions;
+        return { pass: r.length === 1 && r[0].target === 'abc123' && r[0].action === 'confirm', detail: JSON.stringify(r) };
+      } },
+
+    { name: 'review.resolve recategorize: bad category → error; good category → one recategorize resolution with entity/category',
+      run: () => {
+        const entry = { hash: 'abc123', dateISO: '2026-03-05' };
+        const bad = resolve(entry, { type: 'recategorize', category: 'schC:vibes' });
+        const good = resolve(entry, { type: 'recategorize', entity: 'sidehustles', category: 'schC:software' });
+        const r = good.resolutions;
+        const pass = !!bad.error && r.length === 1 && r[0].action === 'recategorize' && r[0].target === 'abc123'
+          && r[0].entity === 'sidehustles' && r[0].category === 'schC:software';
+        return { pass, detail: `bad=${JSON.stringify(bad)} good=${JSON.stringify(r)}` };
+      } },
+
+    { name: 'review.resolve merge → confirm(entry.hash) + void(entry.dupOf)',
+      run: () => {
+        const entry = { hash: 'bankhash1', dupOf: 'manualhash1', dateISO: '2026-03-05' };
+        const out = resolve(entry, { type: 'merge' });
+        const r = out.resolutions;
+        return { pass: r.length === 2 && r[0].action === 'confirm' && r[0].target === 'bankhash1'
+          && r[1].action === 'void' && r[1].target === 'manualhash1', detail: JSON.stringify(r) };
+      } },
+
+    { name: 'review.resolve reject → void(entry.hash)',
+      run: () => {
+        const entry = { hash: 'abc123', dateISO: '2026-03-05' };
+        const out = resolve(entry, { type: 'reject' });
+        const r = out.resolutions;
+        return { pass: r.length === 1 && r[0].action === 'void' && r[0].target === 'abc123', detail: JSON.stringify(r) };
+      } },
+
+    { name: 'resolveLedger: confirmed income A + void-resolution(A) → A absent from output',
+      run: () => {
+        const a = makeEntry({ dateISO: '2026-03-05', amount: 1000, payee: 'Client', entity: 'rodgate', category: 'income:gross-receipts' });
+        const voidRes = makeResolution({ target: a.hash, action: 'void', dateISO: '2026-03-06' });
+        const out = resolveLedger([a, voidRes]);
+        return { pass: out.length === 0, detail: JSON.stringify(out) };
+      } },
+
+    { name: 'resolveLedger: needs_review X + confirm-resolution(X) → X present as confirmed, reviewKind/dupOf stripped',
+      run: () => {
+        const x = makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT', entity: 'rodgate', category: 'schC:supplies', status: 'needs_review' });
+        x.reviewKind = 'suspected-dup'; x.dupOf = 'someOtherHash';
+        const confirmRes = makeResolution({ target: x.hash, action: 'confirm', dateISO: '2026-03-06' });
+        const out = resolveLedger([x, confirmRes]);
+        const found = out.find((e) => e.hash === x.hash);
+        return { pass: out.length === 1 && !!found && found.status === 'confirmed' && !('reviewKind' in found) && !('dupOf' in found),
+          detail: JSON.stringify(found) };
+      } },
+
+    { name: 'resolveLedger recategorize: schC:supplies → schC:software after resolution',
+      run: () => {
+        const e = makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT', entity: 'rodgate', category: 'schC:supplies' });
+        const recatRes = makeResolution({ target: e.hash, action: 'recategorize', category: 'schC:software', dateISO: '2026-03-06' });
+        const out = resolveLedger([e, recatRes]);
+        return { pass: out.length === 1 && out[0].category === 'schC:software', detail: JSON.stringify(out[0]) };
+      } },
+
+    { name: 'summarize backward-compat: no resolutions → same totals as before ($1000 income + $200 expense → net $800)',
+      run: () => {
+        const income = makeEntry({ dateISO: '2026-03-05', amount: 1000, payee: 'Client', entity: 'rodgate', category: 'income:gross-receipts' });
+        const expense = makeEntry({ dateISO: '2026-03-05', amount: 200, payee: 'Office Depot', entity: 'rodgate', category: 'schC:office' });
+        const sum = summarize([income, expense], REG);
+        return { pass: sum.schCByEntity.rodgate.netCents === 80000 && sum.incomeCents === 100000,
+          detail: JSON.stringify(sum.schCByEntity.rodgate) };
+      } },
+
+    { name: 'summarize honors void: a voided income entry is not counted',
+      run: () => {
+        const income = makeEntry({ dateISO: '2026-03-05', amount: 1000, payee: 'Client', entity: 'rodgate', category: 'income:gross-receipts' });
+        const voidRes = makeResolution({ target: income.hash, action: 'void', dateISO: '2026-03-06' });
+        const sum = summarize([income, voidRes], REG);
+        return { pass: sum.incomeCents === 0 && (sum.schCByEntity.rodgate === undefined || sum.schCByEntity.rodgate.incomeCents === 0),
+          detail: JSON.stringify(sum) };
+      } },
+
+    { name: 'listPending: needs_review entries listed; one with a confirm-resolution is not',
+      run: () => {
+        const x = makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT', entity: 'rodgate', category: 'schC:supplies', status: 'needs_review' });
+        const y = makeEntry({ dateISO: '2026-03-06', amount: 99, payee: 'MYSTERY VENDOR', entity: 'rodgate', category: 'meta:personal', status: 'needs_review' });
+        const confirmRes = makeResolution({ target: x.hash, action: 'confirm', dateISO: '2026-03-06' });
+        const pending = listPending([x, y, confirmRes]);
+        return { pass: pending.length === 1 && pending[0].hash === y.hash, detail: JSON.stringify(pending) };
       } },
   ],
 };

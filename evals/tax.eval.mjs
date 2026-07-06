@@ -291,6 +291,16 @@ export default {
           detail: s.headline };
       } },
 
+    { name: 'buildStatus: needs_review income is excluded from bucket targets (matches the estimate)',
+      run: () => {
+        const confirmed = makeEntry({ dateISO: '2026-02-01', amount: 1000, payee: 'A', entity: 'rodgate', category: 'income:gross-receipts', source: 'capture' });
+        const pending = makeEntry({ dateISO: '2026-02-02', amount: 500, payee: 'B', entity: 'rodgate', category: 'income:gross-receipts', source: 'capture', status: 'needs_review' });
+        const s1 = buildStatus({ entries: [confirmed], registry: REG, debts: [], C, todayISO: '2026-07-05' });
+        const s2 = buildStatus({ entries: [confirmed, pending], registry: REG, debts: [], C, todayISO: '2026-07-05' });
+        return { pass: s2.buckets.target.tax === s1.buckets.target.tax && s1.buckets.target.tax > 0,
+          detail: `${s1.buckets.target.tax}==${s2.buckets.target.tax}` };
+      } },
+
     { name: 'org: "the tax guy" and "what do i owe" resolve to TAX-01 Sage under Victor',
       run: () => {
         const a = matchPerson('ask the tax guy'), b = matchPerson('what do i owe this quarter');

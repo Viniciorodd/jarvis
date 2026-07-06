@@ -2,9 +2,6 @@
 // operator sees on Home + the morning brief. PURE core (buildStatus) + a thin I/O wrapper (taxStatus).
 // CLI: node pods/tax/status.mjs
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { TY2026 } from './constants-2026.mjs';
 import { estimate, quarterlies, k1Share, annualDepreciation } from './engine.mjs';
 import { readLedger, summarize } from './ledger.mjs';
@@ -32,7 +29,9 @@ export function buildStatus({ entries, registry, debts, C, todayISO }) {
   const q = quarterlies({ C, projectedTaxCents: est.totalCents, priorYearTaxCents: 0, priorAgiCents: 0,
     paidCents: sum.estPaidCents, todayISO });
   const rates = { ...registry.splits, taxPct: registry.splits.taxPct === 'auto' ? est.setAsidePct : registry.splits.taxPct };
-  const incomeEvents = entries.filter((e) => e && !e.error && e.category && e.category.startsWith('income:'))
+  // needs_review entries are excluded here for the SAME reason summarize() skips them — the bucket
+  // nudge and the tax estimate must always agree on which entries counted.
+  const incomeEvents = entries.filter((e) => e && !e.error && e.status !== 'needs_review' && e.category && e.category.startsWith('income:'))
     .map((e) => ({ cents: e.cents }));
   const buckets = bucketState({ incomeEvents, movedEvents: [], rates });
   const due = paymentsDue({ debts, todayISO });

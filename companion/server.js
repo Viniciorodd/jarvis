@@ -2475,6 +2475,30 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // ── TAX & WEALTH (Sage / TAX-01): live estimate + capture + debt payments ─────────────────────
+  if (req.method === 'GET' && url.pathname === '/api/tax/status') {
+    try { const { taxStatus } = await import('../pods/tax/status.mjs'); return send(res, 200, JSON.stringify(await taxStatus())); }
+    catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/tax/capture') {
+    try {
+      const { text } = await readBody(req);
+      if (!text || !String(text).trim()) return send(res, 400, JSON.stringify({ error: 'text required' }));
+      const { capture } = await import('../pods/tax/capture.mjs');
+      const r = await capture(String(text));
+      return send(res, r.error ? 400 : 200, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/tax/paid') {
+    try {
+      const { debtId, amount, interestAmount } = await readBody(req);
+      if (!debtId || !amount) return send(res, 400, JSON.stringify({ error: 'debtId and amount required' }));
+      const { recordPayment } = await import('../pods/tax/debt.mjs');
+      const r = await recordPayment({ debtId, amount, interestAmount, dateISO: new Date().toLocaleDateString('en-CA') });
+      return send(res, r.error ? 400 : 200, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+
   // ── COCKPIT: the one calm screen (🎯 Today · ✅ Tasks · 📅 Week · ⚡ Capture · approvals strip) ────
   if (req.method === 'GET' && url.pathname === '/api/cockpit') {
     const todayStr = new Date().toLocaleDateString('en-CA'); // local YYYY-MM-DD
@@ -2507,7 +2531,11 @@ const server = http.createServer(async (req, res) => {
     if (govNextAction) oneThing = { text: govNextAction.text + ' — ' + govNextAction.title, kind: 'gov', deadline: govNextAction.deadline, url: govNextAction.url };
     else if (tasks.dueToday && tasks.dueToday[0]) oneThing = { text: tasks.dueToday[0].text, kind: 'task', id: tasks.dueToday[0].id };
     else if (tasks.active && tasks.active[0]) oneThing = { text: tasks.active[0].text, kind: 'task', id: tasks.active[0].id };
-    return send(res, 200, JSON.stringify({ date: todayStr, oneThing, govNextAction, todayCalendar, week, tasks, approvals, calError, hasGoogle: google.googleConfigured() }));
+    let tax = null;
+    try { const { taxStatus } = await import('../pods/tax/status.mjs'); const s = await taxStatus();
+      tax = { headline: s.headline, paymentsDue: s.paymentsDue.filter((p) => !p.paidThisMonth).length, warnings: s.warnings.length }; }
+    catch { /* tax pod optional — cockpit never breaks because of it */ }
+    return send(res, 200, JSON.stringify({ date: todayStr, oneThing, govNextAction, todayCalendar, week, tasks, approvals, calError, hasGoogle: google.googleConfigured(), tax }));
   }
   if (req.method === 'POST' && url.pathname === '/api/cockpit/task/add') {
     try {

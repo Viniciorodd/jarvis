@@ -241,6 +241,17 @@ export default {
           && due[1].daysUntil === 23, detail: JSON.stringify(due.map((d) => d.id)) };
       } },
 
+    { name: 'paymentsDue: unconfigured dueDay → daysUntil null (never fabricated), sorted last, setup passed',
+      run: () => {
+        const debts = [
+          { id: 'sba', creditor: 'SBA', status: 'paying', monthlyPaymentCents: null, dueDay: null, setup: 'enter terms' },
+          { id: 'chase-1', creditor: 'Chase 1', status: 'paying', monthlyPaymentCents: 5000, dueDay: 10 },
+        ];
+        const due = paymentsDue({ debts, todayISO: '2026-07-05' });
+        return { pass: due[0].id === 'chase-1' && due[1].daysUntil === null && due[1].setup === 'enter terms',
+          detail: JSON.stringify(due.map((d) => [d.id, d.daysUntil])) };
+      } },
+
     { name: 'payoffPlan snowball: smallest balance dies first; leftover rolls to the next debt',
       run: () => {
         const debts = [

@@ -17,18 +17,23 @@ export function loadDebts() {
 }
 export function saveDebts(d) { fs.writeFileSync(REAL, JSON.stringify(d, null, 2)); }
 
-// PURE: which active payments are coming up, soonest first. paidThisMonth flips via recordPayment.
+// PURE: which active payments are coming up, soonest first. An UNCONFIGURED dueDay yields
+// daysUntil null (never a fabricated date) and sorts last — the `setup` field tells the UI why.
+// paidThisMonth flips via recordPayment.
 export function paymentsDue({ debts = [], todayISO }) {
   const [y, m, day] = String(todayISO).split('-').map(Number);
   const dim = new Date(y, m, 0).getDate();
   return debts.filter((d) => d.status === 'paying')
     .map((d) => {
-      const dd = Math.min(d.dueDay || dim, dim);
-      const daysUntil = dd >= day ? dd - day : (dim - day) + dd; // wraps into next month
+      let daysUntil = null;
+      if (d.dueDay) {
+        const dd = Math.min(d.dueDay, dim);
+        daysUntil = dd >= day ? dd - day : (dim - day) + dd; // wraps into next month
+      }
       return { id: d.id, creditor: d.creditor, dueDay: d.dueDay, monthlyPaymentCents: d.monthlyPaymentCents,
         daysUntil, paidThisMonth: (d.lastPaid || '').slice(0, 7) === todayISO.slice(0, 7), setup: d.setup || null };
     })
-    .sort((a, b) => a.daysUntil - b.daysUntil);
+    .sort((a, b) => (a.daysUntil == null) - (b.daysUntil == null) || (a.daysUntil || 0) - (b.daysUntil || 0));
 }
 
 // Log a real payment: marks the debt paid this month + writes a ledger event. Principal is
@@ -48,7 +53,7 @@ export async function recordPayment({ debtId, amount, interestAmount = null, dat
     if (!i.error) appendEntry(i, dir);
   }
   d.lastPaid = dateISO;
-  if (typeof d.balanceCents === 'number' && entry.cents <= d.balanceCents) d.balanceCents -= entry.cents;
+  if (typeof d.balanceCents === 'number') d.balanceCents = Math.max(0, d.balanceCents - entry.cents); // overpay → 0, never desync
   saveDebts(store);
   await emit({ kind: 'tax.debt.payment', pod: 'exec', agent: 'TAX-01', action: 'debt-payment',
     payload: { debtId, cents: entry.cents } });

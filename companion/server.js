@@ -2517,7 +2517,7 @@ const server = http.createServer(async (req, res) => {
       const { resolve, listPending } = await import('../pods/tax/review.mjs');
       const year = new Date().getFullYear();
       const records = readLedger(year);
-      const entry = records.find((e) => e && e.hash === hash && e.status === 'needs_review');
+      const entry = listPending(records).find((e) => e.hash === hash); // resolved view — an already-resolved entry is gone, so 404 (append-only status never mutates)
       if (!entry) return send(res, 404, JSON.stringify({ error: 'pending entry not found' }));
       const r = resolve(entry, { type: decision, entity, category });
       if (r.error) return send(res, 400, JSON.stringify(r));

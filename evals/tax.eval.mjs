@@ -10,6 +10,7 @@ import { splitIncome, bucketState, nudgeLine } from '../pods/tax/savings.mjs';
 import { paymentsDue, payoffPlan, codIncome } from '../pods/tax/debt.mjs';
 import { buildStatus } from '../pods/tax/status.mjs';
 import { matchPerson } from '../pods/org.mjs';
+import { headerHash, applyMap, resolveProfile } from '../pods/tax/accounts.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -330,6 +331,41 @@ export default {
         const a = matchPerson('ask the tax guy'), b = matchPerson('what do i owe this quarter');
         return { pass: a && a.codename === 'TAX-01' && b && b.codename === 'TAX-01'
           && a.reports_to === 'LEDGER-01', detail: (a && a.nickname) || 'no match' };
+      } },
+
+    { name: 'headerHash: stable + case/space-insensitive',
+      run: () => {
+        const a = headerHash(['Date', 'Amount', ' Description ']);
+        const b = headerHash(['date', 'amount', 'description']);
+        return { pass: a === b && a.length === 12, detail: a };
+      } },
+
+    { name: 'applyMap signed: negative amount = money out, positive = in; parses cents + ISO date',
+      run: () => {
+        const map = { dateCol: 0, amountCol: 2, descCol: 1, signConvention: 'signed' };
+        const out = applyMap(['03/05/2026', 'HOME DEPOT #4021', '-43.00'], map);
+        const inc = applyMap(['03/06/2026', 'HAP DEPOSIT', '1850.00'], map);
+        return { pass: out.cents === 4300 && out.direction === 'out' && out.dateISO === '2026-03-05'
+          && inc.cents === 185000 && inc.direction === 'in', detail: JSON.stringify(out) };
+      } },
+
+    { name: 'applyMap debit-credit: separate columns; a junk amount → error (never a bad cents value)',
+      run: () => {
+        const map = { dateCol: 0, descCol: 1, debitCol: 2, creditCol: 3, signConvention: 'debit-credit' };
+        const debit = applyMap(['2026-03-05', 'Staples', '20.00', ''], map);
+        const credit = applyMap(['2026-03-06', 'Refund', '', '15.00'], map);
+        const bad = applyMap(['2026-03-06', 'X', 'NaN', ''], map);
+        return { pass: debit.cents === 2000 && debit.direction === 'out' && credit.cents === 1500
+          && credit.direction === 'in' && !!bad.error, detail: JSON.stringify(credit) };
+      } },
+
+    { name: 'resolveProfile: matches saved header hash → columnMap; unknown header → needsMapping',
+      run: () => {
+        const accounts = [{ id: 'chase-biz', defaultEntity: 'rodgate', headerHash: headerHash(['Date','Desc','Amount']),
+          columnMap: { dateCol: 0, descCol: 1, amountCol: 2, signConvention: 'signed' } }];
+        const known = resolveProfile(accounts, ['Date', 'Desc', 'Amount']);
+        const unknown = resolveProfile(accounts, ['Posted', 'Merchant', 'Debit', 'Credit']);
+        return { pass: known.columnMap.amountCol === 2 && unknown.needsMapping === true, detail: JSON.stringify(known.columnMap) };
       } },
   ],
 };

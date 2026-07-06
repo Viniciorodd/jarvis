@@ -1,0 +1,6 @@
+{
+  "_comment": "Account registry TEMPLATE. Your real accounts get written to accounts.local.json (gitignored). Register an account: id, a label, its defaultEntity (rodgate | sidehustles | brickave-llc), and Jarvis learns the CSV columnMap from the first file (you confirm it once).",
+  "accounts": [
+    { "id": "example-card", "label": "Example card (edit or delete me)", "defaultEntity": "rodgate", "headerHash": null, "columnMap": null, "signConvention": null }
+  ]
+}

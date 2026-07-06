@@ -349,6 +349,17 @@ export default {
           && inc.cents === 185000 && inc.direction === 'in', detail: JSON.stringify(out) };
       } },
 
+    { name: 'applyMap: an out-of-range date (month 13, day 45, Feb 30) → error, never a garbage ISO string',
+      run: () => {
+        const map = { dateCol: 0, amountCol: 2, descCol: 1, signConvention: 'signed' };
+        const m13 = applyMap(['13/05/2026', 'X', '-10.00'], map);
+        const d45 = applyMap(['03/45/2026', 'X', '-10.00'], map);
+        const feb30 = applyMap(['02/30/2026', 'X', '-10.00'], map);
+        const good = applyMap(['03/05/2026', 'X', '-10.00'], map);
+        return { pass: !!m13.error && !!d45.error && !!feb30.error && good.dateISO === '2026-03-05',
+          detail: `${m13.error?'err':m13.dateISO} / ${d45.error?'err':d45.dateISO} / ${feb30.error?'err':feb30.dateISO}` };
+      } },
+
     { name: 'applyMap debit-credit: separate columns; a junk amount → error (never a bad cents value)',
       run: () => {
         const map = { dateCol: 0, descCol: 1, debitCol: 2, creditCol: 3, signConvention: 'debit-credit' };

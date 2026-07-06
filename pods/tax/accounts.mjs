@@ -41,12 +41,20 @@ export function applyMap(row, columnMap) {
   return { dateISO, cents, direction };
 }
 
-// PURE: parse common US date formats → ISO. Returns '' if it can't.
+// PURE: parse common US date formats → ISO, VALIDATING the calendar (round-trips through Date so a
+// month>12 or day>days-in-month is rejected). Returns '' if it can't parse OR the date isn't real.
 function toISO(s) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-  if (m) { let [, mo, d, y] = m; if (y.length === 2) y = '20' + y; return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`; }
-  return '';
+  let y, mo, d;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) { [y, mo, d] = s.split('-').map(Number); }
+  else {
+    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (!m) return '';
+    mo = Number(m[1]); d = Number(m[2]); y = Number(m[3].length === 2 ? '20' + m[3] : m[3]);
+  }
+  if (!(y >= 1900 && y <= 2100) || !(mo >= 1 && mo <= 12) || !(d >= 1 && d <= 31)) return '';
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return ''; // e.g. Feb 30
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 // PURE: find the account whose saved headerHash matches this file; else flag needsMapping.

@@ -11,7 +11,7 @@ import { paymentsDue, payoffPlan, codIncome } from '../pods/tax/debt.mjs';
 import { buildStatus } from '../pods/tax/status.mjs';
 import { matchPerson } from '../pods/org.mjs';
 import { headerHash, applyMap, resolveProfile } from '../pods/tax/accounts.mjs';
-import { classifyDedup } from '../pods/tax/importer.mjs';
+import { classifyDedup, assignCategory, finalizeItems, parseCsv } from '../pods/tax/importer.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -414,6 +414,59 @@ export default {
         const rows = [['notadate', 'X', 'NaN']];
         const r = classifyDedup({ rows, account: acct, existingEntries: [], todayISO: '2026-07-05' });
         return { pass: r.prepared.length === 0 && r.failedRows.length === 1, detail: JSON.stringify(r.failedRows[0]) };
+      } },
+
+    { name: 'parseCsv: quote-aware — a quoted field with a comma stays ONE field; normal row still splits',
+      run: () => {
+        const rows = parseCsv('Date,Description,Amount\n2026-03-05,"HOME DEPOT, SCRANTON",-43.00\n2026-03-06,HAP DEPOSIT,1850.00\n');
+        return { pass: rows.length === 3 && rows[1].length === 3 && rows[1][1] === 'HOME DEPOT, SCRANTON'
+          && rows[2].length === 3 && rows[2][1] === 'HAP DEPOSIT',
+          detail: JSON.stringify(rows) };
+      } },
+
+    { name: 'parseCsv: strips a UTF-8 BOM on the first cell and skips blank lines',
+      run: () => {
+        const rows = parseCsv('﻿Date,Description,Amount\n2026-03-05,HD,-43.00\n\n2026-03-06,HAP,1850.00\n');
+        return { pass: rows.length === 3 && rows[0][0] === 'Date' && rows[2][0] === '2026-03-06',
+          detail: JSON.stringify(rows) };
+      } },
+
+    { name: 'assignCategory: income direction — HAP-looking payee → income:hap',
+      run: () => {
+        const item = { direction: 'in', payee: 'HAP DEPOSIT SECTION 8', entity: 'brickave-llc', property: 'brick-ave' };
+        const out = assignCategory(item, { registry: REG });
+        return { pass: out.category === 'income:hap', detail: out.category };
+      } },
+
+    { name: 'assignCategory: expense direction — Home Depot on an LLC rental property → schE (via ruleCategory)',
+      run: () => {
+        const item = { direction: 'out', payee: 'HOME DEPOT #4021', entity: 'brickave-llc', property: 'brick-ave' };
+        const out = assignCategory(item, { registry: REG });
+        return { pass: out.category === 'schE:repairs', detail: out.category };
+      } },
+
+    { name: 'assignCategory: unmatched expense → category stays null (left for the claudeBatch step)',
+      run: () => {
+        const item = { direction: 'out', payee: 'MYSTERY VENDOR XYZ', entity: 'rodgate', property: null };
+        const out = assignCategory(item, { registry: REG });
+        return { pass: out.category === null, detail: String(out.category) };
+      } },
+
+    { name: 'finalizeItems: a null-category item becomes needs_review + meta:personal placeholder (never off-taxonomy)',
+      run: () => {
+        const items = [{ dateISO: '2026-03-05', cents: 4300, payee: 'MYSTERY VENDOR', entity: 'rodgate', property: null, category: null, status: 'confirmed' }];
+        const entries = finalizeItems(items);
+        return { pass: entries.length === 1 && entries[0].status === 'needs_review' && entries[0].category === 'meta:personal',
+          detail: JSON.stringify(entries[0]) };
+      } },
+
+    { name: 'finalizeItems: a suspected-dup item keeps its reviewKind/dupOf through to the entry',
+      run: () => {
+        const items = [{ dateISO: '2026-03-05', cents: 4300, payee: 'HOME DEPOT', entity: 'rodgate', property: null,
+          category: 'schC:supplies', status: 'needs_review', reviewKind: 'suspected-dup', dupOf: 'abc123' }];
+        const entries = finalizeItems(items);
+        return { pass: entries.length === 1 && entries[0].reviewKind === 'suspected-dup' && entries[0].dupOf === 'abc123'
+          && entries[0].status === 'needs_review', detail: JSON.stringify(entries[0]) };
       } },
   ],
 };

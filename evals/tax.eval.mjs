@@ -1,10 +1,13 @@
 // Evals for the Tax & Wealth pod (Sage / TAX-01) — tax math in CODE (directive #1), eval-pinned
 // known-answer scenarios. Pure functions only — no network, no disk.
 
+import fs from 'node:fs';
 import { TY2026 } from '../pods/tax/constants-2026.mjs';
 import { seTax, federalIncomeTax, qbiDeduction, paTax, localEit, annualDepreciation, k1Share, estimate, quarterlies } from '../pods/tax/engine.mjs';
 import { CATEGORIES, validCategory, toCents as ledgerToCents, entryHash, makeEntry, dedupe, summarize } from '../pods/tax/ledger.mjs';
+import { parseCapture, ruleCategory } from '../pods/tax/capture.mjs';
 const C = TY2026;
+const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
 export default {
   agent: 'tax-wealth',
@@ -157,6 +160,30 @@ export default {
         const s = summarize(es, reg);
         return { pass: s.schCByEntity.rodgate.netCents === 80000 && s.llcBooks.incomeCents === 185000
           && s.estPaidCents === 30000, detail: JSON.stringify(s.schCByEntity.rodgate) };
+      } },
+
+    { name: 'parseCapture: "$43 Home Depot, Brick Ave repair" → 43.00 / Home Depot / brick-ave / LLC',
+      run: () => {
+        const p = parseCapture('$43 Home Depot, Brick Ave repair', REG);
+        return { pass: p.amount === '43' && /home depot/i.test(p.payee) && p.property === 'brick-ave'
+          && p.entity === 'brickave-llc', detail: JSON.stringify(p) };
+      } },
+
+    { name: 'parseCapture: no amount → error (never store a number the code did not parse)',
+      run: () => { const p = parseCapture('fix the roof', REG); return { pass: !!p.error, detail: p.error || '' }; } },
+
+    { name: 'parseCapture: ridge → mother\'s (excluded entity) so it can never enter his tax math',
+      run: () => {
+        const p = parseCapture('$120 plumber at ridge st', REG);
+        return { pass: p.entity === 'mom' && p.property === 'ridge-1', detail: `${p.entity}/${p.property}` };
+      } },
+
+    { name: 'ruleCategory: repair words + rental property → schE:repairs; gov supplies → schC; else null',
+      run: () => {
+        const a = ruleCategory({ payee: 'Home Depot', memo: 'repair', entity: 'brickave-llc', property: 'brick-ave', registry: REG });
+        const b = ruleCategory({ payee: 'Staples', memo: 'printer ink', entity: 'rodgate', property: null, registry: REG });
+        const c = ruleCategory({ payee: 'Mystery Vendor', memo: '???', entity: 'rodgate', property: null, registry: REG });
+        return { pass: a === 'schE:repairs' && b === 'schC:supplies' && c === null, detail: `${a}/${b}/${c}` };
       } },
   ],
 };

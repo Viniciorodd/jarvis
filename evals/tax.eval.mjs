@@ -11,6 +11,7 @@ import { paymentsDue, payoffPlan, codIncome } from '../pods/tax/debt.mjs';
 import { buildStatus } from '../pods/tax/status.mjs';
 import { matchPerson } from '../pods/org.mjs';
 import { headerHash, applyMap, resolveProfile } from '../pods/tax/accounts.mjs';
+import { classifyDedup } from '../pods/tax/importer.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -377,6 +378,42 @@ export default {
         const known = resolveProfile(accounts, ['Date', 'Desc', 'Amount']);
         const unknown = resolveProfile(accounts, ['Posted', 'Merchant', 'Debit', 'Credit']);
         return { pass: known.columnMap.amountCol === 2 && unknown.needsMapping === true, detail: JSON.stringify(known.columnMap) };
+      } },
+
+    { name: 'classifyDedup: exact re-drop is skipped (idempotent)',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const existing = [makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT #4021', entity: 'rodgate', category: 'schC:supplies', source: 'csv' })];
+        const rows = [['03/05/2026', 'HOME DEPOT #4021', '-43.00']];
+        const r = classifyDedup({ rows, account: acct, existingEntries: existing, todayISO: '2026-07-05' });
+        return { pass: r.prepared.length === 0 && r.deduped === 1, detail: JSON.stringify(r) };
+      } },
+
+    { name: 'classifyDedup cross-source: equal cents within 3 days of a manual capture → suspected-dup queued',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const manual = makeEntry({ dateISO: '2026-03-03', amount: 43, payee: 'Home Depot', entity: 'rodgate', category: 'schC:supplies', source: 'capture' });
+        const rows = [['03/05/2026', 'HOMEDEPOT #4021 SCRANTON', '-43.00']]; // 2 days later, same $43
+        const r = classifyDedup({ rows, account: acct, existingEntries: [manual], todayISO: '2026-07-05' });
+        return { pass: r.prepared.length === 1 && r.prepared[0].status === 'needs_review'
+          && r.prepared[0].reviewKind === 'suspected-dup' && r.prepared[0].dupOf === manual.hash, detail: JSON.stringify(r.prepared[0]) };
+      } },
+
+    { name: 'classifyDedup: same cents but 4 days apart → NOT a dup, filed separately',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const manual = makeEntry({ dateISO: '2026-03-01', amount: 43, payee: 'Home Depot', entity: 'rodgate', category: 'schC:supplies', source: 'capture' });
+        const rows = [['03/05/2026', 'HOME DEPOT', '-43.00']]; // 4 days later
+        const r = classifyDedup({ rows, account: acct, existingEntries: [manual], todayISO: '2026-07-05' });
+        return { pass: r.prepared.length === 1 && r.prepared[0].reviewKind !== 'suspected-dup', detail: JSON.stringify(r.prepared[0]) };
+      } },
+
+    { name: 'classifyDedup: unparseable row → failedRows, never a bad entry',
+      run: () => {
+        const acct = { defaultEntity: 'rodgate', columnMap: { dateCol:0, descCol:1, amountCol:2, signConvention:'signed' } };
+        const rows = [['notadate', 'X', 'NaN']];
+        const r = classifyDedup({ rows, account: acct, existingEntries: [], todayISO: '2026-07-05' });
+        return { pass: r.prepared.length === 0 && r.failedRows.length === 1, detail: JSON.stringify(r.failedRows[0]) };
       } },
   ],
 };

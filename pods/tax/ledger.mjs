@@ -108,7 +108,7 @@ export function resolveLedger(records) {
   const resolutions = new Map(); // target hash → latest resolution by ts
   for (const r of records || []) if (isResolution(r)) {
     const prev = resolutions.get(r.target);
-    if (!prev || r.ts > prev.ts) resolutions.set(r.target, r);
+    if (!prev || r.ts >= prev.ts) resolutions.set(r.target, r); // >= so the LAST-appended resolution wins on an exact-ts tie (a later operator correction beats an earlier one)
   }
   const out = [];
   for (const e of records || []) {
@@ -118,7 +118,7 @@ export function resolveLedger(records) {
     if (res.action === 'void') continue; // dropped
     const merged = { ...e, status: 'confirmed' };
     delete merged.reviewKind; delete merged.dupOf;
-    if (res.action === 'recategorize') { if (res.entity) merged.entity = res.entity; if (res.category) merged.category = res.category; }
+    if (res.action === 'recategorize') { if (res.entity) merged.entity = res.entity; if (res.category && validCategory(res.category)) merged.category = res.category; } // never let an off-taxonomy category into the live view, even from a hand-built resolution
     out.push(merged);
   }
   return out;
@@ -161,6 +161,15 @@ export function appendEntry(entry, dir) {
   if (existing.some((x) => x.hash === entry.hash)) return { ok: true, deduped: true, hash: entry.hash };
   fs.appendFileSync(file, JSON.stringify(entry) + '\n');
   return { ok: true, deduped: false, hash: entry.hash };
+}
+// Append a resolution DELTA record (from review.resolve) to the year's ledger file. Unlike appendEntry,
+// this NEVER hash-dedupes — resolutions are intentional deltas, and two distinct ones must both persist.
+export function appendResolution(rec, dir) {
+  const d = LDIR(dir);
+  fs.mkdirSync(d, { recursive: true });
+  const file = path.join(d, String(rec.dateISO).slice(0, 4) + '.jsonl');
+  fs.appendFileSync(file, JSON.stringify(rec) + '\n');
+  return { ok: true, hash: rec.hash };
 }
 export function readLedger(year, dir) {
   try {

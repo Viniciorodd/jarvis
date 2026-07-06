@@ -12,6 +12,7 @@ export function listPending(records) {
 export function resolve(entry, decision) {
   const d = decision || {};
   if (d.type === 'recategorize' && d.category && !validCategory(d.category)) return { error: `bad category ${d.category}` };
+  if (d.type === 'recategorize' && !d.entity && !d.category) return { error: 'recategorize requires an entity or category' };
   const res = [];
   const confirm = () => makeResolution({ target: entry.hash, action: 'confirm', dateISO: entry.dateISO });
   if (d.type === 'accept' || d.type === 'keep-both') res.push(confirm());

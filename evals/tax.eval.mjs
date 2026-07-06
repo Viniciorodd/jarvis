@@ -559,5 +559,25 @@ export default {
         const pending = listPending([x, y, confirmRes]);
         return { pass: pending.length === 1 && pending[0].hash === y.hash, detail: JSON.stringify(pending) };
       } },
+
+    { name: 'resolveLedger tie-break: on equal ts, the LAST-appended resolution wins',
+      run: () => {
+        const e = makeEntry({ dateISO: '2026-03-01', amount: 100, payee: 'A', entity: 'rodgate', category: 'income:gross-receipts', source: 'csv' });
+        const ts = '2026-07-06T00:00:00.000Z';
+        const rejectThenAccept = [e, { ...makeResolution({ target: e.hash, action: 'void', dateISO: '2026-03-01' }), ts }, { ...makeResolution({ target: e.hash, action: 'confirm', dateISO: '2026-03-01' }), ts }];
+        const live = resolveLedger(rejectThenAccept);
+        return { pass: live.length === 1 && live[0].status === 'confirmed', detail: JSON.stringify(live.map(x => x.status)) };
+      } },
+
+    { name: 'resolve: recategorize with neither entity nor category → error (no silent accept)',
+      run: () => { const r = resolve({ hash: 'h', dateISO: '2026-03-01' }, { type: 'recategorize' }); return { pass: !!r.error, detail: r.error || 'no error' }; } },
+
+    { name: 'resolveLedger: an invalid recategorize category is ignored, entry keeps its category',
+      run: () => {
+        const e = makeEntry({ dateISO: '2026-03-01', amount: 50, payee: 'X', entity: 'rodgate', category: 'schC:supplies', source: 'csv' });
+        const bad = { ...makeResolution({ target: e.hash, action: 'recategorize', category: 'schC:supplies', dateISO: '2026-03-01' }), category: 'not:real' };
+        const live = resolveLedger([e, bad]);
+        return { pass: live[0].category === 'schC:supplies' && live[0].status === 'confirmed', detail: live[0].category };
+      } },
   ],
 };

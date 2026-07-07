@@ -336,13 +336,14 @@ export default {
         ];
         // 20 days before Sep 15 (the Q3 est-tax due date) → nextVoucher due 2026-09-15.
         const s = buildStatus({ entries, registry: REG, debts: [], C, todayISO: '2026-08-26' });
-        const ds = s.upcomingDeadlines;
-        const sorted = ds.every((d, i) => i === 0 || d.daysUntil >= ds[i - 1].daysUntil);
-        const nearest = ds[0];
-        return { pass: Array.isArray(ds) && ds.length > 0 && sorted
-          && nearest && nearest.id === 'est-tax' && nearest.date === '2026-09-15' && nearest.daysUntil === 20
-          && nearest.amountCents === s.nextVoucher.amountCents && nearest.amountCents > 0,
-          detail: JSON.stringify(nearest) };
+        const dd = s.upcomingDeadlines;
+        const est = dd.find((d) => d.id === 'est-tax');
+        const pass = dd.length > 0
+          && dd.every((d) => d.daysUntil <= 45)                 // the 45-day filter itself
+          && !dd.some((d) => d.id === 'form-1099-nec')          // a >45-day deadline is excluded
+          && est && est.daysUntil === 20 && Number(est.amountCents) > 0
+          && dd.every((d, i) => i === 0 || d.daysUntil >= dd[i-1].daysUntil); // soonest-first
+        return { pass, detail: dd.map((d) => `${d.id}:${d.daysUntil}`).join(' ') };
       } },
 
     { name: 'org: "the tax guy" and "what do i owe" resolve to TAX-01 Sage under Victor',

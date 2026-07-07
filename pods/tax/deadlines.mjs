@@ -3,6 +3,9 @@
 // quarterly comes from the eval-pinned engine (never invented). Reminder state is the event log, so a
 // stage is pushed at most once. Nothing here files or pays.
 
+import { CP_URL, emit, notify } from '../lib.mjs';
+import { TY2026 } from './constants-2026.mjs';
+
 const DAY = 86400000;
 const daysBetween = (fromISO, toISO) => Math.round((Date.parse(toISO + 'T00:00:00Z') - Date.parse(fromISO + 'T00:00:00Z')) / DAY);
 
@@ -76,4 +79,63 @@ export function dueTaxReminders(deadlines, events = [], now = new Date(), { with
       ...(d.amountCents != null ? { amountCents: d.amountCents } : {}), ...(d.note ? { note: d.note } : {}) });
   }
   return out.sort((a, b) => a.daysLeft - b.daysLeft);
+}
+
+// Read the tax event store, find final-stage deadlines (<=3 days out), push a Telegram reminder for each
+// new one, and record the reminder as an event (idempotency + audit) — mirrors pods/gov/deadlines.mjs
+// runDeadlineRadar exactly. Best-effort; never throws. Only 'final' stage is pushed here; 'upcoming'/'soon'
+// already surface on the Home glance.
+export async function runTaxDeadlineRadar({ withinDays = 3 } = {}) {
+  try {
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const year = Number(todayISO.slice(0, 4));
+
+    let nextVoucher = null;
+    try {
+      const { taxStatus } = await import('./status.mjs');
+      const st = await taxStatus();
+      nextVoucher = st && st.nextVoucher ? st.nextVoucher : null;
+    } catch { /* ledger may be absent on the NAS — dates-only reminders are fine */ }
+
+    const deadlines = taxDeadlines({ year, C: TY2026, nextVoucher, todayISO });
+
+    let events = [];
+    try {
+      const r = await fetch(CP_URL + '/events?pod=tax', { signal: AbortSignal.timeout(15000) });
+      const d = await r.json();
+      events = Array.isArray(d) ? d : (d.events || []);
+    } catch (e) {
+      return { ok: false, note: e.message };
+    }
+
+    const due = dueTaxReminders(deadlines, events, new Date(), { withinDays });
+    const finals = due.filter((d) => d.stage === 'final');
+
+    let pushed = 0;
+    for (const d of finals) {
+      const amountText = d.amountCents ? ` · ≈$${(d.amountCents / 100).toFixed(2)}` : '';
+      const noteText = d.note ? ` · ${d.note}` : '';
+      await notify({
+        pod: 'Tax & Wealth',
+        title: `🚨 Tax deadline — ${d.label} due in ${d.daysLeft} day(s)`,
+        detail: `${d.date}${amountText}${noteText}`,
+        verb: 'Review',
+        xp: 50,
+      });
+      // the reminder IS the record — future ticks see this stage and won't re-ping it for this deadline
+      await emit({ kind: 'action', actor: 'TAX-01', pod: 'exec', action: 'tax.deadline.reminded', status: 'done',
+        rationale: `Reminded (final): ${d.label} due ${d.date}`,
+        payload: { id: d.id, date: d.date, stage: d.stage } });
+      pushed++;
+    }
+    return { ok: true, pushed, checked: due.length };
+  } catch (e) {
+    return { ok: false, note: e.message };
+  }
+}
+
+if (process.argv[1] && process.argv[1].endsWith('deadlines.mjs') && process.argv[1].includes('tax')) {
+  runTaxDeadlineRadar({ withinDays: Number(process.env.TAX_DEADLINE_WINDOW_DAYS || 3) })
+    .then((r) => console.log(JSON.stringify(r, null, 2)))
+    .catch((e) => { console.error(e); process.exitCode = 1; });
 }

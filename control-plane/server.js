@@ -220,6 +220,16 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { result = { ok: false, note: e.message }; }
       return send(res, 200, result);
     }
+    // Tax deadline radar → remind before a statutory/estimate deadline closes (final-stage only; idempotent).
+    if (req.method === 'POST' && p === '/maintenance/tax-deadline-check') {
+      const b = await readBody(req);
+      let result;
+      try {
+        const dl = await import('../pods/tax/deadlines.mjs');
+        result = await dl.runTaxDeadlineRadar({ withinDays: Number(b.withinDays) || 3 });
+      } catch (e) { result = { ok: false, note: e.message }; }
+      return send(res, 200, result);
+    }
     // CRM — the subcontractor database (Operations view reads this).
     if (req.method === 'GET' && p === '/crm') {
       try { const conn = await import('../pods/gov/connector.mjs'); return send(res, 200, { subs: conn.loadSubs() }); }

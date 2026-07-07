@@ -28,6 +28,9 @@
     { "id": "deadline-radar", "person": "SAM-SCOUT", "pod": "gov", "type": "maintenance",
       "cadence_hours": 24, "at_hour": 9, "endpoint": "/maintenance/deadline-check",
       "command": "check bid response deadlines and remind before any close (deterministic, no LLM)" },
+    { "id": "tax-deadline-radar", "person": "TAX-01", "pod": "exec", "type": "maintenance",
+      "cadence_hours": 24, "at_hour": 9, "endpoint": "/maintenance/tax-deadline-check",
+      "command": "check tax deadlines (1040-ES/1099-NEC/1065/1040) and push the final-stage ones (deterministic, no LLM)" },
     { "id": "eod-log", "person": "EXEC-01", "pod": "exec", "type": "maintenance",
       "cadence_hours": 24, "at_hour": 20, "endpoint": "/maintenance/eod-log",
       "command": "log the end-of-day summary to the Notion company brain (deterministic, no LLM)" }

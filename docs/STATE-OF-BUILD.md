@@ -87,6 +87,16 @@ and rack up real submit history so workflows can earn promotion up the ladder.
   the Telegram radar activates on the next NAS control-plane redeploy.** 3B (docs indexer) + 3C
   (FreeTaxUSA filing pack) still ahead. Spec:
   `docs/superpowers/specs/2026-07-07-tax-pod-phase3-deadlines-design.md`.
+- ✅ **Tax & Wealth pod Phase 3B — docs indexer (2026-07-07)** — `pods/tax/docs-index.mjs`: `classifyDoc`
+  (kind by filename, property/entity by folder path), `buildIndex`, `suggestDocs` (rank a doc for a ledger
+  entry by property/entity + payee token + amount-in-filename + mtime). **Filename+folder only, READ-ONLY,
+  no OCR** — never opens/moves/deletes a file. `POST /api/tax/docs/reindex` walks `docRoots`
+  (`Z:\Real Estate`, `gov-drafts`, `fiverr`) → `tax-docs/index.json` (**live test indexed 419 real docs**;
+  offline roots skipped gracefully). Attach a receipt to a deduction via the review screen's "📎 receipts"
+  (append-only `attach-doc` resolution folded by `resolveLedger` as `entry.docPath`, status-orthogonal).
+  `status.docsIndexed` count. Only **3C (FreeTaxUSA filing pack)** remains — spec + plan written, build
+  deferred to real-data/filing season. Spec:
+  `docs/superpowers/specs/2026-07-07-tax-pod-phase3b-docs-index-design.md`.
 
 ## Extra gaps the FULL doctrine surfaces (beyond the 5 directives)
 The real `operating-doctrine.md` (now canonical) asks for more than the 5 directives:

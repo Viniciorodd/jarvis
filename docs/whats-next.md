@@ -2,7 +2,23 @@
 
 _Updated 2026-07-06. Committed to `feat/core-infrastructure-v2` (NOT yet pushed — operator pushes when ready). Resume from here._
 
-### 🆕 2026-07-07 (newest) — Tax & Wealth pod Phase 3A shipped: tax deadline wiring
+### 🆕 2026-07-07 (newest) — Tax & Wealth pod Phase 3B shipped: docs indexer
+Built per `docs/superpowers/specs/2026-07-07-tax-pod-phase3b-docs-index-design.md`, branch
+`feat/tax-phase3b-docs-index`, 4 TDD tasks:
+- **`pods/tax/docs-index.mjs`** — `classifyDoc` (kind by filename: receipt/hud/contract/insurance/appraisal/
+  permit/statement/closing; property+entity by folder path), `buildIndex`, `suggestDocs` (rank a doc for a
+  ledger entry by property/entity + payee token + amount-in-filename + mtime proximity). **Filename+folder
+  only — READ-ONLY, no OCR: only reads names + stat, never opens/moves/deletes/uploads a file.**
+- **Index**: `POST /api/tax/docs/reindex` walks `docRoots` (entities.json: `Z:\Real Estate`, `gov-drafts`,
+  `fiverr`) → `tax-docs/index.json` (gitignored). **Live test cataloged 419 real docs.** An offline root
+  (e.g. Z: disconnected) is skipped gracefully.
+- **Attach a receipt to a deduction**: the review screen's "📎 receipts" button → `suggestDocs` → one-tap
+  `attach-doc` (an append-only resolution folded by `resolveLedger` as `entry.docPath`, status-orthogonal).
+- **Next**: Phase **3C** — the FreeTaxUSA filing pack (Sch C ×2 + Brick Ave LLC 1065 books/K-1 + 1099
+  checklist + judgment calls). **Spec + plan are written (`docs/superpowers/{specs,plans}/2026-07-07-...
+  phase3c-filing-pack*`); recommended to BUILD later, against real backfilled data + close to filing season.**
+
+### 2026-07-07 — Tax & Wealth pod Phase 3A shipped: tax deadline wiring
 Built per `docs/superpowers/specs/2026-07-07-tax-pod-phase3-deadlines-design.md`, branch
 `feat/tax-phase3-deadlines`, 4 TDD tasks:
 - **`pods/tax/deadlines.mjs`** — a pure, eval-pinned tax calendar: `taxDeadlines` (1040-ES quarterlies

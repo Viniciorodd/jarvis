@@ -76,8 +76,62 @@
       acts.appendChild(keepBoth);
     }
 
+    var docs = el('button','tr-btn tr-docs','📎 receipts');
+    docs.addEventListener('click', function(){ suggestDocs(entry.hash, row, docs); });
+    acts.appendChild(docs);
+
     row.appendChild(acts);
+
+    var docsBox = el('div','tr-docs-box');
+    docsBox.hidden = true;
+    row.appendChild(docsBox);
+
     return row;
+  }
+
+  function suggestDocs(hash, row, btn){
+    var box = row.querySelector('.tr-docs-box');
+    if(!box) return;
+    if(!box.hidden){ box.hidden = true; return; }
+    box.innerHTML = '';
+    box.hidden = false;
+    box.appendChild(el('div','tr-docs-loading','Looking for matching docs…'));
+    fetch('/api/tax/docs/suggest', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ hash: hash }) })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        box.innerHTML = '';
+        var suggestions = (d && d.suggestions) || [];
+        if(!suggestions.length){
+          box.appendChild(el('div','tr-docs-empty','no matching docs found'));
+          return;
+        }
+        suggestions.forEach(function(s){
+          var item = el('button','tr-doc-item');
+          var name = el('span','tr-doc-name'); name.textContent = s.name || '(unnamed)';
+          var kind = el('span','tr-doc-kind'); kind.textContent = s.kind || '';
+          item.appendChild(name); item.appendChild(kind);
+          item.addEventListener('click', function(){ attachDoc(hash, s.path, box, item); });
+          box.appendChild(item);
+        });
+      })
+      .catch(function(){
+        box.innerHTML = '';
+        box.appendChild(el('div','tr-docs-empty','could not reach docs index'));
+      });
+  }
+
+  function attachDoc(hash, docPath, box, item){
+    fetch('/api/tax/entry/attach-doc', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ hash: hash, docPath: docPath }) })
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if(res && res.ok){
+          box.innerHTML = '';
+          box.appendChild(el('div','tr-docs-attached','📎 attached'));
+        }
+      })
+      .catch(function(){ /* leave the list as-is on failure */ });
   }
 
   function renderCount(){

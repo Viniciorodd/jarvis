@@ -61,7 +61,11 @@ export async function taxStatus() {
   const year = registry.taxYear || TY2026.year;
   const entries = readLedger(year);
   const debts = loadDebts().debts || [];
-  return buildStatus({ entries, registry, debts, C: TY2026, todayISO: new Date().toLocaleDateString('en-CA'), taxYear: year });
+  const status = buildStatus({ entries, registry, debts, C: TY2026, todayISO: new Date().toLocaleDateString('en-CA'), taxYear: year });
+  // docsIndexed is additive I/O (reads tax-docs/index.json) — kept out of buildStatus to preserve its purity.
+  let docsIndexed = 0;
+  try { const { loadIndex } = await import('./docs-index.mjs'); docsIndexed = loadIndex().docs.length; } catch { docsIndexed = 0; }
+  return { ...status, docsIndexed };
 }
 
 if (process.argv[1] && process.argv[1].endsWith('status.mjs')) {

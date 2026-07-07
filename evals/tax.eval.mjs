@@ -14,6 +14,7 @@ import { headerHash, applyMap, resolveProfile } from '../pods/tax/accounts.mjs';
 import { classifyDedup, assignCategory, finalizeItems, parseCsv } from '../pods/tax/importer.mjs';
 import { listPending, resolve } from '../pods/tax/review.mjs';
 import { taxDeadlines, stageFor, dueTaxReminders } from '../pods/tax/deadlines.mjs';
+import { classifyDoc, buildIndex, suggestDocs } from '../pods/tax/docs-index.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -670,6 +671,83 @@ export default {
         const events = [{ action: 'tax.deadline.reminded', payload: { id: q.id, date: q.date, stage: q.stage } }];
         const second = dueTaxReminders(ds, events, now, { withinDays: 30 });
         return { pass: !!q && q.stage === 'final' && !second.find((r) => r.id === q.id && r.stage === q.stage), detail: `${first.length}→${second.length}` };
+      } },
+
+    { name: 'classifyDoc: kind by filename; property/entity by folder path',
+      run: () => {
+        const a = classifyDoc('2135 Brick Ave-Invoice.pdf', 'Z:/Real Estate/Deals/2135 Brick Ave, Scranton, PA 18508 Flip/Receipts', REG);
+        const b = classifyDoc('ALTA Combined Settlement Statement.pdf', 'Z:/Real Estate/Deals/2135 Brick Ave, Scranton', REG);
+        const c = classifyDoc('Full_Owner_Policy.pdf', 'Z:/Real Estate/463 2nd Street Plymouth', REG);
+        const d = classifyDoc('proposal.pdf', 'gov-drafts/sow', REG);
+        return { pass: a.kind === 'receipt' && a.property === 'brick-ave' && a.entity === 'brickave-llc'
+          && b.kind === 'hud' && c.kind === 'insurance' && c.property === 'second-463'
+          && d.entity === 'rodgate', detail: JSON.stringify([a,b,c,d].map(x=>x.kind+'/'+x.property)) };
+      } },
+
+    { name: 'classifyDoc: no folder match → null property/entity; deed → closing kind',
+      run: () => {
+        const a = classifyDoc('random.pdf', 'C:/Downloads', REG);
+        const b = classifyDoc('Deed___2135_Brick.pdf', 'Z:/Real Estate/2135 Brick Ave', REG);
+        return { pass: a.property === null && a.entity === null && b.kind === 'closing' && b.property === 'brick-ave', detail: `${a.property}/${b.kind}` };
+      } },
+
+    { name: 'buildIndex: maps a walkResult to indexed rows with classification applied',
+      run: () => {
+        const walk = [{ path: 'Z:/Real Estate/2135 Brick Ave/Receipts/Siding material receipt.pdf', name: 'Siding material receipt.pdf', folder: 'Z:/Real Estate/2135 Brick Ave/Receipts', mtimeMs: 1000, sizeBytes: 2048 }];
+        const idx = buildIndex(walk, REG);
+        return { pass: idx.length === 1 && idx[0].kind === 'receipt' && idx[0].property === 'brick-ave' && idx[0].sizeBytes === 2048, detail: JSON.stringify(idx[0]) };
+      } },
+
+    { name: 'suggestDocs: a receipt matching entity + amount + date outranks an unrelated doc',
+      run: () => {
+        const index = [
+          { path: 'x/Home Depot 43.00 receipt.pdf', name: 'Home Depot 43.00 receipt.pdf', kind: 'receipt', property: 'brick-ave', entity: 'brickave-llc', mtimeMs: Date.parse('2026-03-05T00:00:00Z') },
+          { path: 'y/random insurance.pdf', name: 'random insurance.pdf', kind: 'insurance', property: null, entity: 'rodgate', mtimeMs: Date.parse('2025-01-01T00:00:00Z') },
+        ];
+        const entry = { dateISO: '2026-03-05', cents: 4300, payee: 'Home Depot', entity: 'brickave-llc', property: 'brick-ave' };
+        const s = suggestDocs(entry, index, { withinDays: 30, limit: 5 });
+        return { pass: s.length >= 1 && s[0].name.includes('Home Depot') && s[0].score > 0, detail: JSON.stringify(s.map(x=>x.name+':'+x.score)) };
+      } },
+
+    { name: 'suggestDocs: empty index → []',
+      run: () => ({ pass: suggestDocs({ dateISO:'2026-03-05', cents:4300, payee:'x', entity:'rodgate' }, [], {}).length === 0, detail: 'ok' }) },
+
+    { name: 'makeResolution: attach-doc carries docPath + action',
+      run: () => {
+        const r = makeResolution({ target: 'h', action: 'attach-doc', docPath: 'Z:/x.pdf', dateISO: '2026-03-01' });
+        return { pass: r.docPath === 'Z:/x.pdf' && r.action === 'attach-doc', detail: JSON.stringify(r) };
+      } },
+
+    { name: 'resolveLedger: attach-doc sets docPath WITHOUT changing status (needs_review stays needs_review, reviewKind kept)',
+      run: () => {
+        const e = { ...makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT', entity: 'rodgate', category: 'schC:supplies', status: 'needs_review' }), reviewKind: 'dup-suspect' };
+        const attach = makeResolution({ target: e.hash, action: 'attach-doc', docPath: 'Z:/receipt.pdf', dateISO: '2026-03-06' });
+        const out = resolveLedger([e, attach]);
+        return { pass: out.length === 1 && out[0].docPath === 'Z:/receipt.pdf' && out[0].status === 'needs_review' && out[0].reviewKind === 'dup-suspect',
+          detail: JSON.stringify(out[0]) };
+      } },
+
+    { name: 'resolveLedger: confirm + attach-doc compose — entry ends confirmed AND has docPath (order-independent)',
+      run: () => {
+        const e = makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT', entity: 'rodgate', category: 'schC:supplies', status: 'needs_review' });
+        const confirmRes = makeResolution({ target: e.hash, action: 'confirm', dateISO: '2026-03-06' });
+        const attach = makeResolution({ target: e.hash, action: 'attach-doc', docPath: 'Z:/receipt.pdf', dateISO: '2026-03-06' });
+        const out1 = resolveLedger([e, confirmRes, attach]);
+        const out2 = resolveLedger([e, attach, confirmRes]);
+        return { pass: out1[0].status === 'confirmed' && out1[0].docPath === 'Z:/receipt.pdf'
+          && out2[0].status === 'confirmed' && out2[0].docPath === 'Z:/receipt.pdf',
+          detail: JSON.stringify([out1[0], out2[0]]) };
+      } },
+
+    { name: 'resolveLedger backward-compat: records with NO attach-doc behave exactly as before (confirmed stays confirmed, void drops)',
+      run: () => {
+        const a = makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HD', entity: 'rodgate', category: 'schC:supplies', status: 'needs_review' });
+        const confirmRes = makeResolution({ target: a.hash, action: 'confirm', dateISO: '2026-03-06' });
+        const b = makeEntry({ dateISO: '2026-03-07', amount: 20, payee: 'X', entity: 'rodgate', category: 'meta:personal' });
+        const voidRes = makeResolution({ target: b.hash, action: 'void', dateISO: '2026-03-08' });
+        const out = resolveLedger([a, confirmRes, b, voidRes]);
+        return { pass: out.length === 1 && out[0].hash === a.hash && out[0].status === 'confirmed' && !('docPath' in out[0]),
+          detail: JSON.stringify(out) };
       } },
   ],
 };

@@ -76,6 +76,17 @@ and rack up real submit history so workflows can earn promotion up the ladder.
   the cockpit); per-row property attribution is entity-level only (no per-row property inference); the
   review routes read the current tax year only (no cross-year review queue). Spec:
   `docs/superpowers/specs/2026-07-06-tax-pod-phase2-importer-design.md`.
+- ✅ **Tax & Wealth pod Phase 3A — tax deadline wiring (2026-07-07)** — `pods/tax/deadlines.mjs`: a pure,
+  eval-pinned calendar (1040-ES quarterlies w/ the estimator's voucher $, Jan 31 1099-NEC, **Mar 15 Form
+  1065** — ties to the open Brick Ave LLC question, Apr 15 1040+PA-40+local), `stageFor`
+  (upcoming≤30 / soon≤7 / final≤3), and `dueTaxReminders` (staged + deduped via `tax.deadline.reminded`
+  events). Surfaced live on the cockpit Home glance + `/api/tax/status` (`buildStatus.upcomingDeadlines`,
+  within 45 days). A daily `tax-deadline-radar` scheduler job → control-plane
+  `/maintenance/tax-deadline-check` → `runTaxDeadlineRadar` pushes **final-stage (≤3-day) reminders to
+  Telegram**, deduped, best-effort (mirrors the gov deadline radar). **The Home-glance surface works now;
+  the Telegram radar activates on the next NAS control-plane redeploy.** 3B (docs indexer) + 3C
+  (FreeTaxUSA filing pack) still ahead. Spec:
+  `docs/superpowers/specs/2026-07-07-tax-pod-phase3-deadlines-design.md`.
 
 ## Extra gaps the FULL doctrine surfaces (beyond the 5 directives)
 The real `operating-doctrine.md` (now canonical) asks for more than the 5 directives:

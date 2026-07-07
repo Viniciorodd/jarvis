@@ -2,7 +2,22 @@
 
 _Updated 2026-07-06. Committed to `feat/core-infrastructure-v2` (NOT yet pushed — operator pushes when ready). Resume from here._
 
-### 🆕 2026-07-06 (newest) — Tax & Wealth pod (Sage/TAX-01) Phase 2 shipped: bank-CSV importer
+### 🆕 2026-07-07 (newest) — Tax & Wealth pod Phase 3A shipped: tax deadline wiring
+Built per `docs/superpowers/specs/2026-07-07-tax-pod-phase3-deadlines-design.md`, branch
+`feat/tax-phase3-deadlines`, 4 TDD tasks:
+- **`pods/tax/deadlines.mjs`** — a pure, eval-pinned tax calendar: `taxDeadlines` (1040-ES quarterlies
+  carrying the estimator's voucher $, Jan 31 1099-NEC, **Mar 15 Form 1065**, Apr 15 1040+PA-40+local;
+  passed dates roll to next occurrence), `stageFor` (upcoming≤30 / soon≤7 / final≤3), `dueTaxReminders`
+  (staged + deduped via `tax.deadline.reminded` events).
+- **Home glance + `/api/tax/status`** now carry `upcomingDeadlines` (within 45 days) — the nearest tax
+  deadline shows on the cockpit with its $ if a quarterly. **This works live now.**
+- **Daily radar** (`runTaxDeadlineRadar` → control-plane `/maintenance/tax-deadline-check` → the
+  `tax-deadline-radar` schedule.json job) pushes **final-stage (≤3-day)** reminders to Telegram, deduped,
+  best-effort — mirrors the gov deadline radar. **Activates on the next NAS control-plane redeploy.**
+- Next in Phase 3: **3B docs indexer** (index Z:\Real Estate + gov/Fiverr folders, link docs↔ledger) →
+  **3C FreeTaxUSA filing pack** (Schedule C ×2 + Brick Ave LLC 1065 books/K-1 + 1099 checklist).
+
+### 2026-07-06 — Tax & Wealth pod (Sage/TAX-01) Phase 2 shipped: bank-CSV importer
 Built per `docs/superpowers/specs/2026-07-06-tax-pod-phase2-importer-design.md`, branch
 `feat/tax-phase2-importer`, 6 TDD tasks:
 - **`pods/tax/importer.mjs`** (parse + dedup + classify + fs drop-folder wrapper), **`accounts.mjs`**

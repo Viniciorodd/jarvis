@@ -70,6 +70,7 @@ iPhone/iPad — nothing is exposed to the public internet.
   The real filled-in profile is `prompts/operator-profile.md` (gitignored — contains personal data).
 - Tax & Wealth pod (Sage/TAX-01): pods/tax/ → /api/tax/status|capture|paid; ledger tax-ledger/<year>.jsonl; TY constants pods/tax/constants-<year>.mjs (verified-flagged); spec docs/superpowers/specs/2026-07-05-tax-pod-design.md.
   Phase 2 (bank-CSV importer): pods/tax/importer.mjs + accounts.mjs (per-account column-map profiles) + review.mjs (needs_review resolution); /api/tax/review(/resolve); tax-inbox/ drop folder + `node pods/tax/importer.mjs --backfill`; spec docs/superpowers/specs/2026-07-06-tax-pod-phase2-importer-design.md.
+  Phase 3A (deadline wiring): pods/tax/deadlines.mjs (pure calendar 1040-ES/1099-NEC/1065/1040 + stageFor + dueTaxReminders, eval-pinned) → buildStatus.upcomingDeadlines on the Home glance; runTaxDeadlineRadar + control-plane /maintenance/tax-deadline-check + schedule.json `tax-deadline-radar` job push final-stage (≤3d) reminders to Telegram (deduped via tax.deadline.reminded events; activates on next NAS control-plane redeploy). Spec docs/superpowers/specs/2026-07-07-tax-pod-phase3-deadlines-design.md.
 
 ## Status / next steps
 

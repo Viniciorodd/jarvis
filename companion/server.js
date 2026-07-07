@@ -2562,7 +2562,9 @@ const server = http.createServer(async (req, res) => {
     else if (tasks.active && tasks.active[0]) oneThing = { text: tasks.active[0].text, kind: 'task', id: tasks.active[0].id };
     let tax = null;
     try { const { taxStatus } = await import('../pods/tax/status.mjs'); const s = await taxStatus();
-      tax = { headline: s.headline, paymentsDue: s.paymentsDue.filter((p) => !p.paidThisMonth).length, warnings: s.warnings.length, needsReview: s.needsReview }; }
+      const upcomingDeadlines = (s.upcomingDeadlines || []).slice(0, 2)
+        .map((d) => ({ label: d.label, daysUntil: d.daysUntil, amountCents: d.amountCents }));
+      tax = { headline: s.headline, paymentsDue: s.paymentsDue.filter((p) => !p.paidThisMonth).length, warnings: s.warnings.length, needsReview: s.needsReview, upcomingDeadlines }; }
     catch { /* tax pod optional — cockpit never breaks because of it */ }
     return send(res, 200, JSON.stringify({ date: todayStr, oneThing, govNextAction, todayCalendar, week, tasks, approvals, calError, hasGoogle: google.googleConfigured(), tax }));
   }

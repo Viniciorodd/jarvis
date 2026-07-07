@@ -329,6 +329,22 @@ export default {
         return { pass: s.needsReview === 1 && s.warnings.some((w) => /need a quick review/i.test(w)), detail: `needsReview=${s.needsReview}` };
       } },
 
+    { name: 'buildStatus: upcomingDeadlines is non-empty, sorted soonest-first, nearest is the Q3 est-tax voucher w/ amountCents',
+      run: () => {
+        const entries = [
+          makeEntry({ dateISO: '2026-02-01', amount: 1000, payee: 'Agency', entity: 'rodgate', category: 'income:gross-receipts', source: 'capture' }),
+        ];
+        // 20 days before Sep 15 (the Q3 est-tax due date) → nextVoucher due 2026-09-15.
+        const s = buildStatus({ entries, registry: REG, debts: [], C, todayISO: '2026-08-26' });
+        const ds = s.upcomingDeadlines;
+        const sorted = ds.every((d, i) => i === 0 || d.daysUntil >= ds[i - 1].daysUntil);
+        const nearest = ds[0];
+        return { pass: Array.isArray(ds) && ds.length > 0 && sorted
+          && nearest && nearest.id === 'est-tax' && nearest.date === '2026-09-15' && nearest.daysUntil === 20
+          && nearest.amountCents === s.nextVoucher.amountCents && nearest.amountCents > 0,
+          detail: JSON.stringify(nearest) };
+      } },
+
     { name: 'org: "the tax guy" and "what do i owe" resolve to TAX-01 Sage under Victor',
       run: () => {
         const a = matchPerson('ask the tax guy'), b = matchPerson('what do i owe this quarter');

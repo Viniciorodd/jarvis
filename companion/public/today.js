@@ -65,6 +65,7 @@
 
   function renderTax(t){
     var old = $id('jTaxLine'); if(old) old.remove();
+    var oldDl = $id('jTaxDeadlineLine'); if(oldDl) oldDl.remove();
     if(!t || !t.headline) return;
     var ticker = $id('jTicker'); if(!ticker || !ticker.parentNode) return;
     var el2 = document.createElement('div');
@@ -78,6 +79,16 @@
       el2.appendChild(reviewLink);
     }
     ticker.parentNode.insertBefore(el2, ticker);
+    if(t.upcomingDeadlines && t.upcomingDeadlines.length){
+      var nd = t.upcomingDeadlines[0];
+      var dl = el('div','j-tax-deadline-line');
+      dl.id = 'jTaxDeadlineLine';
+      dl.style.cssText = 'font-size:12px;opacity:.85;padding:0 10px 6px;cursor:default;';
+      var dlText = '📅 ' + nd.label + ' in ' + nd.daysUntil + 'd';
+      if(nd.amountCents){ dlText += ' · ≈$' + Math.round(nd.amountCents / 100).toLocaleString('en-US'); }
+      dl.textContent = dlText;
+      ticker.parentNode.insertBefore(dl, ticker);
+    }
   }
 
   function renderHomeTasks(tasks){

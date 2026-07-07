@@ -96,10 +96,13 @@ export async function indexDocs({ registry, dir } = {}) {
   const roots = [];
   const walkResult = [];
   for (const root of (registry && registry.docRoots) || []) {
+    // Relative roots (e.g. "gov-drafts", "fiverr") are relative to the repo ROOT, not the process cwd;
+    // an absolute root (e.g. "Z:\Real Estate") is used as-is.
+    const resolved = path.isAbsolute(root) ? root : path.join(ROOT, root);
     try {
-      if (!fs.existsSync(root)) { roots.push({ root, ok: false, error: 'not found' }); continue; }
+      if (!fs.existsSync(resolved)) { roots.push({ root, ok: false, error: 'not found' }); continue; }
       const before = walkResult.length;
-      walkDir(root, root, 0, walkResult);
+      walkDir(resolved, resolved, 0, walkResult);
       roots.push({ root, ok: true, count: walkResult.length - before });
     } catch (e) {
       roots.push({ root, ok: false, error: e.message });

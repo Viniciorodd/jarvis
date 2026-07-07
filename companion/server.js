@@ -2527,6 +2527,61 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, remaining }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  if (req.method === 'GET' && url.pathname === '/api/tax/docs') {
+    try {
+      const { loadIndex } = await import('../pods/tax/docs-index.mjs');
+      const { builtAt, docs } = loadIndex();
+      const counts = { byProperty: {}, byEntity: {}, byKind: {} };
+      for (const d of docs) {
+        const p = d.property || 'unassigned'; counts.byProperty[p] = (counts.byProperty[p] || 0) + 1;
+        const e = d.entity || 'unassigned'; counts.byEntity[e] = (counts.byEntity[e] || 0) + 1;
+        const k = d.kind || 'other'; counts.byKind[k] = (counts.byKind[k] || 0) + 1;
+      }
+      const trimmed = docs.slice(0, 500).map((d) => ({ path: d.path, name: d.name, kind: d.kind, property: d.property, entity: d.entity }));
+      return send(res, 200, JSON.stringify({ builtAt, counts, docs: trimmed }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/tax/docs/reindex') {
+    try {
+      const { indexDocs } = await import('../pods/tax/docs-index.mjs');
+      const { loadRegistry } = await import('../pods/tax/capture.mjs');
+      const summary = await indexDocs({ registry: loadRegistry() });
+      return send(res, 200, JSON.stringify(summary));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/tax/docs/suggest') {
+    try {
+      const { hash } = await readBody(req);
+      if (!hash) return send(res, 400, JSON.stringify({ error: 'hash required' }));
+      const { readLedger, resolveLedger } = await import('../pods/tax/ledger.mjs');
+      const { loadIndex, suggestDocs } = await import('../pods/tax/docs-index.mjs');
+      const year = new Date().getFullYear();
+      const entry = resolveLedger(readLedger(year)).find((e) => e.hash === hash);
+      if (!entry) return send(res, 404, JSON.stringify({ error: 'entry not found' }));
+      const { docs } = loadIndex();
+      const suggestions = suggestDocs(entry, docs, { limit: 5 });
+      return send(res, 200, JSON.stringify({ suggestions }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/tax/entry/attach-doc') {
+    try {
+      const { hash, docPath } = await readBody(req);
+      if (!hash || !docPath || typeof docPath !== 'string' || docPath.includes('..')) {
+        return send(res, 400, JSON.stringify({ error: 'hash and a valid docPath (no ..) required' }));
+      }
+      const { readLedger, resolveLedger, appendResolution } = await import('../pods/tax/ledger.mjs');
+      const { resolve } = await import('../pods/tax/review.mjs');
+      const year = new Date().getFullYear();
+      const records = readLedger(year);
+      const entry = resolveLedger(records).find((e) => e.hash === hash);
+      if (!entry) return send(res, 404, JSON.stringify({ error: 'entry not found' }));
+      const r = resolve(entry, { type: 'attach-doc', docPath });
+      if (r.error) return send(res, 400, JSON.stringify(r));
+      for (const rec of r.resolutions) appendResolution(rec, undefined);
+      try { const { emit } = await import('../pods/lib.mjs'); await emit({ kind: 'action', actor: 'TAX-01', pod: 'exec', action: 'tax.docs.attach', reversible: true, payload: { hash, docPath } }); } catch { /* best-effort */ }
+      return send(res, 200, JSON.stringify({ ok: true }));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
 
   // ── COCKPIT: the one calm screen (🎯 Today · ✅ Tasks · 📅 Week · ⚡ Capture · approvals strip) ────
   if (req.method === 'GET' && url.pathname === '/api/cockpit') {

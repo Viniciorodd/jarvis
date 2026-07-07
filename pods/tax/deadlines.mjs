@@ -3,7 +3,7 @@
 // quarterly comes from the eval-pinned engine (never invented). Reminder state is the event log, so a
 // stage is pushed at most once. Nothing here files or pays.
 
-import { CP_URL, emit, notify } from '../lib.mjs';
+import { CP_URL, emit, mirror, notify } from '../lib.mjs';
 import { TY2026 } from './constants-2026.mjs';
 
 const DAY = 86400000;
@@ -105,6 +105,7 @@ export async function runTaxDeadlineRadar({ withinDays = 3 } = {}) {
       const d = await r.json();
       events = Array.isArray(d) ? d : (d.events || []);
     } catch (e) {
+      await emit({ kind: 'trace', actor: 'TAX-01', pod: 'exec', action: 'tax.deadline.skip', status: 'error', rationale: `tax deadline radar could not read events: ${e.message}` });
       return { ok: false, note: e.message };
     }
 
@@ -128,6 +129,7 @@ export async function runTaxDeadlineRadar({ withinDays = 3 } = {}) {
         payload: { id: d.id, date: d.date, stage: d.stage } });
       pushed++;
     }
+    await mirror('TAX-01', pushed > 0 ? 'need' : 'idle', pushed > 0 ? `${pushed} tax deadline(s) need you` : 'Tax deadlines clear', 'exec');
     return { ok: true, pushed, checked: due.length };
   } catch (e) {
     return { ok: false, note: e.message };

@@ -2555,7 +2555,8 @@ const server = http.createServer(async (req, res) => {
       if (!hash) return send(res, 400, JSON.stringify({ error: 'hash required' }));
       const { readLedger, resolveLedger } = await import('../pods/tax/ledger.mjs');
       const { loadIndex, suggestDocs } = await import('../pods/tax/docs-index.mjs');
-      const year = new Date().getFullYear();
+      const { loadRegistry } = await import('../pods/tax/capture.mjs');
+      const year = loadRegistry().taxYear || new Date().getFullYear();
       const entry = resolveLedger(readLedger(year)).find((e) => e.hash === hash);
       if (!entry) return send(res, 404, JSON.stringify({ error: 'entry not found' }));
       const { docs } = loadIndex();
@@ -2566,12 +2567,18 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/tax/entry/attach-doc') {
     try {
       const { hash, docPath } = await readBody(req);
-      if (!hash || !docPath || typeof docPath !== 'string' || docPath.includes('..')) {
-        return send(res, 400, JSON.stringify({ error: 'hash and a valid docPath (no ..) required' }));
+      const norm = (s) => String(s || '').replace(/\\/g, '/').toLowerCase().replace(/\/+$/, '');
+      const { loadRegistry } = await import('../pods/tax/capture.mjs');
+      const { ROOT } = await import('../pods/lib.mjs');
+      const path = await import('node:path');
+      const roots = (loadRegistry().docRoots || []).map((r) => norm(path.isAbsolute(r) ? r : path.join(ROOT, r)));
+      const dp = norm(docPath);
+      if (!docPath || typeof docPath !== 'string' || dp.includes('..') || !roots.some((r) => dp === r || dp.startsWith(r + '/'))) {
+        return send(res, 400, JSON.stringify({ error: 'docPath must be a real path within a configured docRoot' }));
       }
       const { readLedger, resolveLedger, appendResolution } = await import('../pods/tax/ledger.mjs');
       const { resolve } = await import('../pods/tax/review.mjs');
-      const year = new Date().getFullYear();
+      const year = loadRegistry().taxYear || new Date().getFullYear();
       const records = readLedger(year);
       const entry = resolveLedger(records).find((e) => e.hash === hash);
       if (!entry) return send(res, 404, JSON.stringify({ error: 'entry not found' }));

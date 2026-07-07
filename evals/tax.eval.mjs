@@ -13,6 +13,7 @@ import { matchPerson } from '../pods/org.mjs';
 import { headerHash, applyMap, resolveProfile } from '../pods/tax/accounts.mjs';
 import { classifyDedup, assignCategory, finalizeItems, parseCsv } from '../pods/tax/importer.mjs';
 import { listPending, resolve } from '../pods/tax/review.mjs';
+import { taxDeadlines, stageFor, dueTaxReminders } from '../pods/tax/deadlines.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -607,6 +608,51 @@ export default {
         const bad = { ...makeResolution({ target: e.hash, action: 'recategorize', category: 'schC:supplies', dateISO: '2026-03-01' }), category: 'not:real' };
         const live = resolveLedger([e, bad]);
         return { pass: live[0].category === 'schC:supplies' && live[0].status === 'confirmed', detail: live[0].category };
+      } },
+
+    { name: 'stageFor: 31→null, 30→upcoming, 7→soon, 3→final, 0→final, -1→null',
+      run: () => ({ pass: stageFor(31)===null && stageFor(30)==='upcoming' && stageFor(7)==='soon'
+        && stageFor(3)==='final' && stageFor(0)==='final' && stageFor(-1)===null,
+        detail: [stageFor(31),stageFor(30),stageFor(7),stageFor(3),stageFor(0),stageFor(-1)].join(',') }) },
+
+    { name: 'taxDeadlines: from 2026-09-01 the next est-tax is Sep 15 w/ the voucher amount + daysUntil 14',
+      run: () => {
+        const ds = taxDeadlines({ year: 2026, C, nextVoucher: { due: '2026-09-15', amountCents: 211000 }, todayISO: '2026-09-01' });
+        const q = ds.find((d) => d.kind === 'est-tax');
+        return { pass: q.date === '2026-09-15' && q.daysUntil === 14 && q.amountCents === 211000, detail: JSON.stringify(q) };
+      } },
+
+    { name: 'taxDeadlines: a passed est date rolls to the next occurrence (after Apr 15 → Jun 15)',
+      run: () => {
+        const ds = taxDeadlines({ year: 2026, C, nextVoucher: null, todayISO: '2026-04-16' });
+        const q = ds.find((d) => d.kind === 'est-tax');
+        return { pass: q.date === '2026-06-15' && q.amountCents === undefined, detail: q.date };
+      } },
+
+    { name: 'taxDeadlines: the 1065 + 1099-NEC + 1040 paperwork deadlines are present with notes',
+      run: () => {
+        const ds = taxDeadlines({ year: 2026, C, nextVoucher: null, todayISO: '2026-02-01' });
+        const has = (id) => ds.find((d) => d.id === id);
+        return { pass: !!has('form-1099-nec') && !!has('form-1065') && !!has('form-1040')
+          && /1065|partnership/i.test(has('form-1065').note || ''), detail: ds.map((d)=>d.id).join(',') };
+      } },
+
+    { name: 'taxDeadlines: sorted soonest-first, every daysUntil >= 0',
+      run: () => {
+        const ds = taxDeadlines({ year: 2026, C, nextVoucher: null, todayISO: '2026-01-20' });
+        const sorted = ds.every((d, i) => i === 0 || d.daysUntil >= ds[i-1].daysUntil) && ds.every((d) => d.daysUntil >= 0);
+        return { pass: sorted, detail: ds.map((d)=>`${d.id}:${d.daysUntil}`).join(' ') };
+      } },
+
+    { name: 'dueTaxReminders: within-window, dedup by id|date|stage (a reminded stage does not re-appear)',
+      run: () => {
+        const ds = taxDeadlines({ year: 2026, C, nextVoucher: { due:'2026-09-15', amountCents: 211000 }, todayISO: '2026-09-13' });
+        const now = new Date('2026-09-13T12:00:00Z');
+        const first = dueTaxReminders(ds, [], now, { withinDays: 30 });
+        const q = first.find((r) => r.kind === 'est-tax');
+        const events = [{ action: 'tax.deadline.reminded', payload: { id: q.id, date: q.date, stage: q.stage } }];
+        const second = dueTaxReminders(ds, events, now, { withinDays: 30 });
+        return { pass: !!q && q.stage === 'final' && !second.find((r) => r.id === q.id && r.stage === q.stage), detail: `${first.length}→${second.length}` };
       } },
   ],
 };

@@ -14,6 +14,7 @@ import { headerHash, applyMap, resolveProfile } from '../pods/tax/accounts.mjs';
 import { classifyDedup, assignCategory, finalizeItems, parseCsv } from '../pods/tax/importer.mjs';
 import { listPending, resolve } from '../pods/tax/review.mjs';
 import { taxDeadlines, stageFor, dueTaxReminders } from '../pods/tax/deadlines.mjs';
+import { classifyDoc, buildIndex, suggestDocs } from '../pods/tax/docs-index.mjs';
 const C = TY2026;
 const REG = JSON.parse(fs.readFileSync(new URL('../pods/tax/entities.json', import.meta.url), 'utf8'));
 
@@ -671,5 +672,44 @@ export default {
         const second = dueTaxReminders(ds, events, now, { withinDays: 30 });
         return { pass: !!q && q.stage === 'final' && !second.find((r) => r.id === q.id && r.stage === q.stage), detail: `${first.length}→${second.length}` };
       } },
+
+    { name: 'classifyDoc: kind by filename; property/entity by folder path',
+      run: () => {
+        const a = classifyDoc('2135 Brick Ave-Invoice.pdf', 'Z:/Real Estate/Deals/2135 Brick Ave, Scranton, PA 18508 Flip/Receipts', REG);
+        const b = classifyDoc('ALTA Combined Settlement Statement.pdf', 'Z:/Real Estate/Deals/2135 Brick Ave, Scranton', REG);
+        const c = classifyDoc('Full_Owner_Policy.pdf', 'Z:/Real Estate/463 2nd Street Plymouth', REG);
+        const d = classifyDoc('proposal.pdf', 'gov-drafts/sow', REG);
+        return { pass: a.kind === 'receipt' && a.property === 'brick-ave' && a.entity === 'brickave-llc'
+          && b.kind === 'hud' && c.kind === 'insurance' && c.property === 'second-463'
+          && d.entity === 'rodgate', detail: JSON.stringify([a,b,c,d].map(x=>x.kind+'/'+x.property)) };
+      } },
+
+    { name: 'classifyDoc: no folder match → null property/entity; deed → closing kind',
+      run: () => {
+        const a = classifyDoc('random.pdf', 'C:/Downloads', REG);
+        const b = classifyDoc('Deed___2135_Brick.pdf', 'Z:/Real Estate/2135 Brick Ave', REG);
+        return { pass: a.property === null && a.entity === null && b.kind === 'closing' && b.property === 'brick-ave', detail: `${a.property}/${b.kind}` };
+      } },
+
+    { name: 'buildIndex: maps a walkResult to indexed rows with classification applied',
+      run: () => {
+        const walk = [{ path: 'Z:/Real Estate/2135 Brick Ave/Receipts/Siding material receipt.pdf', name: 'Siding material receipt.pdf', folder: 'Z:/Real Estate/2135 Brick Ave/Receipts', mtimeMs: 1000, sizeBytes: 2048 }];
+        const idx = buildIndex(walk, REG);
+        return { pass: idx.length === 1 && idx[0].kind === 'receipt' && idx[0].property === 'brick-ave' && idx[0].sizeBytes === 2048, detail: JSON.stringify(idx[0]) };
+      } },
+
+    { name: 'suggestDocs: a receipt matching entity + amount + date outranks an unrelated doc',
+      run: () => {
+        const index = [
+          { path: 'x/Home Depot 43.00 receipt.pdf', name: 'Home Depot 43.00 receipt.pdf', kind: 'receipt', property: 'brick-ave', entity: 'brickave-llc', mtimeMs: Date.parse('2026-03-05T00:00:00Z') },
+          { path: 'y/random insurance.pdf', name: 'random insurance.pdf', kind: 'insurance', property: null, entity: 'rodgate', mtimeMs: Date.parse('2025-01-01T00:00:00Z') },
+        ];
+        const entry = { dateISO: '2026-03-05', cents: 4300, payee: 'Home Depot', entity: 'brickave-llc', property: 'brick-ave' };
+        const s = suggestDocs(entry, index, { withinDays: 30, limit: 5 });
+        return { pass: s.length >= 1 && s[0].name.includes('Home Depot') && s[0].score > 0, detail: JSON.stringify(s.map(x=>x.name+':'+x.score)) };
+      } },
+
+    { name: 'suggestDocs: empty index → []',
+      run: () => ({ pass: suggestDocs({ dateISO:'2026-03-05', cents:4300, payee:'x', entity:'rodgate' }, [], {}).length === 0, detail: 'ok' }) },
   ],
 };

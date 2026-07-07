@@ -19,6 +19,7 @@ export function resolve(entry, decision) {
   else if (d.type === 'recategorize') res.push(makeResolution({ target: entry.hash, action: 'recategorize', entity: d.entity, category: d.category, dateISO: entry.dateISO }));
   else if (d.type === 'merge') { res.push(confirm()); if (entry.dupOf) res.push(makeResolution({ target: entry.dupOf, action: 'void', dateISO: entry.dateISO })); }
   else if (d.type === 'reject') res.push(makeResolution({ target: entry.hash, action: 'void', dateISO: entry.dateISO }));
+  else if (d.type === 'attach-doc') { if (!d.docPath) return { error: 'attach-doc requires docPath' }; res.push(makeResolution({ target: entry.hash, action: 'attach-doc', docPath: d.docPath, dateISO: entry.dateISO })); }
   else return { error: `unknown decision ${d.type}` };
   return { resolutions: res };
 }

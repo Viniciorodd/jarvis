@@ -711,5 +711,43 @@ export default {
 
     { name: 'suggestDocs: empty index → []',
       run: () => ({ pass: suggestDocs({ dateISO:'2026-03-05', cents:4300, payee:'x', entity:'rodgate' }, [], {}).length === 0, detail: 'ok' }) },
+
+    { name: 'makeResolution: attach-doc carries docPath + action',
+      run: () => {
+        const r = makeResolution({ target: 'h', action: 'attach-doc', docPath: 'Z:/x.pdf', dateISO: '2026-03-01' });
+        return { pass: r.docPath === 'Z:/x.pdf' && r.action === 'attach-doc', detail: JSON.stringify(r) };
+      } },
+
+    { name: 'resolveLedger: attach-doc sets docPath WITHOUT changing status (needs_review stays needs_review, reviewKind kept)',
+      run: () => {
+        const e = { ...makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT', entity: 'rodgate', category: 'schC:supplies', status: 'needs_review' }), reviewKind: 'dup-suspect' };
+        const attach = makeResolution({ target: e.hash, action: 'attach-doc', docPath: 'Z:/receipt.pdf', dateISO: '2026-03-06' });
+        const out = resolveLedger([e, attach]);
+        return { pass: out.length === 1 && out[0].docPath === 'Z:/receipt.pdf' && out[0].status === 'needs_review' && out[0].reviewKind === 'dup-suspect',
+          detail: JSON.stringify(out[0]) };
+      } },
+
+    { name: 'resolveLedger: confirm + attach-doc compose — entry ends confirmed AND has docPath (order-independent)',
+      run: () => {
+        const e = makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HOME DEPOT', entity: 'rodgate', category: 'schC:supplies', status: 'needs_review' });
+        const confirmRes = makeResolution({ target: e.hash, action: 'confirm', dateISO: '2026-03-06' });
+        const attach = makeResolution({ target: e.hash, action: 'attach-doc', docPath: 'Z:/receipt.pdf', dateISO: '2026-03-06' });
+        const out1 = resolveLedger([e, confirmRes, attach]);
+        const out2 = resolveLedger([e, attach, confirmRes]);
+        return { pass: out1[0].status === 'confirmed' && out1[0].docPath === 'Z:/receipt.pdf'
+          && out2[0].status === 'confirmed' && out2[0].docPath === 'Z:/receipt.pdf',
+          detail: JSON.stringify([out1[0], out2[0]]) };
+      } },
+
+    { name: 'resolveLedger backward-compat: records with NO attach-doc behave exactly as before (confirmed stays confirmed, void drops)',
+      run: () => {
+        const a = makeEntry({ dateISO: '2026-03-05', amount: 43, payee: 'HD', entity: 'rodgate', category: 'schC:supplies', status: 'needs_review' });
+        const confirmRes = makeResolution({ target: a.hash, action: 'confirm', dateISO: '2026-03-06' });
+        const b = makeEntry({ dateISO: '2026-03-07', amount: 20, payee: 'X', entity: 'rodgate', category: 'meta:personal' });
+        const voidRes = makeResolution({ target: b.hash, action: 'void', dateISO: '2026-03-08' });
+        const out = resolveLedger([a, confirmRes, b, voidRes]);
+        return { pass: out.length === 1 && out[0].hash === a.hash && out[0].status === 'confirmed' && !('docPath' in out[0]),
+          detail: JSON.stringify(out) };
+      } },
   ],
 };

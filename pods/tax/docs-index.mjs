@@ -2,6 +2,10 @@
 // rank likely receipts for a ledger entry. PURE core (this section) + a thin fs walk wrapper (below).
 // READ-ONLY on the filesystem: name + stat only, never opens/moves/deletes/uploads a file (doctrine §2/§4).
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { ROOT, emit } from '../lib.mjs';
+
 const KIND_RULES = [
   [/receipt|invoice|order[_ ]?conf|order[_ ]?ack|purchase/i, 'receipt'],
   [/\bhud\b|alta|settlement/i, 'hud'],
@@ -57,4 +61,64 @@ export function suggestDocs(entry, index, { withinDays = 30, limit = 5 } = {}) {
     return { path: d.path, name: d.name, kind: d.kind, score };
   }).filter((d) => d.score > 0).sort((a, b) => b.score - a.score);
   return scored.slice(0, limit);
+}
+
+// ── thin fs wrapper (not eval-tested; evals stay pure) ──────────────────────────────────────────────
+const SKIP_DIRS = new Set(['node_modules', '.git', '.tmp']);
+const SKIP_FILES = new Set(['Thumbs.db']);
+const IDIR = (dir) => dir || path.join(ROOT, 'tax-docs');
+const MAX_DEPTH = 8;
+
+function walkDir(root, dir, depth, out) {
+  if (depth > MAX_DEPTH) return;
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const ent of entries) {
+    const name = ent.name;
+    if (name.startsWith('.')) continue;
+    const full = path.join(dir, name);
+    if (ent.isDirectory()) {
+      if (SKIP_DIRS.has(name)) continue;
+      walkDir(root, full, depth + 1, out);
+    } else if (ent.isFile()) {
+      if (SKIP_FILES.has(name) || /\.(tmp|crdownload)$/i.test(name)) continue;
+      let st;
+      try { st = fs.statSync(full); } catch { continue; }
+      out.push({ path: full, name, folder: dir, mtimeMs: st.mtimeMs, sizeBytes: st.size });
+    }
+  }
+}
+
+// Walk registry.docRoots (read-only: readdir + stat only — never opens/moves/deletes a file), build the
+// index, and write it to tax-docs/index.json. A root that's missing/offline (e.g. the Z: network drive) is
+// skipped with ok:false rather than crashing the whole reindex.
+export async function indexDocs({ registry, dir } = {}) {
+  const roots = [];
+  const walkResult = [];
+  for (const root of (registry && registry.docRoots) || []) {
+    try {
+      if (!fs.existsSync(root)) { roots.push({ root, ok: false, error: 'not found' }); continue; }
+      const before = walkResult.length;
+      walkDir(root, root, 0, walkResult);
+      roots.push({ root, ok: true, count: walkResult.length - before });
+    } catch (e) {
+      roots.push({ root, ok: false, error: e.message });
+    }
+  }
+  const docs = buildIndex(walkResult, registry);
+  const d = IDIR(dir);
+  fs.mkdirSync(d, { recursive: true });
+  const builtAt = new Date().toISOString();
+  fs.writeFileSync(path.join(d, 'index.json'), JSON.stringify({ builtAt, docs }, null, 2));
+  await emit({ kind: 'action', actor: 'TAX-01', pod: 'exec', action: 'tax.docs.reindex',
+    payload: { total: docs.length, roots } });
+  return { roots, total: docs.length };
+}
+
+export function loadIndex(dir) {
+  try {
+    const raw = fs.readFileSync(path.join(IDIR(dir), 'index.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    return { builtAt: parsed.builtAt || null, docs: parsed.docs || [] };
+  } catch { return { builtAt: null, docs: [] }; }
 }

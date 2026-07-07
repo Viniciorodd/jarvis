@@ -93,33 +93,44 @@ export const dedupe = (entries) => {
 // (the content hash can't change on accept/recategorize). action: 'confirm' | 'recategorize' | 'void'.
 export function isResolution(rec) { return !!(rec && rec.kind === 'tax.resolution' && rec.target); }
 
-export function makeResolution({ target, action, entity = null, category = null, dateISO }) {
+export function makeResolution({ target, action, entity = null, category = null, docPath = null, dateISO }) {
   const rec = { kind: 'tax.resolution', target, action,
     dateISO: dateISO || new Date().toLocaleDateString('en-CA'), ts: new Date().toISOString() };
   if (entity) rec.entity = entity;
   if (category) rec.category = category;
+  if (docPath) rec.docPath = docPath;
   rec.hash = crypto.createHash('sha256').update(`res|${target}|${action}|${rec.ts}`).digest('hex').slice(0, 16);
   return rec;
 }
 
 // PURE: fold resolution deltas into a record list → the LIVE entries. Latest resolution per target wins.
+// attach-doc is tracked SEPARATELY from status resolutions (confirm/recategorize/void) — attaching a doc
+// must never un-confirm or re-confirm an entry, it only ever adds docPath.
 // Backward-compatible: a log with NO resolutions returns its real entries unchanged.
 export function resolveLedger(records) {
-  const resolutions = new Map(); // target hash → latest resolution by ts
+  const resolutions = new Map(); // target → latest STATUS resolution (void/confirm/recategorize)
+  const attachments = new Map(); // target → latest attach-doc (docPath only, orthogonal to status)
   for (const r of records || []) if (isResolution(r)) {
-    const prev = resolutions.get(r.target);
-    if (!prev || r.ts >= prev.ts) resolutions.set(r.target, r); // >= so the LAST-appended resolution wins on an exact-ts tie (a later operator correction beats an earlier one)
+    const map = r.action === 'attach-doc' ? attachments : resolutions;
+    const prev = map.get(r.target);
+    if (!prev || r.ts >= prev.ts) map.set(r.target, r);
   }
   const out = [];
   for (const e of records || []) {
     if (!e || isResolution(e) || !e.hash) continue; // resolution markers are not entries
     const res = resolutions.get(e.hash);
-    if (!res) { out.push(e); continue; }
-    if (res.action === 'void') continue; // dropped
-    const merged = { ...e, status: 'confirmed' };
-    delete merged.reviewKind; delete merged.dupOf;
-    if (res.action === 'recategorize') { if (res.entity) merged.entity = res.entity; if (res.category && validCategory(res.category)) merged.category = res.category; } // never let an off-taxonomy category into the live view, even from a hand-built resolution
-    out.push(merged);
+    let entry;
+    if (!res) entry = e;
+    else if (res.action === 'void') continue; // dropped
+    else {
+      const merged = { ...e, status: 'confirmed' };
+      delete merged.reviewKind; delete merged.dupOf;
+      if (res.action === 'recategorize') { if (res.entity) merged.entity = res.entity; if (res.category && validCategory(res.category)) merged.category = res.category; } // never let an off-taxonomy category into the live view, even from a hand-built resolution
+      entry = merged;
+    }
+    const att = attachments.get(e.hash);
+    if (att && att.docPath) entry = { ...entry, docPath: att.docPath };
+    out.push(entry);
   }
   return out;
 }

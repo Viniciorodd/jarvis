@@ -7,6 +7,10 @@ import { CP_URL, emit, mirror, notify } from '../lib.mjs';
 import { TY2026 } from './constants-2026.mjs';
 
 const DAY = 86400000;
+// Deadline reminders live in their OWN low-traffic event bucket so the daily dedup read is precise and
+// can't be evicted by busy pods — and so the emit pod and the read pod can never drift apart (that
+// mismatch silently defeated dedup and spammed the final-stage push). Read-pod === emit-pod, always.
+const REMINDER_POD = 'tax';
 const daysBetween = (fromISO, toISO) => Math.round((Date.parse(toISO + 'T00:00:00Z') - Date.parse(fromISO + 'T00:00:00Z')) / DAY);
 
 // Fixed statutory dates for a given calendar year (self-employed, single, PA). 1099-NEC issue + partnership
@@ -101,11 +105,11 @@ export async function runTaxDeadlineRadar({ withinDays = 3 } = {}) {
 
     let events = [];
     try {
-      const r = await fetch(CP_URL + '/events?pod=tax', { signal: AbortSignal.timeout(15000) });
+      const r = await fetch(`${CP_URL}/events?pod=${REMINDER_POD}`, { signal: AbortSignal.timeout(15000) });
       const d = await r.json();
       events = Array.isArray(d) ? d : (d.events || []);
     } catch (e) {
-      await emit({ kind: 'trace', actor: 'TAX-01', pod: 'exec', action: 'tax.deadline.skip', status: 'error', rationale: `tax deadline radar could not read events: ${e.message}` });
+      await emit({ kind: 'trace', actor: 'TAX-01', pod: REMINDER_POD, action: 'tax.deadline.skip', status: 'error', rationale: `tax deadline radar could not read events: ${e.message}` });
       return { ok: false, note: e.message };
     }
 
@@ -124,7 +128,7 @@ export async function runTaxDeadlineRadar({ withinDays = 3 } = {}) {
         xp: 50,
       });
       // the reminder IS the record — future ticks see this stage and won't re-ping it for this deadline
-      await emit({ kind: 'action', actor: 'TAX-01', pod: 'exec', action: 'tax.deadline.reminded', status: 'done',
+      await emit({ kind: 'action', actor: 'TAX-01', pod: REMINDER_POD, action: 'tax.deadline.reminded', status: 'done',
         rationale: `Reminded (final): ${d.label} due ${d.date}`,
         payload: { id: d.id, date: d.date, stage: d.stage } });
       pushed++;

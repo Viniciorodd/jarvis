@@ -40,7 +40,8 @@ export function taxDeadlines({ year, C, nextVoucher = null, todayISO }) {
     out.push(item);
   }
   // statutory paperwork: roll each to its next occurrence.
-  for (const s of statutory(year)) {
+  const baseYear = Number(String(todayISO).slice(0, 4)); // statutory dates anchor to today's year (never a stale param), then roll forward
+  for (const s of statutory(baseYear)) {
     const rolled = daysBetween(todayISO, s.date) >= 0 ? s.date : nextOccurrence(s.date.slice(5), todayISO);
     out.push({ ...s, date: rolled });
   }

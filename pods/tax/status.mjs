@@ -8,6 +8,7 @@ import { readLedger, summarize, resolveLedger } from './ledger.mjs';
 import { bucketState, nudgeLine } from './savings.mjs';
 import { loadDebts, paymentsDue } from './debt.mjs';
 import { loadRegistry } from './capture.mjs';
+import { taxDeadlines } from './deadlines.mjs';
 
 const usd = (c) => '$' + Math.round(c / 100).toLocaleString('en-US');
 
@@ -48,8 +49,11 @@ export function buildStatus({ entries, registry, debts, C, todayISO, taxYear }) 
   const nextVoucher = q.remaining[0] || null;
   const headline = `Set aside ${est.setAsidePct}% of every dollar in · tax bucket target ${usd(buckets.target.tax)}`
     + (nextVoucher ? ` · next quarterly ~${usd(nextVoucher.amountCents)} due ${nextVoucher.due}` : '');
+  // Full self-employed deadline calendar (est-tax + 1099-NEC + 1065 + 1040), trimmed to what's actually
+  // near — the year arg is advisory only (deadlines.mjs derives statutory dates from todayISO).
+  const upcomingDeadlines = taxDeadlines({ year: C.year, C, nextVoucher, todayISO }).filter((d) => d.daysUntil <= 45);
   return { headline, setAsidePct: est.setAsidePct, estimate: est, nextVoucher, buckets,
-    nudge: nudgeLine(buckets), paymentsDue: due, flags: est.flags, warnings, needsReview };
+    nudge: nudgeLine(buckets), paymentsDue: due, flags: est.flags, warnings, needsReview, upcomingDeadlines };
 }
 
 export async function taxStatus() {

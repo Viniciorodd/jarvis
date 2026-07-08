@@ -28,6 +28,47 @@ async function tg(method, body) { try { return await (await fetch(API + '/' + me
 async function send(chat, text) { for (let i = 0; i < text.length; i += 3900) await tg('sendMessage', { chat_id: chat, text: text.slice(i, i + 3900) }); }
 async function get(p) { try { return await (await fetch(COMPANION + p)).json(); } catch (e) { return { error: e.message }; } }
 
+// ── Approve-from-phone ────────────────────────────────────────────────────────────────────────────
+// Push each NEW gated action as inline ✅/⏭ buttons; a tap fires the SAME control-plane executor the app
+// uses — so nothing sends without your tap, but you can tap from anywhere (the point while you travel).
+// Approve→actually-send requires GOV_AUTO_SEND=1 in .env; otherwise Approve just previews what would go out.
+const CP = env('JARVIS_CP_URL', env('CONTROL_PLANE_URL', 'http://192.168.6.121:8787')).replace(/\/$/, '');
+async function cp(p, opts) { try { return await (await fetch(CP + p, opts)).json(); } catch (e) { return { error: e.message }; } }
+const pushedApprovals = new Set();
+function approvalText(a) {
+  const p = a.payload || {};
+  const title = p.title || a.rationale || a.action || 'Needs your approval';
+  const detail = p.detail || (p.to ? 'To: ' + p.to : '');
+  return `🟡 NEEDS YOU — tap to decide\n\n${title}${detail ? '\n' + detail : ''}\n\n(${a.pod || ''} · ${a.action || ''})`;
+}
+async function seedApprovals() { const list = await cp('/approvals/pending'); if (Array.isArray(list)) for (const a of list) pushedApprovals.add(a.id); }
+async function pushApprovals() {
+  if (!ALLOWED) return;
+  const list = await cp('/approvals/pending');
+  if (!Array.isArray(list)) return;
+  for (const a of list) {
+    if (pushedApprovals.has(a.id)) continue;
+    pushedApprovals.add(a.id);
+    await tg('sendMessage', { chat_id: ALLOWED, text: approvalText(a), reply_markup: { inline_keyboard: [[{ text: '✅ Approve & send', callback_data: 'ap:' + a.id }, { text: '⏭ Skip', callback_data: 'sk:' + a.id }]] } });
+  }
+}
+async function handleCallback(q) {
+  const chat = String((q.message && q.message.chat && q.message.chat.id) || '');
+  if (ALLOWED && chat !== ALLOWED) { await tg('answerCallbackQuery', { callback_query_id: q.id }); return; }
+  const [act, id] = String(q.data || '').split(':');
+  const decision = act === 'ap' ? 'approve' : act === 'sk' ? 'pass' : null;
+  if (!decision || !id) { await tg('answerCallbackQuery', { callback_query_id: q.id }); return; }
+  const r = await cp('/approvals/' + id, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision, pod: 'gov' }) });
+  let note;
+  if (r && r.duplicate) note = 'Already decided.';
+  else if (decision === 'pass') note = '⏭ Skipped.';
+  else if (r && r.executed && r.executed.sent) note = '✅ Approved — sent.';
+  else if (r && r.executed && r.executed.ok) note = '✅ Approved (auto-send off → previewed; set GOV_AUTO_SEND=1 to actually send).';
+  else note = '✅ Approved.';
+  await tg('answerCallbackQuery', { callback_query_id: q.id, text: note });
+  try { await tg('editMessageText', { chat_id: chat, message_id: q.message.message_id, text: (q.message.text || '') + '\n\n' + note }); } catch { /* */ }
+}
+
 async function askJarvis(text) {
   history.push({ role: 'user', content: text });
   const r = await fetch(COMPANION + '/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: history.slice(-16) }) }).catch((e) => ({ ok: false, _e: e.message }));
@@ -64,9 +105,10 @@ async function handle(chat, text) {
 
 let offset = 0;
 async function poll() {
-  const d = await tg('getUpdates', { offset, timeout: 50, allowed_updates: ['message'] });
+  const d = await tg('getUpdates', { offset, timeout: 50, allowed_updates: ['message', 'callback_query'] });
   for (const u of (d.result || [])) {
     offset = u.update_id + 1;
+    if (u.callback_query) { try { await handleCallback(u.callback_query); } catch { /* */ } continue; }
     const msg = u.message; if (!msg || !msg.text) continue;
     const chat = String(msg.chat.id);
     if (ALLOWED && chat !== ALLOWED) { await send(chat, `Not authorized. (To allow this phone, set TELEGRAM_CHAT_ID=${chat} in .env.)`); continue; }
@@ -77,6 +119,8 @@ async function poll() {
 
 (async () => {
   const me = await tg('getMe', {});
-  console.log('JARVIS Telegram bridge running as @' + ((me.result || {}).username || '?') + '  ·  brain: ' + COMPANION + (ALLOWED ? '' : '  ·  ⚠ no TELEGRAM_CHAT_ID — message the bot to learn yours'));
+  console.log('JARVIS Telegram bridge running as @' + ((me.result || {}).username || '?') + '  ·  brain: ' + COMPANION + '  ·  CP: ' + CP + (ALLOWED ? '' : '  ·  ⚠ no TELEGRAM_CHAT_ID — message the bot to learn yours'));
+  await seedApprovals();               // mark the existing backlog as seen (don't blast it on boot)
+  setInterval(pushApprovals, 15000);   // push NEW gated actions as tap-to-approve buttons
   poll();
 })();

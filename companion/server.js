@@ -1470,8 +1470,36 @@ const server = http.createServer(async (req, res) => {
     try {
       const { messages } = await readBody(req);
       if (!Array.isArray(messages) || !messages.length) return send(res, 400, JSON.stringify({ error: 'messages required' }));
+      // Voice expense capture: "Hey Jarvis, I spent $40 on gas today" → parsed + logged in CODE (money is
+      // never LLM-guessed, doctrine #1) and confirmed out loud — no model call. Falls through if it isn't one.
+      try {
+        const last = messages[messages.length - 1];
+        if (last && last.role === 'user' && typeof last.content === 'string') {
+          const EXP = await import('../pods/expenses.mjs');
+          const cap = EXP.captureFromText(last.content);
+          if (cap.ok) return send(res, 200, JSON.stringify({ text: cap.spoken, actions: [{ ok: true, label: `💸 logged $${cap.expense.amount.toFixed(2)} · ${cap.expense.description}` }], expense: cap.expense }));
+        }
+      } catch { /* not an expense / parser error → normal chat */ }
       const out = await converse(messages.slice(-20));
       return send(res, 200, JSON.stringify(out));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── VOICE EXPENSE TRACKING: "I spent X on Y" → deterministic log. GET = today/summary, POST = log ──
+  if (req.method === 'GET' && url.pathname === '/api/expense') {
+    try {
+      const EXP = await import('../pods/expenses.mjs');
+      const since = url.searchParams.get('since') || '';
+      const list = EXP.readExpenses({ since });
+      return send(res, 200, JSON.stringify({ ...EXP.summarize(list), recent: list.slice(-20).reverse() }));
+    } catch (e) { return send(res, 200, JSON.stringify({ count: 0, total: 0, byCategory: {}, recent: [], error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/expense') {
+    try {
+      const EXP = await import('../pods/expenses.mjs');
+      const b = await readBody(req);
+      if (b.text) { const cap = EXP.captureFromText(b.text); return send(res, cap.ok ? 200 : 400, JSON.stringify(cap.ok ? cap : { ok: false, error: 'no expense found in that text' })); }
+      const r = EXP.logExpense({ amount: b.amount, description: b.description, date: b.date, category: b.category, source: b.source || 'manual' });
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   // ── daily brief (calendar + unread + needs-you + top opportunity) ──

@@ -16,6 +16,7 @@ import { notifyTelegram } from '../lib.mjs';
 import { maybeConnect } from './connector.mjs';
 import { procurementPath } from './replies.mjs';
 import { checkCompliance } from './compliance.mjs';
+import { factsCheck, factsCheckSummary } from './facts-check.mjs';
 import { isDescriptionUrl, fetchDescription, pullScopeOfWork, sowPath } from './sow.mjs';
 import * as deals from './deals.mjs';
 
@@ -189,10 +190,20 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     const comp = await checkCompliance({ op, draft: d.md }); spend += comp._cost || 0;
     await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.check', reversible: true, status: comp.verdict === 'FAIL' ? 'error' : 'done', rationale: `Compliance ${comp.verdict}: ${comp.summary}`, payload: { noticeId: op.noticeId, verdict: comp.verdict, needs_sub_past_performance: !!comp.needs_sub_past_performance } });
     if (comp.verdict === 'FAIL') await mirror('GOV-ANALYST', 'need', `⚠ Compliance risk on ${op.title}: ${comp.summary}`);
+    // LAST-STEP FACTS GUARD (doctrine Canonical Facts + Lessons L-005/L-006/L-007): scan the draft for
+    // identity/certification claims Rodgate does NOT hold. Code disposes — a hit is flagged on the gate so
+    // the human fixes it BEFORE staging. Jarvis never sends, so this can't leak, but it stops the near-miss.
+    const facts = factsCheck(d.md);
+    if (!facts.ok) {
+      await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'facts.violation', status: 'error', reversible: true, rationale: factsCheckSummary(facts), payload: { noticeId: op.noticeId, file, violations: facts.violations } });
+      await mirror('GOV-ANALYST', 'need', `⚠ FACTS-CHECK on ${op.title}: ${facts.violations.map((v) => v.rule).join('; ')}`);
+    } else {
+      await emit({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'facts.check', status: 'done', rationale: '✓ facts-check clean', payload: { noticeId: op.noticeId } });
+    }
     // HITL gate — never auto-submit (doctrine §9 rule 2 + entity rule: Vinicio signs everything)
     await gateApproval(
-      { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: `Proposal drafted for ${op.title} (score ${sc.match_score}). Compliance: ${comp.verdict}. Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: sc.subcontractor_needed, compliance: comp.verdict } },
-      { pod: 'Gov War Room', title: `Review & submit: ${op.title}`, detail: `Score ${sc.match_score}/100 · 🛡 ${comp.verdict}${comp.summary ? ' (' + comp.summary + ')' : ''} · deadline ${op.deadline} · ${file}${sc.subcontractor_needed ? ' · needs a local subcontractor' : ''}`, xp: 50, verb: 'Open draft' });
+      { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: `Proposal drafted for ${op.title} (score ${sc.match_score}). Compliance: ${comp.verdict}. Facts: ${facts.ok ? 'clean' : 'FAILED — ' + facts.violations.map((v) => v.rule).join('; ')}. Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: sc.subcontractor_needed, compliance: comp.verdict, facts: facts.ok ? 'clean' : 'FAILED', factsViolations: facts.violations } },
+      { pod: 'Gov War Room', title: `Review & submit: ${op.title}`, detail: `Score ${sc.match_score}/100 · 🛡 ${comp.verdict}${comp.summary ? ' (' + comp.summary + ')' : ''}${facts.ok ? '' : ' · ⚠ FACTS-CHECK FAILED — fix before sending'} · deadline ${op.deadline} · ${file}${sc.subcontractor_needed ? ' · needs a local subcontractor' : ''}`, xp: 50, verb: 'Open draft' });
     try { deals.upsertDeal(op.noticeId, { stage: 'proposal_ready', proposalFile: file, pendingSubmit: true, stageNote: 'proposal drafted — awaiting your sign-off' }); } catch { /* ledger best-effort */ }
     // Connector (Hector): if this bid needs subcontracted labor, draft the outreach now (you send it).
     if (sc.subcontractor_needed) { try { await maybeConnect({ op, sc }); } catch { /* connector best-effort */ } }

@@ -2983,9 +2983,25 @@ const server = http.createServer(async (req, res) => {
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));
 });
 
+// Keep the Second Brain 🏆 Action Log current even when nobody's looking at it. The vault lives on THIS
+// machine (not the NAS scheduler), so the periodic mirror runs here: pull recent control-plane events,
+// append any new achievements, re-render the vault note. Best-effort; interval tunable via ACTION_SYNC_MS.
+function scheduleActionSync() {
+  const run = async () => {
+    try {
+      const ACT = await import('../pods/actions.mjs');
+      const ev = await fetch(CP_URL + '/events', { signal: AbortSignal.timeout(6000) }).then((r) => r.json()).catch(() => null);
+      if (Array.isArray(ev)) { const r = ACT.syncFromEvents(ev, vaultOpt()); if (r.added) console.log(`  action-log: mirrored ${r.added} new action(s) → vault`); }
+    } catch { /* best-effort */ }
+  };
+  setTimeout(run, 20000);                                              // once ~20s after boot
+  setInterval(run, Number(process.env.ACTION_SYNC_MS) || 20 * 60000); // then every ~20 min
+}
+
 server.listen(PORT, () => {
   console.log(`JARVIS Companion on http://localhost:${PORT}`);
   console.log(`  areas: ${ROOTS.join('  |  ')}`);
   if (!API_KEY) console.log('  (no API key — chat disabled until ANTHROPIC_API_KEY is set)');
-  ensureKokoro(); // bring up the free local natural voice if it isn't already running
+  ensureKokoro();      // bring up the free local natural voice if it isn't already running
+  scheduleActionSync(); // keep the vault Action Log current on a calm interval
 });

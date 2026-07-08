@@ -1489,7 +1489,8 @@ const server = http.createServer(async (req, res) => {
     try {
       const EXP = await import('../pods/expenses.mjs');
       const since = url.searchParams.get('since') || '';
-      const list = EXP.readExpenses({ since });
+      const book = url.searchParams.get('book') || ''; // 'personal' | 'business' | '' (both)
+      const list = EXP.readExpenses({ since, book });
       return send(res, 200, JSON.stringify({ ...EXP.summarize(list), recent: list.slice(-20).reverse() }));
     } catch (e) { return send(res, 200, JSON.stringify({ count: 0, total: 0, byCategory: {}, recent: [], error: e.message })); }
   }

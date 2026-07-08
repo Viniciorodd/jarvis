@@ -119,6 +119,48 @@ export function captureFromText(text) {
   return { ok: true, expense: r.expense, spoken };
 }
 
+// ── PURE: is this a correction of the LAST expense, and to which book? Eval-pinned. Returns { ok, book }.
+// Fires only on correction phrasing ("mark that as business", "that was personal", "actually, business")
+// — and only checked AFTER parseExpense fails, so a real new expense is never mistaken for a correction.
+export function parseCorrection(text) {
+  const t = String(text || '').toLowerCase();
+  const book = /\b(business|work|company)\b/.test(t) ? 'business' : /\b(personal|family|household)\b/.test(t) ? 'personal' : '';
+  if (!book) return { ok: false };
+  const isCorrection =
+    /\b(mark|change|make|switch|set|correct|move|put|recategor\w*|reclassif\w*)\b[^.]*\b(that|it|this|last|the last)\b/.test(t)
+    || /\bthat( one)? (was|is|should be|goes|belongs|shoulda? been)\b/.test(t)
+    || /\b(actually|no,?|oops,?)\b[^.]*\b(business|personal|work|family|company|household)\b/.test(t)
+    || /\bthe last (one|expense|entry)\b[^.]*\b(business|personal|work|family)\b/.test(t);
+  return isCorrection ? { ok: true, book } : { ok: false };
+}
+
+// Re-book the most recent expense (rewrites its line in place — the ledger stays one record per expense).
+export function correctLastExpense(book) {
+  if (!BOOKS.includes(book)) return { ok: false, error: 'book must be personal|business' };
+  const file = ledgerFile(new Date().getFullYear());
+  let raw; try { raw = fs.readFileSync(file, 'utf8'); } catch { return { ok: false, error: 'no expenses logged yet' }; }
+  const lines = raw.split('\n').filter((l) => l.trim());
+  if (!lines.length) return { ok: false, error: 'no expenses logged yet' };
+  let rec; try { rec = JSON.parse(lines[lines.length - 1]); } catch { return { ok: false, error: 'ledger read error' }; }
+  const from = rec.book || DEFAULT_BOOK;
+  rec.book = book; rec.correctedAt = new Date().toISOString();
+  lines[lines.length - 1] = JSON.stringify(rec);
+  try { fs.writeFileSync(file, lines.join('\n') + '\n'); } catch (e) { return { ok: false, error: e.message }; }
+  return { ok: true, expense: rec, from };
+}
+
+// Convenience: apply a spoken correction. Returns { ok, expense, spoken }.
+export function captureCorrection(text) {
+  const c = parseCorrection(text);
+  if (!c.ok) return { ok: false };
+  const r = correctLastExpense(c.book);
+  if (!r.ok) return { ok: false, error: r.error };
+  const spoken = r.from === c.book
+    ? `That one's already ${c.book} — "${r.expense.description}" ($${r.expense.amount.toFixed(2)}).`
+    : `Done — moved "${r.expense.description}" ($${r.expense.amount.toFixed(2)}) from ${r.from} to ${c.book}.`;
+  return { ok: true, expense: r.expense, spoken };
+}
+
 if (process.argv[1] && process.argv[1].endsWith('expenses.mjs')) {
   const arg = process.argv.slice(2).join(' ');
   if (arg) console.log(JSON.stringify(captureFromText(arg), null, 2));

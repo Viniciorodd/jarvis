@@ -1477,7 +1477,10 @@ const server = http.createServer(async (req, res) => {
         if (last && last.role === 'user' && typeof last.content === 'string') {
           const EXP = await import('../pods/expenses.mjs');
           const cap = EXP.captureFromText(last.content);
-          if (cap.ok) return send(res, 200, JSON.stringify({ text: cap.spoken, actions: [{ ok: true, label: `💸 logged $${cap.expense.amount.toFixed(2)} · ${cap.expense.description}` }], expense: cap.expense }));
+          if (cap.ok) return send(res, 200, JSON.stringify({ text: cap.spoken, actions: [{ ok: true, label: `💸 logged $${cap.expense.amount.toFixed(2)} · ${cap.expense.description} (${cap.expense.book})` }], expense: cap.expense }));
+          // Not a new expense — maybe a correction of the last one ("actually, mark that as business").
+          const fix = EXP.captureCorrection(last.content);
+          if (fix.ok) return send(res, 200, JSON.stringify({ text: fix.spoken, actions: [{ ok: true, label: `↔ re-booked to ${fix.expense.book}` }], expense: fix.expense }));
         }
       } catch { /* not an expense / parser error → normal chat */ }
       const out = await converse(messages.slice(-20));

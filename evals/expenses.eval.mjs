@@ -1,7 +1,7 @@
 // Regression suite for voice expense tracking (pods/expenses.mjs). Money is parsed by CODE, never the
 // LLM (doctrine #1) — these pin amount/description/date, the personal↔business book split, and totals.
 
-import { parseExpense, categoryOf, detectBook, summarize } from '../pods/expenses.mjs';
+import { parseExpense, categoryOf, detectBook, summarize, parseCorrection } from '../pods/expenses.mjs';
 
 const NOW = new Date('2026-07-08T15:00:00Z');
 const p = (t) => parseExpense(t, NOW);
@@ -40,6 +40,14 @@ export default {
       ok(p('what did I spend this week?').ok === false && p('the meeting is at 40 Main St').ok === false && p('hello jarvis').ok === false) },
     { name: 'categoryOf maps common items', run: () =>
       ok(categoryOf('gas') === 'transport' && categoryOf('lunch') === 'food' && categoryOf('electric bill') === 'bills' && categoryOf('random thing') === 'other') },
+    { name: 'parseCorrection: "mark that as business" / "that was personal" / "actually, business"', run: () =>
+      ok(parseCorrection('actually, mark that last one as business').ok === true && parseCorrection('actually, mark that last one as business').book === 'business'
+        && parseCorrection('that was personal').book === 'personal'
+        && parseCorrection('no, that should be a business expense').book === 'business') },
+    { name: 'parseCorrection ignores non-corrections + real expenses', run: () =>
+      ok(parseCorrection('how was your day').ok === false
+        && parseCorrection('spent $40 on gas for the business').ok === false
+        && parseCorrection('mark the calendar').ok === false) },
     { name: 'summarize splits by book + category', run: () => {
       const s = summarize([{ amount: 40, category: 'transport', book: 'business' }, { amount: 10, category: 'food', book: 'personal' }, { amount: 5, category: 'food', book: 'personal' }]);
       return ok(s.count === 3 && s.total === 55 && s.byBook.business === 40 && s.byBook.personal === 15 && s.byCategory.food === 15, JSON.stringify(s));

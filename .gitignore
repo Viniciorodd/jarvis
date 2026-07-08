@@ -98,3 +98,6 @@ pods/tax/accounts.local.json
 
 # Voice expense ledger (personal)
 expenses/
+
+# Action Log momentum ledger (personal)
+actions/

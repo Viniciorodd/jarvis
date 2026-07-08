@@ -1481,6 +1481,17 @@ const server = http.createServer(async (req, res) => {
           // Not a new expense — maybe a correction of the last one ("actually, mark that as business").
           const fix = EXP.captureCorrection(last.content);
           if (fix.ok) return send(res, 200, JSON.stringify({ text: fix.spoken, actions: [{ ok: true, label: `↔ re-booked to ${fix.expense.book}` }], expense: fix.expense }));
+          // ACTION LOG (momentum): "I submitted X" / "reached out to Y" / "log that I …" → the Second Brain
+          // Action Log. Auto-fires only on STRONG achievement statements or an explicit "log …", so casual
+          // chat isn't logged; weaker mentions (met/called/other) need the explicit "log" trigger.
+          const ACT = await import('../pods/actions.mjs');
+          const act = ACT.parseManualAction(last.content);
+          const explicitLog = /^\s*(log|logged|track|record|note)\b/i.test(last.content);
+          if (act.ok && (explicitLog || ['submitted', 'sent', 'outreach', 'sources_sought', 'registration', 'won'].includes(act.type))) {
+            const r = ACT.logAction(act, vaultOpt());
+            const spoken = r.duplicate ? 'Already logged that one.' : `Logged it: ${act.text}. ✊ Keep the momentum.`;
+            return send(res, 200, JSON.stringify({ text: spoken, actions: [{ ok: true, label: '📓 action logged' }], action: r.entry }));
+          }
         }
       } catch { /* not an expense / parser error → normal chat */ }
       const out = await converse(messages.slice(-20));
@@ -1503,6 +1514,25 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       if (b.text) { const cap = EXP.captureFromText(b.text); return send(res, cap.ok ? 200 : 400, JSON.stringify(cap.ok ? cap : { ok: false, error: 'no expense found in that text' })); }
       const r = EXP.logExpense({ amount: b.amount, description: b.description, date: b.date, category: b.category, source: b.source || 'manual' });
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── ACTION LOG (momentum): mirror Jarvis's actions + log yours to the Second Brain 🏆 Action Log ──
+  if (req.method === 'GET' && url.pathname === '/api/action') {
+    try {
+      const ACT = await import('../pods/actions.mjs');
+      // pull recent control-plane events and mirror any new achievements in (deduped), then render the vault note.
+      try { const ev = await fetch(CP_URL + '/events', { signal: AbortSignal.timeout(4500) }).then((r) => r.json()); ACT.syncFromEvents(ev, vaultOpt()); } catch { /* CP offline → still return the ledger */ }
+      const list = ACT.readActions({});
+      return send(res, 200, JSON.stringify({ ...ACT.summarize(list), recent: list.slice(-25).reverse() }));
+    } catch (e) { return send(res, 200, JSON.stringify({ total: 0, byType: {}, week: { total: 0, byType: {} }, recent: [], error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/action') {
+    try {
+      const ACT = await import('../pods/actions.mjs');
+      const b = await readBody(req);
+      if (b.text && !b.type) { const cap = ACT.captureManual(b.text, vaultOpt()); return send(res, cap.ok ? 200 : 400, JSON.stringify(cap.ok ? cap : { ok: false, error: 'no action found in that text' })); }
+      const r = ACT.logAction({ type: b.type, text: b.text, source: b.source || 'you' }, vaultOpt());
       return send(res, r.ok ? 200 : 400, JSON.stringify(r));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }

@@ -33,8 +33,12 @@ quarter/year. Also this session hardened the "run the business from Florida for 
   **Action Log / momentum** (`pods/actions.mjs` → vault `00 - System/🏆 Action Log.md`, 20-min auto-sync).
   **Gate dedup** made idempotent. **Kokoro TTS auto-start + VAD push-to-talk**. **Voice-first home**
   (`companion/public/talkhome.js`). All committed + pushed; NAS deploy confirmed.
-- ⏭ **Open queue (Florida-critical + parked):** (a) **Tailnet subnet-router sidecar** — needs the operator's
-  Tailscale auth key (remote access to PC + MacBook from Florida). (b) **Board write-back** (append-only,
+- ✅ **Florida remote access (set up 2026-07-10):** PC already on the tailnet as **`shisui`** → cockpit
+  reachable from anywhere at **`http://shisui:8095`** (verified over Tailscale; companion binds all
+  interfaces). PC never sleeps on AC. **Subnet-router turned out unnecessary** (every device runs Tailscale
+  directly). Reboot/crash resilience: **`companion/jarvis-forever.cmd`** (companion-only, self-healing)
+  auto-starts at logon via a Startup-folder shortcut. NAS keeps running control-plane/scheduler/Telegram 24/7.
+- ⏭ **Open queue (parked):** (b) **Board write-back** (append-only,
   concept approved). (c) **Outreach-at-scale drafting** (primes/subs, daily batch, council pre-review,
   GATED — operator chose "draft at scale, I approve from my phone", never auto-send). (d) **`GOV_AUTO_SEND=1`**
   operator's config call to make Approve actually send. (e) USACE PIEE submit (operator, due 7/13).

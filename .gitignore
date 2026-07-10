@@ -101,3 +101,6 @@ expenses/
 
 # Action Log momentum ledger (personal)
 actions/
+
+# Focus/time tracker ledger (personal)
+focus/

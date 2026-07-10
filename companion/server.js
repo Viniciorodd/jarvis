@@ -1492,6 +1492,10 @@ const server = http.createServer(async (req, res) => {
             const spoken = r.duplicate ? 'Already logged that one.' : `Logged it: ${act.text}. ✊ Keep the momentum.`;
             return send(res, 200, JSON.stringify({ text: spoken, actions: [{ ok: true, label: '📓 action logged' }], action: r.entry }));
           }
+          // Focus/time tracking (replaces Forest): "I focused 90 minutes on gov" → logged in code + spoken back.
+          const FOC = await import('../pods/focus.mjs');
+          const foc = FOC.captureFocus(last.content);
+          if (foc.ok) return send(res, 200, JSON.stringify({ text: foc.spoken, actions: [{ ok: true, label: `🌳 ${foc.session.minutes}m focus` }], focus: foc.session }));
         }
       } catch { /* not an expense / parser error → normal chat */ }
       const out = await converse(messages.slice(-20));
@@ -1533,6 +1537,25 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       if (b.text && !b.type) { const cap = ACT.captureManual(b.text, vaultOpt()); return send(res, cap.ok ? 200 : 400, JSON.stringify(cap.ok ? cap : { ok: false, error: 'no action found in that text' })); }
       const r = ACT.logAction({ type: b.type, text: b.text, source: b.source || 'you' }, vaultOpt());
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── FOCUS / TIME TRACKER (replaces Forest): log a session + see totals/patterns by any period ──────
+  if (req.method === 'GET' && url.pathname === '/api/focus') {
+    try {
+      const F = await import('../pods/focus.mjs');
+      const grouping = ['day', 'week', 'month', 'quarter', 'year'].includes(url.searchParams.get('grouping')) ? url.searchParams.get('grouping') : 'month';
+      const since = url.searchParams.get('since') || ''; const until = url.searchParams.get('until') || '';
+      const list = F.readFocus({ since, until });
+      return send(res, 200, JSON.stringify(F.summarize(list, { grouping })));
+    } catch (e) { return send(res, 200, JSON.stringify({ sessions: 0, totalHours: 0, series: [], topTags: [], error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/focus/log') {
+    try {
+      const F = await import('../pods/focus.mjs');
+      const b = await readBody(req);
+      if (b.text && !b.minutes) { const cap = F.captureFocus(b.text); return send(res, cap.ok ? 200 : 400, JSON.stringify(cap.ok ? cap : { ok: false, error: 'no focus session found in that text' })); }
+      const r = F.logFocus({ minutes: b.minutes, tag: b.tag, note: b.note, source: b.source || 'manual' });
       return send(res, r.ok ? 200 : 400, JSON.stringify(r));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
@@ -2977,7 +3000,7 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
-  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname.replace(/^\/+/, '');
+  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));

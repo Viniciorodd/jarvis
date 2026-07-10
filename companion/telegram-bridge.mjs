@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findPerson } from '../pods/org.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 function env(k, d = '') {
@@ -52,6 +53,44 @@ async function pushApprovals() {
     await tg('sendMessage', { chat_id: ALLOWED, text: approvalText(a), reply_markup: { inline_keyboard: [[{ text: '✅ Approve & send', callback_data: 'ap:' + a.id }, { text: '⏭ Skip', callback_data: 'sk:' + a.id }]] } });
   }
 }
+// ── Agent activity feed ────────────────────────────────────────────────────────────────────────────
+// So you FEEL the team working: every meaningful agent action pings your phone, signed by the agent who
+// did it ("— Gideon (Gov Scout)"). Milestones only (scans/drafts/sends/finds), not the noise. This is the
+// fix for "my agents do so much and never tell me anything." Seeds the backlog on boot; frequency is fine
+// by design — you'd rather hear the team than be out of the loop.
+const seenEvents = new Set();
+function personaFor(actor) { const p = findPerson(actor); return p ? `${p.nickname} (${p.title})` : (actor === 'operator' ? 'You' : 'Jarvis'); }
+function narrationFor(ev) {
+  const a = String(ev.action || '').toLowerCase();
+  const p = ev.payload || {};
+  const t = p.title ? ` — ${p.title}` : '';
+  if (a === 'scan.done') return `🔭 Scanned SAM — ${p.count != null ? p.count : 'new'} opportunities`;
+  if (a === 'sow.pull') return `📄 Pulled the scope of work${t}`;
+  if (a === 'proposal.draft') return `📝 Drafted a proposal${t}`;
+  if (a === 'proposal.submitted') return `📤 Submitted a proposal${t}`;
+  if (/sources?[-_. ]?sought/.test(a)) return `📋 Answered a sources-sought${t}`;
+  if (a === 'email.sent') return `✉️ Sent an email${p.to ? ` → ${p.to}` : ''}`;
+  if (/outreach|reach[-_. ]?out/.test(a)) return `🤝 Reached out to a subcontractor${t}`;
+  if (a === 'facts.violation') return `⚠️ A draft failed the facts-check${t} — needs a fix before it goes out`;
+  if (a === 'market.journal') return `📊 Journaled the watchlist${Array.isArray(p.notable) && p.notable.length ? ` — ${p.notable.length} notable move(s)` : ''}`;
+  if (a === 'disposition') return /won/i.test(ev.rationale || '') ? `🏆 A bid WON${t}` : null;
+  if (a === 'invoice.created') return '💵 Created a payment link';
+  return null; // scores, scan starts, spend checks, traces → not worth a ping
+}
+async function seedEvents() { const list = await cp('/events'); if (Array.isArray(list)) for (const ev of list) seenEvents.add(ev.id); }
+async function pushNarration() {
+  if (!ALLOWED) return;
+  const list = await cp('/events');
+  if (!Array.isArray(list)) return;
+  for (const ev of list) {
+    if (seenEvents.has(ev.id)) continue;
+    seenEvents.add(ev.id);
+    const text = narrationFor(ev);
+    if (!text) continue;
+    await tg('sendMessage', { chat_id: ALLOWED, text: `${text}\n— ${personaFor(ev.actor)}` });
+  }
+}
+
 async function handleCallback(q) {
   const chat = String((q.message && q.message.chat && q.message.chat.id) || '');
   if (ALLOWED && chat !== ALLOWED) { await tg('answerCallbackQuery', { callback_query_id: q.id }); return; }
@@ -121,6 +160,9 @@ async function poll() {
   const me = await tg('getMe', {});
   console.log('JARVIS Telegram bridge running as @' + ((me.result || {}).username || '?') + '  ·  brain: ' + COMPANION + '  ·  CP: ' + CP + (ALLOWED ? '' : '  ·  ⚠ no TELEGRAM_CHAT_ID — message the bot to learn yours'));
   await seedApprovals();               // mark the existing backlog as seen (don't blast it on boot)
+  await seedEvents();                   // same for the activity feed
   setInterval(pushApprovals, 15000);   // push NEW gated actions as tap-to-approve buttons
+  setInterval(pushNarration, 90000);   // narrate meaningful agent actions, signed by the agent
+  if (ALLOWED) tg('sendMessage', { chat_id: ALLOWED, text: '👥 Jarvis team is online — I\'ll tell you what each agent does, and send you approvals to tap. Let\'s make money.' }).catch(() => {});
   poll();
 })();

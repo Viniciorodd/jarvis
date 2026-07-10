@@ -2,6 +2,28 @@
 
 _Updated 2026-07-10. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
+### 🆕 2026-07-10 (newest) — ONE design system across every surface + GovCon OS integration
+Follow-up to the design overhaul: the operator wanted the themes truly everywhere (not one look per
+tab/OS/overlay) and the new gov modules folded into GovCon OS. Done via a 5-agent parallel Workflow
+sweep over disjoint files (583k tokens, 0 errors):
+- **Overlay theme-sweep** (`style.css` + `tax-review.css`): ~100 hardcoded colors in the overlays
+  (ops/businesses/floor/command/activity/settings/personal/hq/dock/chat/studio/weather/tax) → theme vars;
+  dropped Silkscreen/Space Grotesk/Georgia/Courier → `var(--font)`; unified radii. **Verified: command/ops/
+  floor/activity now render white-on-True-White** (were dark-hardcoded).
+- **GovCon OS rethemed + integrated** (`govcon.{css,html,js}`): was a standalone navy/royal-blue palette →
+  now the Jarvis palette (Jet Black/True White, teal, Inter); its ☾ toggle writes the app-wide
+  `jarvis-theme` (black/white) so it carries everywhere. **Integrated ⚡ Quick wins (middle col) + 🤝 Teaming
+  radar (right col, gated intro drafting)** — verified live in both themes (Amentum $611M in the teaming card).
+- **JS-injected styles** (16 files: submit-wizard/agents/hud/skills/wall/brain/health/catchup/strip/pause/
+  ops/today) → `var(--x, fallback)`; per-pod avatar hues collapsed to the single accent.
+- **Standalone pages** (ideas, dealroom) + **HQ game floor** (`hq/public/*`): Inter + black/white theme
+  blocks + swatches. `theme-color` meta + manifest → `#000000`. HQ keeps Silkscreen for its deliberately
+  game-styled branding (demoted "behind the scenes" surface).
+- 432 evals green; all JS syntax-valid; zero console errors; both themes verified via computed styles.
+- ⚠ **Notes:** used `color-mix()` for non-teal tints (needs Chromium 111+/Safari 16.2+ — fine for
+  Electron/Chrome). `--shadow-lg` referenced in a few govcon rules but never defined (pre-existing, benign).
+  Screenshot tool still flaky with the animated canvas — verified via computed styles, operator should eyeball.
+
 ### 🆕 2026-07-10 (newest) — system-wide design overhaul (font · themes · brain · Today)
 Operator's ask: make it feel like Timepage/Things3/Fantastical/Notion, not a mess. Foundation reset:
 - **ONE typeface (Inter) system-wide** — dropped the 3-font mix (Space Grotesk + Silkscreen pixel + Georgia

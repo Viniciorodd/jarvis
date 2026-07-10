@@ -1576,6 +1576,15 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, html, 'text/html; charset=utf-8');
     } catch (e) { return send(res, 500, 'error: ' + e.message, 'text/plain'); }
   }
+  // ── QUICK WINS: the wide-net scout for one-off / in-lane jobs the primary (3-NAICS) scout misses ──
+  if (req.method === 'GET' && url.pathname === '/api/gov/quickwins') {
+    try {
+      const QW = await import('../pods/gov/quickwins.mjs');
+      const days = Math.min(30, Math.max(1, Number(url.searchParams.get('days')) || 7));
+      const r = await QW.scanQuickWins({ days });
+      return send(res, 200, JSON.stringify(r));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, leads: [], count: 0 })); }
+  }
   // ── daily brief (calendar + unread + needs-you + top opportunity) ──
   if (req.method === 'GET' && url.pathname === '/api/brief') {
     try { const b = await dailyBrief(); return send(res, 200, JSON.stringify({ ...b, text: briefText(b) })); }
@@ -3017,7 +3026,7 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
-  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname.replace(/^\/+/, '');
+  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));

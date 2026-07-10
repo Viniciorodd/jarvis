@@ -89,6 +89,7 @@ var moreItems = {
   jMoreGovcon:  function(){ window.location.href = '/govcon'; },
   jMoreIdeas:   function(){ window.location.href = '/ideas'; },  /* proactive vault idea-miner inbox */
   jMoreFocus:   function(){ window.location.href = '/focus'; },  /* Forest replacement — time/focus dashboard */
+  jMoreQuickwins: function(){ window.location.href = '/quickwins'; },  /* wide-net one-off/quick jobs */
   jMoreCapability: function(){ window.open('/capability', '_blank'); },  /* 1-page capability statement → print-to-PDF */
   jMoreMap:     function(){ triggerGhost('mapBtn'); },
   jMoreFloor:   function(){ triggerGhost('floorBtn'); },

@@ -17,8 +17,15 @@ quarter/year. Also this session hardened the "run the business from Florida for 
     tiles + top-tags breakdown + inline log box. Theme-aware, mobile-first. **Verified live in-browser**
     (Month + Year views, API serving the full decade, no console errors).
   - **API**: `GET /api/focus?grouping=day|week|month|quarter|year`, `POST /api/focus/log`.
-  - ⏭ Deploy: activates on the NAS on the **next control-plane redeploy** (the companion serves it). Import
-    is local-only right now (ran from PC against `Y:\Forest Plants...csv`); re-run on the NAS if wanted.
+  - ✅ Live now: the **companion runs on the PC** (`companion/server.js` :8095, reached from the phone over
+    Tailscale) — NOT a NAS service — so restarting the local companion (done 2026-07-10) made it live; no NAS
+    redeploy needed. Import ran local-only against `Y:\Forest Plants...csv`.
+  - **UX overhaul same day** (`fix(cockpit)`): killed the PC perf hang (the heavy always-on neural backdrop
+    was pegging tight PCs → fewer particles + frame-throttle + DPR cap); **decluttered Home** (it now leads
+    with THE ONE THING; "While you were away" + team strip demoted via flex `order`); **real desktop layout**
+    (≥1024px Home is a centered two-column cockpit, not a phone-width column); **Command wall now shows a
+    JARVIS arc-reactor core** (rotating reactor housing + JARVIS wordmark) instead of the abstract sphere/burst.
+    Confirmed: voice-first home is already the default landing screen (`nav.js`). All verified in-browser.
 - **Florida-ops (earlier this session, all LIVE):** the **Telegram bridge as a 24/7 NAS service**
   (`companion/telegram-bridge.mjs` — approve-from-phone inline buttons + agent-signed activity feed;
   `jarvis-telegram-bridge-1` confirmed Up, operator received "team is online"). **Slack #floor war-room**

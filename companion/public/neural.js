@@ -12,8 +12,13 @@
   const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const MOTION_OFF = (() => { try { return localStorage.getItem('jarvis-motion') === 'off'; } catch { return false; } })();
   const SPEED = REDUCED ? 0.45 : 1;   // calm mode: slower drift
-  let frameSkip = false;              // calm mode: ~30fps instead of 60
-  const N = 300;                 // particles
+  // Perf (2026-07-10): the always-on full-screen backdrop was pegging tight PCs ("errors everywhere").
+  // Fewer particles + a real frame-throttle (≈20fps ambient, ≈30fps full) keeps it as eye-candy without
+  // burning a core behind every screen. Desktops get the lighter cloud by default.
+  const DESKTOP = (window.innerWidth || 0) >= 1024;
+  const N = DESKTOP ? 150 : 200;       // particles (was 300)
+  let frameCount = 0;
+  const FRAME_MOD = REDUCED ? 3 : 2;   // draw 1 of N frames: ~20fps calm / ~30fps full
   // ── selectable brain palettes (Settings → "Brain · 3D map") — main cloud / context nodes / work flare ──
   const PALETTES = {
     trillion:  { main: [45, 212, 168],  node: [167, 139, 250], flare: [245, 178, 60] },  // teal · purple · gold
@@ -71,7 +76,7 @@
   }
 
   function resize() {
-    DPR = Math.min(2, window.devicePixelRatio || 1);
+    DPR = Math.min(1.5, window.devicePixelRatio || 1); // background layer — no need for full retina
     W = canvas.width = innerWidth * DPR;
     H = canvas.height = innerHeight * DPR;
     canvas.style.width = innerWidth + 'px';
@@ -151,9 +156,9 @@
     running = true;
     const loop = (time) => {
       if (document.hidden) { running = false; return; } // battery: stop cold when not visible
-      if (REDUCED) { frameSkip = !frameSkip; if (frameSkip) { requestAnimationFrame(loop); return; } } // ~30fps calm
-      t = time; draw(time * SPEED);
       requestAnimationFrame(loop);
+      if ((frameCount++ % FRAME_MOD) !== 0) return;      // throttle to ~20-30fps — spares tight PCs
+      t = time; draw(time * SPEED);
     };
     requestAnimationFrame(loop);
   }

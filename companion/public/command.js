@@ -10,7 +10,7 @@
 
   // ── animated CORE (particle sphere) ─────────────────────────────────────────
   function teal() { const v = getComputedStyle(document.documentElement).getPropertyValue('--teal-rgb').trim(); return v || '57,224,208'; }
-  function coreStyle() { try { return localStorage.getItem('jarvis-core') || 'sphere'; } catch { return 'sphere'; } }
+  function coreStyle() { try { return localStorage.getItem('jarvis-core') || 'jarvis'; } catch { return 'jarvis'; } }
   function startCore() {
     const cv = el('cmdCore'); if (!cv) return;
     const ctx = cv.getContext('2d');
@@ -49,9 +49,47 @@
       cg.addColorStop(0, `hsla(${(t * 60) % 360},92%,78%,0.9)`); cg.addColorStop(0.5, `hsla(${(t * 60 + 140) % 360},92%,62%,0.22)`); cg.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(cx, cy, R * 0.55, 0, 7); ctx.fill();
     }
+    // ── the JARVIS arc-reactor: Iron-Man reactor housing (segmented outer ring), a counter-rotating
+    // dashed ring, an inner ring, radial ticks, and a soft core the "JARVIS" wordmark sits inside. This
+    // reads as HIM, not an abstract shape — the requested "see Jarvis in the command wall". ──
+    function jarvis(rgb, t) {
+      const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.34, pulse = 1 + Math.sin(t * 1.5) * 0.025;
+      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.7);
+      glow.addColorStop(0, `rgba(${rgb},0.24)`); glow.addColorStop(0.45, `rgba(${rgb},0.07)`); glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(cx, cy, R * 1.7, 0, 7); ctx.fill();
+      ctx.lineCap = 'round';
+      // outer reactor housing — 12 bright segmented coils, slow clockwise drift
+      const segs = 12, gap = (Math.PI * 2 / segs) * 0.34;
+      for (let i = 0; i < segs; i++) {
+        const a0 = (i / segs) * Math.PI * 2 + t * 0.22;
+        ctx.strokeStyle = `rgba(${rgb},0.55)`; ctx.lineWidth = 6 * DPR;
+        ctx.beginPath(); ctx.arc(cx, cy, R * 1.04 * pulse, a0, a0 + (Math.PI * 2 / segs) - gap); ctx.stroke();
+      }
+      // mid dashed ring — counter-rotating
+      ctx.save(); ctx.setLineDash([3 * DPR, 9 * DPR]);
+      ctx.strokeStyle = `rgba(${rgb},0.38)`; ctx.lineWidth = 2 * DPR;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, -t * 0.35, Math.PI * 2 - t * 0.35); ctx.stroke();
+      ctx.restore();
+      // inner solid ring
+      ctx.strokeStyle = `rgba(${rgb},0.7)`; ctx.lineWidth = 2.4 * DPR;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.58 * pulse, 0, 7); ctx.stroke();
+      // radial ticks around the housing
+      for (let i = 0; i < 48; i++) {
+        const ang = (i / 48) * Math.PI * 2, big = i % 4 === 0, r0 = R * 1.16, r1 = R * (1.16 + (big ? 0.11 : 0.05));
+        ctx.strokeStyle = `rgba(${rgb},${big ? 0.5 : 0.2})`; ctx.lineWidth = (big ? 2 : 1) * DPR;
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0); ctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1); ctx.stroke();
+      }
+      // soft core — dim enough that the "JARVIS" wordmark on top stays legible
+      const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.5);
+      cg.addColorStop(0, `rgba(${rgb},0.5)`); cg.addColorStop(0.55, `rgba(${rgb},0.22)`); cg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(cx, cy, R * 0.5 * pulse, 0, 7); ctx.fill();
+    }
     function frame() {
       const t = Date.now() / 1000; ctx.clearRect(0, 0, W, H);
-      if (coreStyle() === 'burst') burst(t); else { a += 0.0042; sphere(teal(), t); }
+      const style = coreStyle();
+      if (style === 'burst') burst(t);
+      else if (style === 'sphere') { a += 0.0042; sphere(teal(), t); }
+      else jarvis(teal(), t);
       raf = requestAnimationFrame(frame);
     }
     window.addEventListener('resize', size);
@@ -223,8 +261,10 @@
   }, 60000);
 
   const coreBtn = el('coreStyleBtn');
-  function paintCore() { if (coreBtn) coreBtn.textContent = '◉ Core: ' + (coreStyle() === 'burst' ? 'neural burst' : 'sphere'); }
-  if (coreBtn) { paintCore(); coreBtn.addEventListener('click', () => { try { localStorage.setItem('jarvis-core', coreStyle() === 'burst' ? 'sphere' : 'burst'); } catch { /* */ } paintCore(); }); }
+  const CORE_CYCLE = { jarvis: 'sphere', sphere: 'burst', burst: 'jarvis' };
+  const CORE_LABEL = { jarvis: 'JARVIS reactor', sphere: 'sphere', burst: 'neural burst' };
+  function paintCore() { if (coreBtn) coreBtn.textContent = '◉ Core: ' + (CORE_LABEL[coreStyle()] || 'JARVIS reactor'); }
+  if (coreBtn) { paintCore(); coreBtn.addEventListener('click', () => { try { localStorage.setItem('jarvis-core', CORE_CYCLE[coreStyle()] || 'sphere'); } catch { /* */ } paintCore(); }); }
   const baBtn = el('briefAutoBtn');
   function paintBA() { if (baBtn) baBtn.textContent = '🔊 Morning briefing: ' + (localStorage.getItem('jarvis-brief-off') === '1' ? 'off' : 'on'); }
   if (baBtn) { paintBA(); baBtn.addEventListener('click', () => { try { localStorage.setItem('jarvis-brief-off', localStorage.getItem('jarvis-brief-off') === '1' ? '0' : '1'); } catch { /* */ } paintBA(); }); }

@@ -1086,3 +1086,34 @@ body.dock-open .j-dock-fab{ display:none; }
   .j-more-list{ max-width:640px; }
   #jTalkView #transcript{ width:min(860px, 80vw); }
 }
+
+/* ══ COCKPIT DECLUTTER + PC LAYOUT (2026-07-10) — lead with the focus, not the catch-up ══
+   catchup.js + strip.js prepend to #jHomeView, which buried the greeting + THE ONE THING below a wall
+   of updates. Reorder with flex `order` (no JS change), and give the desktop a real 2-column cockpit
+   instead of one lonely phone-width column. */
+#jHomeView .j-hero{ order:-4; padding-top:16px; }
+#jHomeView #jOneThing{ order:-3; }
+#jHomeView #jTicker{ order:-2; }
+#jHomeView #jTodaySection{ order:-1; }
+#jHomeView #catchupCard{ order:20; }   /* "While you were away" → below the fold, still one tap away */
+#jHomeView #statusStrip{ order:21; }   /* the team avatars strip is ambience — demote it */
+
+@media (min-width: 1024px){
+  /* two-column cockpit: the focus rail (greeting · one-thing · ticker · today · catch-up) spans the top,
+     the glanceable panels (metrics · needs · gov · recent · weather) flow into two aligned columns below.
+     The whole grid is one centered block so the full-width rows and the columns share the same edges. */
+  #jHomeView.active{ display:grid; align-content:start;
+    grid-template-columns:repeat(2, minmax(0, 1fr)); column-gap:30px; row-gap:4px;
+    max-width:1180px; margin-left:auto; margin-right:auto; }
+  #jHomeView.active > *{ max-width:none !important; margin-left:0 !important; margin-right:0 !important; }
+  #jHomeView .j-hero,
+  #jHomeView #jOneThing,
+  #jHomeView #jTicker,
+  #jHomeView #jTodaySection,
+  #jHomeView #catchupCard{ grid-column:1 / -1; }
+  #jHomeView .j-hero{ padding:18px 4px 4px; }
+}
+
+/* The JARVIS wordmark sitting inside the arc-reactor core (Command wall) */
+.cmd-core-name{ font-size:19px; letter-spacing:.34em; color:var(--teal);
+  text-shadow:0 0 18px rgba(var(--teal-rgb), .5); }

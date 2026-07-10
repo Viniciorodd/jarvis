@@ -1559,6 +1559,23 @@ const server = http.createServer(async (req, res) => {
       return send(res, r.ok ? 200 : 400, JSON.stringify(r));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // ── PDF / print docs: letterheaded proposal + the 1-page capability statement (dependency-free
+  //    print-to-PDF — open in a tab, hit "Download PDF" → "Save as PDF"). The gov wants a real document. ──
+  if (req.method === 'GET' && (url.pathname === '/api/gov/print' || url.pathname === '/capability' || url.pathname === '/api/gov/capability')) {
+    try {
+      const PDF = await import('../pods/gov/pdf.mjs');
+      const kind = url.pathname === '/api/gov/print' ? (url.searchParams.get('kind') || 'proposal') : 'capability';
+      if (kind === 'capability') return send(res, 200, PDF.capabilityDoc(), 'text/html; charset=utf-8');
+      const noticeId = url.searchParams.get('noticeId') || '';
+      if (!noticeId) return send(res, 400, 'noticeId required', 'text/plain');
+      const base = kind === 'outreach' ? `outreach-${noticeId}` : noticeId;
+      const file = path.join(__dirname, '..', 'gov-drafts', `${base}.md`);
+      let md; try { md = fs.readFileSync(file, 'utf8'); } catch { return send(res, 404, 'draft not found: ' + base + '.md', 'text/plain'); }
+      const title = url.searchParams.get('title') || (md.match(/^<!--\s*(.+?)\s*·/) || [])[1] || 'Proposal';
+      const html = PDF.proposalDoc(md, { title, kind, noticeId, deadline: url.searchParams.get('deadline') || '', date: new Date().toISOString().slice(0, 10) });
+      return send(res, 200, html, 'text/html; charset=utf-8');
+    } catch (e) { return send(res, 500, 'error: ' + e.message, 'text/plain'); }
+  }
   // ── daily brief (calendar + unread + needs-you + top opportunity) ──
   if (req.method === 'GET' && url.pathname === '/api/brief') {
     try { const b = await dailyBrief(); return send(res, 200, JSON.stringify({ ...b, text: briefText(b) })); }

@@ -252,7 +252,9 @@
       bodyEl.appendChild(h('div', { class: 'sw-row' }, [
         h('button', { class: 'sw-btn soft tiny', text: '📋 Copy the email', onclick: function () { copy(e.body || '', 'Email copied'); } }),
         h('button', { class: 'sw-btn soft tiny', text: '📋 Copy subject', onclick: function () { copy(e.subject || '', 'Subject copied'); } }),
+        h('button', { class: 'sw-btn soft tiny', text: '📄 Proposal as PDF', onclick: openPdf }),
       ]));
+      bodyEl.appendChild(h('p', { class: 'sw-note', text: 'Attach the PDF to the email — that’s the format the government expects.' }));
       bodyEl.appendChild(h('div', { class: 'sw-doc', style: 'max-height:30vh', html: fmtDoc(e.body || '') }));
       bodyEl.appendChild(h('p', { class: 'sw-note', text: 'How: open Gmail (or your email), start a new message, paste the address, subject, and the copied text, then Send.' }));
     } else {
@@ -260,8 +262,9 @@
       bodyEl.appendChild(h('p', { class: 'sw-sub', text: "Jarvis can’t log in as you, so you submit it on the site. Here’s exactly how — it only takes a minute." }));
       if (o.url) bodyEl.appendChild(h('div', { class: 'sw-dest' }, [h('div', {}, [h('div', { class: 'lbl', text: 'The website' }), h('div', { text: 'SAM.gov opportunity page' })]), h('a', { class: 'sw-btn soft tiny', text: 'Open ↗', href: o.url, target: '_blank', rel: 'noreferrer' })]));
       bodyEl.appendChild(h('div', { class: 'sw-row' }, [
+        h('button', { class: 'sw-btn soft tiny', text: '📄 Save as PDF', onclick: openPdf }),
         h('button', { class: 'sw-btn soft tiny', text: '📋 Copy the proposal', onclick: function () { copy(S.draft || '', 'Proposal copied'); } }),
-        h('button', { class: 'sw-btn soft tiny', text: '⬇ Download it', onclick: downloadDraft }),
+        h('button', { class: 'sw-btn soft tiny', text: '⬇ Markdown', onclick: downloadDraft }),
       ]));
       bodyEl.appendChild(h('ol', { class: 'sw-steps' }, [
         h('li', { text: 'Tap “Open ↗” above to go to the opportunity on SAM.gov.' }),
@@ -278,6 +281,14 @@
   }
   function downloadDraft() {
     try { var b = new Blob([S.draft || ''], { type: 'text/markdown' }); var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = (S.data.draftFile || 'proposal').split(/[\\/]/).pop(); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000); toast('Downloaded ✓'); } catch (e) { toast('Download failed'); }
+  }
+  // Open the letterheaded, print-ready proposal in a new tab → "Download PDF" → Save as PDF (dep-free).
+  function openPdf() {
+    var url = '/api/gov/print?kind=proposal&noticeId=' + encodeURIComponent(S.noticeId);
+    var o = S.data && S.data.opp;
+    if (o && o.title) url += '&title=' + encodeURIComponent(o.title);
+    if (o && o.deadline) url += '&deadline=' + encodeURIComponent(o.deadline);
+    window.open(url, '_blank'); toast('Opened — hit “Download PDF”');
   }
 
   // ── STEP 6 — record proof ─────────────────────────────────────────────────────────────────────────

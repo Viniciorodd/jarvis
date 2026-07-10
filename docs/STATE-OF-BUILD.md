@@ -2,7 +2,19 @@
 
 > Honest scorecard of the vision (see [`operating-doctrine.md`](operating-doctrine.md) +
 > [`reference/jarvis-build-plan.md`](reference/jarvis-build-plan.md)) vs. what actually exists.
-> Last assessed: **2026-06-30**. Legend: ✅ done · 🟡 partial · ❌ missing.
+> Last assessed: **2026-07-10**. Legend: ✅ done · 🟡 partial · ❌ missing.
+
+> **Addendum 2026-07-10 (since the 2026-06-30 scorecard below):** eval harness now **408 green** (was 218).
+> Shipped since: **Tax & Wealth pod** (Phases 1→3B — engine, CSV importer, deadline radar, docs indexer);
+> **Florida-ops layer** — the **Telegram bridge as a 24/7 NAS service** (approve-from-phone + agent activity
+> feed, confirmed live), **Slack #floor**, **voice expense tracker**, **Action Log momentum**; the
+> **Focus/time tracker** (Forest replacement — 6,036 sessions / 3,792.8h / 2016–2026 imported, `/focus`
+> dashboard + voice logging); and a **cockpit UX overhaul** (fixed the PC perf hang, decluttered Home,
+> real desktop 2-col layout, a **JARVIS arc-reactor** command core, voice-first home). **Architecture note:**
+> the **Companion/cockpit runs on the PC** (:8095, phone reaches it over Tailscale), NOT a NAS docker
+> service — companion/UI changes go live by restarting the local companion, not a NAS redeploy. Still open:
+> containerize the companion on the NAS; deploy Langfuse; Tailnet subnet-router (needs the operator's auth
+> key); board write-back; outreach-at-scale (gated); `GOV_AUTO_SEND=1`; the USACE PIEE submit (operator, due 7/13).
 
 ## Headline
 **Core infrastructure is DONE and the doctrine's old weak spots are now closed** (2026-06-30): per-agent

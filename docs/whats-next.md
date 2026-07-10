@@ -2,6 +2,33 @@
 
 _Updated 2026-07-10. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
+### 🆕 2026-07-10 (newest) — GovCon growth engine (PDF · capability · quick-wins · teaming) + cockpit fixes
+Eval harness **432 green**. Companion is PC-local (restart to load `server.js` route changes; done).
+- **PDF + capability statement** (`pods/gov/pdf.mjs` + `company.mjs`): the gov wants a letterheaded PDF,
+  not text. Dependency-free — render print-perfect HTML with a "Download PDF" button (browser Save-as-PDF).
+  `mdToHtml` (pure, eval-pinned) letterheads any gov-draft; `capabilityDoc()` = the 1-page capability
+  statement from canonical facts (UEI Z1SWBFEK7EM4 / CAGE 18S75, self-certified SDB — never a cert we lack).
+  Routes `/api/gov/print?kind=proposal&noticeId=` + `/capability`. Submit wizard step 5 now offers
+  **"Save as PDF"** on both email + portal paths. More → "Capability statement (PDF)".
+- **Wide-net "Quick Wins" scout** (`pods/gov/quickwins.mjs`): the primary scout is locked to 3 janitorial
+  NAICS; this casts a wider net (15 adjacent service NAICS + keyword sweep for one-off jobs — cleaning,
+  grounds, snow, hauling, pressure-wash, chimney, dumpster), screens out traps (base-ops/O&M/construction/
+  IT/clearance/certs-we-lack), scores by fit, flags sources-sought + one-time. `/api/gov/quickwins?days=N`,
+  page `/quickwins`, More → "Quick wins". **Live: 146 in 7d.** `classifyQuickWin` pure eval-pinned.
+- **Teaming radar** (`pods/gov/teaming.mjs`): Rodgate as the SUB reaching UP to primes. Scans USASpending.gov
+  (free, no key) for recent >$750k awards in our lane (the winner must carry a small-biz subcontracting
+  plan), ranks primes by size + PA/NJ/FL proximity, **drafts** a personalized intro (gated — you send it).
+  `/api/gov/teaming` + `/api/gov/teaming/intro`, page `/teaming`, More → "Teaming radar". **Live: 70 primes
+  (URS $932M NJ, Amentum $611M FL, General Dynamics $335M PA).** classify + introLetter pure eval-pinned.
+- **Cockpit fixes:** linked the **Focus dashboard** (`/focus`) into More — it had NO menu entry, so it was
+  unreachable. Cleared **`companion/.dashboard.json`** — it held stale mid-June demo seeds ("Approve personal
+  inbox cleanup", "Authorize hosting…") with no id/executor, so approving them faded the card but fired
+  nothing (both already done). Approvals that matter live in the control-plane (~26 pending gov gates —
+  note the gate-dedup isn't holding on the NAS; same outreach queued ~8×, a cleanup for next session).
+- ⏭ **Next / open:** (a) **gov gate-dedup on the NAS** — dedupe the ~26 stale/duplicate pending approvals +
+  confirm `gateKey` idempotency is deployed. (b) wire quick-wins + teaming into the **scheduler** (daily
+  batch → Telegram digest, gated). (c) outreach-at-scale (the gated batch drafting). (d) `GOV_AUTO_SEND=1`.
+
 ### 🆕 2026-07-10 (newest) — Focus/time tracker (Forest replacement) + the Florida-ops layer
 The operator outgrew the **Forest** app; he wants his time as data — charts/bars per day/week/month/
 quarter/year. Also this session hardened the "run the business from Florida for a month" layer.

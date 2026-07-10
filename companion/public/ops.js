@@ -225,7 +225,7 @@
           <a class="btn ghost" href="${esc(url)}" target="_blank" rel="noreferrer" style="font-size:11px; padding:5px 11px;">open in browser ↗</a>
         </div>
         <iframe class="df-frame" src="${esc(url)}" title="DealForge" referrerpolicy="no-referrer"
-          style="width:100%; height:calc(100vh - 190px); min-height:520px; border:0; border-radius:14px; background:var(--card, #0e1117);"
+          style="width:100%; height:calc(100vh - 190px); min-height:520px; border:0; border-radius:14px; background:var(--panel, #141417);"
           onerror="this.parentElement.querySelector('.df-fallback')?.removeAttribute('hidden')"></iframe>
         <div class="df-fallback ops-empty" hidden>DealForge isn't reachable at ${esc(url)} — start it with <code>node dealforge/server.js</code>.</div>
       </div>`;

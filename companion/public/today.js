@@ -187,7 +187,7 @@
       if(!title || !date){ if(toast){ toast.style.color = 'var(--dim)'; toast.textContent = 'need a title + date'; } return; }
       api('/api/cockpit/event', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ summary:title, date:date, time:time }) })
         .then(function(){ if(toast){ toast.style.color = 'var(--teal)'; toast.textContent = '✓ added to your calendar'; setTimeout(function(){ toast.textContent = ''; }, 2500); } $id('tdEventTitle').value = ''; load(); if(window.__calRefresh) window.__calRefresh(); })
-        .catch(function(err){ if(toast){ toast.style.color = 'var(--coral, #f08a7a)'; toast.textContent = String(err.message || 'failed — re-run google-auth for calendar write'); } });
+        .catch(function(err){ if(toast){ toast.style.color = 'var(--err, #ff8f80)'; toast.textContent = String(err.message || 'failed — re-run google-auth for calendar write'); } });
     });
     // "all →" jumps to the Today tab; the ticker opens Operations (where you review + approve)
     var more = $id('jTodayMore'); if(more) more.addEventListener('click', function(e){ e.preventDefault(); var b = $id('jNavToday'); if(b) b.click(); });

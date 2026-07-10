@@ -1,5 +1,6 @@
 /* Palette harmonized with the JARVIS AI companion (dark ink + glowing teal) so HQ and the assistant
-   read as ONE product. Same 3 themes as the companion (teal / mono / dark); pick via the HUD swatches.
+   read as ONE product. Flagship themes: black (Jet Black, default) / white (True White), plus legacy
+   teal / mono / dark; pick via the HUD swatches.
    Semantic names kept; gold/mint are teal-family, alert = coral (greys out in Mono). */
 :root, [data-theme="teal"]{ /* JARVIS teal — bright HUD (default) */
   --ink:#04070f; --ink2:#07131a; --panel:#0a141b; --panel2:#0d1a22; --line:#163a39;
@@ -19,19 +20,38 @@
   --gold:#46c8bd; --mint:#79d6cc; --alert:#ff9a7a; --err:#ff5c7a; --cream:#cdd6d9; --dim:#5d7480;
   --glow:rgba(var(--teal-rgb),.30); --ink-on-accent:#04140f;
 }
+[data-theme="black"]{ /* Jet Black — flagship dark, matches the companion */
+  --ink:#000000; --ink2:#0a0a0c; --panel:#141417; --panel2:#1a1a1f; --line:rgba(255,255,255,.09);
+  --teal:#43e6d4; --teal-rgb:67,230,212; --teal-dim:#1e6e64;
+  --gold:#43e6d4; --mint:#7deee0; --alert:#ff9a7a; --err:#ff5c7a; --cream:#f3f4f6; --dim:#8b909a;
+  --glow:rgba(var(--teal-rgb),.35); --ink-on-accent:#04211d;
+}
+[data-theme="white"]{ /* True White — flagship light, matches the companion */
+  --ink:#ffffff; --ink2:#f4f6f9; --panel:#ffffff; --panel2:#f4f6f9; --line:#e2e6ec;
+  --teal:#0d9488; --teal-rgb:13,148,136; --teal-dim:#7fc9c2;
+  --gold:#0d9488; --mint:#0f766e; --alert:#c2410c; --err:#dc2626; --cream:#181b22; --dim:#68707d;
+  --glow:rgba(var(--teal-rgb),.20); --ink-on-accent:#ffffff;
+}
 /* theme picker (HUD swatches) */
 .theme-pick{ display:inline-flex; gap:6px; align-items:center; }
 .theme-pick .sw{ width:15px; height:15px; border-radius:99px; cursor:pointer; padding:0;
   border:1px solid var(--line); transition:transform .15s ease, box-shadow .15s ease; }
 .theme-pick .sw:hover{ transform:scale(1.18); }
 .theme-pick .sw.on{ border-color:var(--teal); box-shadow:0 0 10px var(--glow); }
+.theme-pick .sw[data-theme="black"]{ background:#000000; box-shadow:inset 0 0 0 2px #43e6d4; }
+.theme-pick .sw[data-theme="white"]{ background:#ffffff; box-shadow:inset 0 0 0 2px #0d9488; }
 .theme-pick .sw[data-theme="teal"]{ background:#39e0d0; }
 .theme-pick .sw[data-theme="mono"]{ background:linear-gradient(135deg,#eef2f5 50%,#0a0c0f 50%); }
 .theme-pick .sw[data-theme="dark"]{ background:#0a0e11; box-shadow:inset 0 0 0 2px #46c8bd; }
+/* True White: no glow text-shadows, subtle neutral shadows (design contract) */
+[data-theme="white"] .title,
+[data-theme="white"] .big{ text-shadow:none; }
+[data-theme="white"] .gold-btn,
+[data-theme="white"] .toast{ box-shadow:0 1px 2px rgba(17,24,39,.05), 0 10px 24px rgba(17,24,39,.06); }
 *{ box-sizing:border-box; }
 body{
   margin:0; min-height:100vh; color:var(--cream);
-  font-family:'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  font-family:'Inter', ui-sans-serif, -apple-system, 'Segoe UI', system-ui, sans-serif;
   background: radial-gradient(900px 600px at 50% 35%, var(--ink2) 0%, transparent 70%), var(--ink);
 }
 .wrap{ max-width:880px; margin:0 auto; padding:20px 16px 48px; }
@@ -121,7 +141,7 @@ h2{ font-size:12px; margin:0 0 4px; }
 .toast{ background:var(--teal); color:var(--ink-on-accent); font-family:'Silkscreen',monospace; font-size:12px; font-weight:700;
   border-radius:10px; padding:7px 13px; box-shadow:0 6px 24px rgba(0,0,0,.45), 0 0 20px var(--glow); animation:floatUp 1.9s ease-out forwards; }
 
-.overlay{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(4,7,15,.9); }
+.overlay{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(0,0,0,.6); }
 .overlay.hidden{ display:none; }
 .rankcard{ padding:34px 30px; max-width:380px; width:100%; text-align:center; position:relative; overflow:hidden; animation:riseIn .35s ease-out; }
 .rankname{ font-size:24px; margin-top:8px; }

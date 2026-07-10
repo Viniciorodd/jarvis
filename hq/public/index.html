@@ -8,11 +8,11 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#04070f">
+<meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<script>try{const _tp=new URLSearchParams(location.search).get('theme');document.documentElement.dataset.theme=_tp||localStorage.getItem('jarvis-theme')||'mono'}catch(e){}</script>
+<script>try{const _tp=new URLSearchParams(location.search).get('theme');document.documentElement.dataset.theme=_tp||localStorage.getItem('jarvis-theme')||'black'}catch(e){}</script>
 </head>
 <body>
 <div class="wrap">
@@ -24,6 +24,8 @@
         <span class="dim small" id="streak">🔥 EOD streak · 0</span>
         <span class="dim small" id="mode-tag"></span>
         <span class="theme-pick" id="theme-pick">
+          <button class="sw" data-theme="black" title="Jet Black"></button>
+          <button class="sw" data-theme="white" title="True White"></button>
           <button class="sw" data-theme="teal" title="Teal"></button>
           <button class="sw" data-theme="mono" title="Mono · black & white"></button>
           <button class="sw" data-theme="dark" title="Full dark"></button>

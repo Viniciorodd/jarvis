@@ -24,7 +24,7 @@
     card.style.cssText = 'margin:10px 14px 4px;padding:14px 16px 10px;border:1px solid var(--line,rgba(255,255,255,.08));border-radius:14px;background:var(--panel,rgba(255,255,255,.03));';
     const rows = data.items.map((it) => `
       <div style="display:flex;gap:8px;align-items:baseline;padding:4px 0;font-size:13px;line-height:1.45;">
-        <span style="opacity:.7;${it.kind === 'needs-you' ? 'color:var(--warn,#f59e0b);' : it.kind === 'error' ? 'color:var(--danger,#e44);' : ''}">${ICON[it.kind] || '·'}</span>
+        <span style="opacity:.7;${it.kind === 'needs-you' ? 'color:var(--warn,#f0b45c);' : it.kind === 'error' ? 'color:var(--err,#ff8f80);' : ''}">${ICON[it.kind] || '·'}</span>
         <span style="flex:1;color:var(--cream,#e8e4da);">${esc(it.text)}</span>
         <span style="opacity:.45;font-size:11px;white-space:nowrap;">${AGO(it.ts)}</span>
       </div>`).join('');

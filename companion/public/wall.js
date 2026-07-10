@@ -25,19 +25,19 @@
     animation:wallIn .45s ease both;
   }
   #jTalkView #transcript .msg.you {
-    font:600 clamp(20px,4.2vw,34px)/1.28 Georgia,'Times New Roman',serif;
-    color:#fff; text-transform:uppercase; letter-spacing:.035em;
-    text-shadow:0 2px 26px rgba(45,212,168,.4), 0 1px 4px rgba(0,0,0,.7);
+    font:600 clamp(20px,4.2vw,34px)/1.28 var(--font,Inter,sans-serif);
+    color:var(--cream,#f3f4f6); text-transform:uppercase; letter-spacing:.035em;
+    text-shadow:0 2px 26px rgba(var(--teal-rgb,67,230,212),.4), 0 1px 4px rgba(0,0,0,.7);
   }
   #jTalkView #transcript .msg.j {
-    font:400 clamp(15px,2.7vw,20px)/1.55 Georgia,'Times New Roman',serif;
-    color:#ece8de; text-shadow:0 1px 18px rgba(0,0,0,.75);
+    font:400 clamp(15px,2.7vw,20px)/1.55 var(--font,Inter,sans-serif);
+    color:var(--cream,#f3f4f6); text-shadow:0 1px 18px rgba(0,0,0,.75);
   }
   #jTalkView #transcript .msg.j .who {
-    display:block; font:600 10px/1 -apple-system,'Segoe UI',sans-serif;
-    color:#c9a862; letter-spacing:.28em; margin-bottom:7px;
+    display:block; font:600 10px/1 var(--font,Inter,sans-serif);
+    color:var(--teal,#43e6d4); letter-spacing:.28em; margin-bottom:7px;
   }
-  #jTalkView #transcript .msg.err { color:#d98a7e; font-size:14px; }
+  #jTalkView #transcript .msg.err { color:var(--err,#ff8f80); font-size:14px; }
   /* only the current exchange lives on the wall — history stays in the dock/log */
   #jTalkView #transcript .msg:not(:nth-last-child(-n+3)) { display:none; }
   @keyframes wallIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
@@ -46,7 +46,7 @@
   #jTalkView .visual{
     position:fixed !important; left:50% !important; top:auto !important; bottom:190px !important;
     transform:translateX(-50%); width:min(680px,94vw); max-height:46vh; overflow:auto; z-index:4;
-    background:rgba(14,17,24,.92) !important; border:1px solid rgba(201,168,98,.35) !important;
+    background:var(--panel,rgba(14,17,24,.92)) !important; border:1px solid rgba(var(--teal-rgb,67,230,212),.35) !important;
     border-radius:14px !important; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
     box-shadow:0 18px 60px rgba(0,0,0,.55); pointer-events:auto;
   }
@@ -54,11 +54,11 @@
   /* the open-conversation chip */
   #handsFreeChip {
     position:fixed; right:14px; bottom:132px; z-index:3;
-    border:1px solid rgba(255,255,255,.14); border-radius:99px; padding:6px 14px;
-    background:rgba(14,17,24,.85); color:#8a8fa0; font:500 11.5px -apple-system,'Segoe UI',sans-serif;
+    border:1px solid var(--line,rgba(255,255,255,.09)); border-radius:99px; padding:6px 14px;
+    background:var(--panel,rgba(14,17,24,.85)); color:var(--dim,#8b909a); font:500 11.5px var(--font,Inter,sans-serif);
     letter-spacing:.04em; cursor:pointer; display:none; backdrop-filter:blur(6px);
   }
-  #handsFreeChip.on { color:#c9a862; border-color:rgba(201,168,98,.45); }
+  #handsFreeChip.on { color:var(--teal,#43e6d4); border-color:rgba(var(--teal-rgb,67,230,212),.45); }
   `;
 
   const KEY = 'jarvisHandsFree';

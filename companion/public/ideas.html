@@ -1,15 +1,34 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>try{var _t=localStorage.getItem('jarvis-theme');document.documentElement.dataset.theme=(!_t||_t==='exec')?'black':_t;}catch(e){document.documentElement.dataset.theme='black';}</script>
 <title>Ideas to Approve · Jarvis</title>
-<meta name="theme-color" content="#0F172A">
+<meta name="theme-color" content="#000000">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="govcon.css">
 <style>
+  /* ── Jet Black / True White remap of the govcon palette (theme variable definitions — design contract) ── */
+  :root, [data-theme="black"], [data-theme="dark"] {
+    --navy:#000000; --bg:#000000; --panel:#141417; --panel-2:#1c1c21; --line:rgba(255,255,255,.09);
+    --ink:#f3f4f6; --muted:#8b909a; --faint:#6b7280;
+    --accent:#43e6d4; --accent-soft:rgba(67,230,212,.12);
+    --ok:#5dcaa5; --warn:#f0b45c; --danger:#ff8f80;
+    --glow:#0a0a0c; --briefing:#101013; --topfade:rgba(0,0,0,.86);
+    --shadow:0 1px 0 rgba(255,255,255,.03), 0 8px 24px rgba(0,0,0,.35);
+  }
+  [data-theme="white"], [data-theme="light"] {
+    --navy:#181b22; --bg:#ffffff; --panel:#ffffff; --panel-2:#f4f6f9; --line:rgba(17,24,39,.10);
+    --ink:#181b22; --muted:#68707d; --faint:#98a1ae;
+    --accent:#0d9488; --accent-soft:rgba(13,148,136,.10);
+    --ok:#0d9488; --warn:#b45309; --danger:#c0392b;
+    --glow:#f4f6f9; --briefing:#f4f6f9; --topfade:rgba(255,255,255,.9);
+    --shadow:0 1px 2px rgba(17,24,39,.05), 0 10px 24px rgba(17,24,39,.06);
+  }
+
   .id-row { display:flex; gap:12px; align-items:flex-start; padding:14px 0; border-bottom:1px solid var(--line); }
   .id-row:last-child { border-bottom:0; }
   .id-eff { flex-shrink:0; width:30px; height:30px; border-radius:8px; display:grid; place-items:center; font-weight:800; font-size:13px; background:var(--panel-2); color:var(--muted); }
@@ -19,11 +38,12 @@
   .id-why { color:var(--muted); font-size:13px; margin-top:3px; line-height:1.5; }
   .id-cat { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--accent); margin-top:6px; display:inline-block; }
   .id-actions { display:flex; gap:8px; flex-shrink:0; }
-  .id-btn { border:1px solid var(--line); background:var(--panel-2); color:var(--ink); border-radius:8px; padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:.15s; }
+  .id-btn { border:1px solid var(--line); background:var(--panel-2); color:var(--ink); border-radius:10px; padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:.15s; }
   .id-btn.approve:hover { border-color:var(--ok); color:var(--ok); }
   .id-btn.dismiss:hover { border-color:var(--danger); color:var(--danger); }
-  .id-mine { border:1px solid color-mix(in srgb,var(--accent) 40%,transparent); background:var(--accent-soft); color:#93b4ff; border-radius:9px; padding:8px 16px; font-weight:700; cursor:pointer; font-family:inherit; font-size:13px; }
+  .id-mine { border:1px solid color-mix(in srgb,var(--accent) 40%,transparent); background:var(--accent-soft); color:var(--accent); border-radius:10px; padding:8px 16px; font-weight:700; cursor:pointer; font-family:inherit; font-size:13px; }
   .id-mine:disabled { opacity:.6; cursor:default; }
+  .id-btn:focus-visible, .id-mine:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
   .id-counts { display:flex; gap:16px; font-size:12px; color:var(--muted); margin-top:10px; }
   .id-fade { animation: idFade .25s ease; }
   @keyframes idFade { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }

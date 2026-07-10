@@ -14,7 +14,7 @@
     btn.type = 'button';
     btn.setAttribute('aria-label', 'System health');
     btn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;width:auto;padding:0 10px;font-size:12px;font-weight:500;letter-spacing:.02em;white-space:nowrap;';
-    btn.innerHTML = '<span id="healthDot" style="width:8px;height:8px;border-radius:50%;background:var(--muted,#888);display:inline-block"></span><span id="healthLbl" style="display:none"></span>';
+    btn.innerHTML = '<span id="healthDot" style="width:8px;height:8px;border-radius:50%;background:var(--dim,#8b909a);display:inline-block"></span><span id="healthLbl" style="display:none"></span>';
     // place it just before the brain chip / settings button
     const anchor = document.getElementById('brainChip') || document.getElementById('settingsBtn');
     if (anchor) bar.insertBefore(btn, anchor); else bar.appendChild(btn);
@@ -29,10 +29,10 @@
     if (!dot || !chip) return;
     const ok = h && h.controlPlane;
     const unknown = !h;
-    dot.style.background = unknown ? 'var(--muted,#888)' : ok ? 'var(--ok,#10b981)' : 'var(--danger,#e44)';
+    dot.style.background = unknown ? 'var(--dim,#8b909a)' : ok ? 'var(--ok,#5dcaa5)' : 'var(--err,#ff8f80)';
     // only show a text label when something is WRONG — keep the bar calm when healthy
     if (lbl) {
-      if (!ok && !unknown) { lbl.textContent = 'brain offline'; lbl.style.display = 'inline'; lbl.style.color = 'var(--danger,#e44)'; }
+      if (!ok && !unknown) { lbl.textContent = 'brain offline'; lbl.style.display = 'inline'; lbl.style.color = 'var(--err,#ff8f80)'; }
       else { lbl.style.display = 'none'; }
     }
     chip.title = unknown

@@ -266,13 +266,14 @@
   function initTheme() {
     const btn = $('gcTheme'); if (!btn) return;
     // Theme is shared with the whole Jarvis app via localStorage 'jarvis-theme'. GovCon's CSS only has
-    // light/dark, so map: 'light' → light, any dark theme (mono/teal/dark/arc) → dark.
+    // light/dark, so map: 'white'/'light' → light, anything else (black/teal/arc/exec/dark/mono) → dark.
+    // The toggle writes the app-wide theme names ('black'/'white') so the choice carries across Jarvis.
     const paint = (light) => { document.documentElement.dataset.theme = light ? 'light' : 'dark'; btn.textContent = light ? '☀' : '☾'; };
-    let isLight = false; try { isLight = localStorage.getItem('jarvis-theme') === 'light'; } catch { /* */ }
-    paint(isLight);
+    let t = null; try { t = localStorage.getItem('jarvis-theme'); } catch { /* */ }
+    paint(t === 'white' || t === 'light');
     btn.onclick = () => {
       const goLight = document.documentElement.dataset.theme !== 'light';
-      try { if (goLight) localStorage.setItem('jarvis-theme', 'light'); else if (localStorage.getItem('jarvis-theme') === 'light') localStorage.setItem('jarvis-theme', 'mono'); } catch { /* */ }
+      try { localStorage.setItem('jarvis-theme', goLight ? 'white' : 'black'); } catch { /* */ }
       paint(goLight);
     };
   }
@@ -397,6 +398,49 @@
     const top = $('gcSpendTop');
     if (top) top.textContent = res.length ? `· $ heat: ${res.slice(0, 3).map((s) => `${s.state} $${fmtShort(s.amount)}`).join(', ')}` : '';
     if (lastBoard) renderMap(lastBoard); // redraw the opportunity map with the merged spending heat layer
+  }
+
+  // ── ⚡ Quick wins: fast-close leads from the quick-wins radar (best-effort; page is fine without it) ─
+  async function loadQuickwins() {
+    const el = $('gcQuickwins'); if (!el) return;
+    const r = await getJSON('/api/gov/quickwins?days=7');
+    if (!r || !r.ok) { el.innerHTML = '<div class="gc-empty">Quick-wins feed unavailable right now.</div>'; return; }
+    const leads = (r.leads || []).slice(0, 6);
+    if (!leads.length) { el.innerHTML = '<div class="gc-empty">No quick wins flagged — the radar keeps scanning.</div>'; return; }
+    el.innerHTML = leads.map((l) => {
+      const dd = daysTo(l.due);
+      const meta = [l.agency, dd != null ? (dd >= 0 ? `${dd}d left` : 'closed') : ''].filter(Boolean).join(' · ');
+      return `<div class="gc-qw-item"><span class="gc-qw-score">${Number(l.score) || 0}</span><span class="gc-qw-t">${esc(l.title)}</span><span class="gc-qw-meta">${esc(meta)}</span>${l.link ? `<a class="gc-qw-open" href="${esc(l.link)}" target="_blank" rel="noopener">Open ↗</a>` : ''}</div>`;
+    }).join('');
+  }
+
+  // ── 🤝 Teaming radar: primes winning nearby → gated intro letters (nothing sends itself) ──────────
+  const fmtM = (n) => { n = Number(n) || 0; return n >= 1e6 ? '$' + (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? '$' + Math.round(n / 1e3) + 'K' : '$' + Math.round(n); };
+  async function loadTeaming() {
+    const el = $('gcTeaming'); if (!el) return;
+    if (el.querySelector('.gc-team-letter:not([hidden])')) return; // don't wipe an open intro letter on refresh
+    const r = await getJSON('/api/gov/teaming?days=120');
+    if (!r || !r.ok) { el.innerHTML = '<div class="gc-empty">Teaming feed unavailable right now.</div>'; return; }
+    const leads = (r.leads || []).slice(0, 5);
+    if (!leads.length) { el.innerHTML = '<div class="gc-empty">No primes flagged yet — fills as nearby awards land.</div>'; return; }
+    el.innerHTML = leads.map((l, i) => {
+      const meta = [l.amount ? fmtM(l.amount) : '', l.agency, l.state].filter(Boolean).join(' · ');
+      return `<div class="gc-team-item"><div class="gc-team-row"><span class="gc-team-prime" title="${esc(l.why || '')}">${esc(l.recipient)}</span><span class="gc-team-meta">${esc(meta)}</span><button class="gc-btn" data-i="${i}">✍ Intro</button></div><div class="gc-team-letter" id="gcTeamLetter${i}" hidden></div></div>`;
+    }).join('');
+    el.querySelectorAll('button[data-i]').forEach((b) => { b.onclick = () => teamIntro(leads[Number(b.dataset.i)], Number(b.dataset.i), b); });
+  }
+  async function teamIntro(lead, i, btn) {
+    const box = $('gcTeamLetter' + i); if (!lead || !box) return;
+    if (!box.hidden && box.dataset.done) { box.hidden = true; return; } // second click folds the expando
+    box.hidden = false; box.innerHTML = '<div class="gc-empty">drafting the intro…</div>'; btn.disabled = true;
+    const r = await postJSON('/api/gov/teaming/intro', { prime: lead, agency: lead.agency });
+    btn.disabled = false;
+    if (!r || !r.ok || !r.letter) { box.innerHTML = `<div class="gc-empty">Couldn’t draft it: ${esc((r && (r.error || r.reason)) || 'unavailable')}</div>`; return; }
+    box.dataset.done = '1';
+    box.innerHTML = '<div class="gc-team-note">Nothing sends automatically — you send it.</div><pre class="gc-team-text"></pre><button class="gc-btn" data-copy>Copy</button>';
+    box.querySelector('.gc-team-text').textContent = r.letter;
+    const cp = box.querySelector('[data-copy]');
+    cp.onclick = async () => { try { await navigator.clipboard.writeText(r.letter); cp.textContent = '✓ Copied'; setTimeout(() => { cp.textContent = 'Copy'; }, 1400); } catch { /* */ } };
   }
 
   function render(board, cockpit, finance) {
@@ -544,6 +588,8 @@
     catch (e) { $('gcFootStatus').textContent = 'Render error: ' + e.message; }
     loadJournal();
     loadSpending();
+    loadQuickwins();
+    loadTeaming();
   }
 
   initTheme();

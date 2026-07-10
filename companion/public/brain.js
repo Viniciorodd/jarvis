@@ -15,7 +15,7 @@
     btn.type = 'button';
     btn.setAttribute('aria-label', 'Brain mode');
     btn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;width:auto;padding:0 10px;font-size:12px;font-weight:500;letter-spacing:.02em;white-space:nowrap;';
-    btn.innerHTML = '<span id="brainDot" style="width:8px;height:8px;border-radius:50%;background:var(--muted,#888);display:inline-block"></span><span id="brainLbl">…</span>';
+    btn.innerHTML = '<span id="brainDot" style="width:8px;height:8px;border-radius:50%;background:var(--dim,#8b909a);display:inline-block"></span><span id="brainLbl">…</span>';
     // place it just before the settings button if present, else append
     const settings = document.getElementById('settingsBtn');
     if (settings) bar.insertBefore(btn, settings); else bar.appendChild(btn);
@@ -33,8 +33,8 @@
     const have = state.have || {};
     // green = a free brain is reachable (so "never goes dark" holds); amber = only Claude; grey = unknown
     const free = have.local || have.openrouter;
-    const color = state.prefer === 'claude' ? (have.claude ? 'var(--accent,#4af)' : 'var(--danger,#e44)')
-      : free ? 'var(--ok,#10b981)' : (have.claude ? 'var(--warn,#f59e0b)' : 'var(--muted,#888)');
+    const color = state.prefer === 'claude' ? (have.claude ? 'var(--teal,#43e6d4)' : 'var(--err,#ff8f80)')
+      : free ? 'var(--ok,#5dcaa5)' : (have.claude ? 'var(--warn,#f0b45c)' : 'var(--dim,#8b909a)');
     dot.style.background = color;
     const m = state.models || {};
     document.getElementById('brainChip').title =

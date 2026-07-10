@@ -32,7 +32,7 @@
     }
     if (cur.active) {
       ico.textContent = '▶'; ico.style.opacity = '1';
-      lbl.textContent = 'paused'; lbl.style.display = 'inline'; lbl.style.color = 'var(--warn,#f59e0b)';
+      lbl.textContent = 'paused'; lbl.style.display = 'inline'; lbl.style.color = 'var(--warn,#f0b45c)';
       chip.title = `⏸ Proactive behavior is PAUSED${cur.until ? ' until ' + new Date(cur.until).toLocaleTimeString() : ''} — no scans, no scheduled jobs, no agent acts on its own. You can still talk to Jarvis. Tap to resume.`;
     } else {
       ico.textContent = '⏸'; ico.style.opacity = '.8'; lbl.style.display = 'none';

@@ -269,15 +269,15 @@ $('approvals').addEventListener('click', (ev) => {
   adapter.decide(card.dataset.id, btn.dataset.act, card);
 });
 
-// ── theme picker (same 3 themes as the companion: teal / mono / dark) ───────────────────────────
+// ── theme picker (flagship black / white + legacy teal / mono / dark — same as the companion) ────
 function applyTheme(name) {
-  const ok = ['teal', 'mono', 'dark'].includes(name) ? name : 'mono';
+  const ok = ['black', 'white', 'teal', 'mono', 'dark'].includes(name) ? name : 'black';
   document.documentElement.dataset.theme = ok;
   document.querySelectorAll('#theme-pick .sw').forEach((b) => b.classList.toggle('on', b.dataset.theme === ok));
   try { localStorage.setItem('jarvis-theme', ok); } catch { /* private mode */ }
 }
 document.querySelectorAll('#theme-pick .sw').forEach((b) => b.addEventListener('click', () => applyTheme(b.dataset.theme)));
-applyTheme(document.documentElement.dataset.theme || 'mono');
+applyTheme(document.documentElement.dataset.theme || 'black');
 
 adapter = DEMO ? demoAdapter : liveAdapter;
 adapter.start();

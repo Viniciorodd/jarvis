@@ -8,6 +8,9 @@ COPY control-plane/package.json ./package.json
 RUN npm install --omit=dev --no-audit --no-fund || echo "optional email deps not installed; reply-reading will degrade"
 COPY control-plane ./control-plane
 COPY pods ./pods
+# the Telegram bridge shares this image (compose runs it as its own service). Dependency-free; imports
+# only from pods/ (already copied), so just the one file is needed — keeps the image small.
+COPY companion/telegram-bridge.mjs ./companion/telegram-bridge.mjs
 # what the pod workers need at runtime: the image engine (Fiverr) + entity/operator profiles (Gov).
 # The scheduler shares this image (its compose service just overrides the command).
 COPY scripts ./scripts

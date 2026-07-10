@@ -11,6 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pkg from '@slack/bolt';
 const { App } = pkg;
+import { narrationFor, personaFor } from '../pods/narrate.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 function env(k, d = '') {
@@ -24,6 +25,8 @@ const APPROVALS_CH = env('SLACK_APPROVALS_CHANNEL', '#approvals');
 const COMPANION = env('COMPANION_URL', 'http://localhost:8095').replace(/\/$/, '');
 const HQ = env('JARVIS_HQ_URL', 'http://192.168.6.121:8099').replace(/\/$/, '');
 const HQ_TOKEN = env('HQ_TOKEN');
+const CP = env('JARVIS_CP_URL', env('CONTROL_PLANE_URL', 'http://192.168.6.121:8787')).replace(/\/$/, '');
+const FLOOR_CH = env('SLACK_FLOOR_CHANNEL', '#floor'); // the war-room: watch the team work
 
 if (!BOT || !APP_TOKEN) { console.error('Need SLACK_BOT_TOKEN (xoxb-) and SLACK_APP_TOKEN (xapp-) in .env. See docs/slack-setup.md'); process.exit(1); }
 
@@ -83,10 +86,28 @@ async function pollApprovals() {
   } catch { /* HQ unreachable; retry next tick */ }
 }
 
+// ── #floor: the war room — agent-signed activity so you watch the whole team work together ──────────
+const seenFloor = new Set();
+async function seedFloor() { try { const ev = await (await fetch(CP + '/events')).json(); if (Array.isArray(ev)) for (const e of ev) seenFloor.add(e.id); } catch { /* CP offline; seed next tick */ } }
+async function pollFloor() {
+  try {
+    const ev = await (await fetch(CP + '/events')).json();
+    if (!Array.isArray(ev)) return;
+    for (const e of ev) {
+      if (seenFloor.has(e.id)) continue; seenFloor.add(e.id);
+      const text = narrationFor(e);
+      if (!text) continue;
+      await app.client.chat.postMessage({ channel: FLOOR_CH, text: `${text}  —  _${personaFor(e.actor)}_` });
+    }
+  } catch { /* retry next tick */ }
+}
+
 (async () => {
   await app.start();
   console.log('JARVIS Slack bridge running (Socket Mode).');
-  console.log(`  brain: ${COMPANION}  |  HQ: ${HQ}  |  approvals → ${APPROVALS_CH}`);
+  console.log(`  brain: ${COMPANION}  |  HQ: ${HQ}  |  CP: ${CP}  |  approvals → ${APPROVALS_CH}  |  floor → ${FLOOR_CH}`);
+  await seedFloor();                 // don't replay history into #floor on boot
   setInterval(pollApprovals, 20000);
+  setInterval(pollFloor, 30000);     // narrate the team's work into #floor
   pollApprovals();
 })();

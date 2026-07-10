@@ -441,7 +441,8 @@ async function toggleRecord() {
 
 // ── settings: theme swatches (pick by mood) + open/close ─────────────────────
 function applyTheme(name) {
-  const ok = ['exec', 'teal', 'mono', 'dark', 'arc', 'light'].includes(name) ? name : 'exec';
+  if (name === 'exec') name = 'black'; // migrate the old translucent default → the clean Jet Black
+  const ok = ['black', 'white', 'exec', 'teal', 'mono', 'dark', 'arc', 'light'].includes(name) ? name : 'black';
   document.documentElement.dataset.theme = ok;
   document.querySelectorAll('.theme-swatch').forEach((s) => s.classList.toggle('on', s.dataset.theme === ok));
   try { localStorage.setItem('jarvis-theme', ok); } catch { /* private mode */ }
@@ -450,7 +451,7 @@ function applyTheme(name) {
   const f = $('hqFrame'); if (f && f.getAttribute('src')) { const u = new URL(hqUrl); u.searchParams.set('theme', ok); f.src = u.toString(); }
 }
 document.querySelectorAll('.theme-swatch').forEach((s) => s.addEventListener('click', () => applyTheme(s.dataset.theme)));
-applyTheme((() => { try { return localStorage.getItem('jarvis-theme') || 'exec'; } catch { return 'exec'; } })());
+applyTheme((() => { try { return localStorage.getItem('jarvis-theme') || 'black'; } catch { return 'black'; } })());
 $('settingsBtn').addEventListener('click', () => { $('settingsView').hidden = false; });
 $('settingsX').addEventListener('click', () => { $('settingsView').hidden = true; });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('settingsView').hidden) $('settingsView').hidden = true; });

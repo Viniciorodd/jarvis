@@ -1,74 +1,78 @@
-/* ══════════════════════════════════════════ JARVIS — THEME VARIABLES ══ */
-:root, [data-theme="teal"]{
-  --ink:#04070f; --ink2:#081420; --panel:#0a121a;
+/* ══════════════════════════════════════════ JARVIS — THEME SYSTEM ══
+   ONE typeface (Inter) system-wide. Two flagship themes — Jet Black (default) and True White — plus the
+   legacy accents, all on the same variable contract so every surface themes cleanly. The 3D brain
+   (neural.js) is confined to the Jarvis tab by the brain-confinement block at the end of this section. */
+:root{
+  --font:'Inter', ui-sans-serif, -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --radius:14px;
+}
+
+/* ── JET BLACK (default) — true #000, solid surfaces, one calm teal accent ── */
+:root, [data-theme="black"], [data-theme="dark"], [data-theme="mono"]{
+  --ink:#000000; --ink2:#0c0c0e; --panel:#141417; --panel2:#1c1c21;
+  --teal:#43e6d4; --teal-rgb:67,230,212; --teal-dim:#1f6f68;
+  --cream:#f3f4f6; --dim:#8b909a; --glow:rgba(var(--teal-rgb),.30); --ink-on-accent:#00201c;
+  --warn:#f0b45c; --warn-ink:#1c1305; --err:#ff8f80; --active:#5dcaa5;
+  --bg:#000000; --line:rgba(255,255,255,.09); --accent:#43e6d4; --muted:#8b909a; --ok:#5dcaa5; --danger:#ff8f80;
+  color-scheme:dark;
+}
+
+/* ── TRUE WHITE — pure #fff, dark ink text, darkened teal accent for AA contrast ── */
+[data-theme="white"], [data-theme="light"]{
+  --ink:#ffffff; --ink2:#f5f6f8; --panel:#ffffff; --panel2:#f4f6f9;
+  --teal:#0d9488; --teal-rgb:13,148,136; --teal-dim:#7bc3bb;
+  --cream:#181b22; --dim:#68707d; --glow:rgba(var(--teal-rgb),.16); --ink-on-accent:#ffffff;
+  --warn:#b45309; --warn-ink:#fff7ed; --err:#c0392b; --active:#0d9488;
+  --bg:#ffffff; --line:rgba(17,24,39,.10); --accent:#0d9488; --muted:#68707d; --ok:#0d9488; --danger:#c0392b;
+  color-scheme:light;
+}
+[data-theme="white"] *, [data-theme="light"] *{ text-shadow:none !important; }
+[data-theme="white"] .card, [data-theme="light"] .card,
+[data-theme="white"] .hm, [data-theme="light"] .hm,
+[data-theme="white"] .j-action-card, [data-theme="light"] .j-action-card,
+[data-theme="white"] .j-onething, [data-theme="light"] .j-onething{ box-shadow:0 1px 2px rgba(17,24,39,.05), 0 10px 24px rgba(17,24,39,.06); }
+
+/* ── legacy accents, refreshed onto the same var contract ── */
+[data-theme="teal"]{
+  --ink:#04070f; --ink2:#081420; --panel:#0c1620; --panel2:#0f1a26;
   --teal:#39e0d0; --teal-rgb:57,224,208; --teal-dim:#1c6e69;
-  --cream:#dfeef0; --dim:#5d7480; --glow:rgba(var(--teal-rgb),.55); --ink-on-accent:#04342c;
+  --cream:#dfeef0; --dim:#6a8290; --glow:rgba(var(--teal-rgb),.4); --ink-on-accent:#04342c;
   --warn:#ffc06a; --warn-ink:#1c1305; --err:#ff9a7a; --active:#5dcaa5;
-}
-[data-theme="mono"]{
-  --ink:#000000; --ink2:#0a0a0a; --panel:#111111;
-  --teal:#ffffff; --teal-rgb:255,255,255; --teal-dim:#555555;
-  --cream:#e8e8e8; --dim:#666666; --glow:rgba(255,255,255,.18); --ink-on-accent:#000000;
-  --warn:#cccccc; --warn-ink:#000000; --err:#999999; --active:#ffffff;
-}
-[data-theme="dark"]{
-  --ink:#000000; --ink2:#06090b; --panel:#0a0e11;
-  --teal:#46c8bd; --teal-rgb:70,200,189; --teal-dim:#244b47;
-  --cream:#cdd6d9; --dim:#5d7480; --glow:rgba(var(--teal-rgb),.32); --ink-on-accent:#04140f;
-  --warn:#ffc06a; --warn-ink:#1c1305; --err:#ff9a7a; --active:#5dcaa5;
+  --bg:#04070f; --line:rgba(255,255,255,.08); --accent:#39e0d0; --muted:#6a8290; --ok:#5dcaa5; --danger:#ff9a7a;
 }
 [data-theme="arc"]{
-  --ink:#02040a; --ink2:#070e1c; --panel:#0b1626;
+  --ink:#02040a; --ink2:#070e1c; --panel:#0b1626; --panel2:#0e1a2c;
   --teal:#5fd9ff; --teal-rgb:95,217,255; --teal-dim:#225f7c;
   --cream:#eaf4fb; --dim:#7088a0; --glow:rgba(var(--teal-rgb),.5); --ink-on-accent:#03222e;
   --warn:#ffce6e; --warn-ink:#241803; --err:#ff8f87; --active:#65d6c0;
+  --bg:#02040a; --line:rgba(255,255,255,.08); --accent:#5fd9ff; --muted:#7088a0; --ok:#65d6c0; --danger:#ff8f87;
 }
-/* ══ EXECUTIVE — the Deal Room skin for the WHOLE app (charcoal · champagne gold · ivory · serif).
-   The one structural difference from every other theme: PANELS ARE TRANSLUCENT, so the neural-map
-   brain (neural.js, z-index:-1) reads through every screen — the Trillion look, everywhere. ══ */
 [data-theme="exec"]{
-  --ink:#0a0d12; --ink2:#10141b; --panel:#141924;
+  --ink:#0a0d12; --ink2:#10141b; --panel:#141924; --panel2:#12161f;
   --teal:#c9a862; --teal-rgb:201,168,98; --teal-dim:#6e5c33;
   --cream:#e8e4da; --dim:#8a8fa0; --glow:rgba(var(--teal-rgb),.38); --ink-on-accent:#1c1508;
   --warn:#f0b45c; --warn-ink:#1c1305; --err:#d98a7e; --active:#6fbf8f;
-  /* vars the newer chips/panels (strip, buckets, catchup, rail) already use */
-  --bg:#0a0d12; --line:rgba(255,255,255,.08); --accent:#c9a862; --muted:#8a8fa0;
-  --ok:#6fbf8f; --danger:#d98a7e; --panel2:#12161f;
+  --bg:#0a0d12; --line:rgba(255,255,255,.08); --accent:#c9a862; --muted:#8a8fa0; --ok:#6fbf8f; --danger:#d98a7e;
 }
-/* translucency layer: the brain must show through — cards float ON it, they don't wall it off */
-[data-theme="exec"] .card, [data-theme="exec"] .hm,
-[data-theme="exec"] .j-ticker, [data-theme="exec"] .j-more-item,
-[data-theme="exec"] .j-talk-glance, [data-theme="exec"] .j-talk-top{
-  background:rgba(16,20,27,.78) !important; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-  border-color:rgba(255,255,255,.07);
-}
-[data-theme="exec"] .j-view, [data-theme="exec"] .j-main{ background:transparent !important; }
-[data-theme="exec"] .j-top{ background:rgba(10,13,18,.72) !important; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-bottom:1px solid rgba(255,255,255,.06); }
-[data-theme="exec"] .j-nav, [data-theme="exec"] .j-composer-bar{ background:rgba(10,13,18,.82) !important; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-top:1px solid rgba(255,255,255,.06); }
-[data-theme="exec"] .j-composer{ background:rgba(20,25,36,.85); border:1px solid rgba(255,255,255,.1); }
-/* the executive voice: serif display instead of the pixel brand font */
-[data-theme="exec"] .px{ font-family:Georgia,'Times New Roman',serif; letter-spacing:.22em; }
-[data-theme="exec"] h1, [data-theme="exec"] h2, [data-theme="exec"] h3{ font-family:Georgia,'Times New Roman',serif; font-weight:400; }
+.sw-black{ background:#000; } .sw-white{ background:#fff; border:1px solid #d7dbe0; }
 .sw-exec{ background:linear-gradient(135deg,#0a0d12 55%,#c9a862 55%); }
-
-/* Light / white theme — bg/text roles inverted; accent darkened for contrast on white. */
-[data-theme="light"]{
-  --ink:#eef2f8; --ink2:#e3e9f2; --panel:#ffffff;
-  --teal:#0f766e; --teal-rgb:15,118,110; --teal-dim:#5eada6;
-  --cream:#101826; --dim:#5b6b7a; --glow:rgba(var(--teal-rgb),.28); --ink-on-accent:#ffffff;
-  --warn:#b45309; --warn-ink:#fff7ed; --err:#b91c1c; --active:#0f766e;
-  color-scheme: light;
-}
-[data-theme="light"] *{ text-shadow:none !important; }              /* kill the dark-mode neon glows on white */
-[data-theme="light"] .j-top{ border-bottom:1px solid rgba(15,23,42,.08); }
-[data-theme="light"] .j-nav{ border-top:1px solid rgba(15,23,42,.08); }
-[data-theme="light"] .card, [data-theme="light"] .hm{ box-shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 20px rgba(15,23,42,.06); }
 
 /* ══════════════════════════════════════════ BASE ══ */
 *{ box-sizing:border-box; margin:0; padding:0; }
 html,body{ height:100%; overflow:hidden; }
-body{ background:var(--ink); color:var(--cream); font-family:'Space Grotesk', ui-sans-serif, system-ui, sans-serif; height:100dvh; }
-.px{ font-family:'Silkscreen', monospace; }
+body{ background:var(--ink); color:var(--cream); font-family:var(--font); height:100dvh; letter-spacing:-.011em; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+h1,h2,h3,h4,h5,h6,button,input,select,textarea{ font-family:var(--font); }
+/* the old pixel-brand class → SAME typeface, just spaced + bold so the JARVIS wordmark still reads as a mark */
+.px{ font-family:var(--font); font-weight:700; letter-spacing:.15em; }
+
+/* ══ 3D BRAIN CONFINEMENT — the neural map (neural.js, fixed, z-index:-1) glows ONLY behind the Jarvis
+   tab. Every other view paints a solid --ink background over it; the talk view stays transparent so it
+   shows through, and neural.js pauses its draw loop when the Jarvis tab isn't active (see neural.js). ══ */
+.j-main{ background:transparent; }
+.j-view{ background:var(--ink); }
+#jTalkView{ background:transparent !important; }
+#neuralMap{ opacity:0; transition:opacity .5s ease; }
+body:has(#jTalkView.active) #neuralMap{ opacity:1; }
 
 /* ══════════════════════════════════════════ MAIN SHELL ══ */
 .j-shell{ height:100dvh; display:flex; flex-direction:column; overflow:hidden; }

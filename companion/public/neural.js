@@ -156,6 +156,8 @@
     running = true;
     const loop = (time) => {
       if (document.hidden) { running = false; return; } // battery: stop cold when not visible
+      const talk = document.getElementById('jTalkView'); // the brain lives ONLY on the Jarvis tab
+      if (talk && !talk.classList.contains('active')) { setTimeout(() => requestAnimationFrame(loop), 400); return; } // idle-poll off-tab
       requestAnimationFrame(loop);
       if ((frameCount++ % FRAME_MOD) !== 0) return;      // throttle to ~20-30fps — spares tight PCs
       t = time; draw(time * SPEED);

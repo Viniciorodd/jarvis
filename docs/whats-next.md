@@ -2,6 +2,28 @@
 
 _Updated 2026-07-10. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
+### 🆕 2026-07-10 (newest) — system-wide design overhaul (font · themes · brain · Today)
+Operator's ask: make it feel like Timepage/Things3/Fantastical/Notion, not a mess. Foundation reset:
+- **ONE typeface (Inter) system-wide** — dropped the 3-font mix (Space Grotesk + Silkscreen pixel + Georgia
+  serif). Body, headings, the `.px` wordmark, and the standalone pages (focus/quickwins/teaming) all use
+  `var(--font)`. Fonts now consistent A-Z.
+- **Two flagship themes** on a complete variable contract, in `style.css`: **Jet Black** (true #000, default)
+  and **True White** (pure #fff, dark ink, AA-contrast teal). Legacy teal/arc/exec kept in the picker; old
+  translucent `exec` default auto-migrates to Jet Black (index.html init + `applyTheme` allow-list + `.html`
+  page heads). Verified readable in both via computed styles.
+- **3D brain confined to the Jarvis tab**: `neural.js` no longer bleeds through every screen. Non-talk views
+  paint a solid `--ink` bg; `#jTalkView` is transparent so the neural map glows through ONLY there; the draw
+  loop idle-polls (2fps) off-tab. (`body:has(#jTalkView.active) #neuralMap{opacity:1}`.)
+- **Premium Today tab** (`today.css` append): live date header (weekday title + full date sub via a small
+  script), Things-3 circle checkboxes, roomy rows, softer rounded calendar (filled-pill "today", chip
+  events, accent toggles), pill inputs. Fixed a hardcoded `color-scheme:dark` picker.
+- ⚠ **Verification caveat:** the preview screenshot tool timed out all session (flaky with the animated
+  canvas), so visual polish was verified via **computed styles**, not screenshots — the operator should eyeball
+  it. **Known remaining work:** the deep legacy overlays (`ops`/`floor`/`command`/`personal`/`hq` iframe, and
+  the `/govcon` page which has its own CSS) may still have hardcoded colors that don't fully adapt to True
+  White — a follow-up "theme-sweep the overlays" pass is needed for true A-Z coverage. Main surfaces (Home,
+  Today, Jarvis, More, focus/quickwins/teaming) are done.
+
 ### 🆕 2026-07-10 (newest) — GovCon growth engine (PDF · capability · quick-wins · teaming) + cockpit fixes
 Eval harness **432 green**. Companion is PC-local (restart to load `server.js` route changes; done).
 - **PDF + capability statement** (`pods/gov/pdf.mjs` + `company.mjs`): the gov wants a letterheaded PDF,

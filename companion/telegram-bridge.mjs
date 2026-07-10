@@ -92,13 +92,19 @@ async function handleCallback(q) {
 
 async function askJarvis(text) {
   history.push({ role: 'user', content: text });
-  const r = await fetch(COMPANION + '/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: history.slice(-16) }) }).catch((e) => ({ ok: false, _e: e.message }));
-  if (r.ok === false) return '⚠ companion offline (' + (r._e || '') + ')';
-  const d = await r.json();
-  if (d.error) return '⚠ ' + d.error;
-  history.push({ role: 'assistant', content: d.text });
-  const acts = (d.actions || []).map((a) => (a.ok ? '• ' : '✕ ') + a.label).join('\n');
-  return d.text + (acts ? '\n\n' + acts : '');
+  // Prefer the full companion brain (all its tools) when it's reachable (bridge runs next to it on the PC).
+  try {
+    const r = await fetch(COMPANION + '/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: history.slice(-16) }) });
+    if (r.ok) { const d = await r.json(); if (!d.error) { history.push({ role: 'assistant', content: d.text }); const acts = (d.actions || []).map((a) => (a.ok ? '• ' : '✕ ') + a.label).join('\n'); return d.text + (acts ? '\n\n' + acts : ''); } }
+  } catch { /* no companion here — fall through */ }
+  // Running on the NAS (no companion) → route the message through the control-plane Chief-of-Staff router.
+  try {
+    const r = await fetch(CP + '/command', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, source: 'telegram' }) });
+    const d = await r.json();
+    const reply = d && d.routing && d.routing.reply;
+    if (reply) { history.push({ role: 'assistant', content: reply }); return reply; }
+  } catch { /* */ }
+  return '⚠ Brain unreachable right now — try again in a moment.';
 }
 
 async function handle(chat, text) {

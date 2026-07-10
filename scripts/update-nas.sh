@@ -25,7 +25,7 @@ cd "$DEST"
 # Rebuild ONLY the Node services. jarvis-world is RETIRED (folded into the companion Floor) and its
 # Vite build hangs this NAS — never add it back here. hq rarely changes; rebuild it manually if needed:
 #   sudo docker compose up -d --build hq
-sudo docker compose up -d --build control-plane scheduler
+sudo docker compose up -d --build control-plane scheduler telegram-bridge
 
 HOST="$(hostname)"
 echo ""

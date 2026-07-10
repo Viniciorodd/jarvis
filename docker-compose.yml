@@ -137,6 +137,23 @@ services:
       SCHEDULER_TICK_MS: ${SCHEDULER_TICK_MS:-900000}
       JOB_CHECK_URL: ${JOB_CHECK_URL}
 
+  # Telegram bridge — runs 24/7 ON THE NAS so the agent activity feed + approve-from-phone reach your
+  # phone even with your PC off (the point of it while you travel). Talks to the control-plane for
+  # approvals + the event feed; free-text falls back to the CoS router (no companion needed on the NAS).
+  telegram-bridge:
+    build:
+      context: .
+      dockerfile: control-plane/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - control-plane
+    command: ["node", "companion/telegram-bridge.mjs"]
+    environment:
+      JARVIS_CP_URL: http://control-plane:8787
+      COMPANION_URL: http://control-plane:8787   # no companion on the NAS → chat falls back to /command
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+
   # --- Langfuse (OPTIONAL visual tracing, doctrine §11) — see docs/langfuse.md ---------------------
   # Uncomment to add visual tracing. It reuses the existing `postgres` service (create the DB first:
   #   docker compose exec postgres createdb -U ${POSTGRES_USER:-jarvis} langfuse ).

@@ -1,6 +1,38 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-07-06. Committed to `feat/core-infrastructure-v2` (NOT yet pushed — operator pushes when ready). Resume from here._
+_Updated 2026-07-10. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+
+### 🆕 2026-07-10 (newest) — Focus/time tracker (Forest replacement) + the Florida-ops layer
+The operator outgrew the **Forest** app; he wants his time as data — charts/bars per day/week/month/
+quarter/year. Also this session hardened the "run the business from Florida for a month" layer.
+- **Focus tracker** (`pods/focus.mjs`, eval-pinned `evals/focus.eval.mjs`, 408/408 green):
+  - **Voice/typed logging** — "focused 90 min on gov proposals" parses in code (amount/tag never by LLM),
+    logs to `focus/<year>.jsonl`, speaks back the running daily total. Wired into `/api/chat` (after the
+    expense + action-log captures) and `POST /api/focus/log`.
+  - **Forest import** — `importForest(csv)`, idempotent (dedup by start-time). **Imported the operator's full
+    export: 6,036 sessions · 3,792.8h · 1,966 active days · 97% completed · 2016→2026.** Top tags: 📚reading
+    1,364h · work 1,156h · trading 294h · real estate 240h. Best weekday: Tue. Peak year 2017 (794h),
+    2025 rebound (443h).
+  - **Dashboard** `/focus` (`companion/public/focus.html`): period toggle + scrollable bar chart + 6 stat
+    tiles + top-tags breakdown + inline log box. Theme-aware, mobile-first. **Verified live in-browser**
+    (Month + Year views, API serving the full decade, no console errors).
+  - **API**: `GET /api/focus?grouping=day|week|month|quarter|year`, `POST /api/focus/log`.
+  - ⏭ Deploy: activates on the NAS on the **next control-plane redeploy** (the companion serves it). Import
+    is local-only right now (ran from PC against `Y:\Forest Plants...csv`); re-run on the NAS if wanted.
+- **Florida-ops (earlier this session, all LIVE):** the **Telegram bridge as a 24/7 NAS service**
+  (`companion/telegram-bridge.mjs` — approve-from-phone inline buttons + agent-signed activity feed;
+  `jarvis-telegram-bridge-1` confirmed Up, operator received "team is online"). **Slack #floor war-room**
+  (`companion/slack-bridge.mjs`). **Voice expense tracker** (`pods/expenses.mjs`, personal+business books).
+  **Action Log / momentum** (`pods/actions.mjs` → vault `00 - System/🏆 Action Log.md`, 20-min auto-sync).
+  **Gate dedup** made idempotent. **Kokoro TTS auto-start + VAD push-to-talk**. **Voice-first home**
+  (`companion/public/talkhome.js`). All committed + pushed; NAS deploy confirmed.
+- ⏭ **Open queue (Florida-critical + parked):** (a) **Tailnet subnet-router sidecar** — needs the operator's
+  Tailscale auth key (remote access to PC + MacBook from Florida). (b) **Board write-back** (append-only,
+  concept approved). (c) **Outreach-at-scale drafting** (primes/subs, daily batch, council pre-review,
+  GATED — operator chose "draft at scale, I approve from my phone", never auto-send). (d) **`GOV_AUTO_SEND=1`**
+  operator's config call to make Approve actually send. (e) USACE PIEE submit (operator, due 7/13).
+  (f) [[hermes-full-capability]] + [[jarvis-on-alexa]] parked. (g) Fiverr/private expansion HELD until
+  USACE submitted + first Fiverr sale.
 
 ### 🆕 2026-07-07 (newest) — Tax & Wealth pod Phase 3B shipped: docs indexer
 Built per `docs/superpowers/specs/2026-07-07-tax-pod-phase3b-docs-index-design.md`, branch

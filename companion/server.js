@@ -1585,6 +1585,24 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(r));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, leads: [], count: 0 })); }
   }
+  // ── TEAMING RADAR: primes who just won big awards + may need small-biz subs. Drafts an intro (gated). ──
+  if (req.method === 'GET' && url.pathname === '/api/gov/teaming') {
+    try {
+      const T = await import('../pods/gov/teaming.mjs');
+      const days = Math.min(365, Math.max(30, Number(url.searchParams.get('days')) || 120));
+      const minAward = Math.max(250000, Number(url.searchParams.get('min')) || 750000);
+      const r = await T.scanTeaming({ days, minAward });
+      return send(res, 200, JSON.stringify(r));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, leads: [], count: 0 })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/gov/teaming/intro') {
+    try {
+      const T = await import('../pods/gov/teaming.mjs');
+      const b = await readBody(req);
+      const letter = T.introLetter(b.prime || b, { agency: b.agency || '', award: b.award || '' });
+      return send(res, 200, JSON.stringify({ ok: true, letter }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // ── daily brief (calendar + unread + needs-you + top opportunity) ──
   if (req.method === 'GET' && url.pathname === '/api/brief') {
     try { const b = await dailyBrief(); return send(res, 200, JSON.stringify({ ...b, text: briefText(b) })); }
@@ -3026,7 +3044,7 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
-  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname.replace(/^\/+/, '');
+  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));

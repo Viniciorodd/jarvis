@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>🤝 Teaming Radar — Jarvis</title>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('jarvis-theme')||'exec'}catch(e){}</script>
+<link rel="stylesheet" href="style.css">
+<style>
+  body{ margin:0; background:var(--ink); color:var(--cream); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:920px; margin:0 auto; padding:18px 16px calc(28px + env(safe-area-inset-bottom,0)); }
+  .top{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  h1{ font-size:22px; font-weight:800; margin:0; letter-spacing:-.01em; }
+  .back{ font-size:13px; color:var(--teal); text-decoration:none; }
+  .sub{ color:var(--dim); font-size:13px; margin:4px 0 14px; line-height:1.5; }
+  .bar{ display:flex; gap:8px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+  .bar select,.bar button{ appearance:none; border:1px solid rgba(var(--teal-rgb),.28); background:transparent; color:var(--cream); border-radius:9px; padding:8px 13px; font:inherit; font-size:13px; cursor:pointer; }
+  .bar button.go{ background:var(--teal); color:var(--ink-on-accent); border-color:var(--teal); font-weight:700; }
+  .card{ background:var(--panel); border:1px solid rgba(var(--teal-rgb),.14); border-radius:14px; padding:14px 16px; margin-bottom:11px; }
+  .r1{ display:flex; align-items:flex-start; gap:10px; }
+  .score{ flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:rgba(var(--teal-rgb),.14); color:var(--teal); font-weight:800; font-size:15px; display:flex; align-items:center; justify-content:center; }
+  .name{ font-size:15.5px; font-weight:600; line-height:1.3; }
+  .meta{ font-size:12px; color:var(--dim); margin-top:2px; }
+  .amt{ margin-left:auto; align-self:center; font-size:15px; font-weight:700; color:var(--teal); white-space:nowrap; }
+  .why{ font-size:12.5px; color:var(--dim); margin-top:8px; }
+  .acts{ display:flex; gap:8px; margin-top:11px; flex-wrap:wrap; }
+  .acts button,.acts a{ font-size:12.5px; text-decoration:none; border-radius:8px; padding:7px 12px; border:1px solid rgba(var(--teal-rgb),.28); color:var(--cream); background:none; cursor:pointer; font-family:inherit; }
+  .acts button.primary{ background:var(--teal); color:var(--ink-on-accent); border-color:var(--teal); font-weight:600; }
+  .empty{ color:var(--dim); font-size:14px; padding:30px 0; text-align:center; }
+  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; padding:16px; z-index:50; }
+  .modal.on{ display:flex; }
+  .sheet{ background:var(--panel); border:1px solid rgba(var(--teal-rgb),.2); border-radius:14px; max-width:640px; width:100%; max-height:86vh; overflow:auto; padding:18px; }
+  .sheet h3{ margin:0 0 4px; font-size:17px; }
+  .sheet .g{ font-size:12.5px; color:var(--dim); margin-bottom:12px; }
+  .sheet textarea{ width:100%; box-sizing:border-box; min-height:280px; background:var(--ink2); border:1px solid rgba(var(--teal-rgb),.25); border-radius:10px; color:var(--cream); padding:12px 14px; font:inherit; font-size:13.5px; line-height:1.55; resize:vertical; }
+  .sheet .row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .sheet .row button,.sheet .row a{ font-size:13px; border-radius:9px; padding:9px 14px; border:1px solid rgba(var(--teal-rgb),.28); background:none; color:var(--cream); cursor:pointer; text-decoration:none; font-family:inherit; }
+  .sheet .row .primary{ background:var(--teal); color:var(--ink-on-accent); border-color:var(--teal); font-weight:600; }
+  .gate{ font-size:11.5px; color:#e0b64a; margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>🤝 Teaming Radar</h1><a class="back" href="/">‹ Jarvis</a></div>
+  <div class="sub">Primes who just won big federal contracts (over $750k → they must carry a small-business subcontracting plan) and may need a custodial/grounds sub like you. Jarvis drafts the intro — <b>you send it</b>.</div>
+
+  <div class="bar">
+    <label style="font-size:13px;color:var(--dim)">Awards in the last</label>
+    <select id="days"><option value="90">90 days</option><option value="120" selected>120 days</option><option value="180">6 months</option><option value="365">1 year</option></select>
+    <button class="go" id="scan">Scan awards</button>
+    <a href="/capability" target="_blank" style="margin-left:auto;font-size:12.5px;color:var(--teal);text-decoration:none">📄 Capability statement</a>
+  </div>
+
+  <div id="list"><div class="empty">Tap “Scan awards” to find primes who need subs.</div></div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <h3 id="mName">Intro</h3>
+    <div class="g" id="mMeta"></div>
+    <textarea id="mText"></textarea>
+    <div class="gate">⚠ Nothing sends automatically. Copy this into your own email, attach the capability PDF, and send it yourself.</div>
+    <div class="row">
+      <button class="primary" id="mCopy">📋 Copy the intro</button>
+      <a href="/capability" target="_blank">📄 Capability PDF</a>
+      <button id="mClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function money(n){ n=Number(n)||0; return n>=1e6 ? '$'+(n/1e6).toFixed(1)+'M' : '$'+Math.round(n/1000)+'k'; }
+var LEADS=[];
+function card(l,i){
+  return '<div class="card"><div class="r1"><div class="score">'+esc(l.score)+'</div><div style="flex:1">'
+    +'<div class="name">'+esc(l.recipient)+'</div><div class="meta">'+esc(l.agency)+(l.state?' · '+esc(l.state):'')+' · NAICS '+esc(l.naics)+'</div></div>'
+    +'<div class="amt">'+money(l.amount)+'</div></div>'
+    +'<div class="why">'+esc(l.why)+'</div>'
+    +'<div class="acts"><button class="primary" onclick="draft('+i+')">✍ Draft intro</button>'
+    +(l.awardId?'<a href="https://www.usaspending.gov/award/'+encodeURIComponent(l.awardId)+'" target="_blank" rel="noreferrer">View award ↗</a>':'')+'</div></div>';
+}
+function scan(){
+  var days=document.getElementById('days').value;
+  var list=document.getElementById('list');
+  list.innerHTML='<div class="empty">Scanning federal awards in your lane…</div>';
+  fetch('/api/gov/teaming?days='+days).then(function(r){return r.json();}).then(function(d){
+    if(!d.ok){ list.innerHTML='<div class="empty">Could not scan: '+esc(d.error||'unknown')+'</div>'; return; }
+    LEADS=d.leads||[];
+    if(!LEADS.length){ list.innerHTML='<div class="empty">No qualifying primes in this window. Widen the range.</div>'; return; }
+    document.querySelector('.sub').innerHTML = d.count+' primes who may need a sub — ranked by fit. Jarvis drafts the intro; <b>you send it</b>.';
+    list.innerHTML=LEADS.map(card).join('');
+  }).catch(function(){ list.innerHTML='<div class="empty">Offline or the scan failed.</div>'; });
+}
+function draft(i){
+  var l=LEADS[i]; if(!l) return;
+  var m=document.getElementById('modal');
+  document.getElementById('mName').textContent='Intro to '+l.recipient;
+  document.getElementById('mMeta').textContent=money(l.amount)+' · '+(l.agency||'')+(l.state?' · '+l.state:'');
+  document.getElementById('mText').value='Drafting…';
+  m.classList.add('on');
+  fetch('/api/gov/teaming/intro',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prime:l,agency:l.agency})})
+    .then(function(r){return r.json();}).then(function(d){ document.getElementById('mText').value=d.ok?d.letter:'Could not draft.'; })
+    .catch(function(){ document.getElementById('mText').value='Offline.'; });
+}
+document.getElementById('scan').addEventListener('click',scan);
+document.getElementById('mClose').addEventListener('click',function(){document.getElementById('modal').classList.remove('on');});
+document.getElementById('modal').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('on'); });
+document.getElementById('mCopy').addEventListener('click',function(){ var t=document.getElementById('mText'); t.select(); try{ navigator.clipboard.writeText(t.value); this.textContent='Copied ✓'; var b=this; setTimeout(function(){b.textContent='📋 Copy the intro';},1500); }catch(e){} });
+scan();
+</script>
+</body>
+</html>

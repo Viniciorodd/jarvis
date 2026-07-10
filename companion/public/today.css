@@ -289,3 +289,51 @@
 .td-ev-x:hover{ color:var(--coral, #f08a7a); }
 /* native date/time pickers shouldn't stretch; tint them to the dark theme */
 .td-event-add input[type=date], .td-event-add input[type=time]{ flex:0 0 auto; color-scheme:dark; max-width:140px; }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   PREMIUM TODAY (2026-07-10) — Things 3 / Fantastical / Timepage calm. Circle checkboxes, roomy rows,
+   a warm date header, softer rounded calendar. All on theme vars so it reads in Jet Black AND True White.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+#jTodayView .j-hero{ padding:28px 20px 6px; }
+#jTodayView .j-greeting{ font-size:30px; font-weight:750; letter-spacing:-.022em; line-height:1.05; }
+#jTodayView .j-hero-sub{ font-size:14px; color:var(--dim); margin-top:7px; }
+
+/* section headers — lighter, airier, consistent */
+.j-sh{ font-size:11px; letter-spacing:.10em; text-transform:uppercase; color:var(--dim); font-weight:600;
+  padding:0 20px; margin:20px 0 9px; display:flex; align-items:center; gap:8px; }
+
+/* tasks — Things 3 circle checkbox + roomy rows + real weight */
+.td-task{ padding:11px 20px; gap:13px; transition:background .12s; }
+.td-task:hover{ background:rgba(var(--teal-rgb),.05); }
+.td-box{ width:21px; height:21px; border-radius:50%; border:2px solid var(--line); background:transparent;
+  position:relative; transition:border-color .15s, background .15s; margin-top:1px; box-shadow:none; }
+.td-box:hover{ border-color:var(--teal); box-shadow:none; }
+.td-task.td-gone .td-box, .td-box.done{ background:var(--teal); border-color:var(--teal); }
+.td-task.td-gone .td-box::after, .td-box.done::after{ content:''; position:absolute; left:6px; top:2px;
+  width:5px; height:10px; border:solid var(--ink-on-accent); border-width:0 2px 2px 0; transform:rotate(45deg); }
+.td-txt{ font-size:15px; line-height:1.45; font-weight:450; }
+.td-meta span{ font-size:11.5px; }
+
+/* add / capture — pill inputs with a subtle fill that works on black AND white */
+.td-add{ margin:0 20px 12px; }
+.td-add input{ background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:12px 15px;
+  font-size:14.5px; color:var(--cream); }
+.td-add input::placeholder{ color:var(--dim); }
+.td-add input:focus{ border-color:var(--teal); }
+.td-btn{ border-radius:12px; padding:0 18px; font-weight:600; }
+
+/* calendar — softer, rounder, airier; today gets a filled pill day-number */
+.cal-cell{ min-height:66px; border-radius:11px; background:var(--panel2); border:1px solid var(--line); }
+.cal-cell:hover{ border-color:var(--teal); }
+.cal-cell.today{ border-color:var(--teal); background:rgba(var(--teal-rgb),.10); }
+.cal-cell.today .cal-dnum{ background:var(--teal); color:var(--ink-on-accent); border-radius:50%;
+  width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-weight:700; }
+.cal-ev{ border-radius:6px; padding:2px 6px; font-weight:500; }
+.cal-btn, .cal-vbtn{ border-radius:10px; }
+.cal-vbtn.on{ background:var(--teal); color:var(--ink-on-accent); border-color:var(--teal); }
+.cal-drow, .cal-wcol{ border-radius:12px; background:var(--panel2); border:1px solid var(--line); }
+.cal-drow{ padding:12px 14px; }
+.cal-title{ font-weight:600; }
+
+/* native date/time pickers follow the active theme instead of forcing dark on white */
+.td-event-add input[type=date], .td-event-add input[type=time]{ color-scheme:light dark; }

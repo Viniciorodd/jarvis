@@ -94,8 +94,8 @@
     <!-- ── TODAY VIEW (tasks · calendar · capture — vault-backed) ── -->
     <div class="j-view" id="jTodayView">
       <div class="j-hero">
-        <div class="j-greeting">Today</div>
-        <div class="j-hero-sub">tasks, calendar &amp; capture — backed by your vault</div>
+        <div class="j-greeting" id="tdGreeting">Today</div>
+        <div class="j-hero-sub" id="tdHeroSub">tasks, calendar &amp; capture — backed by your vault</div>
       </div>
 
       <!-- ✅ Tasks -->
@@ -597,5 +597,17 @@
 <script src="personal.js"></script>
 <script src="assistant.js"></script>
 <script src="cinematic.js"></script>
+<script>
+/* Fantastical-style live date in the Today header — weekday as the title, full date as the subtitle. */
+(function(){
+  try{
+    var g=document.getElementById('tdGreeting'), s=document.getElementById('tdHeroSub');
+    if(!g||!s) return;
+    var d=new Date();
+    g.textContent=d.toLocaleDateString('en-US',{weekday:'long'});
+    s.textContent=d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  }catch(e){}
+})();
+</script>
 </body>
 </html>

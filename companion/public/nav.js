@@ -88,6 +88,7 @@ var moreItems = {
   /* Gov Pipeline + Ops gov + GovCon merged into ONE surface (2026-07-05): everything gov → /govcon */
   jMoreGovcon:  function(){ window.location.href = '/govcon'; },
   jMoreIdeas:   function(){ window.location.href = '/ideas'; },  /* proactive vault idea-miner inbox */
+  jMoreFocus:   function(){ window.location.href = '/focus'; },  /* Forest replacement — time/focus dashboard */
   jMoreMap:     function(){ triggerGhost('mapBtn'); },
   jMoreFloor:   function(){ triggerGhost('floorBtn'); },
   jMoreHQ:      function(){ triggerGhost('hqBtn'); },

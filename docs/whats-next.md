@@ -1,6 +1,57 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-07-10. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+_Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+
+### 🆕 2026-07-12 (later) — the STANDING DEBRIEF RULE (wins too) + NAS shares indexed
+- **"If we ask for the debrief, no loss is a real loss — everything is a win"** (operator). Marking an
+  opportunity **won OR lost** on the board (`/api/gov-board/disposition`) now AUTOMATICALLY: records the
+  outcome in the capture ledger (`gov-capture/outcomes.jsonl`) + drafts the FAR debrief request +
+  writes it to `gov-drafts/debrief-<noticeId>.md` + returns it in the response. Wins use the
+  **FAR 15.506 successful-offeror** debrief (learn WHY we won + open the performance relationship);
+  losses use the existing 15.505/15.506 request. Nothing auto-sends — operator sends. Eval-pinned
+  (463 green). Verified end-to-end with test dispositions (then cleaned up).
+- **NAS docs indexed**: added `\\192.168.6.121\PersonalVault` + `\\192.168.6.121\BusinessVault` to
+  `pods/tax/entities.json` docRoots (read-only walk — names+stat only, never opens files). Reindex run
+  kicked off; recommendation to operator stands: docs LIVE on the NAS, Jarvis indexes them — only
+  actively-edited notes belong in the vault.
+
+### 🆕 2026-07-12 — the LEARNING MACHINE: Idea Vault · capture playbook · truthful narration · daily digest
+Built from the operator's own vault research (GovCon Tier Ladder, Telegram Discrepancy Log, "don't
+request a debrief", the forgotten business-credit idea). Evals **462 green** (was 432). 5-agent workflow.
+- **💡 Idea Vault** (`pods/idea-vault.mjs`) — "no idea worth doing gets left behind, even if I go in a
+  coma." Append-only ledger `ideas-vault/ideas.jsonl` (gitignored); statuses new/active/waiting/parked/
+  done/dropped with resurface clocks (7/7/14/30d — parked resurfaces FOREVER until done/dropped);
+  **SEEDED with 16 recovered ideas** (Rodgate business-credit journey #1, financing+SCORE, LinkedIn,
+  debrief agent, Brother Crew sub, risk-engine bid scorer, bad-reviews product, Alexa, Hermes…). Renders
+  `00 - System/💡 Idea Vault.md` in the Second Brain (LIVE, 16 ideas). Routes `/api/ideas-vault(/add|/touch)`;
+  Home shows a **"💡 Revived idea" card** (Keep alive/Park/Done) when one goes stale — first card ~7 days
+  after seeding by design. CLI: `node pods/idea-vault.mjs [list|due|seed|touch|add]`.
+- **GovCon capture & learning desk** (`pods/gov/capture.mjs`) — the tier-ladder procedures as code:
+  pure **bid/no-bid gate** (in-lane sources-sought → always RESPOND_SS; traps → NO_BID: certs we lack,
+  >$250k, <3d w/o draft; BID threshold 60/100 — tune as outcomes accrue), **win/loss ledger**
+  (`gov-capture/outcomes.jsonl`), **FAR 15.505/15.506 debrief-request drafter** (gracious, zero cert
+  claims, NEVER auto-sent — operator sends), `lessonsSummary` (win rate, top loss reasons, debrief rate,
+  price-gap avg), `relationshipsDue` cadence (CO 30d, small-biz-specialist 45d, prime 30d, sub 60d,
+  mentor 90d). Routes `/api/gov/capture(/outcome|/debrief)`. ⏭ surface in the GovCon OS UI next.
+- **✅ TRUTHFUL NARRATION — the Telegram false-completion RESOLVED** (vault log root-caused exactly as
+  hypothesized): `connector.mjs` emits `sub.outreach.draft` when Hector merely WRITES the outreach file
+  (gated, auto-send off), and the old narration regex turned that into "🤝 Reached out to a subcontractor".
+  Fix: gates narrate "✏️ Drafted — waiting on YOUR approval (nothing sent)"; dry-runs "🧪 NOT sent
+  (auto-send is off)"; **"Sent/Reached out" now REQUIRES SMTP evidence** (messageId/accepted/sent:true);
+  `sender.mjs` emits status/dryRun/sentAt ground truth; telegram-bridge un-masks failed sends ("Approved —
+  but the send FAILED"); same lie-class fixed in the Action Log (`pods/actions.mjs`: draft ≠ reached out).
+  Eval-pinned incl. the exact historical Hector event (`evals/narrate-truth.eval.mjs`). Old ledger events
+  narrate truthfully too (read-time fix). Update the vault discrepancy log → RESOLVED.
+- **Daily gov growth digest** (`pods/gov/digest.mjs` + control-plane route + `schedule.json` job):
+  weekday 8:00 ONE Telegram — top 3 quick wins + top 3 teaming primes, deduped via `gov.digest.sent`
+  events. **Activates on the next NAS control-plane redeploy** (with the narration + dedup fixes).
+- **NAS gate cleanup PENDING operator OK:** 8 duplicate outreach gates identified on the CP (same
+  pod:action:noticeId queued 4-5×; keep-newest plan ready) — mass-`pass` was blocked by permissions until
+  the operator explicitly says "clear the dupes". Also waiting: which NAS doc folders to add to the
+  read-only docs index (recommendation given: index, don't copy into the vault).
+- **SBA answer delivered:** $150/mo on the $20k EIDL @3.75% = $62.50/mo interest + deferment-accrued
+  interest (~$1.8k) repaid FIRST → principal barely moves; Jarvis's figure is a static 2026-04-27 snapshot.
+  ⏭ get real principal/accrued split from MySBA portal → update `debts.json` + add amortization.
 
 ### 🆕 2026-07-10 (newest) — ONE design system across every surface + GovCon OS integration
 Follow-up to the design overhaul: the operator wanted the themes truly everywhere (not one look per

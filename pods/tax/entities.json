@@ -3,7 +3,7 @@
   "filingStatus": "single",
   "localEitRatePct": { "value": 1.0, "verified": false, "note": "SETUP: enter your municipality's earned-income tax rate (%)" },
   "splits": { "taxPct": "auto", "debtPct": 10, "emergencyPct": 5, "investPct": 5 },
-  "docRoots": ["Z:\\Real Estate", "gov-drafts", "fiverr"],
+  "docRoots": ["Z:\\Real Estate", "gov-drafts", "fiverr", "\\\\192.168.6.121\\PersonalVault", "\\\\192.168.6.121\\BusinessVault"],
   "entities": [
     { "id": "rodgate",      "name": "Rodgate LLC",          "kind": "schC", "aliases": ["rodgate", "gov", "govcon", "contracting"] },
     { "id": "sidehustles",  "name": "Side hustles",         "kind": "schC", "aliases": ["fiverr", "web", "music", "studio", "thumbnail"] },

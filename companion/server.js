@@ -3012,13 +3012,29 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'POST' && url.pathname === '/api/gov-board/disposition') {
     try {
-      const { noticeId, stage } = await readBody(req);
+      const { noticeId, stage, title: bodyTitle, agency: bodyAgency } = await readBody(req);
       if (!noticeId || ['won', 'lost', 'passed', 'reset'].indexOf(stage) < 0) return send(res, 400, JSON.stringify({ error: 'noticeId + stage (won|lost|passed|reset) required' }));
       const st = loadGovState(); st.dispositions = st.dispositions || {};
       if (stage === 'reset') delete st.dispositions[noticeId]; else st.dispositions[noticeId] = stage;
       saveGovState(st);
       if (stage !== 'reset') fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'meta', actor: 'operator', pod: 'gov', action: 'disposition', rationale: `marked ${stage}`, payload: { noticeId } }) }).catch(() => {});
-      return send(res, 200, JSON.stringify({ ok: true }));
+      // ── THE STANDING DEBRIEF RULE (operator, 2026-07-12): every decided outcome — won AND lost — is
+      // recorded in the capture ledger and gets a debrief-request draft, automatically. "If we ask for
+      // the debrief, no loss is a real loss." The draft is returned + written to gov-drafts/ — the
+      // operator sends it himself (nothing auto-sends). Best-effort: a failure here never blocks the board.
+      let debrief = null, debriefFile = null;
+      if (stage === 'won' || stage === 'lost') {
+        try {
+          const CAP = await import('../pods/gov/capture.mjs');
+          let title = String(bodyTitle || ''), agency = String(bodyAgency || '');
+          if (!title) { try { const ev = await cp('/events?pod=gov'); const hit = (Array.isArray(ev) ? ev : []).find((e) => e.payload && e.payload.noticeId === noticeId && (e.payload.title || e.payload.agency)); if (hit) { title = title || hit.payload.title || ''; agency = agency || hit.payload.agency || ''; } } catch { /* */ } }
+          CAP.recordOutcome({ noticeId, title, agency, result: stage, lessons: [], debriefRequested: false });
+          debrief = CAP.debriefRequestEmail({ opp: { title, noticeId, agency }, result: stage });
+          debriefFile = path.join('gov-drafts', `debrief-${noticeId}.md`);
+          fs.writeFileSync(path.join(__dirname, '..', debriefFile), `Subject: ${debrief.subject}\n\n${debrief.body}\n`);
+        } catch { debrief = null; debriefFile = null; }
+      }
+      return send(res, 200, JSON.stringify({ ok: true, debrief, debriefFile }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   // Operator sets a $ value estimate for an opportunity → drives Pipeline $ / Est. revenue (their numbers).

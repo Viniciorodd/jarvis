@@ -168,6 +168,29 @@ export function debriefRequestEmail({ opp = {}, result = 'lost' } = {}) {
   const noticeId = String(opp.noticeId || '').trim();
   const agency = String(opp.agency || 'your agency').trim();
   const contact = String(opp.contactName || '').trim() || 'Contracting Officer';
+  // WON → successful offerors may request a post-award debriefing too (FAR 15.506(a)) — the elite habit:
+  // learn WHY you won so it can be repeated, and open the performance relationship on the right foot.
+  // "If we ask for the debrief, no loss is a real loss — everything is a win." (operator, 2026-07-12)
+  if (result === 'won') {
+    const subject = `Thank you — and a brief debrief request — ${title}${noticeId ? ` (${noticeId})` : ''}`;
+    const body = [
+      `Dear ${contact},`,
+      ``,
+      `Thank you — to you and the evaluation team — for selecting us on ${title}${noticeId ? ` (Notice ID ${noticeId})` : ''}. We're honored by ${agency}'s confidence and fully committed to performing this work at a level that earns it.`,
+      ``,
+      `Under FAR 15.506, we would like to respectfully request a brief post-award debriefing as the successful offeror. We're a small business that treats every evaluation as a chance to get better: understanding which parts of our technical approach and pricing stood out — and where we still have room to improve — helps us serve ${agency} better on this contract and the next one.`,
+      ``,
+      `We'd also welcome any guidance on how your team prefers to communicate during performance — we intend to make this an easy, reliable award for you.`,
+      ``,
+      `Thank you again.`,
+      ``,
+      `Respectfully,`,
+      `${c.contact.name} · ${c.contact.role}`,
+      `${c.legalName} (UEI ${c.uei} · CAGE ${c.cage})`,
+      `${c.contact.email} · ${c.contact.phone}`,
+    ].join('\n');
+    return { subject, body };
+  }
   // Lost after award → post-award debrief (FAR 15.506). Excluded / no-award → pre-award rights (15.505).
   const far = result === 'lost'
     ? 'FAR 15.506, we would like to respectfully request a post-award debriefing'

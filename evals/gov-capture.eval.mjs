@@ -50,6 +50,16 @@ export default {
         && /technical/.test(body) && /pricing/.test(body) && /future/i.test(body)
         && subject.includes('ABC123') && body.includes('Rodgate, LLC'), body.slice(0, 140));
     } },
+    { name: 'WON debrief (standing rule 2026-07-12): FAR 15.506 as successful offeror, thanks the team, no cert claims', run: () => {
+      const { subject, body } = debriefRequestEmail({
+        opp: { title: 'Grounds Maintenance — Fort Indiantown Gap', noticeId: 'W912XYZ', agency: 'Army National Guard', contactName: 'John Doe' },
+        result: 'won',
+      });
+      const certClaim = /8\s*\(\s*a\s*\)|\b8a\b|8-a|HUBZone|SDVOSB|VOSB|WOSB|EDWOSB/i;
+      return ok(/debrief/i.test(subject) && /thank you/i.test(subject + body) && /FAR 15\.506/.test(body)
+        && /successful offeror/i.test(body) && /improve|better/i.test(body) && !certClaim.test(body)
+        && body.includes('John Doe') && body.includes('W912XYZ'), subject + ' | ' + body.slice(0, 120));
+    } },
     { name: 'recordOutcome/readOutcomes roundtrip (temp dir) + computed price gap + bad result rejected', run: () => {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gov-capture-'));
       try {

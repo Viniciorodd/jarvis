@@ -2,6 +2,26 @@
 
 _Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
+### 🆕 2026-07-12 (latest) — BUSINESS-HOURS JARVIS: TZ fix · batched messages · Pursue buttons · APPROVE-TO-SEND
+Operator QoL feedback, all shipped (evals **477 green**). ⚠ **Everything here activates on the NEXT NAS
+redeploy** (bridge/scheduler/CP run there) + set `GOV_AUTO_SEND=1` in the **NAS .env** during it:
+- **4-5 AM messages root-caused**: NAS containers run UTC → `at_hour: 8` fired at 4 AM ET. Fixed:
+  `TZ=${TZ:-America/New_York}` on control-plane/scheduler/telegram-bridge + tzdata in the Dockerfile.
+- **Business-hours decision nudges**: `/maintenance/approvals-nudge` + 2 schedule jobs (12pm + 4pm
+  weekdays, max 2/day deduped via `approvals.nudged` events, silent when no gates wait).
+- **Batched narration**: `rollupNarrations()` (pure, eval-pinned) — ONE Telegram per 90s cycle,
+  grouped "Team update — pulled the SOW for 4 opportunities: A, B, C +1 more". Truth contract intact.
+- **Per-opportunity Pursue/Pass buttons** replace "reply 1/2/3" — approve any or ALL. Taps → CP
+  `/maintenance/pursue` (idempotent; also fixed pursueOpportunity to hydrate bare {noticeId} from the
+  deal ledger — buttons would have failed without it).
+- **APPROVE-TO-SEND GRANTED (operator, 2026-07-12)**: approval pushes inline the draft email (To/Subject
+  + ~900 chars); tapping ✅ on a send gate REALLY SENDS (`GOV_AUTO_SEND=1`, set on PC .env; **NAS .env at
+  redeploy**). "Approve = SENDS" wording only appears on genuine send gates with auto-send actually on.
+  The gate remains the control — nothing sends without a human tap. Idea Vault entry marked done.
+- **Docs index scoped to signal**: 106,695 → **18,827 real docs** (48.3 → 8.2 MB, 52ms parse). Excluded
+  RECOVERY/5TB Recovery (80k), Media, Gaming, recycle bins; `#recycle/@eaDir/$RECYCLE.BIN` skipped in code;
+  the old `Z:\Real Estate` root removed (Z: maps to BusinessVault — was double-indexed).
+
 ### 🆕 2026-07-12 (later) — the STANDING DEBRIEF RULE (wins too) + NAS shares indexed
 - **"If we ask for the debrief, no loss is a real loss — everything is a win"** (operator). Marking an
   opportunity **won OR lost** on the board (`/api/gov-board/disposition`) now AUTOMATICALLY: records the

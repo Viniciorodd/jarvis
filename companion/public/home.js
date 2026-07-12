@@ -154,7 +154,89 @@ function loadHome(){
       renderCards(urgent.concat(approvals));
       renderFeed(data);
     })
-    .catch(function(){ renderCards([]); });
+    .catch(function(){ renderCards([]); })
+    .then(function(){ loadRevivedIdea(); }); /* after the cards settle, so a refresh never wipes the idea card */
+}
+
+/* ── revived idea (idea vault) — ONE calm card for the single stalest idea that's gone quiet ── */
+function loadRevivedIdea(){
+  try {
+    fetch('/api/ideas-vault')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(data){
+        if(!data || !data.due || !data.due.length) return;
+        renderRevivedIdea(data.due[0]); /* queue arrives stalest-first */
+      })
+      .catch(function(){}); /* vault offline → Home stays calm */
+  } catch(e){ /* never let the vault break Home */ }
+}
+
+function renderRevivedIdea(idea){
+  var container = qid('jNeedsCards');
+  if(!container || !idea || !idea.id) return;
+
+  /* one card only — a refresh replaces any previous revived-idea card */
+  var old = container.querySelector('.j-idea-card');
+  if(old) old.remove();
+
+  var card = el('div','j-action-card j-idea-card');
+  var days = Math.max(0, Math.round(Number(idea.staleDays) || 0));
+  card.appendChild(el('div','j-card-room','IDEA VAULT'));
+  card.appendChild(el('div','j-card-title','💡 Revived idea ('+ days +'d quiet): ' + escHtml(idea.title || '')));
+  card.appendChild(el('div','j-card-meta', escHtml(idea.detail || '')));
+
+  var btns = el('div','j-card-btns');
+  function ideaBtn(label, cls, body){
+    var b = el('button', cls, label);
+    b.addEventListener('click', function(){
+      dismissIdeaCard(card);
+      body.id = idea.id;
+      fetch('/api/ideas-vault/touch', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      }).catch(function(){}); /* intentionally silent */
+    });
+    return b;
+  }
+  btns.appendChild(ideaBtn('Keep alive','j-btn-approve',{ note:'revived from Home' }));
+  btns.appendChild(ideaBtn('Park','j-btn-pass',{ status:'parked', note:'parked from Home' }));
+  btns.appendChild(ideaBtn('Done','j-btn-pass',{ status:'done', note:'done from Home' }));
+  card.appendChild(btns);
+  container.appendChild(card);
+
+  /* the card counts as something needing you — unhide the section + fix the counts */
+  var section = qid('jNeedsSection');
+  if(section) section.style.display = '';
+  var count = container.querySelectorAll('.j-action-card').length;
+  var badge = qid('jNeedsCount');
+  if(badge) badge.textContent = count;
+  updateHeroSub(count);
+}
+
+function dismissIdeaCard(card){
+  /* same optimistic collapse as handleAction — dismiss now, POST in the background */
+  card.style.transition = 'max-height .25s, opacity .25s, margin .25s, padding .25s';
+  card.style.maxHeight = card.offsetHeight + 'px';
+  card.style.overflow = 'hidden';
+  requestAnimationFrame(function(){
+    card.style.maxHeight = '0';
+    card.style.opacity = '0';
+    card.style.marginBottom = '0';
+    card.style.padding = '0';
+  });
+  setTimeout(function(){
+    if(card.parentNode) card.remove();
+    var container = qid('jNeedsCards');
+    var remaining = container ? container.querySelectorAll('.j-action-card').length : 0;
+    if(!remaining){
+      renderCards([]);
+    } else {
+      var badge = qid('jNeedsCount');
+      if(badge) badge.textContent = remaining;
+      updateHeroSub(remaining);
+    }
+  }, 270);
 }
 
 /* ── recent activity feed ── */

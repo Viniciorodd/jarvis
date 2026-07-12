@@ -5,6 +5,13 @@
 // Doctrine §9 rule 2: a send is irreversible, so it only happens behind an explicit human approval. The
 // executor is additionally gated behind GOV_AUTO_SEND so auto-send is opt-in (off = it dry-runs + previews).
 // nodemailer is imported dynamically so this module loads even where the dep is absent (it just can't send).
+//
+// TRUTH CONTRACT (feeds pods/narrate.mjs — the "Hector lied" fix): every result is unambiguous about
+// what physically happened, so events built from it can never over-claim:
+//   dry-run  → { sent:false, dryRun:true,  status:'dry-run' }          (prepared, NOT sent)
+//   real send→ { sent:true,  dryRun:false, status:'sent', messageId, accepted, sentAt }  (SMTP receipt)
+//   failure  → { sent:false, status:'error', reason }                  (nothing went out)
+// Fields are ADDITIVE — nothing renamed — so existing consumers (control-plane executor, CLI) keep working.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -63,9 +70,9 @@ async function slackPreview(label, to, subject, body) {
 export async function sendGovEmail({ file, toSelf = false, dryRun = false, slack = true } = {}) {
   let raw;
   try { raw = fs.readFileSync(resolveFile(file), 'utf8'); }
-  catch { return { ok: false, sent: false, reason: `cannot read ${file}` }; }
+  catch { return { ok: false, sent: false, status: 'error', reason: `cannot read ${file}` }; }
   const parsed = parseEmailFile(raw);
-  if (!parsed.ok) return { ok: false, sent: false, reason: parsed.reason };
+  if (!parsed.ok) return { ok: false, sent: false, status: 'error', reason: parsed.reason };
 
   const USER = env('RODGATE_GMAIL_USER');
   const PASS = (env('RODGATE_GMAIL_APP_PASSWORD') || '').replace(/\s+/g, '');
@@ -76,13 +83,14 @@ export async function sendGovEmail({ file, toSelf = false, dryRun = false, slack
 
   if (dryRun) {
     if (slack) await slackPreview('PREVIEW (dry run)', to, subject, body);
-    return { ok: true, sent: false, dryRun: true, to, subject, from: USER, body };
+    // status:'dry-run' is the narration-visible ground truth: prepared + previewed, nothing sent.
+    return { ok: true, sent: false, dryRun: true, status: 'dry-run', to, subject, from: USER, body };
   }
-  if (!USER || !PASS) return { ok: false, sent: false, to, subject, reason: 'RODGATE_GMAIL_USER / RODGATE_GMAIL_APP_PASSWORD not set' };
+  if (!USER || !PASS) return { ok: false, sent: false, status: 'error', to, subject, reason: 'RODGATE_GMAIL_USER / RODGATE_GMAIL_APP_PASSWORD not set' };
 
   let nodemailer;
   try { nodemailer = (await import('nodemailer')).default; }
-  catch { return { ok: false, sent: false, to, subject, reason: 'nodemailer not available in this runtime' }; }
+  catch { return { ok: false, sent: false, status: 'error', to, subject, reason: 'nodemailer not available in this runtime' }; }
   try {
     const transport = nodemailer.createTransport({ service: 'gmail', auth: { user: USER, pass: PASS } });
     await transport.verify();
@@ -91,6 +99,7 @@ export async function sendGovEmail({ file, toSelf = false, dryRun = false, slack
     // Deal ledger: a REAL send just happened — if this was a sub outreach, advance its deal to
     // outreach_sent so the Deal Room stops showing it as hanging (matched by file basename).
     try { const D = await import('./deals.mjs'); D.markOutreachSentByFile(file); } catch { /* ledger best-effort */ }
-    return { ok: true, sent: true, to, subject, from: USER, messageId: info.messageId, accepted: info.accepted || [] };
-  } catch (e) { return { ok: false, sent: false, to, subject, reason: 'SMTP: ' + e.message }; }
+    // messageId + accepted are the SMTP receipt — the HARD evidence narration requires before saying "Sent".
+    return { ok: true, sent: true, dryRun: false, status: 'sent', sentAt: new Date().toISOString(), to, subject, from: USER, messageId: info.messageId, accepted: info.accepted || [] };
+  } catch (e) { return { ok: false, sent: false, status: 'error', to, subject, reason: 'SMTP: ' + e.message }; }
 }

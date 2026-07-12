@@ -1540,6 +1540,40 @@ const server = http.createServer(async (req, res) => {
       return send(res, r.ok ? 200 : 400, JSON.stringify(r));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // ── IDEA VAULT (pods/idea-vault.mjs): the anti-amnesia layer — every idea in an append-only ledger
+  //    with a revisit clock; the due queue drags stale ones back into view. Memory, not a gate:
+  //    nothing here sends or spends. First GET self-seeds (idempotent by title). ─────────────────────
+  if (req.method === 'GET' && url.pathname === '/api/ideas-vault') {
+    try {
+      const IV = await import('../pods/idea-vault.mjs');
+      IV.seedIfEmpty(IV.SEED, {}); // first hit self-seeds; re-runs add nothing already there
+      try { IV.writeVaultNote({}); } catch { /* Second Brain note is best-effort — ledger is the truth */ }
+      const ideas = IV.listIdeas({});
+      return send(res, 200, JSON.stringify({ ideas, due: IV.resurfaceQueue(IV.readIdeas({}), new Date().toISOString()) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ideas: [], due: [], error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/ideas-vault/add') {
+    try {
+      const IV = await import('../pods/idea-vault.mjs');
+      const b = await readBody(req);
+      const r = IV.addIdea({ title: b.title, detail: b.detail, tags: b.tags, source: b.source || 'companion' }, {});
+      if (r.ok) try { IV.writeVaultNote({}); } catch { /* best-effort */ }
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
+  // touch = "keep it alive" (bumps lastTouched, leaves the due queue); with a status it's a move
+  // (parked/done/dropped/...) — updateIdea resets the revisit clock to the new status's default.
+  if (req.method === 'POST' && url.pathname === '/api/ideas-vault/touch') {
+    try {
+      const IV = await import('../pods/idea-vault.mjs');
+      const b = await readBody(req);
+      const r = b.status
+        ? IV.updateIdea(b.id, { status: b.status, note: b.note }, {})
+        : IV.touchIdea(b.id, b.note || '', {});
+      if (r.ok) try { IV.writeVaultNote({}); } catch { /* best-effort */ }
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // ── FOCUS / TIME TRACKER (replaces Forest): log a session + see totals/patterns by any period ──────
   if (req.method === 'GET' && url.pathname === '/api/focus') {
     try {
@@ -1601,6 +1635,33 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const letter = T.introLetter(b.prime || b, { agency: b.agency || '', award: b.award || '' });
       return send(res, 200, JSON.stringify({ ok: true, letter }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
+  // ── CAPTURE & LEARNING DESK (pods/gov/capture.mjs): win/loss ledger → lessons that change the next
+  //    bid, + the FAR 15.505/15.506 debrief-request DRAFT. Doctrine: everything here proposes — the
+  //    debrief email is returned as text for the operator to read, edit, and send HIMSELF. ────────────
+  if (req.method === 'GET' && url.pathname === '/api/gov/capture') {
+    try {
+      const C = await import('../pods/gov/capture.mjs');
+      const outcomes = C.readOutcomes({});
+      return send(res, 200, JSON.stringify({ summary: C.lessonsSummary(outcomes), outcomes: outcomes.slice(-20).reverse() }));
+    } catch (e) { return send(res, 200, JSON.stringify({ summary: null, outcomes: [], error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/gov/capture/outcome') {
+    try {
+      const C = await import('../pods/gov/capture.mjs');
+      const b = await readBody(req);
+      const r = C.recordOutcome(b, {});
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
+  // returns the DRAFT only — nothing is sent from here, ever (the operator sends it himself).
+  if (req.method === 'POST' && url.pathname === '/api/gov/capture/debrief') {
+    try {
+      const C = await import('../pods/gov/capture.mjs');
+      const b = await readBody(req);
+      const email = C.debriefRequestEmail({ opp: b.opp || {}, result: b.result || 'lost' });
+      return send(res, 200, JSON.stringify({ ok: true, email }));
     } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
   }
   // ── daily brief (calendar + unread + needs-you + top opportunity) ──

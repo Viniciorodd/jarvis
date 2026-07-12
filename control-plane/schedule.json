@@ -31,6 +31,9 @@
     { "id": "tax-deadline-radar", "person": "TAX-01", "pod": "exec", "type": "maintenance",
       "cadence_hours": 24, "at_hour": 9, "endpoint": "/maintenance/tax-deadline-check",
       "command": "check tax deadlines (1040-ES/1099-NEC/1065/1040) and push the final-stage ones (deterministic, no LLM)" },
+    { "id": "gov-growth-digest", "person": "SAM-SCOUT", "pod": "gov", "type": "maintenance",
+      "cadence_hours": 24, "at_hour": 8, "endpoint": "/maintenance/gov-growth-digest",
+      "command": "push the daily gov growth digest — fresh quick wins + teaming primes, one Telegram, weekdays only (deterministic, no LLM; the route dedups to one per day)" },
     { "id": "eod-log", "person": "EXEC-01", "pod": "exec", "type": "maintenance",
       "cadence_hours": 24, "at_hour": 20, "endpoint": "/maintenance/eod-log",
       "command": "log the end-of-day summary to the Notion company brain (deterministic, no LLM)" }

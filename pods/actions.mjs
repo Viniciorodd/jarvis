@@ -41,10 +41,19 @@ export function classifyEvent(ev = {}) {
   const pod = ev.pod || '';
   const subj = (ev.payload && (ev.payload.title || ev.payload.to)) || cleanRationale(ev.rationale) || '';
   let type = null, text = '';
+  // Truthfulness gate (2026-07-12, same lie-class as narrate.mjs): a DRAFT outreach/SS event must never
+  // log as a completed "Reached out"/"Answered" achievement unless it carries hard send evidence.
+  const sendEvidence = !!(ev.payload && (ev.payload.sent === true || ev.payload.messageId));
   if (a === 'proposal.submitted') { type = 'submitted'; text = `Submitted proposal — ${subj}`; }
   else if (a === 'email.sent') { type = 'sent'; text = `Sent email${ev.payload && ev.payload.to ? ' → ' + ev.payload.to : ''}${subj && !(ev.payload && ev.payload.to) ? ' — ' + subj : ''}`; }
-  else if (/sources?[-_. ]?sought|^rfi/.test(a) || /sources[-_. ]?sought/i.test(subj)) { type = 'sources_sought'; text = `Answered sources-sought — ${subj}`; }
-  else if (/outreach|reach[-_. ]?out|connect/.test(a)) { type = 'outreach'; text = `Reached out — ${subj}`; }
+  else if (/sources?[-_. ]?sought|^rfi/.test(a) || /sources[-_. ]?sought/i.test(subj)) {
+    if (/draft/.test(a) && !sendEvidence) return null; // drafted ≠ answered
+    type = 'sources_sought'; text = `Answered sources-sought — ${subj}`;
+  }
+  else if (/outreach|reach[-_. ]?out|connect/.test(a)) {
+    if (/draft/.test(a) && !sendEvidence) return null; // drafted ≠ reached out
+    type = 'outreach'; text = `Reached out — ${subj}`;
+  }
   else if (a === 'invoice.created') { type = 'sent'; text = `Invoiced a client — ${subj}`; }
   else if (a === 'disposition') { const won = /won/i.test(ev.rationale || ''); type = won ? 'won' : 'action'; text = `${won ? 'WON' : 'Updated'} — ${subj}`; }
   else return null; // proposal.draft, scan, score, spend.check, traces, etc. are not achievements

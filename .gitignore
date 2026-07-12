@@ -104,3 +104,9 @@ actions/
 
 # Focus/time tracker ledger (personal)
 focus/
+
+# GovCon capture win/loss ledger (business outcomes — machine data, never commit)
+gov-capture/
+
+# Idea Vault ledger (personal — append-only, never delete)
+ideas-vault/

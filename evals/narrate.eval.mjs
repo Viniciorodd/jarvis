@@ -8,11 +8,14 @@ const ok = (pass, detail = '') => ({ pass, detail });
 export default {
   agent: 'narrate',
   cases: [
-    { name: 'milestones narrate: scan / draft / sent / outreach / submitted', run: () =>
+    // NOTE (truth contract): "Sent" and "Reached out" now require HARD send evidence (messageId /
+    // sent:true / status:'sent') — the old pin let a bare action name claim a completed send, which is
+    // exactly how the false "Reached out to a subcontractor — Hector" Telegram line happened.
+    { name: 'milestones narrate: scan / draft / sent(evidence) / outreach(evidence) / submitted', run: () =>
       ok(/Scanned SAM — 8/.test(narrationFor({ action: 'scan.done', payload: { count: 8 } }))
         && /Drafted a proposal — West Point/.test(narrationFor({ action: 'proposal.draft', payload: { title: 'West Point' } }))
-        && /Sent an email → co@usace/.test(narrationFor({ action: 'email.sent', payload: { to: 'co@usace.army.mil' } }))
-        && /Reached out to a subcontractor/.test(narrationFor({ action: 'sub.outreach' }))
+        && /Sent an email → co@usace/.test(narrationFor({ action: 'email.sent', payload: { to: 'co@usace.army.mil', sent: true, messageId: '<m1@rodgate>' } }))
+        && /Reached out to a subcontractor/.test(narrationFor({ action: 'sub.outreach', status: 'sent', payload: { messageId: '<m2@rodgate>' } }))
         && /Submitted a proposal/.test(narrationFor({ action: 'proposal.submitted' }))) },
     { name: 'noise is skipped (null): scores, scan-starts, spend checks, traces', run: () =>
       ok(narrationFor({ action: 'bid.score' }) === null && narrationFor({ action: 'scan.start' }) === null

@@ -86,7 +86,7 @@ const server = http.createServer(async (req, res) => {
             const action = r.sent ? 'email.sent' : (r.ok ? 'email.preview' : 'email.failed');
             store.appendEvent({ kind: 'action', actor: 'GOV-SEND', pod: 'gov', action, reversible: false, status: r.ok ? 'done' : 'error',
               rationale: r.sent ? `Sent "${r.subject}" → ${r.to}` : r.ok ? `Auto-send off (set GOV_AUTO_SEND=1) — previewed "${r.subject}" → ${r.to}` : `Send not done: ${r.reason}`,
-              ref: id, payload: { file: job.file, to: r.to || null, sent: !!r.sent, messageId: r.messageId || null } });
+              ref: id, payload: { file: job.file, to: r.to || null, sent: !!r.sent, messageId: r.messageId || null, dryRun: !!r.dryRun, status: r.status || null } });
             executed = { action, ok: r.ok, sent: !!r.sent, to: r.to || null, reason: r.reason || null };
           }
         } catch (e) {
@@ -229,6 +229,28 @@ const server = http.createServer(async (req, res) => {
         result = await dl.runTaxDeadlineRadar({ withinDays: Number(b.withinDays) || 3 });
       } catch (e) { result = { ok: false, note: e.message }; }
       return send(res, 200, result);
+    }
+    // Gov growth digest → ONE calm weekday-morning Telegram with the freshest quick wins + teaming
+    // primes (pods/gov/digest.mjs). Deduped via gov.digest.sent events (payload.date === today) so at
+    // most ONE digest goes out per calendar day even if the scheduler fires twice; weekends rest.
+    // Best-effort: Telegram unconfigured → report it WITHOUT logging the sent event (so the first
+    // configured morning still sends); never throws.
+    if (req.method === 'POST' && p === '/maintenance/gov-growth-digest') {
+      try {
+        const now = new Date();
+        if (now.getDay() === 0 || now.getDay() === 6) return send(res, 200, { ok: true, skipped: 'weekend' });
+        const today = now.toISOString().slice(0, 10);
+        if (store.readEvents({ kind: 'gov.digest.sent' }).some((e) => e.payload && e.payload.date === today))
+          return send(res, 200, { ok: true, skipped: 'already sent today' });
+        const lib = await import('../pods/lib.mjs');
+        if (!lib.env('TELEGRAM_BOT_TOKEN') || !lib.env('TELEGRAM_CHAT_ID')) return send(res, 200, { ok: false, error: 'telegram not configured' });
+        const dig = await import('../pods/gov/digest.mjs');
+        const { text, counts } = await dig.buildGrowthDigest({ now });
+        lib.notifyTelegram(text);
+        store.appendEvent({ kind: 'gov.digest.sent', actor: 'SAM-SCOUT', pod: 'gov', action: 'gov.digest.sent', status: 'done',
+          rationale: `Gov growth digest pushed (${counts.quickwins} quick wins · ${counts.teaming} teaming primes)`, payload: { date: today, counts } });
+        return send(res, 200, { ok: true, sent: true, date: today, counts });
+      } catch (e) { return send(res, 200, { ok: false, note: e.message }); }
     }
     // CRM — the subcontractor database (Operations view reads this).
     if (req.method === 'GET' && p === '/crm') {

@@ -80,11 +80,14 @@ async function handleCallback(q) {
   const decision = act === 'ap' ? 'approve' : act === 'sk' ? 'pass' : null;
   if (!decision || !id) { await tg('answerCallbackQuery', { callback_query_id: q.id }); return; }
   const r = await cp('/approvals/' + id, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision, pod: 'gov' }) });
+  // Truthful outcome notes (the "Hector lied" fix): say sent ONLY on a confirmed send; a dry-run says
+  // NOT sent; a failed send is never masked behind a bare "Approved." — the operator must know nothing left.
   let note;
   if (r && r.duplicate) note = 'Already decided.';
   else if (decision === 'pass') note = '⏭ Skipped.';
   else if (r && r.executed && r.executed.sent) note = '✅ Approved — sent.';
-  else if (r && r.executed && r.executed.ok) note = '✅ Approved (auto-send off → previewed; set GOV_AUTO_SEND=1 to actually send).';
+  else if (r && r.executed && r.executed.ok) note = '✅ Approved — dry-run only: previewed, NOT sent (auto-send is off; set GOV_AUTO_SEND=1 to actually send).';
+  else if (r && r.executed) note = '✅ Approved — but the send FAILED, nothing went out' + (r.executed.reason ? ': ' + r.executed.reason : '.');
   else note = '✅ Approved.';
   await tg('answerCallbackQuery', { callback_query_id: q.id, text: note });
   try { await tg('editMessageText', { chat_id: chat, message_id: q.message.message_id, text: (q.message.text || '') + '\n\n' + note }); } catch { /* */ }

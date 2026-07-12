@@ -45,13 +45,13 @@ request a debrief", the forgotten business-credit idea). Evals **462 green** (wa
 - **Daily gov growth digest** (`pods/gov/digest.mjs` + control-plane route + `schedule.json` job):
   weekday 8:00 ONE Telegram — top 3 quick wins + top 3 teaming primes, deduped via `gov.digest.sent`
   events. **Activates on the next NAS control-plane redeploy** (with the narration + dedup fixes).
-- **NAS gate cleanup PENDING operator OK:** 8 duplicate outreach gates identified on the CP (same
-  pod:action:noticeId queued 4-5×; keep-newest plan ready) — mass-`pass` was blocked by permissions until
-  the operator explicitly says "clear the dupes". Also waiting: which NAS doc folders to add to the
-  read-only docs index (recommendation given: index, don't copy into the vault).
-- **SBA answer delivered:** $150/mo on the $20k EIDL @3.75% = $62.50/mo interest + deferment-accrued
-  interest (~$1.8k) repaid FIRST → principal barely moves; Jarvis's figure is a static 2026-04-27 snapshot.
-  ⏭ get real principal/accrued split from MySBA portal → update `debts.json` + add amortization.
+- **✅ NAS gate cleanup DONE (operator approved "clear the dupes"):** passed 8/8 duplicate outreach gates
+  (pass never executes anything). Queue: 24 → **16 real gates, zero dupes** — the two ALF Bradford submit
+  gates are different noticeIds (reposted notice), both real. gateKey idempotency activates on NAS redeploy.
+- **✅ SBA EIDL verified with real MySBA figures (recorded in `pods/tax/debts.json`):** principal STILL
+  exactly $20,000.00 — all $2,140 paid so far went to interest (deferment accrual). $340.25 interest
+  backlog remains; at $150/mo it clears in ~4 months, then principal drops ~$87.65/mo. ⏭ optional: an
+  amortization view in the tax pod so Home shows real principal progress month over month.
 
 ### 🆕 2026-07-10 (newest) — ONE design system across every surface + GovCon OS integration
 Follow-up to the design overhaul: the operator wanted the themes truly everywhere (not one look per

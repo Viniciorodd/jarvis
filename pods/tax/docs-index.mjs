@@ -64,7 +64,7 @@ export function suggestDocs(entry, index, { withinDays = 30, limit = 5 } = {}) {
 }
 
 // ── thin fs wrapper (not eval-tested; evals stay pure) ──────────────────────────────────────────────
-const SKIP_DIRS = new Set(['node_modules', '.git', '.tmp']);
+const SKIP_DIRS = new Set(['node_modules', '.git', '.tmp', '#recycle', '@eaDir', '$RECYCLE.BIN', 'System Volume Information']);
 const SKIP_FILES = new Set(['Thumbs.db']);
 const IDIR = (dir) => dir || path.join(ROOT, 'tax-docs');
 const MAX_DEPTH = 8;

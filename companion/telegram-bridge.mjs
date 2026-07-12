@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { narrationFor, personaFor } from '../pods/narrate.mjs';
+import { rollupNarrations } from '../pods/narrate.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 function env(k, d = '') {
@@ -36,11 +36,49 @@ async function get(p) { try { return await (await fetch(COMPANION + p)).json(); 
 const CP = env('JARVIS_CP_URL', env('CONTROL_PLANE_URL', 'http://192.168.6.121:8787')).replace(/\/$/, '');
 async function cp(p, opts) { try { return await (await fetch(CP + p, opts)).json(); } catch (e) { return { error: e.message }; } }
 const pushedApprovals = new Set();
+
+// ── The approval message CARRIES THE GOODS (operator: "I get the full report, get the email, read it,
+// approve — and it sends"). When the gate points at a gov-drafts/*.md draft, inline To/Subject + the
+// first ~900 chars of the body right in the Telegram message, so the decision needs no laptop.
+// Best-effort by contract: a missing/unreadable draft NEVER breaks the push (returns '').
+function draftExcerpt(file) {
+  try {
+    const rel = String(file || '').replace(/\\/g, '/');
+    if (!/^gov-drafts\/[^/]+\.md$/i.test(rel)) return '';                 // repo-root relative, drafts only
+    const lines = fs.readFileSync(path.join(ROOT, rel), 'utf8').split(/\r?\n/);
+    // mirror pods/gov/sender.mjs parseEmailFile: To:/Subject: headers, then a ---- delimiter, then body.
+    const toIdx = lines.findIndex((l) => /^To:\s*\S/.test(l));
+    const subjIdx = lines.findIndex((l, i) => i > toIdx && /^Subject:\s*\S/.test(l));
+    const delim = lines.findIndex((l, i) => i > subjIdx && /^-{4,}\s*$/.test(l));
+    const bodyStart = delim > -1 ? delim + 1 : (subjIdx > -1 ? subjIdx + 1 : 0);
+    const head = [toIdx > -1 ? lines[toIdx].trim() : '', subjIdx > -1 ? lines[subjIdx].trim() : ''].filter(Boolean);
+    let body = lines.slice(bodyStart).join('\n').replace(/<!--[\s\S]*?-->/, '').replace(/\s+$/, '').trim();
+    if (body.length > 900) body = body.slice(0, 900).trimEnd() + '…';
+    if (!head.length && !body) return '';
+    return (head.length ? head.join('\n') + '\n\n' : '') + body;
+  } catch { return ''; }
+}
+// GOV_AUTO_SEND read fresh per push (not cached at boot) so the wording can never claim a send the
+// executor won't perform. Only an actual SEND gate (action send/email + a draft file — the exact set
+// pods/gov/sender.mjs approvalToSend executes) may claim "the email SENDS"; a submit gate never emails.
+function autoSendOn() { return /^(1|true|yes|on)$/i.test(env('GOV_AUTO_SEND', '')); }
+function isSendGate(a) {
+  return (a.pod === 'gov') && ['send', 'email'].includes(String(a.action || '').toLowerCase()) && !!(a.payload && a.payload.file);
+}
 function approvalText(a) {
   const p = a.payload || {};
   const title = p.title || a.rationale || a.action || 'Needs your approval';
   const detail = p.detail || (p.to ? 'To: ' + p.to : '');
-  return `🟡 NEEDS YOU — tap to decide\n\n${title}${detail ? '\n' + detail : ''}\n\n(${a.pod || ''} · ${a.action || ''})`;
+  const excerpt = draftExcerpt(p.file);
+  let note = '';
+  if (isSendGate(a)) {
+    note = autoSendOn()
+      ? '\n✅ Approve = the email SENDS (auto-send is on).'
+      : '\n✅ Approve = dry-run only: previewed, NOT sent (auto-send is off; set GOV_AUTO_SEND=1 to actually send).';
+  }
+  return `🟡 NEEDS YOU — tap to decide\n\n${title}${detail ? '\n' + detail : ''}`
+    + (excerpt ? `\n\n━━ the draft ━━\n${excerpt}` : '')
+    + `\n\n(${a.pod || ''} · ${a.action || ''})${note}`;
 }
 async function seedApprovals() { const list = await cp('/approvals/pending'); if (Array.isArray(list)) for (const a of list) pushedApprovals.add(a.id); }
 async function pushApprovals() {
@@ -53,30 +91,87 @@ async function pushApprovals() {
     await tg('sendMessage', { chat_id: ALLOWED, text: approvalText(a), reply_markup: { inline_keyboard: [[{ text: '✅ Approve & send', callback_data: 'ap:' + a.id }, { text: '⏭ Skip', callback_data: 'sk:' + a.id }]] } });
   }
 }
-// ── Agent activity feed ────────────────────────────────────────────────────────────────────────────
-// So you FEEL the team working: every meaningful agent action pings your phone, signed by the agent who
-// did it ("— Gideon (Gov Scout)"). Milestones only (scans/drafts/sends/finds), not the noise. This is the
-// fix for "my agents do so much and never tell me anything." Seeds the backlog on boot; frequency is fine
-// by design — you'd rather hear the team than be out of the loop.
+// ── Agent activity feed (BATCHED) ──────────────────────────────────────────────────────────────────
+// So you FEEL the team working: meaningful agent actions ping your phone, signed by the agent who did
+// them ("— Gideon (Gov Scout)"). Milestones only (scans/drafts/sends/finds), not the noise. BUT one
+// message per event was spam ("scope-of-work pull, scope-of-work pull…"), so each 90s cycle now collects
+// ALL new events and sends ONE rolled-up message (pods/narrate.mjs rollupNarrations — same-actor
+// same-family events collapse to "pulled the scope of work for N opportunities — A, B, C"). The seen-id
+// cursor is unchanged: an event is marked seen the moment it's picked up, so nothing narrates twice.
 const seenEvents = new Set();
 async function seedEvents() { const list = await cp('/events'); if (Array.isArray(list)) for (const ev of list) seenEvents.add(ev.id); }
 async function pushNarration() {
   if (!ALLOWED) return;
   const list = await cp('/events');
   if (!Array.isArray(list)) return;
+  const fresh = [];
   for (const ev of list) {
     if (seenEvents.has(ev.id)) continue;
     seenEvents.add(ev.id);
-    const text = narrationFor(ev);
-    if (!text) continue;
-    await tg('sendMessage', { chat_id: ALLOWED, text: `${text}\n— ${personaFor(ev.actor)}` });
+    fresh.push(ev);
   }
+  if (!fresh.length) return;
+  const msg = rollupNarrations(fresh);        // one truthful message per cycle, or null if all noise
+  if (msg) await send(ALLOWED, msg);          // send() chunks >3900 chars, so a big batch still delivers
 }
 
+// Per-opportunity Pursue/Pass taps must be idempotent: two taps on the SAME button arrive as two
+// callback_queries with DIFFERENT q.ids, so we key on the callback DATA ('pursue:<noticeId>'), not q.id.
+// A failed action releases the key so the operator can retry; a success keeps it (and edits the message,
+// which drops the buttons — belt and suspenders across bridge restarts).
+const handledOppTaps = new Set();
 async function handleCallback(q) {
   const chat = String((q.message && q.message.chat && q.message.chat.id) || '');
   if (ALLOWED && chat !== ALLOWED) { await tg('answerCallbackQuery', { callback_query_id: q.id }); return; }
-  const [act, id] = String(q.data || '').split(':');
+  const data = String(q.data || '');
+  const sep = data.indexOf(':');
+  const act = sep < 0 ? data : data.slice(0, sep);
+  const id = sep < 0 ? '' : data.slice(sep + 1);
+
+  // ── Per-opportunity buttons from the daily scan (no exclusivity — pursue one, or all of them) ────
+  if ((act === 'pursue' || act === 'passopp') && id) {
+    if (handledOppTaps.has(data)) { await tg('answerCallbackQuery', { callback_query_id: q.id, text: 'Already handled.' }); return; }
+    handledOppTaps.add(data);
+    if (act === 'pursue') {
+      // CP /maintenance/pursue drafts the proposal NOW (an LLM draft — can take a minute), and the submit
+      // itself still gates on you (doctrine §2). Answer the tap IMMEDIATELY and run the pursue DETACHED:
+      // Telegram expires unanswered callbacks in seconds, and this handler must not freeze the poll loop.
+      await tg('answerCallbackQuery', { callback_query_id: q.id, text: 'On it — drafting the proposal…' });
+      const msgId = q.message.message_id;
+      cp('/maintenance/pursue', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ noticeId: id }) }).then(async (r) => {
+        if (r && r.ok) {
+          // success → append the checkmark; the edit also drops the buttons, so no double-fire ever.
+          try { await tg('editMessageText', { chat_id: chat, message_id: msgId, text: (q.message.text || '') + '\n\n→ pursuing ✓ (proposal drafted — review & submit gates on you)' }); } catch { /* */ }
+        } else {
+          // failure → release the idempotency key and say so in a NEW message (the original keeps its
+          // buttons untouched, so a retry tap still works).
+          handledOppTaps.delete(data);
+          await tg('sendMessage', { chat_id: chat, text: '⚠ Pursue FAILED' + (r && r.error ? ': ' + r.error : ' (control-plane unreachable?)') + ' — tap Pursue again to retry.' });
+        }
+      }).catch(() => { handledOppTaps.delete(data); });
+      return;
+    }
+    // Pass: prefer the companion's real disposition endpoint (companion/server.js /api/gov-board/
+    // disposition — updates the board's pipeline-state AND emits the CP meta event itself); when the
+    // bridge runs without a companion (NAS), record the identical meta event straight on the CP.
+    let done = false;
+    try {
+      const r = await fetch(COMPANION + '/api/gov-board/disposition', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ noticeId: id, stage: 'passed' }) });
+      done = r.ok;
+    } catch { /* companion not reachable here — fall through to the CP event */ }
+    if (!done) {
+      const r2 = await cp('/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'meta', actor: 'operator', pod: 'gov', action: 'disposition', rationale: 'marked passed (from Telegram)', payload: { noticeId: id } }) });
+      done = !!(r2 && !r2.error);
+    }
+    const note = done ? '→ passed' : '→ pass FAILED — try again, or pass it on the Gov board in the app';
+    if (!done) handledOppTaps.delete(data); // failure releases the idempotency key so a retry can work
+    await tg('answerCallbackQuery', { callback_query_id: q.id, text: note.replace(/^→ /, '') });
+    // Only edit on success: editMessageText drops the inline buttons, which is exactly right once the
+    // action landed (no double-fire even after a bridge restart) and exactly wrong if a retry is needed.
+    if (done) { try { await tg('editMessageText', { chat_id: chat, message_id: q.message.message_id, text: (q.message.text || '') + '\n\n' + note }); } catch { /* */ } }
+    return;
+  }
+
   const decision = act === 'ap' ? 'approve' : act === 'sk' ? 'pass' : null;
   if (!decision || !id) { await tg('answerCallbackQuery', { callback_query_id: q.id }); return; }
   const r = await cp('/approvals/' + id, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision, pod: 'gov' }) });

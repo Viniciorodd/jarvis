@@ -252,6 +252,38 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: true, sent: true, date: today, counts });
       } catch (e) { return send(res, 200, { ok: false, note: e.message }); }
     }
+    // Approvals nudge → business-hours "decisions waiting on YOU" ping (the operator's #1 need is
+    // knowing what's HIS to do — this brings the open gates to him instead of hoping he opens the app).
+    // The scheduler fires it at 12:00 and 16:00 LOCAL (schedule.json approvals-nudge-midday/-afternoon);
+    // the route enforces the calm contract: weekdays only, SILENT when no gates are open, and at most
+    // TWICE per calendar day — deduped via approvals.nudged events on payload.date + payload.slot,
+    // where slot = hour < 14 ? 'midday' : 'afternoon' (two slots ⇒ two nudges max, even if the
+    // scheduler re-fires). Push-only + truthful: it says "waiting on YOUR approval" — nothing is sent
+    // by this route; approving on Telegram buttons / HQ / cockpit is still the one human gate that
+    // fires an executor (doctrine §9 rule 2). Best-effort: Telegram unconfigured → report WITHOUT
+    // logging the nudged event (the first configured slot still fires); never throws.
+    if (req.method === 'POST' && p === '/maintenance/approvals-nudge') {
+      try {
+        const now = new Date();
+        if (now.getDay() === 0 || now.getDay() === 6) return send(res, 200, { ok: true, skipped: 'weekend' });
+        const pending = store.pendingApprovals();
+        if (!pending.length) return send(res, 200, { ok: true, skipped: 'no gates' });
+        const today = now.toISOString().slice(0, 10);
+        const slot = now.getHours() < 14 ? 'midday' : 'afternoon';
+        if (store.readEvents({ kind: 'approvals.nudged' }).some((e) => e.payload && e.payload.date === today && e.payload.slot === slot))
+          return send(res, 200, { ok: true, skipped: 'already nudged this slot', slot });
+        const lib = await import('../pods/lib.mjs');
+        if (!lib.env('TELEGRAM_BOT_TOKEN') || !lib.env('TELEGRAM_CHAT_ID')) return send(res, 200, { ok: false, error: 'telegram not configured' });
+        const clip = (s) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > 60 ? s.slice(0, 60) + '…' : s; };
+        const lines = pending.slice(0, 3).map((a) => { const r = clip(a.rationale); return `• ${a.action || 'decision'}${r ? ' — ' + r : ''}`; });
+        const text = [`🟡 ${pending.length} decision${pending.length === 1 ? '' : 's'} waiting on you`, ...lines,
+          'Open Telegram ⏫ (buttons above) or the cockpit to approve.'].join('\n');
+        lib.notifyTelegram(text);
+        store.appendEvent({ kind: 'approvals.nudged', actor: 'MAILROOM-01', pod: 'chief-of-staff', action: 'approvals.nudged', status: 'done',
+          rationale: `Nudged the operator (${slot}): ${pending.length} decision(s) waiting on his approval (nothing sent)`, payload: { date: today, slot, count: pending.length } });
+        return send(res, 200, { ok: true, sent: true, date: today, slot, count: pending.length });
+      } catch (e) { return send(res, 200, { ok: false, note: e.message }); }
+    }
     // CRM — the subcontractor database (Operations view reads this).
     if (req.method === 'GET' && p === '/crm') {
       try { const conn = await import('../pods/gov/connector.mjs'); return send(res, 200, { subs: conn.loadSubs() }); }

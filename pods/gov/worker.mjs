@@ -12,13 +12,61 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, DRAFTS, env, secret, profile, emit, mirror, hqApproval, gateApproval, claude, claudeBatch } from './lib.mjs';
-import { notifyTelegram } from '../lib.mjs';
 import { maybeConnect } from './connector.mjs';
 import { procurementPath } from './replies.mjs';
 import { checkCompliance } from './compliance.mjs';
 import { factsCheck, factsCheckSummary } from './facts-check.mjs';
 import { isDescriptionUrl, fetchDescription, pullScopeOfWork, sowPath } from './sow.mjs';
 import * as deals from './deals.mjs';
+
+// ── Telegram push with INLINE BUTTONS (the "no more reply 1/2/3" fix) ───────────────────────────
+// notifyTelegram (pods/lib.mjs) is text-only; per-opportunity Pursue/Pass buttons need reply_markup,
+// so the worker carries its own tiny sender on the SAME raw bot-API pattern rather than widening the
+// shared helper. Best-effort, never throws — a Telegram hiccup must never fail a scan.
+async function tgPush(text, replyMarkup = null) {
+  const token = env('TELEGRAM_BOT_TOKEN'); const chat = env('TELEGRAM_CHAT_ID');
+  if (!token || !chat) return false;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ chat_id: chat, text, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+// PURE: one opportunity brief (pods/gov/briefs.mjs shape) → the short per-opportunity message body:
+// title · agency · fit · due date · one-line why. Exported so it can be eval-pinned later.
+export function oppMessageText(b = {}) {
+  const clip = (s, n = 180) => { const x = String(s || '').replace(/\s+/g, ' ').trim(); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
+  const lines = [String(b.title || 'Opportunity')];
+  const meta = [b.agency, b.deadline ? `due ${String(b.deadline).slice(0, 10)}${b.daysLeft != null ? ` (${b.daysLeft}d)` : ''}` : ''].filter(Boolean);
+  if (meta.length) lines.push(meta.join(' · '));
+  lines.push(`Fit ${b.fit != null ? b.fit : '?'}/5 (${b.score != null ? b.score : '?'}/100)${b.winChance != null ? ` · win ~${b.winChance}%` : ''}`);
+  const why = clip(b.strategy || b.lookingFor);
+  if (why) lines.push(`Why: ${why}`);
+  return lines.join('\n');
+}
+
+// The operator, verbatim: "I want an approve button per opportunity… and if I want all three, I approve
+// all three." One SHORT intro, then one message PER opportunity with its own ✅ Pursue / ⏭ Pass inline
+// buttons — NO exclusivity, every one of them can be pursued. The tap lands in the Telegram bridge
+// (companion/telegram-bridge.mjs handleCallback: 'pursue:<noticeId>' → CP /maintenance/pursue;
+// 'passopp:<noticeId>' → disposition). callback_data is capped at 64 bytes by Telegram, so a freak
+// oversized noticeId falls back to a buttonless message instead of a rejected send.
+async function pushOpportunityButtons(briefs = []) {
+  if (!briefs.length) return false;
+  const intro = await tgPush(`🎯 Top ${briefs.length} opportunit${briefs.length === 1 ? 'y' : 'ies'} today — tap Pursue on any (or all)`);
+  if (!intro) return false; // Telegram unconfigured/down — don't half-send the digest
+  for (const b of briefs) {
+    const id = String(b.noticeId || '');
+    const keyboard = id && ('passopp:' + id).length <= 64
+      ? { inline_keyboard: [[{ text: '✅ Pursue', callback_data: 'pursue:' + id }, { text: '⏭ Pass', callback_data: 'passopp:' + id }]] }
+      : null;
+    await tgPush(oppMessageText(b) + (b.url ? `\n${b.url}` : ''), keyboard);
+  }
+  return true;
+}
 
 // ── A. SCOUT — find opportunities (real SAM.gov, fallback to a realistic simulated feed) ────────
 function simulatedFeed() {
@@ -213,16 +261,16 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
   await mirror('GOV-ANALYST', drafted.length ? 'need' : 'idle', drafted.length ? `${drafted.length} proposal(s) ready for your review` : 'No bid-worthy opportunities this scan');
   if (spend > 0) await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'spend.log', cost_usd: 0, status: 'done', rationale: `gov scan AI spend ~$${spend.toFixed(4)}`, payload: { ai_spend_usd: Number(spend.toFixed(4)) } });
 
-  // Send the operator a FEW quality opportunities (not a flood) — the curated top-3 digest to his phone,
-  // with what-they-want + fit + win-chance + a pursuit strategy. This is what he asked for. Best-effort.
+  // Send the operator a FEW quality opportunities (not a flood) — one message PER opportunity with its
+  // own ✅ Pursue / ⏭ Pass buttons (no more "reply 1, 2 or 3"): tap any, or tap all. Best-effort.
   const bidWorthy = scored.filter((s) => s.sc.recommendation === 'bid').length;
   if (bidWorthy > 0) {
     try {
       const B = await import('./briefs.mjs');
-      const { text: digest, briefs } = await B.buildBriefs({ topN: 3 });
+      const { briefs } = await B.buildBriefs({ topN: 3 });
       if (briefs.length) {
-        notifyTelegram(digest);
-        await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'briefs.push', status: 'done', rationale: `Sent the top ${briefs.length} opportunities to your phone`, payload: { count: briefs.length, source } });
+        const pushed = await pushOpportunityButtons(briefs);
+        if (pushed) await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'briefs.push', status: 'done', rationale: `Sent the top ${briefs.length} opportunities to your phone (Pursue/Pass buttons)`, payload: { count: briefs.length, source } });
       }
     } catch { /* digest is best-effort — the board still has everything */ }
   }
@@ -240,7 +288,13 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
 // raise the same gated submit approval, plus kick off sub outreach if it needs labor. `op` is the known
 // opportunity (from the cockpit); `sc` is optional (reconstructed from the score if absent).
 export async function pursueOpportunity({ op = {}, sc = null } = {}) {
-  if (!op || !op.title) return { ok: false, error: 'opportunity required' };
+  // A Telegram Pursue button can carry ONLY the noticeId (Telegram caps callback_data at 64 bytes), so
+  // the CP forwards a bare {noticeId} — hydrate title/agency/deadline/url/score from the deal ledger,
+  // where every scanned opportunity already lives (deals.upsertDeal in runScan). Caller fields still win.
+  if (op && op.noticeId && !op.title) {
+    try { const known = deals.getDeal(op.noticeId); if (known) op = { ...known, ...op }; } catch { /* ledger best-effort */ }
+  }
+  if (!op || !op.title) return { ok: false, error: 'opportunity required (unknown noticeId — not in the deal ledger)' };
   const prof = profile();
   const scoreObj = sc || {
     match_score: Number(op.score != null ? op.score : 70) || 70,

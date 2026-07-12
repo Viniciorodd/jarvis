@@ -34,6 +34,12 @@
     { "id": "gov-growth-digest", "person": "SAM-SCOUT", "pod": "gov", "type": "maintenance",
       "cadence_hours": 24, "at_hour": 8, "endpoint": "/maintenance/gov-growth-digest",
       "command": "push the daily gov growth digest — fresh quick wins + teaming primes, one Telegram, weekdays only (deterministic, no LLM; the route dedups to one per day)" },
+    { "id": "approvals-nudge-midday", "person": "MAILROOM-01", "pod": "chief-of-staff", "type": "maintenance",
+      "cadence_hours": 24, "at_hour": 12, "endpoint": "/maintenance/approvals-nudge",
+      "command": "midday nudge — decisions waiting on the operator, one calm Telegram, weekdays only (deterministic, no LLM; the route stays silent when no gates are open and dedups to one per slot per day)" },
+    { "id": "approvals-nudge-afternoon", "person": "MAILROOM-01", "pod": "chief-of-staff", "type": "maintenance",
+      "cadence_hours": 24, "at_hour": 16, "endpoint": "/maintenance/approvals-nudge",
+      "command": "afternoon nudge — decisions still waiting on the operator, one calm Telegram, weekdays only (deterministic, no LLM; the route stays silent when no gates are open and dedups to one per slot per day)" },
     { "id": "eod-log", "person": "EXEC-01", "pod": "exec", "type": "maintenance",
       "cadence_hours": 24, "at_hour": 20, "endpoint": "/maintenance/eod-log",
       "command": "log the end-of-day summary to the Notion company brain (deterministic, no LLM)" }

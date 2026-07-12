@@ -2,6 +2,11 @@
 # (see docker-compose) because the Chief-of-Staff router it dispatches to lives in ../pods.
 FROM node:20-alpine
 WORKDIR /app
+# tzdata — belt-and-braces so TZ=America/New_York (set in docker-compose) actually resolves on alpine.
+# Without it the containers run UTC and every schedule.json at_hour fires at 4-5 AM ET (the "Jarvis
+# talks to me at dawn" bug). Covers the server, scheduler, AND telegram-bridge (all share this image),
+# plus every child process they spawn.
+RUN apk add --no-cache tzdata
 # optional email deps for the Gov pod (Hector's IMAP reply-reading + SMTP send). Guarded so a network
 # hiccup can NEVER fail the build — if install is skipped, reply-reading just degrades gracefully.
 COPY control-plane/package.json ./package.json

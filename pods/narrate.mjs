@@ -108,3 +108,81 @@ export function narrationLine(ev) {
   const text = narrationFor(ev);
   return text ? `${text}\n— ${personaFor(ev.actor)}` : null;
 }
+
+// ── BATCHED NARRATION (the anti-spam rollup) ────────────────────────────────────────────────────────
+// The operator, verbatim: "instead of spamming me with scope-of-work pull, scope-of-work pull... just
+// brief: X pulled Y amount of Z." So one poll cycle's events collapse into ONE Telegram message:
+// same actor + same action FAMILY → one grouped line ("Gideon (Gov Scout): 📄 Pulled the scope of work
+// for 4 opportunities — A, B, C +1 more"); singletons keep their normal truthful narration line.
+// Every line still flows through narrationFor, so the truth contract above survives the rollup —
+// a grouped batch of drafts can never say "Reached out". Pure + eval-pinned (evals/narrate-rollup.eval.mjs).
+
+// PURE: which family an event groups under. Gates and dry-runs group by TRUTH CLASS (not action name)
+// so a collapsed line can carry one honest claim for the whole group; everything else by its action.
+export function familyFor(ev = {}) {
+  if (ev.kind === 'approval.request') return 'gate';
+  if (isDryRun(ev)) return 'dryrun';
+  return String(ev.action || '').toLowerCase();
+}
+
+// best-effort title for the grouped listing: payload.title, else the sow.pull rationale pattern the
+// gov worker emits ("SOW pulled for <title> (N attachment(s))") — real sow.pull events carry no title.
+const titleOf = (ev = {}) => {
+  const p = ev.payload || {};
+  if (p.title) return short(p.title, 60);
+  const m = String(ev.rationale || '').match(/^SOW pulled for (.+) \(\d+ attachment/);
+  return m ? short(m[1], 60) : '';
+};
+
+// PURE: "A, B, C +K more" — up to `max` distinct titles, then the honest remainder count.
+export function titleList(evs = [], max = 3) {
+  const seen = [];
+  for (const ev of evs) { const t = titleOf(ev); if (t && !seen.includes(t)) seen.push(t); }
+  const shown = seen.slice(0, max);
+  const more = evs.length - shown.length;
+  return shown.length ? shown.join(', ') + (more > 0 ? ` +${more} more` : '') : '';
+}
+
+// PURE: one collapsed line for N same-family events (persona prefix added by the caller). Named
+// phrasings for the frequent flyers; the generic path re-narrates a TITLE-STRIPPED representative
+// (evidence/dry-run fields kept intact) so the truth contract still picks the verb, then appends ×N.
+function collapsedLine(family, evs) {
+  const n = evs.length;
+  const list = titleList(evs);
+  const tail = list ? ` — ${list}` : '';
+  if (family === 'gate') return `✏️ Drafted ${n} actions${tail} — each waiting on YOUR approval (nothing sent)`;
+  if (family === 'dryrun') return `🧪 Dry-run ×${n}: prepared${tail} — NOT sent (auto-send is off)`;
+  if (family === 'sow.pull') return `📄 Pulled the scope of work for ${n} opportunities${tail}`;
+  if (family === 'proposal.draft') return `📝 Drafted ${n} proposals${tail}`;
+  if (family === 'scan.done') {
+    const total = evs.reduce((s, ev) => s + (Number((ev.payload || {}).count) || 0), 0);
+    return `🔭 Scanned SAM ×${n}${total ? ` — ${total} opportunities` : ''}`;
+  }
+  const rep = { ...evs[0], rationale: '', payload: { ...(evs[0].payload || {}), title: '' } };
+  const base = narrationFor(rep) || narrationFor(evs[0]) || '';
+  return `${base} ×${n}${tail}`;
+}
+
+// PURE: one poll cycle's NEW events → ONE message string (or null if nothing narratable).
+//   • 1 narratable event  → the classic single narration + signature (no header)
+//   • 1 group only        → that one grouped line (the line itself carries the count)
+//   • 2+ lines            → "🤖 Team update — N actions" header + bulleted lines
+export function rollupNarrations(events = []) {
+  const narratable = (Array.isArray(events) ? events : []).filter((ev) => narrationFor(ev) != null);
+  if (!narratable.length) return null;
+  if (narratable.length === 1) return narrationLine(narratable[0]);
+  const groups = new Map(); // key = actor|family, first-seen order preserved
+  for (const ev of narratable) {
+    const key = `${ev.actor || ''}|${familyFor(ev)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(ev);
+  }
+  const lines = [];
+  for (const evs of groups.values()) {
+    const persona = personaFor(evs[0].actor);
+    if (evs.length === 1) lines.push(`${narrationFor(evs[0])} — ${persona}`);
+    else lines.push(`${persona}: ${collapsedLine(familyFor(evs[0]), evs)}`);
+  }
+  if (lines.length === 1) return lines[0];
+  return [`🤖 Team update — ${narratable.length} actions`, ...lines.map((l) => '• ' + l)].join('\n');
+}

@@ -73,6 +73,9 @@ services:
       - "8787:8787"
     environment:
       CONTROL_PLANE_PORT: 8787
+      # Local clock (the "WHEN Jarvis talks" fix): containers default to UTC, so schedule.json
+      # at_hour:8 fired at 08:00 UTC = 4 AM ET. With TZ set, at_hour/working_hours are TRUE local hours.
+      TZ: ${TZ:-America/New_York}
       SPEND_ACTION_CAP_USD: ${SPEND_ACTION_CAP_USD:-2}
       SPEND_DAILY_CAP_USD: ${SPEND_DAILY_CAP_USD:-5}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
@@ -131,6 +134,9 @@ services:
       - hq
     command: ["node", "control-plane/scheduler.mjs"]
     environment:
+      # Same local clock as the control-plane — the scheduler's now.getHours() must mean ET,
+      # or every at_hour/working_hours check in schedule.json drifts 4-5 hours early.
+      TZ: ${TZ:-America/New_York}
       CONTROL_PLANE_URL: http://control-plane:8787
       HQ_URL: http://hq:8099
       HQ_TOKEN: ${HQ_TOKEN}
@@ -149,6 +155,8 @@ services:
       - control-plane
     command: ["node", "companion/telegram-bridge.mjs"]
     environment:
+      # Local clock too — any timestamps/digests the bridge renders should read in the operator's day.
+      TZ: ${TZ:-America/New_York}
       JARVIS_CP_URL: http://control-plane:8787
       COMPANION_URL: http://control-plane:8787   # no companion on the NAS → chat falls back to /command
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}

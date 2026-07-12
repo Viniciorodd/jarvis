@@ -3,7 +3,19 @@
   "filingStatus": "single",
   "localEitRatePct": { "value": 1.0, "verified": false, "note": "SETUP: enter your municipality's earned-income tax rate (%)" },
   "splits": { "taxPct": "auto", "debtPct": 10, "emergencyPct": 5, "investPct": 5 },
-  "docRoots": ["Z:\\Real Estate", "gov-drafts", "fiverr", "\\\\192.168.6.121\\PersonalVault", "\\\\192.168.6.121\\BusinessVault"],
+  "docRoots": [
+    "gov-drafts", "fiverr",
+    "\\\\192.168.6.121\\BusinessVault",
+    "\\\\192.168.6.121\\PersonalVault\\Documents",
+    "\\\\192.168.6.121\\PersonalVault\\PC Documents (To be assorted)",
+    "\\\\192.168.6.121\\PersonalVault\\Private",
+    "\\\\192.168.6.121\\PersonalVault\\Personal Development",
+    "\\\\192.168.6.121\\PersonalVault\\NotabilityBackups",
+    "\\\\192.168.6.121\\PersonalVault\\Just Press Record",
+    "\\\\192.168.6.121\\PersonalVault\\Google Drive Sync Folder",
+    "\\\\192.168.6.121\\PersonalVault\\OneDrive Sync Folder"
+  ],
+  "docRootsNote": "BusinessVault covers Real Estate (Z: maps there — the old Z:\\Real Estate root double-indexed it). PersonalVault is scoped to DOC folders on purpose: RECOVERY/5TB Recovery (80k recovered files), Media, Gaming, #recycle are excluded as noise.",
   "entities": [
     { "id": "rodgate",      "name": "Rodgate LLC",          "kind": "schC", "aliases": ["rodgate", "gov", "govcon", "contracting"] },
     { "id": "sidehustles",  "name": "Side hustles",         "kind": "schC", "aliases": ["fiverr", "web", "music", "studio", "thumbnail"] },

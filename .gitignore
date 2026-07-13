@@ -110,3 +110,6 @@ gov-capture/
 
 # Idea Vault ledger (personal — append-only, never delete)
 ideas-vault/
+
+# Failure & Audit ledger (personal failure record — append-only, never committed)
+audit-log/

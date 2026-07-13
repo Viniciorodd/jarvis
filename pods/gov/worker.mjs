@@ -15,6 +15,7 @@ import { ROOT, DRAFTS, env, secret, profile, emit, mirror, hqApproval, gateAppro
 import { maybeConnect } from './connector.mjs';
 import { procurementPath } from './replies.mjs';
 import { checkCompliance } from './compliance.mjs';
+import { improveUntilPass } from './remediate.mjs';
 import { factsCheck, factsCheckSummary } from './facts-check.mjs';
 import { isDescriptionUrl, fetchDescription, pullScopeOfWork, sowPath } from './sow.mjs';
 import * as deals from './deals.mjs';
@@ -234,10 +235,30 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     const file = path.join('gov-drafts', `${slug}.md`);
     fs.writeFileSync(path.join(ROOT, file), `<!-- ${op.title} · ${op.url} · deadline ${op.deadline} -->\n\n${d.md}\n`);
     await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'proposal.draft', cost_usd: d.cost || 0, reversible: true, rationale: `drafted ${op.title}`, payload: { noticeId: op.noticeId, file } });
-    // VERIFY before the gate: compliance pre-check so a non-compliant bid never looks ready (doctrine §0).
-    const comp = await checkCompliance({ op, draft: d.md }); spend += comp._cost || 0;
-    await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.check', reversible: true, status: comp.verdict === 'FAIL' ? 'error' : 'done', rationale: `Compliance ${comp.verdict}: ${comp.summary}`, payload: { noticeId: op.noticeId, verdict: comp.verdict, needs_sub_past_performance: !!comp.needs_sub_past_performance } });
-    if (comp.verdict === 'FAIL') await mirror('GOV-ANALYST', 'need', `⚠ Compliance risk on ${op.title}: ${comp.summary}`);
+    // VERIFY + SELF-HEAL before the gate: diagnose WHY compliance would fail, HONESTLY fix the soft gaps,
+    // re-check, and loop until PASS — or ESCALATE if a gap can only be fixed by lying (doctrine §0, never
+    // fabricate). Best-effort: any failure falls back to the plain single checkCompliance below.
+    let comp = null, heal = null;
+    try { heal = await improveUntilPass({ op, draft: d.md }); } catch { heal = null; }
+    if (heal) {
+      comp = { verdict: heal.verdict, summary: heal.escalated ? (heal.hardGaps ? heal.hardGaps.map((g) => g.issue).filter(Boolean).join('; ') : (heal.reason || 'needs your decision')) : 'auto-healed to ' + heal.verdict, needs_sub_past_performance: false };
+      // If the loop improved the draft, overwrite the STAGED file (reversible, still behind the submit gate).
+      const changed = (heal.log || []).flatMap((r) => r.changes || []);
+      if (changed.length && heal.draft && heal.draft !== d.md) {
+        fs.writeFileSync(path.join(ROOT, file), `<!-- ${op.title} · ${op.url} · deadline ${op.deadline} -->\n\n${heal.draft}\n`);
+        d.md = heal.draft;
+        await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.remediated', reversible: true, status: 'done', rationale: `Auto-fixed ${changed.length} compliance gap(s): ${[...new Set(changed.map((c) => c.code))].join(', ')}`, payload: { noticeId: op.noticeId, changes: changed } });
+      }
+      // A hard gap the loop refused to touch → this needs the OPERATOR's decision, not a rubber-stamp.
+      if (heal.escalated && heal.hardGaps && heal.hardGaps.length) {
+        await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.escalated', status: 'error', reversible: true, rationale: `Compliance needs YOUR decision (not auto-fixable): ${heal.hardGaps.map((g) => g.issue).filter(Boolean).join('; ')}`, payload: { noticeId: op.noticeId, hardGaps: heal.hardGaps } });
+      }
+    } else {
+      comp = await checkCompliance({ op, draft: d.md }); spend += comp._cost || 0;
+    }
+    const hardEscalation = !!(heal && heal.escalated && heal.hardGaps && heal.hardGaps.length);
+    await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.check', reversible: true, status: comp.verdict === 'FAIL' || hardEscalation ? 'error' : 'done', rationale: `Compliance ${comp.verdict}: ${comp.summary}`, payload: { noticeId: op.noticeId, verdict: comp.verdict, needs_sub_past_performance: !!comp.needs_sub_past_performance, hardGaps: hardEscalation ? heal.hardGaps : undefined } });
+    if (comp.verdict === 'FAIL' || hardEscalation) await mirror('GOV-ANALYST', 'need', `⚠ Compliance ${hardEscalation ? 'needs your decision' : 'risk'} on ${op.title}: ${comp.summary}`);
     // LAST-STEP FACTS GUARD (doctrine Canonical Facts + Lessons L-005/L-006/L-007): scan the draft for
     // identity/certification claims Rodgate does NOT hold. Code disposes — a hit is flagged on the gate so
     // the human fixes it BEFORE staging. Jarvis never sends, so this can't leak, but it stops the near-miss.
@@ -248,10 +269,15 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     } else {
       await emit({ kind: 'trace', actor: 'GOV-ANALYST', pod: 'gov', action: 'facts.check', status: 'done', rationale: '✓ facts-check clean', payload: { noticeId: op.noticeId } });
     }
-    // HITL gate — never auto-submit (doctrine §9 rule 2 + entity rule: Vinicio signs everything)
+    // HITL gate — never auto-submit (doctrine §9 rule 2 + entity rule: Vinicio signs everything). When the
+    // self-heal loop hit a HARD gap, the gate says this needs the operator's DECISION (no-bid / teaming /
+    // real past performance) rather than looking submit-ready.
+    const decisionRationale = hardEscalation
+      ? `Proposal for ${op.title} needs YOUR decision before it can go anywhere — not auto-fixable without fabricating: ${comp.summary}. Options: no-bid, team with a prime, or provide real past performance.`
+      : `Proposal drafted for ${op.title} (score ${sc.match_score}). Compliance: ${comp.verdict}${comp.summary ? ' — ' + comp.summary : ''}. Facts: ${facts.ok ? 'clean' : 'FAILED — ' + facts.violations.map((v) => v.rule).join('; ')}. Review + sign + submit.`;
     await gateApproval(
-      { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: `Proposal drafted for ${op.title} (score ${sc.match_score}). Compliance: ${comp.verdict}. Facts: ${facts.ok ? 'clean' : 'FAILED — ' + facts.violations.map((v) => v.rule).join('; ')}. Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: sc.subcontractor_needed, compliance: comp.verdict, facts: facts.ok ? 'clean' : 'FAILED', factsViolations: facts.violations } },
-      { pod: 'Gov War Room', title: `Review & submit: ${op.title}`, detail: `Score ${sc.match_score}/100 · 🛡 ${comp.verdict}${comp.summary ? ' (' + comp.summary + ')' : ''}${facts.ok ? '' : ' · ⚠ FACTS-CHECK FAILED — fix before sending'} · deadline ${op.deadline} · ${file}${sc.subcontractor_needed ? ' · needs a local subcontractor' : ''}`, xp: 50, verb: 'Open draft' });
+      { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: decisionRationale, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: sc.subcontractor_needed, compliance: comp.verdict, needs_decision: hardEscalation, hardGaps: hardEscalation ? heal.hardGaps : undefined, facts: facts.ok ? 'clean' : 'FAILED', factsViolations: facts.violations } },
+      { pod: 'Gov War Room', title: hardEscalation ? `⚠ Your decision needed: ${op.title}` : `Review & submit: ${op.title}`, detail: `Score ${sc.match_score}/100 · 🛡 ${comp.verdict}${comp.summary ? ' (' + comp.summary + ')' : ''}${hardEscalation ? ' · ⚠ NEEDS YOUR DECISION (no-bid / team / real past performance)' : ''}${facts.ok ? '' : ' · ⚠ FACTS-CHECK FAILED — fix before sending'} · deadline ${op.deadline} · ${file}${sc.subcontractor_needed ? ' · needs a local subcontractor' : ''}`, xp: 50, verb: 'Open draft' });
     try { deals.upsertDeal(op.noticeId, { stage: 'proposal_ready', proposalFile: file, pendingSubmit: true, stageNote: 'proposal drafted — awaiting your sign-off' }); } catch { /* ledger best-effort */ }
     // Connector (Hector): if this bid needs subcontracted labor, draft the outreach now (you send it).
     if (sc.subcontractor_needed) { try { await maybeConnect({ op, sc }); } catch { /* connector best-effort */ } }
@@ -309,11 +335,28 @@ export async function pursueOpportunity({ op = {}, sc = null } = {}) {
   const file = path.join('gov-drafts', `${slug}.md`);
   fs.writeFileSync(path.join(ROOT, file), `<!-- ${op.title} · ${op.url || ''} · deadline ${op.deadline || ''} -->\n\n${d.md}\n`);
   await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'proposal.draft', cost_usd: d.cost || 0, reversible: true, rationale: `drafted ${op.title} (you pursued it)`, payload: { noticeId: op.noticeId, file } });
-  const comp = await checkCompliance({ op, draft: d.md });
-  await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.check', reversible: true, status: comp.verdict === 'FAIL' ? 'error' : 'done', rationale: `Compliance ${comp.verdict}: ${comp.summary}`, payload: { noticeId: op.noticeId, verdict: comp.verdict } });
+  // Same self-heal loop as the scan path: diagnose → honestly fix soft gaps → re-check → escalate hard gaps.
+  let comp = null, heal = null;
+  try { heal = await improveUntilPass({ op, draft: d.md }); } catch { heal = null; }
+  if (heal) {
+    comp = { verdict: heal.verdict, summary: heal.escalated ? (heal.hardGaps ? heal.hardGaps.map((g) => g.issue).filter(Boolean).join('; ') : (heal.reason || 'needs your decision')) : 'auto-healed to ' + heal.verdict };
+    const changed = (heal.log || []).flatMap((r) => r.changes || []);
+    if (changed.length && heal.draft && heal.draft !== d.md) {
+      fs.writeFileSync(path.join(ROOT, file), `<!-- ${op.title} · ${op.url || ''} · deadline ${op.deadline || ''} -->\n\n${heal.draft}\n`);
+      d.md = heal.draft;
+      await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.remediated', reversible: true, status: 'done', rationale: `Auto-fixed ${changed.length} compliance gap(s): ${[...new Set(changed.map((c) => c.code))].join(', ')}`, payload: { noticeId: op.noticeId, changes: changed } });
+    }
+    if (heal.escalated && heal.hardGaps && heal.hardGaps.length) {
+      await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.escalated', status: 'error', reversible: true, rationale: `Compliance needs YOUR decision (not auto-fixable): ${heal.hardGaps.map((g) => g.issue).filter(Boolean).join('; ')}`, payload: { noticeId: op.noticeId, hardGaps: heal.hardGaps } });
+    }
+  } else {
+    comp = await checkCompliance({ op, draft: d.md });
+  }
+  const hardEscalation = !!(heal && heal.escalated && heal.hardGaps && heal.hardGaps.length);
+  await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'compliance.check', reversible: true, status: comp.verdict === 'FAIL' || hardEscalation ? 'error' : 'done', rationale: `Compliance ${comp.verdict}: ${comp.summary}`, payload: { noticeId: op.noticeId, verdict: comp.verdict, hardGaps: hardEscalation ? heal.hardGaps : undefined } });
   await gateApproval(
-    { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: `Proposal drafted for ${op.title} (you pursued it). Compliance: ${comp.verdict}. Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: scoreObj.subcontractor_needed, compliance: comp.verdict } },
-    { pod: 'Gov War Room', title: `Review & submit: ${op.title}`, detail: `Pursued by you · 🛡 ${comp.verdict}${comp.summary ? ' (' + comp.summary + ')' : ''} · draft ${file}`, xp: 50, verb: 'Open draft' });
+    { kind: 'approval.request', actor: 'GOV-ANALYST', pod: 'gov', action: 'submit', status: 'pending', reversible: false, rationale: hardEscalation ? `Proposal for ${op.title} (you pursued it) needs YOUR decision — not auto-fixable without fabricating: ${comp.summary}. Options: no-bid, team with a prime, or provide real past performance.` : `Proposal drafted for ${op.title} (you pursued it). Compliance: ${comp.verdict}${comp.summary ? ' — ' + comp.summary : ''}. Review + sign + submit.`, payload: { noticeId: op.noticeId, file, deadline: op.deadline, subcontractor_needed: scoreObj.subcontractor_needed, compliance: comp.verdict, needs_decision: hardEscalation, hardGaps: hardEscalation ? heal.hardGaps : undefined } },
+    { pod: 'Gov War Room', title: hardEscalation ? `⚠ Your decision needed: ${op.title}` : `Review & submit: ${op.title}`, detail: `Pursued by you · 🛡 ${comp.verdict}${comp.summary ? ' (' + comp.summary + ')' : ''}${hardEscalation ? ' · ⚠ NEEDS YOUR DECISION' : ''} · draft ${file}`, xp: 50, verb: 'Open draft' });
   try { deals.upsertDeal(op.noticeId, { title: op.title, agency: op.agency, deadline: op.deadline, url: op.url, setAside: op.setAside, score: scoreObj.match_score, recommendation: 'bid', subNeeded: scoreObj.subcontractor_needed !== false, stage: 'proposal_ready', proposalFile: file, pendingSubmit: true, stageNote: 'pursued by you — proposal drafted' }); } catch { /* ledger best-effort */ }
   if (scoreObj.subcontractor_needed) { try { await maybeConnect({ op, sc: scoreObj }); } catch { /* connector best-effort */ } }
   await mirror('GOV-ANALYST', 'need', `Proposal drafted (pursued): ${op.title} — review & submit`);

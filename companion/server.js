@@ -1574,6 +1574,27 @@ const server = http.createServer(async (req, res) => {
       return send(res, r.ok ? 200 : 400, JSON.stringify(r));
     } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // ── FAILURE & AUDIT LEDGER (pods/audit-log.mjs): every error + failed audit gets a durable line
+  //    AND a fix hint. GET self-populates from the live event log (dead sends, compliance FAIL/RISK,
+  //    facts violations, executor throws), then renders the ⚠️ Failure & Audit Log vault note. ───────
+  if (req.method === 'GET' && url.pathname === '/api/audit') {
+    try {
+      const AL = await import('../pods/audit-log.mjs');
+      try { await AL.syncFromEvents({ cpUrl: CP_URL }); } catch { /* CP offline → still return the ledger */ }
+      const failures = AL.readFailures({});
+      try { AL.writeVaultNote({}); } catch { /* Second Brain note is best-effort — ledger is the truth */ }
+      return send(res, 200, JSON.stringify({ summary: AL.summarize(failures), open: AL.openFailures(failures) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ summary: { openCount: 0, bySource: {}, recent: [] }, open: [], error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/audit/resolve') {
+    try {
+      const AL = await import('../pods/audit-log.mjs');
+      const b = await readBody(req);
+      const r = AL.resolveFailure(b.id, b.note || '', {});
+      if (r.ok) try { AL.writeVaultNote({}); } catch { /* best-effort */ }
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // ── FOCUS / TIME TRACKER (replaces Forest): log a session + see totals/patterns by any period ──────
   if (req.method === 'GET' && url.pathname === '/api/focus') {
     try {

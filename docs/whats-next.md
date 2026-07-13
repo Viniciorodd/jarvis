@@ -2,7 +2,25 @@
 
 _Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-13 (latest) — SELF-IMPROVEMENT: failure/audit ledger + compliance self-heal (never fabricates)
+### 🆕 2026-07-13 (latest) — NO-OPEN-LOOPS SWEEP (operator policy: finish everything, phases OK)
+Closed every code-closable loop; loaded the operator-only ones into resurfacing systems so none is forgotten.
+- **Outreach recipient bug FIXED** (`pods/gov/connector.mjs`): the audit ledger's 3 "no To:/Subject" send
+  failures were outreach drafts with no enriched email that STILL raised a send gate (could only fail).
+  Now: email present → send gate; absent → a `sub.needs_email` task (not a failing gate). Both paths. 495 green.
+- **env.txt moved OUT of the synced vault** → `C:\Users\vinic\.jarvis-private\` (was in `Second Brain\`,
+  syncing secrets to the NAS + every device — audit security debt, closed).
+- **L-009 confirmed resolved**: no Edward/Passaic/Tampa strings in subs.json (audit's "⚠️ open" was stale).
+- **Hermes 3 pulled (4.7GB) + wired** as LOCAL_MODEL (smart); Ollama live; gemma4 verified. 32GB RAM.
+- **Operator-gated loops loaded into the Idea Vault** (resurface on their own): rotate OpenRouter key
+  (security, still unrotated), enable OpenClaw (own bot token + pairing), NAS redeploy #2 (activates
+  compliance self-heal + outreach fix on the NAS gov worker), improve sub-email enrichment hit-rate.
+- **The policy is now structurally enforced**: Idea Vault (resurfacing clocks), audit ledger (failures +
+  fix hints), capture desk (win/loss + standing debrief), business-hours nudges — nothing worth doing can
+  silently die, even done in phases. **Irreducible operator-only + time-sensitive:** the 2 submissions due
+  TODAY 7/13 (USACE 5pm / Southern Research noon, PIEE portal), repo→private, Delaware County pre-bid
+  MANDATORY Tue 7/14 11am, OpenRouter rotation, OpenClaw bot token, NAS redeploy #2.
+
+### 🆕 2026-07-13 — SELF-IMPROVEMENT: failure/audit ledger + compliance self-heal (never fabricates)
 Operator: "mark down all errors/failed audits so we know how to fix them" + "self-improve on Compliance:
 FAIL — diagnose, fix, loop until passing." Evals **463 → 495 green**. 2 parallel Agent builds, verified.
 - **Failure & Audit Ledger** (`pods/audit-log.mjs`): every failure (send-failed, compliance FAIL/RISK,

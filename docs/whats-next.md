@@ -2,7 +2,36 @@
 
 _Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-12 (latest) — BUSINESS-HOURS JARVIS: TZ fix · batched messages · Pursue buttons · APPROVE-TO-SEND
+### 🆕 2026-07-13 (latest) — SELF-IMPROVEMENT: failure/audit ledger + compliance self-heal (never fabricates)
+Operator: "mark down all errors/failed audits so we know how to fix them" + "self-improve on Compliance:
+FAIL — diagnose, fix, loop until passing." Evals **463 → 495 green**. 2 parallel Agent builds, verified.
+- **Failure & Audit Ledger** (`pods/audit-log.mjs`): every failure (send-failed, compliance FAIL/RISK,
+  facts-violation, executor-error, compliance-escalated) → a durable record with a concrete FIX HINT.
+  `classifyFailure` (pure) maps control-plane events → failures; append-only `audit-log/failures.jsonl`
+  (gitignored); vault note `00 - System/⚠️ Failure & Audit Log.md`; routes `GET /api/audit` +
+  `POST /api/audit/resolve`. **LIVE on PC companion — first hit surfaced 10 real failures**: gov-send ×3
+  ("no To:/Subject: header — draft had no enriched recipient email" — a SECOND send bug beyond the creds),
+  compliance ×6, executor ×1.
+- **Compliance self-heal** (`pods/gov/{compliance,remediate}.mjs` + worker wiring): `checkCompliance` now
+  returns structured `gaps`; `improveUntilPass` diagnoses → honestly fixes (strip false certs via
+  facts-check; LLM rewrite for scope/clause/formatting) → re-checks → loops to PASS, editing the STAGED
+  draft only (reversible, behind the human gate). **ANTI-FABRICATION GUARANTEE (verified in code + 2
+  adversarial evals):** `GAP_POLICY` pins set-aside-ineligible / missing-past-performance / passed-deadline
+  as hard/not-fixable; `improveUntilPass` escalates a hard gap at line 118 BEFORE remediate is reached;
+  facts safety net reverts any smuggled claim. It will NEVER invent past performance or eligibility to fake
+  a pass — those escalate to the operator (no-bid / teaming / real past performance).
+  ⏭ The worker self-heal activates wherever the gov worker runs — **on the NAS after the next redeploy**;
+  `/api/audit` is live on the PC companion now.
+
+### 🆕 2026-07-13 — approve-to-send ARMED on the NAS (redeploy done)
+Redeploy verified: container `date` = **EDT** (4am-messages bug dead), `GOV_AUTO_SEND=1` +
+`RODGATE_GMAIL_USER=rodgategroup@gmail.com` confirmed in the control-plane container. Fixed a real gap:
+compose only injects listed vars, so `GOV_AUTO_SEND` had to be added to the control-plane + telegram-bridge
+`environment:` blocks (committed) — `.env` alone wasn't enough. Approve-to-send is now fully live: tapping
+✅ on a send gate really emails via Gmail SMTP. The "sub reach-out FAILED ×2" was the missing creds +
+missing recipient-email enrichment (now both visible in the audit ledger).
+
+### 🆕 2026-07-12 — BUSINESS-HOURS JARVIS: TZ fix · batched messages · Pursue buttons · APPROVE-TO-SEND
 Operator QoL feedback, all shipped (evals **477 green**). ⚠ **Everything here activates on the NEXT NAS
 redeploy** (bridge/scheduler/CP run there) + set `GOV_AUTO_SEND=1` in the **NAS .env** during it:
 - **4-5 AM messages root-caused**: NAS containers run UTC → `at_hour: 8` fired at 4 AM ET. Fixed:

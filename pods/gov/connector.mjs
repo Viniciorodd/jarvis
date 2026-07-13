@@ -117,13 +117,20 @@ export async function maybeConnect({ op, sc }) {
 
   await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.outreach.draft', cost_usd: d.cost || 0, reversible: true, rationale: `${trade} outreach drafted (asks for past performance + quote)`, payload: { noticeId: op.noticeId, trade, top: top ? top.id : null, file } });
   const detail = top ? `Top: ${top.name} (${top.score}/100 — ${top.reasons.join(', ')}) · asks for past perf + quote · ${file}` : `No vendor on file — draft says where to source one · ${file}`;
-  await gateApproval(
-    { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send ${trade} outreach (SOW + ask for past performance + quote) for ${op.title}.`, payload: { noticeId: op.noticeId, trade, file, shortlist } },
-    { pod: 'Gov War Room', title: `Send ${trade} outreach: ${op.title}`, detail, xp: 20, verb: 'Review & send' });
   // Deal ledger: the outreach now EXISTS but has NOT gone out — the Deal Room shows it as your move
   // until the send is approved (this is the "researchers aren't reaching out" fix: it can't float).
   try { const D = await import('./deals.mjs'); D.recordOutreach(op.noticeId, { file, sub: top ? top.id : null, trade }); } catch { /* ledger best-effort */ }
-  await mirror('CONNECT-01', 'need', shortlist.length ? `Shortlisted ${shortlist.length} ${trade} sub(s) — outreach ready to send` : `Need a ${trade} vendor — outreach ready`);
+  // Only raise a SEND gate when there's a real recipient — a send gate on a draft with no To: can ONLY
+  // fail (the audit-ledger "no To:/Subject" class, 2026-07-13). No email → a needs-email task instead.
+  if (top && top.contact_email) {
+    await gateApproval(
+      { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send ${trade} outreach (SOW + ask for past performance + quote) for ${op.title} → ${top.contact_email}.`, payload: { noticeId: op.noticeId, trade, file, shortlist, to: top.contact_email } },
+      { pod: 'Gov War Room', title: `Send ${trade} outreach: ${op.title}`, detail, xp: 20, verb: 'Review & send' });
+    await mirror('CONNECT-01', 'need', `${trade} outreach ready to send → ${top.name}`);
+  } else {
+    await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.needs_email', status: 'need', reversible: true, rationale: `${trade} outreach for ${op.title} is drafted but has NO recipient email — add one (enrich or manually) before it can send.`, payload: { noticeId: op.noticeId, trade, file, shortlist } });
+    await mirror('CONNECT-01', 'need', `${trade} outreach for ${op.title} needs a recipient email before it can send`);
+  }
   return { trade, shortlist, top: top ? top.id : null, file };
 }
 
@@ -145,9 +152,15 @@ export async function reachOutToSub({ id } = {}) {
   const header = sub.contact_email ? `To: ${sub.contact_email}\nSubject: Teaming with Rodgate, LLC — ${sub.name}\n${'-'.repeat(48)}\n` : '';
   fs.writeFileSync(path.join(ROOT, file), `<!-- CRM reach-out to ${sub.name} -->\n\n${header}${r.text || '# (no draft — model unavailable)'}\n`);
   await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.outreach.draft', cost_usd: r.cost || 0, reversible: true, rationale: `Reach-out drafted to ${sub.name}`, payload: { sub: id, file } });
-  await gateApproval(
-    { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send teaming intro to ${sub.name}${sub.contact_email ? ` (${sub.contact_email})` : ' — no email found yet, add one first'}.`, payload: { sub: id, file } },
-    { pod: 'Gov War Room', title: `Reach out: ${sub.name}`, detail: `${sub.contact_email || 'no email'} · teaming intro · ${file}`, xp: 15, verb: 'Review & send' });
-  await mirror('CONNECT-01', 'need', `Reach-out to ${sub.name} ready — review & send`);
+  if (sub.contact_email) {
+    await gateApproval(
+      { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send teaming intro to ${sub.name} (${sub.contact_email}).`, payload: { sub: id, file, to: sub.contact_email } },
+      { pod: 'Gov War Room', title: `Reach out: ${sub.name}`, detail: `${sub.contact_email} · teaming intro · ${file}`, xp: 15, verb: 'Review & send' });
+    await mirror('CONNECT-01', 'need', `Reach-out to ${sub.name} ready — review & send`);
+  } else {
+    // No email found → don't raise a send gate that can only fail. Ask for an email first.
+    await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.needs_email', status: 'need', reversible: true, rationale: `Teaming intro to ${sub.name} is drafted but no email was found — add one before it can send.`, payload: { sub: id, file } });
+    await mirror('CONNECT-01', 'need', `${sub.name}: intro drafted but needs an email before it can send`);
+  }
   return { ok: true, file, email: sub.contact_email || '', name: sub.name };
 }

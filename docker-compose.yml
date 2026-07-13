@@ -96,6 +96,10 @@ services:
       GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY}
       RODGATE_GMAIL_USER: ${RODGATE_GMAIL_USER}
       RODGATE_GMAIL_APP_PASSWORD: ${RODGATE_GMAIL_APP_PASSWORD}
+      # Approve-to-send (operator granted 2026-07-12): with this ON, approving a gov SEND gate really
+      # sends the email via RODGATE_GMAIL SMTP. Without it here, .env's flag never reaches the container
+      # and every approval dry-runs. The gate stays the control — nothing sends without a human tap.
+      GOV_AUTO_SEND: ${GOV_AUTO_SEND:-0}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
       # Notion "Company Brain" sync (opportunities / subs / daily log / lessons). Without this the
@@ -159,6 +163,8 @@ services:
       TZ: ${TZ:-America/New_York}
       JARVIS_CP_URL: http://control-plane:8787
       COMPANION_URL: http://control-plane:8787   # no companion on the NAS → chat falls back to /command
+      # so the approval push shows "✅ Approve = the email SENDS" instead of the dry-run wording
+      GOV_AUTO_SEND: ${GOV_AUTO_SEND:-0}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
 

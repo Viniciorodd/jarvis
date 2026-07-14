@@ -2,7 +2,21 @@
 
 _Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-14 (latest) — FOCUS dashboard v2: backdating + timeline + day drill-down + Line/Radar charts
+### 🆕 2026-07-14 (latest) — FOCUS dashboard v3: FULL-WIDTH Forest-caliber (heatmap · donut · time-of-day · records · FAB)
+Operator (on a big monitor) wanted the full screen used, more info at once, a "+" to add (couldn't find
+the bottom log box), a better radar, and "everything Forest shows." Evals 508 green (backend byHour+records).
+- **Backend:** `summarize` now returns `byHour` (24 time-of-day buckets) + `records` (longest session,
+  most-focused day, avg session) — all-time (grouping only re-buckets the series). Peak hour = 5PM/210h;
+  longest 4h25m; best day 12h (Jan 20 2017).
+- **Dashboard** (`companion/public/focus.html`): 12-column desktop grid (max-width 1400, stacks on mobile).
+  Panels: stat tiles · **Records & habits** strip · main time-series (Bars/Line) · **calendar heatmap**
+  (GitHub-style, 12 months, tap→drilldown) · **tag donut** · enlarged **day-of-week radar** · **time-of-day**
+  bars · recent timeline · **"+" FAB** → add-session sheet (backdating-aware; replaced the hidden bottom box).
+  All hand-drawn inline SVG (no lib, PWA-safe). Verified: 7 panels, 367 heatmap cells, donut+radar render
+  (var() resolves in SVG fills), FAB works, 0 console errors, Jet Black + True White both flip clean.
+- ⏭ **NEXT = Phase 2: host the companion on the NAS (always-on / PC-independent).** Then Slack full wiring.
+
+### 🆕 2026-07-14 — FOCUS dashboard v2: backdating + timeline + day drill-down + Line/Radar charts
 Operator: log past sessions on their REAL date (stopwatch / pasted from Obsidian notes), and a richer view.
 Evals **504 → 507 green**. Verified in-browser (both themes, no console errors).
 - **Backdating** (`pods/focus.mjs` `parseFocusDate`, pure/eval-pinned): "July 13 2026 at 2 AM, 30 min of

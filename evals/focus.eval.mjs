@@ -52,6 +52,17 @@ export default {
       const day = sessionsOn(list, '2026-07-13');
       return ok(day.length === 2 && day[0].tag === 'reading' && day[1].tag === 'gov', JSON.stringify(day.map((d) => d.tag)));
     } },
+    { name: 'summarize: byHour (time-of-day) + records (longest session, best day, avg)', run: () => {
+      const s = summarize([
+        { date: '2026-07-13', start: '2026-07-13T02:00:00', minutes: 30, tag: 'reading' },
+        { date: '2026-07-13', start: '2026-07-13T14:00:00', minutes: 90, tag: 'gov' },
+        { date: '2026-07-14', start: '2026-07-14T14:30:00', minutes: 45, tag: 'gov' },
+      ], { grouping: 'day' });
+      const h2 = s.byHour.find((x) => x.hour === 2).minutes, h14 = s.byHour.find((x) => x.hour === 14).minutes;
+      return ok(h2 === 30 && h14 === 135 && s.records.longestSessionMin === 90 && s.records.longestSessionDate === '2026-07-13'
+        && s.records.bestDayMinutes === 120 && s.records.bestDayDate === '2026-07-13' && s.records.avgSessionMin === 55,
+        JSON.stringify({ h2, h14, rec: s.records }));
+    } },
     { name: 'bucketKey groups day/week/month/quarter/year', run: () =>
       ok(bucketKey('2026-07-10', 'day') === '2026-07-10'
         && bucketKey('2026-07-10', 'month') === '2026-07'

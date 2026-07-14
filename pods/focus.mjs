@@ -166,15 +166,22 @@ export function bucketKey(dateStr, grouping = 'day') {
 
 // ── PURE: aggregate sessions → totals + a time series + by-tag + patterns. Eval-pinned. ─────────────
 export function summarize(sessions = [], { grouping = 'day' } = {}) {
-  let totalMin = 0, ok = 0;
+  let totalMin = 0, ok = 0, longestMin = 0, longestDate = '', longestTag = '';
   const byBucket = {}, byTag = {}, byDow = [0, 0, 0, 0, 0, 0, 0], days = new Set();
+  const byHour = new Array(24).fill(0), byDate = {};
   for (const s of sessions) {
     const m = Number(s.minutes) || 0; totalMin += m; if (s.success !== false) ok++;
     const b = bucketKey(s.date, grouping); byBucket[b] = (byBucket[b] || 0) + m;
     byTag[s.tag || 'focus'] = (byTag[s.tag || 'focus'] || 0) + m;
-    days.add(s.date);
+    days.add(s.date); byDate[s.date] = (byDate[s.date] || 0) + m;
     const dow = new Date((s.date || '') + 'T00:00:00Z').getUTCDay(); if (dow >= 0 && dow <= 6) byDow[dow] += m;
+    // time-of-day ("when do you focus"): hour as WRITTEN in the start stamp (preserves the logged-local hour).
+    if (s.start) { const h = parseInt(String(s.start).slice(11, 13), 10); if (h >= 0 && h < 24) byHour[h] += m; }
+    if (m > longestMin) { longestMin = m; longestDate = s.date; longestTag = s.tag || 'focus'; }
   }
+  // records — the single biggest session + the single most-focused day.
+  let bestDayMin = 0, bestDayDate = '';
+  for (const [d, mm] of Object.entries(byDate)) { if (mm > bestDayMin) { bestDayMin = mm; bestDayDate = d; } }
   const series = Object.keys(byBucket).sort().map((k) => ({ bucket: k, minutes: byBucket[k], hours: Math.round(byBucket[k] / 6) / 10 }));
   const topTags = Object.entries(byTag).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([tag, minutes]) => ({ tag, minutes, hours: Math.round(minutes / 6) / 10 }));
   const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -191,7 +198,13 @@ export function summarize(sessions = [], { grouping = 'day' } = {}) {
     successRate: sessions.length ? Math.round((ok / sessions.length) * 100) : 0,
     grouping, series, topTags, recent,
     byDayOfWeek: dowNames.map((n, i) => ({ day: n, minutes: byDow[i] })),
+    byHour: byHour.map((minutes, hour) => ({ hour, minutes })),
     bestDayOfWeek: totalMin ? dowNames[bestDow] : null,
+    records: {
+      longestSessionMin: longestMin, longestSessionDate: longestDate, longestSessionTag: longestTag,
+      bestDayMinutes: bestDayMin, bestDayDate,
+      avgSessionMin: sessions.length ? Math.round(totalMin / sessions.length) : 0,
+    },
     streak: currentStreak([...days]),
   };
 }

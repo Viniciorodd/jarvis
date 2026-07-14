@@ -14,8 +14,14 @@ Operator: "I want them incorporated into Jarvis, not a separate model + a second
   requires the message to START with `openclaw:`/`hands:` (a passing mention never fires); `runOpenClaw` is
   never called from any untrusted-content/agent-loop/scheduled path; args go to `spawn` with no shell (no
   injection); OpenClaw's own owner-approval still gates dangerous ops. Idea Vault: both marked done.
-- ⏭ Optional: switch OpenClaw's default agent model config to hermes3 permanently (dispatch already passes
-  `--model ollama/hermes3:latest`); migrate openclaw.json plaintext token to SecretRefs (`openclaw secrets`).
+- ✅ **hermes3 is now OpenClaw's PERMANENT default** (`openclaw models set ollama/hermes3:latest`, gateway
+  restarted, backup at openclaw.json.bak). Brain (router LOCAL_MODEL) + hands (OpenClaw) now share ONE
+  resident model — less RAM, no gemma4↔hermes3 swap-thrash. gemma4 stays installed as fallback.
+- ⏭ Skipped: `openclaw secrets configure` migration — only the `env` provider is available (not real
+  keychain encryption; just relocates plaintext), and it risks breaking the scheduled-task gateway. The
+  token lives in a local-only, non-synced, non-committed file (`~/.openclaw/openclaw.json`) — low exposure.
+  The real secret risk (env.txt in the LiveSync'd vault) was already moved out. Revisit only if a file/exec
+  secrets provider gets set up. (OpenClaw's own bot pairing also works now — operator DM'd it, it replied.)
 
 ### 🆕 2026-07-13 — NO-OPEN-LOOPS SWEEP (operator policy: finish everything, phases OK)
 Closed every code-closable loop; loaded the operator-only ones into resurfacing systems so none is forgotten.

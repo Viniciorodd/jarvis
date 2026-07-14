@@ -609,5 +609,16 @@
   }catch(e){}
 })();
 </script>
+<script>
+/* Register the service worker so "Add to Home Screen" launches reliably (no blank screen) on iPhone/iPad/Mac.
+   Only over a secure context — HTTPS (Tailscale Serve) or localhost; over plain http it's a harmless no-op. */
+(function(){
+  try{
+    if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1')){
+      window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); });
+    }
+  }catch(e){}
+})();
+</script>
 </body>
 </html>

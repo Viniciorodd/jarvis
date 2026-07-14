@@ -1475,6 +1475,20 @@ const server = http.createServer(async (req, res) => {
       try {
         const last = messages[messages.length - 1];
         if (last && last.role === 'user' && typeof last.content === 'string') {
+          // ── OPENCLAW dispatch (local HANDS). ⚠ OPERATOR-TRIGGERED ONLY (doctrine directive #4):
+          //    this is the ONLY auto-path to OpenClaw's real local-command execution, and it fires ONLY
+          //    on an EXPLICIT operator-typed prefix ("openclaw:" / "hands:"). We deliberately gate on the
+          //    prefix (not a keyword) so untrusted content — which never legitimately arrives as an
+          //    operator chat message anyway — can't trick Jarvis into running commands. It runs BEFORE
+          //    the normal Claude path so the request goes to the local hands, not the cloud brain.
+          //    OpenClaw's own owner-approval/exec-policy still gates anything dangerous. Never widen this. ──
+          const OC = await import('../pods/openclaw.mjs');
+          const trig = OC.parseChatTrigger(last.content);
+          if (trig.hit) {
+            const r = await OC.runOpenClaw(trig.task);
+            const text = r.ok ? `🖐 OpenClaw (local): ${r.reply}` : `🖐 OpenClaw (local) couldn't run that — ${r.error || 'no reply'}`;
+            return send(res, 200, JSON.stringify({ text, actions: [{ ok: r.ok, label: r.ok ? '🖐 dispatched to local hands' : '🖐 OpenClaw error' }] }));
+          }
           const EXP = await import('../pods/expenses.mjs');
           const cap = EXP.captureFromText(last.content);
           if (cap.ok) return send(res, 200, JSON.stringify({ text: cap.spoken, actions: [{ ok: true, label: `💸 logged $${cap.expense.amount.toFixed(2)} · ${cap.expense.description} (${cap.expense.book})` }], expense: cap.expense }));
@@ -1501,6 +1515,20 @@ const server = http.createServer(async (req, res) => {
       const out = await converse(messages.slice(-20));
       return send(res, 200, JSON.stringify(out));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  // ── OPENCLAW: Jarvis's local HANDS. Dispatch a task to the on-device OpenClaw CLI agent (free, local).
+  //    ⚠ OPERATOR-TRIGGERED ONLY (doctrine directive #4): OpenClaw runs REAL local commands, and Jarvis
+  //    handles untrusted content, so this is NEVER auto-invoked from any untrusted/agent/scheduled path —
+  //    only an explicit operator request reaches it (this POST route, or the typed "openclaw:"/"hands:"
+  //    prefix in /api/chat below). OpenClaw's own owner-approval/exec-policy still gates dangerous actions. ──
+  if (req.method === 'POST' && url.pathname === '/api/openclaw') {
+    try {
+      const OC = await import('../pods/openclaw.mjs');
+      const b = await readBody(req);
+      if (!b.task || !String(b.task).trim()) return send(res, 400, JSON.stringify({ ok: false, error: 'task required' }));
+      const r = await OC.runOpenClaw(b.task, { model: b.model });
+      return send(res, r.ok ? 200 : 502, JSON.stringify({ ok: r.ok, reply: r.reply || '', error: r.error, ms: r.ms }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
   }
   // ── VOICE EXPENSE TRACKING: "I spent X on Y" → deterministic log. GET = today/summary, POST = log ──
   if (req.method === 'GET' && url.pathname === '/api/expense') {

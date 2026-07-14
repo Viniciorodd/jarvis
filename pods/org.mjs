@@ -54,6 +54,19 @@ export const ROSTER = [
   { codename: 'CONCIERGE-01', nickname: 'Nina', title: 'Personal Assistant', pod: 'personal', reports_to: 'MAILROOM-01', tier: 'cheap',
     aliases: ['remind', 'reminder', 'personal', 'errand', 'appointment', 'book a', 'travel', 'flight', 'gift', 'family', 'todo', 'to-do', 'grocery'],
     does: 'Calendar, reminders, errands, travel, personal-life logistics.' },
+
+  // ── The LOCAL layer — free, private, on-device. Jarvis's own brain + hands, so the operator runs ONE
+  //    Jarvis instead of juggling a separate model and a separate bot. HERMES is the free local BRAIN
+  //    (Hermes 3 on Ollama, wired as LOCAL_MODEL in pods/model-router.mjs — the default when Claude tokens
+  //    run out or privacy work must stay on the PC). OPENCLAW is the free local HANDS (the on-device CLI
+  //    agent in pods/openclaw.mjs). ⚠ OpenClaw dispatch is OPERATOR-TRIGGERED ONLY — it never acts on
+  //    untrusted content; this roster seat is for visibility/addressing, not an autonomous executor.
+  { codename: 'HERMES', nickname: 'Hermes', title: 'Local Brain (free, private)', pod: 'local', reports_to: 'EXEC-01', tier: 'draft',
+    aliases: ['hermes', 'local brain', 'local model', 'offline', 'private brain', 'free brain', 'on-device model', 'ollama'],
+    does: 'Jarvis\'s free, private, on-device reasoning model (Hermes 3 via Ollama). Runs $0 and keeps private work on the PC; the fallback when cloud tokens run out.' },
+  { codename: 'OPENCLAW', nickname: 'OpenClaw', title: 'Local Hands (free, on-device)', pod: 'local', reports_to: 'EXEC-01', tier: 'draft',
+    aliases: ['openclaw', 'hands', 'local hands', 'run a command', 'local agent', 'on-device agent', 'do it locally'],
+    does: 'Jarvis\'s free, on-device HANDS (the OpenClaw CLI agent) — runs commands / touches files / browses locally. OPERATOR-TRIGGERED ONLY (explicit "openclaw:"/"hands:" prefix); keeps its own owner-approval gate.' },
 ];
 
 // Model tiers — EXPERT defaults: Haiku for high-volume scanning, Sonnet for the real work (proposals,

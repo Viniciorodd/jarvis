@@ -5,6 +5,12 @@
 (function () {
   const MODES = ['auto', 'local', 'claude', 'openrouter'];
   const LABEL = { auto: 'Auto', local: 'Local', claude: 'Claude', openrouter: 'OpenRouter' };
+  // Friendly name for the active local Ollama model, so the chip reads "Hermes 3" — the free local brain —
+  // instead of a generic "Local". Keeps Jarvis's brain visible, not invisible plumbing.
+  const MODEL_NAME = (id) => { const s = String(id || '').toLowerCase();
+    if (s.includes('hermes')) return 'Hermes 3'; if (s.includes('gemma')) return 'Gemma';
+    if (s.includes('qwen')) return 'Qwen'; if (s.includes('glm')) return 'GLM';
+    return id ? id.split(':')[0] : 'Local'; };
 
   function mount() {
     const bar = document.getElementById('jTop');
@@ -29,18 +35,20 @@
     const lbl = document.getElementById('brainLbl');
     const dot = document.getElementById('brainDot');
     if (!lbl || !dot) return;
-    lbl.textContent = LABEL[state.prefer] || 'Auto';
+    const m = state.models || {};
+    const localName = MODEL_NAME(m.local);
+    // Name the local brain (Hermes 3) when it's the active mode — it reads as a real brain, not "Local".
+    lbl.textContent = state.prefer === 'local' ? localName : (LABEL[state.prefer] || 'Auto');
     const have = state.have || {};
     // green = a free brain is reachable (so "never goes dark" holds); amber = only Claude; grey = unknown
     const free = have.local || have.openrouter;
     const color = state.prefer === 'claude' ? (have.claude ? 'var(--teal,#43e6d4)' : 'var(--err,#ff8f80)')
       : free ? 'var(--ok,#5dcaa5)' : (have.claude ? 'var(--warn,#f0b45c)' : 'var(--dim,#8b909a)');
     dot.style.background = color;
-    const m = state.models || {};
     document.getElementById('brainChip').title =
-      `Brain: ${LABEL[state.prefer]}\n` +
-      `Claude: ${have.claude ? '✓' : '✗'}   Local (${m.local || 'ollama'}): ${have.local ? '✓' : 'start Ollama'}   OpenRouter: ${have.openrouter ? '✓' : 'add key'}\n` +
-      `Tap to cycle. Auto = free-first, falls back so Jarvis never goes dark.`;
+      `Brain: ${state.prefer === 'local' ? localName + ' (local, free)' : LABEL[state.prefer]}\n` +
+      `Claude: ${have.claude ? '✓' : '✗'}   ${localName} (local): ${have.local ? '✓' : 'start Ollama'}   OpenRouter: ${have.openrouter ? '✓' : 'add key'}\n` +
+      `Tap to cycle. Auto = free-first (${localName} local), falls back so Jarvis never goes dark.`;
   }
 
   async function refresh() {

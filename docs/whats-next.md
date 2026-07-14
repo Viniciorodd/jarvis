@@ -2,7 +2,20 @@
 
 _Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-14 (latest) — SAME JARVIS ON EVERY DEVICE: installable PWA (Phase 1 of 2)
+### 🆕 2026-07-14 (latest) — FOCUS dashboard v2: backdating + timeline + day drill-down + Line/Radar charts
+Operator: log past sessions on their REAL date (stopwatch / pasted from Obsidian notes), and a richer view.
+Evals **504 → 507 green**. Verified in-browser (both themes, no console errors).
+- **Backdating** (`pods/focus.mjs` `parseFocusDate`, pure/eval-pinned): "July 13 2026 at 2 AM, 30 min of
+  reading" → logs 30m/reading on **2026-07-13T02:00**, not today. Handles ISO / US m-d[-y] / month-name /
+  relative (yesterday, last night, N days ago) + time. Works via the log box AND Jarvis chat. Backdated
+  sessions confirm "📅 Logged … on Jul 13 (backdated)".
+- **Backend:** `summarize().recent` (40-session timeline), `sessionsOn()` + `GET /api/focus/day?date=`.
+- **Dashboard** (`companion/public/focus.html`): Recent timeline (time/tag/description/source glyph), day
+  drill-down overlay (tap a day/row → every session with when+what+source), chart-type toggle **Bars ·
+  Line · Radar** — all hand-drawn inline SVG (no library, PWA-safe): Line has a dashed moving-average trend;
+  Radar is a 7-spoke by-day-of-week spider. Theme-aware. Live on phone/Mac after a refresh (PWA).
+
+### 🆕 2026-07-14 — SAME JARVIS ON EVERY DEVICE: installable PWA (Phase 1 of 2)
 Operator wants the SAME Jarvis on Mac + iPhone + iPad (his Mac had an old separate instance; PWA
 add-to-home-screen showed blank). Reframe: there is ONE Jarvis app (companion web server on the PC); every
 device just opens/installs it over the tailnet. Chose "PC now, NAS next".

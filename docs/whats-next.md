@@ -2,7 +2,24 @@
 
 _Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-14 (latest) — ONE JARVIS: OpenClaw (local hands) + Hermes 3 (local brain) incorporated
+### 🆕 2026-07-14 (latest) — SAME JARVIS ON EVERY DEVICE: installable PWA (Phase 1 of 2)
+Operator wants the SAME Jarvis on Mac + iPhone + iPad (his Mac had an old separate instance; PWA
+add-to-home-screen showed blank). Reframe: there is ONE Jarvis app (companion web server on the PC); every
+device just opens/installs it over the tailnet. Chose "PC now, NAS next".
+- **PWA blank-screen fixed:** root cause = NO service worker + plain http (service workers need a secure
+  context). Added `companion/public/sw.js` (app-shell cache; network-first navigations fall back to the
+  cached shell so it never blanks; /api never cached) + gated registration in index.html (https/localhost).
+- **HTTPS via Tailscale Serve:** `tailscale serve --bg http://127.0.0.1:8095` → **https://shisui.tailf46d22.ts.net**
+  (real auto-provisioned cert, tailnet-only, persists across reboots). Verified: app + sw.js both 200 over HTTPS.
+  This ALSO unlocks the browser mic on mobile (voice needs HTTPS) — voice now works on phone/iPad/Mac.
+- **The one URL for all devices: `https://shisui.tailf46d22.ts.net`** (Tailscale ON + PC on; PC self-heals).
+  Mac: open it (delete the old separate Mac instance — same server, same vault/tasks/calendar/timelogs).
+  iPhone/iPad: Safari → Share → Add to Home Screen → now launches reliably as a real app.
+- ⏭ **Phase 2 (backlog "containerize companion on NAS"):** host the companion on the NAS so Jarvis is
+  always-on / PC-independent (ideal for travel). Tradeoffs to solve: vault/tasks/focus data paths → NAS,
+  Google/voice keys → NAS .env, Kokoro TTS may not run server-side. Then one always-on URL for everything.
+
+### 🆕 2026-07-14 — ONE JARVIS: OpenClaw (local hands) + Hermes 3 (local brain) incorporated
 Operator: "I want them incorporated into Jarvis, not a separate model + a second bot." Done. Evals **504 green**.
 - **Hermes 3 = the free local brain** — already the router's LOCAL_MODEL; now VISIBLE: a named team-roster
   seat (`HERMES`, pod:'local') + the top-bar **brain chip shows "Hermes 3"** (`brain.js` names the local model).

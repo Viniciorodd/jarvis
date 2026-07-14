@@ -56,22 +56,59 @@ export function parseForestCsv(text) {
   return out;
 }
 
+// ── PURE: extract an EXPLICIT date (+ optional start time) from a typed/pasted log so a session can be
+// BACKDATED to when it actually happened, not stamped "now". Handles: ISO 2026-07-13, US 7/13[/2026],
+// month names (July 13[, 2026] / 13 Jul), and relative (yesterday / last night / today / N days ago).
+// Time: "at 2am", "2:30 PM", "14:30". Returns { date:'YYYY-MM-DD'|null, start:ISO|null, matched }. Eval-pinned.
+const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+const _pad = (n) => String(n).padStart(2, '0');
+const _ymd = (y, m, d) => `${y}-${_pad(m)}-${_pad(d)}`;
+export function parseFocusDate(text, now = new Date()) {
+  const t = String(text || '');
+  const Y = now.getFullYear();
+  const shift = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return _ymd(d.getFullYear(), d.getMonth() + 1, d.getDate()); };
+  let date = null, matched = null;
+  let mm;
+  if (/\bthe day before yesterday\b/i.test(t)) { date = shift(2); matched = 'the day before yesterday'; }
+  else if (/\b(yesterday|last night)\b/i.test(t)) { date = shift(1); matched = 'yesterday'; }
+  else if ((mm = t.match(/\b(\d+)\s*days?\s*ago\b/i))) { date = shift(parseInt(mm[1], 10)); matched = mm[0]; }
+  else if (/\b(today|this (?:morning|afternoon|evening)|tonight)\b/i.test(t)) { date = shift(0); matched = 'today'; }
+  if (!date && (mm = t.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/))) { date = _ymd(+mm[1], +mm[2], +mm[3]); matched = mm[0]; }
+  if (!date && (mm = t.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/))) { let y = mm[3] ? +mm[3] : Y; if (y < 100) y += 2000; date = _ymd(y, +mm[1], +mm[2]); matched = mm[0]; }
+  if (!date && (mm = t.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(20\d{2}))?/i))) { date = _ymd(mm[3] ? +mm[3] : Y, MONTHS[mm[1].toLowerCase().slice(0, 3)], +mm[2]); matched = mm[0]; }
+  if (!date && (mm = t.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?:,?\s*(20\d{2}))?/i))) { date = _ymd(mm[3] ? +mm[3] : Y, MONTHS[mm[2].toLowerCase().slice(0, 3)], +mm[1]); matched = mm[0]; }
+  let start = null;
+  if (date) {
+    const tm = t.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)/i) || t.match(/\bat\s+(\d{1,2}):(\d{2})\b/);
+    if (tm) {
+      let hh = parseInt(tm[1], 10); const min = tm[2] ? parseInt(tm[2], 10) : 0; const ap = (tm[3] || '').toLowerCase();
+      if (ap.startsWith('p') && hh < 12) hh += 12; if (ap.startsWith('a') && hh === 12) hh = 0;
+      if (hh >= 0 && hh < 24 && min < 60) start = `${date}T${_pad(hh)}:${_pad(min)}:00`;
+    }
+  }
+  return { date, start, matched };
+}
+
 // ── PURE: parse a spoken/typed focus log. "I focused 90 minutes on gov" / "2 hours deep work on the
-// proposal" / "studied 45 min". Returns { ok, minutes, tag, note } or { ok:false }. Eval-pinned. ────────
-const FOCUS_VERB = /\b(focus(?:ed|ing)?|deep[- ]?work|worked?|studied|study|grind(?:ed|ing)?|session|productive)\b/i;
-export function parseFocusUtterance(text) {
+// proposal" / "studied 45 min" / "7/13 at 2am 30 min of reading" (backdated). Returns
+// { ok, minutes, tag, note, date, start } or { ok:false }. Eval-pinned. ─────────────────────────────────
+const FOCUS_VERB = /\b(focus(?:ed|ing)?|deep[- ]?work|worked?|studied|study|read(?:ing)?|journal(?:ing|ed)?|grind(?:ed|ing)?|session|productive)\b/i;
+export function parseFocusUtterance(text, now = new Date()) {
   const t = String(text || '').trim();
   if (!t || /\?\s*$/.test(t)) return { ok: false };
-  if (!FOCUS_VERB.test(t) && !/\b\d+\s*(?:h|hr|hrs|hours?|m|min|mins|minutes?)\b/i.test(t)) return { ok: false };
+  if (!FOCUS_VERB.test(t) && !/\b\d+(?:\.\d+)?\s*(?:h|hr|hrs|hours?|m|min|mins|minutes?)\b/i.test(t)) return { ok: false };
   let minutes = 0;
   const hm = t.match(/\b(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hours?)\b(?:\s*(?:and\s*)?(\d+)\s*(?:m|min|mins|minutes?))?/i);
   if (hm) minutes = Math.round(parseFloat(hm[1]) * 60 + (hm[2] ? parseInt(hm[2], 10) : 0));
   else { const mm = t.match(/\b(\d+)\s*(?:m|min|mins|minutes?)\b/i); if (mm) minutes = parseInt(mm[1], 10); }
   if (!(minutes > 0) || minutes > 24 * 60) return { ok: false };
+  const when = parseFocusDate(t, now);
   let tag = '', note = '';
-  const on = t.match(/\bon\s+(.+)$/i);
-  if (on) { note = on[1].replace(/[.!?,\s]+$/, '').trim(); tag = note.split(/\s+/).slice(0, 3).join(' ').toLowerCase(); }
-  return { ok: true, minutes, tag: tag || 'focus', note };
+  const act = t.match(/\b(?:on|of|doing|reading|studying|journaling)\s+(.+)$/i);
+  if (act) { note = act[1].replace(/[.!?,\s]+$/, '').trim(); tag = note.split(/\s+/).slice(0, 3).join(' ').toLowerCase(); }
+  else if (/\breading\b/i.test(t)) { tag = 'reading'; note = 'reading'; }
+  else if (/\bjournal/i.test(t)) { tag = 'journal'; note = 'journaling'; }
+  return { ok: true, minutes, tag: tag || 'focus', note, date: when.date || '', start: when.start || '' };
 }
 
 // ── IO ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -142,12 +179,17 @@ export function summarize(sessions = [], { grouping = 'day' } = {}) {
   const topTags = Object.entries(byTag).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([tag, minutes]) => ({ tag, minutes, hours: Math.round(minutes / 6) / 10 }));
   const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const bestDow = byDow.indexOf(Math.max(...byDow));
+  // the timeline: the most recent sessions by when they actually happened (start||date), newest first.
+  const recent = [...sessions]
+    .sort((a, b) => String(b.start || b.date || '').localeCompare(String(a.start || a.date || '')))
+    .slice(0, 40)
+    .map((s) => ({ date: s.date, start: s.start || '', minutes: s.minutes, tag: s.tag, note: s.note || '', source: s.source || '' }));
   return {
     sessions: sessions.length,
     totalMinutes: totalMin, totalHours: Math.round(totalMin / 6) / 10,
     activeDays: days.size, avgPerActiveDay: days.size ? Math.round(totalMin / days.size) : 0,
     successRate: sessions.length ? Math.round((ok / sessions.length) * 100) : 0,
-    grouping, series, topTags,
+    grouping, series, topTags, recent,
     byDayOfWeek: dowNames.map((n, i) => ({ day: n, minutes: byDow[i] })),
     bestDayOfWeek: totalMin ? dowNames[bestDow] : null,
     streak: currentStreak([...days]),
@@ -163,17 +205,33 @@ export function currentStreak(dayList = []) {
   return streak;
 }
 
-// Convenience for the voice/chat path.
-export function captureFocus(text) {
+// PURE: sessions for one specific day, ordered by time (for the day drill-down: when + what + source).
+export function sessionsOn(sessions = [], day = '') {
+  return sessions.filter((s) => s.date === day)
+    .sort((a, b) => String(a.start || a.ts || '').localeCompare(String(b.start || b.ts || '')))
+    .map((s) => ({ date: s.date, start: s.start || '', end: s.end || '', minutes: s.minutes, tag: s.tag, note: s.note || '', source: s.source || '', ts: s.ts || '' }));
+}
+
+// Convenience for the voice/chat + typed-log path. Honors a backdate parsed from the text ("Jul 13, 2am,
+// 30 min reading" logs ON Jul 13, not today). source: 'voice' from chat, 'manual' from the dashboard box.
+export function captureFocus(text, source = 'manual') {
   const p = parseFocusUtterance(text);
   if (!p.ok) return { ok: false };
-  const r = logFocus({ minutes: p.minutes, tag: p.tag, note: p.note, source: 'voice' });
+  const today = new Date().toISOString().slice(0, 10);
+  const backdated = !!p.date && p.date !== today;
+  const r = logFocus({ minutes: p.minutes, tag: p.tag, note: p.note, date: p.date || '', start: p.start || '', source: backdated ? 'manual' : source });
   if (!r.ok) return { ok: false, error: r.error };
   const h = Math.floor(p.minutes / 60), mm = p.minutes % 60;
   const dur = h ? `${h}h${mm ? ' ' + mm + 'm' : ''}` : `${mm}m`;
-  const todayTotal = summarize(readFocus({ since: new Date().toISOString().slice(0, 10) })).totalMinutes;
+  const onNote = p.note ? ' on ' + p.note : '';
+  if (backdated) {
+    const nice = new Date(p.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const atT = p.start ? ' at ' + p.start.slice(11, 16) : '';
+    return { ok: true, session: r.session, backdated: true, spoken: `📅 Logged ${dur}${onNote} on ${nice}${atT} (backdated) ✓` };
+  }
+  const todayTotal = summarize(readFocus({ since: today })).totalMinutes;
   const th = Math.floor(todayTotal / 60), tm = todayTotal % 60;
-  return { ok: true, session: r.session, spoken: `Logged ${dur} of focus${p.note ? ' on ' + p.note : ''}. 🌳 ${th ? th + 'h ' : ''}${tm}m focused today.` };
+  return { ok: true, session: r.session, spoken: `Logged ${dur}${onNote}. 🌳 ${th ? th + 'h ' : ''}${tm}m focused today.` };
 }
 
 if (process.argv[1] && process.argv[1].endsWith('focus.mjs')) {

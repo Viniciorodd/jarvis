@@ -1633,12 +1633,24 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(F.summarize(list, { grouping })));
     } catch (e) { return send(res, 200, JSON.stringify({ sessions: 0, totalHours: 0, series: [], topTags: [], error: e.message })); }
   }
+  // Day drill-down: every session on a specific day, ordered by time (when + what + source).
+  if (req.method === 'GET' && url.pathname === '/api/focus/day') {
+    try {
+      const F = await import('../pods/focus.mjs');
+      const day = (url.searchParams.get('date') || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return send(res, 400, JSON.stringify({ error: 'date=YYYY-MM-DD required' }));
+      const list = F.readFocus({ since: day, until: day });
+      const sessions = F.sessionsOn(list, day);
+      const total = sessions.reduce((s, x) => s + (x.minutes || 0), 0);
+      return send(res, 200, JSON.stringify({ date: day, sessions, totalMinutes: total, count: sessions.length }));
+    } catch (e) { return send(res, 200, JSON.stringify({ date: '', sessions: [], error: e.message })); }
+  }
   if (req.method === 'POST' && url.pathname === '/api/focus/log') {
     try {
       const F = await import('../pods/focus.mjs');
       const b = await readBody(req);
       if (b.text && !b.minutes) { const cap = F.captureFocus(b.text); return send(res, cap.ok ? 200 : 400, JSON.stringify(cap.ok ? cap : { ok: false, error: 'no focus session found in that text' })); }
-      const r = F.logFocus({ minutes: b.minutes, tag: b.tag, note: b.note, source: b.source || 'manual' });
+      const r = F.logFocus({ minutes: b.minutes, tag: b.tag, note: b.note, date: b.date || '', start: b.start || '', source: b.source || 'manual' });
       return send(res, r.ok ? 200 : 400, JSON.stringify(r));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }

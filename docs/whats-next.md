@@ -2,7 +2,22 @@
 
 _Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-13 (latest) — NO-OPEN-LOOPS SWEEP (operator policy: finish everything, phases OK)
+### 🆕 2026-07-14 (latest) — ONE JARVIS: OpenClaw (local hands) + Hermes 3 (local brain) incorporated
+Operator: "I want them incorporated into Jarvis, not a separate model + a second bot." Done. Evals **504 green**.
+- **Hermes 3 = the free local brain** — already the router's LOCAL_MODEL; now VISIBLE: a named team-roster
+  seat (`HERMES`, pod:'local') + the top-bar **brain chip shows "Hermes 3"** (`brain.js` names the local model).
+- **OpenClaw = the free local hands, dispatched FROM Jarvis** (`pods/openclaw.mjs`): typing `openclaw: <task>`
+  or `hands: <task>` in Jarvis chat runs the task on OpenClaw's local `main` agent (on Hermes 3, on-device,
+  $0) and returns the reply — no second bot, no pairing needed. `POST /api/openclaw` too. `OPENCLAW` roster seat.
+  **Live end-to-end verified**: Jarvis→OpenClaw→Hermes replied "INCORPORATED" (89s first call, model load).
+- **SECURITY (verified in code + evals):** dispatch is OPERATOR-TRIGGERED ONLY — the explicit prefix regex
+  requires the message to START with `openclaw:`/`hands:` (a passing mention never fires); `runOpenClaw` is
+  never called from any untrusted-content/agent-loop/scheduled path; args go to `spawn` with no shell (no
+  injection); OpenClaw's own owner-approval still gates dangerous ops. Idea Vault: both marked done.
+- ⏭ Optional: switch OpenClaw's default agent model config to hermes3 permanently (dispatch already passes
+  `--model ollama/hermes3:latest`); migrate openclaw.json plaintext token to SecretRefs (`openclaw secrets`).
+
+### 🆕 2026-07-13 — NO-OPEN-LOOPS SWEEP (operator policy: finish everything, phases OK)
 Closed every code-closable loop; loaded the operator-only ones into resurfacing systems so none is forgotten.
 - **Outreach recipient bug FIXED** (`pods/gov/connector.mjs`): the audit ledger's 3 "no To:/Subject" send
   failures were outreach drafts with no enriched email that STILL raised a send gate (could only fail).

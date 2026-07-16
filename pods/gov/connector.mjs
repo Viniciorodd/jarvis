@@ -9,6 +9,30 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, DRAFTS, profile, emit, mirror, hqApproval, gateApproval, claude } from './lib.mjs';
+import { checkSubExclusion } from './exclusions.mjs';
+
+// FAR forbids subcontracting to a DEBARRED/SUSPENDED/EXCLUDED party (SAM Exclusions is a SEPARATE list from
+// registration — a registered sub can still be excluded). Before we raise any outreach/send gate for a sub
+// we run the exclusion check. Best-effort wrapper: on ANY failure default to UNVERIFIED (a caution, never a
+// silent "clear") so a check outage can't (a) award to an excluded sub, nor (b) break the outreach flow.
+// Also persists exclusionStatus + exclusionCheckedAt back onto the CRM row (non-breaking) for "last-checked".
+async function gateExclusion(sub) {
+  let res;
+  try { res = await checkSubExclusion(sub); }
+  catch (e) { res = { excluded: false, unverified: true, matches: [], checkedAt: new Date().toISOString(), reason: `exclusion check failed: ${e.message}` }; }
+  try {
+    if (sub && sub.id) {
+      const subs = loadSubs();
+      const row = subs.find((s) => s.id === sub.id);
+      if (row) {
+        row.exclusionStatus = res.excluded ? 'excluded' : res.unverified ? 'unverified' : 'clear';
+        row.exclusionCheckedAt = res.checkedAt || new Date().toISOString();
+        saveSubs(subs);
+      }
+    }
+  } catch { /* CRM persist is best-effort */ }
+  return res;
+}
 
 // The CRM lives in GOV_DATA_DIR if set (a mounted volume on the NAS, so it persists + you can open it),
 // else next to the code (pods/gov, for local dev). The in-repo subs.json is the seed/fallback.
@@ -103,6 +127,20 @@ export async function maybeConnect({ op, sc }) {
     } catch { /* enrichment best-effort — falls back to a review draft */ }
   }
 
+  // Stage-3 EXCLUSION gate on the top candidate BEFORE we invest in drafting/gating outreach. An excluded
+  // sub is a hard stop (FAR); an unverified check is a caution carried onto the (already human-gated) send.
+  let excl = null;
+  if (top) {
+    excl = await gateExclusion(top);
+    if (excl.excluded) {
+      await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.excluded', status: 'error', reversible: true, rationale: `⛔ ${top.name} is on the SAM EXCLUSIONS list — cannot subcontract. ${excl.reason}`, payload: { noticeId: op.noticeId, trade, sub: top, matches: excl.matches } });
+      await mirror('CONNECT-01', 'need', `⛔ ${top.name} is on the SAM EXCLUSIONS list — cannot subcontract (${trade}). Pick another sub.`);
+      return { trade, shortlist, top: top.id, excluded: true, file: null };
+    }
+  }
+  const exclNote = excl && excl.unverified ? ' ⚠ exclusion check UNVERIFIED — confirm at SAM.gov before sending.' : '';
+  const exclPayload = excl ? (excl.unverified ? { exclusionUnverified: true } : { exclusionChecked: true, exclusionCheckedAt: excl.checkedAt }) : {};
+
   const d = await draftOutreach(op, top, trade, shortlist);
   fs.mkdirSync(DRAFTS, { recursive: true });
   const slug = (op.noticeId || op.title).replace(/[^\w]+/g, '-').slice(0, 44);
@@ -124,8 +162,8 @@ export async function maybeConnect({ op, sc }) {
   // fail (the audit-ledger "no To:/Subject" class, 2026-07-13). No email → a needs-email task instead.
   if (top && top.contact_email) {
     await gateApproval(
-      { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send ${trade} outreach (SOW + ask for past performance + quote) for ${op.title} → ${top.contact_email}.`, payload: { noticeId: op.noticeId, trade, file, shortlist, to: top.contact_email } },
-      { pod: 'Gov War Room', title: `Send ${trade} outreach: ${op.title}`, detail, xp: 20, verb: 'Review & send' });
+      { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send ${trade} outreach (SOW + ask for past performance + quote) for ${op.title} → ${top.contact_email}.${exclNote}`, payload: { noticeId: op.noticeId, trade, file, shortlist, to: top.contact_email, ...exclPayload } },
+      { pod: 'Gov War Room', title: `Send ${trade} outreach: ${op.title}`, detail: detail + exclNote, xp: 20, verb: 'Review & send' });
     await mirror('CONNECT-01', 'need', `${trade} outreach ready to send → ${top.name}`);
   } else {
     await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.needs_email', status: 'need', reversible: true, rationale: `${trade} outreach for ${op.title} is drafted but has NO recipient email — add one (enrich or manually) before it can send.`, payload: { noticeId: op.noticeId, trade, file, shortlist } });
@@ -144,6 +182,16 @@ export async function reachOutToSub({ id } = {}) {
     await mirror('CONNECT-01', 'work', `Finding a contact email for ${sub.name}…`);
     try { const { enrichSubs } = await import('./enrich.mjs'); await enrichSubs({ ids: [id] }); sub = loadSubs().find((s) => s.id === id) || sub; } catch { /* best-effort */ }
   }
+  // Stage-3 EXCLUSION gate — never add a debarred/suspended/excluded party to our bench (FAR).
+  const excl = await gateExclusion(sub);
+  if (excl.excluded) {
+    await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.excluded', status: 'error', reversible: true, rationale: `⛔ ${sub.name} is on the SAM EXCLUSIONS list — cannot subcontract. ${excl.reason}`, payload: { sub, matches: excl.matches } });
+    await mirror('CONNECT-01', 'need', `⛔ ${sub.name} is on the SAM EXCLUSIONS list — cannot subcontract. Removed from reach-out.`);
+    return { ok: false, error: 'sub is on the SAM exclusions list', excluded: true, matches: excl.matches, name: sub.name };
+  }
+  const exclNote = excl.unverified ? ' ⚠ exclusion check UNVERIFIED — confirm at SAM.gov before sending.' : '';
+  const exclPayload = excl.unverified ? { exclusionUnverified: true } : { exclusionChecked: true, exclusionCheckedAt: excl.checkedAt };
+
   const sys = `You are Hector, procurement lead for Rodgate, LLC (a PA-based SDB/Minority/Hispanic-owned janitorial-facilities GovCon PRIME that subcontracts labor). Draft a SHORT (<160 words), warm, professional intro email to a local ${sub.trade || 'facilities'} company to add them to our subcontractor bench for upcoming federal/SLED janitorial-facilities contracts. Ask them to reply with: services + areas covered, relevant past performance, proof of insurance + certifications, and typical pricing. Warm, zero ego, exposure-not-persuasion. End with "[REVIEW & SEND — Vinicio approves]". Firm profile:\n${profile()}`;
   const r = await claude(sys, `COMPANY: ${JSON.stringify({ name: sub.name, location: sub.location, website: sub.website })}`, { tier: 'draft', maxTokens: 600, agent: 'CONNECT-01' });
   const slug = ('reach-' + (sub.name || id)).replace(/[^\w]+/g, '-').slice(0, 46);
@@ -154,8 +202,8 @@ export async function reachOutToSub({ id } = {}) {
   await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.outreach.draft', cost_usd: r.cost || 0, reversible: true, rationale: `Reach-out drafted to ${sub.name}`, payload: { sub: id, file } });
   if (sub.contact_email) {
     await gateApproval(
-      { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send teaming intro to ${sub.name} (${sub.contact_email}).`, payload: { sub: id, file, to: sub.contact_email } },
-      { pod: 'Gov War Room', title: `Reach out: ${sub.name}`, detail: `${sub.contact_email} · teaming intro · ${file}`, xp: 15, verb: 'Review & send' });
+      { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send teaming intro to ${sub.name} (${sub.contact_email}).${exclNote}`, payload: { sub: id, file, to: sub.contact_email, ...exclPayload } },
+      { pod: 'Gov War Room', title: `Reach out: ${sub.name}`, detail: `${sub.contact_email} · teaming intro · ${file}${exclNote}`, xp: 15, verb: 'Review & send' });
     await mirror('CONNECT-01', 'need', `Reach-out to ${sub.name} ready — review & send`);
   } else {
     // No email found → don't raise a send gate that can only fail. Ask for an email first.

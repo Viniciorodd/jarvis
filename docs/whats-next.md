@@ -2,7 +2,31 @@
 
 _Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-14 (latest) — FOCUS dashboard v3: FULL-WIDTH Forest-caliber (heatmap · donut · time-of-day · records · FAB)
+### 🆕 2026-07-14 (latest) — RECONCILED 5 planning docs vs. the live build ("inspect, log everything, apply what's worth it")
+Operator handed 5 vault plans (Cross-Device PRD, Victor CFO Expanded PRD, GovCon Master Reference, CAIVRS/SBA
+Findings, Financing Plan brief) and asked: what's built / partial / missing, apply the worth-it items, and
+**log the reason** for anything not worth doing. Full audit written to the vault:
+`03 - Business/Gov Contracting/Reconciliation — Plans vs Built (2026-07-14).md`.
+- **⭐ Top finding — the CAIVRS premise is likely WRONG.** Three financing docs assume the SBA EIDL was
+  *charged off* → CAIVRS flag → SBA-backed financing closed. But `credit-history.json`+`debts.json`+MySBA
+  show the **$20k EIDL is CURRENT/paying**; the 7 charge-offs are all credit CARDS. CAIVRS flags *default*,
+  not a current federal loan — **SBA financing may NOT be closed.** Logged as the #1 item + corrected in the
+  `tax-pod` memory; needs CAIVRS confirmation via an SBA lender/SCORE mentor before the docs drive strategy.
+- **Applied now:** SAM **Exclusions/debarment check for subs** (`pods/gov/exclusions.mjs`) — hard-stops an
+  excluded sub before outreach, never treats "unverified" as "clear" (closes the Master Reference §3 gap +
+  a real FAR/False-Claims risk).
+- **Logged NOT-worth-it (with reasons):** public cloud VPS/Supabase/cloud-n8n (violates self-hosted/private
+  doctrine + cost/attack-surface — our NAS+Tailscale+PWA already meets the goal for $0); formal artifact
+  schema (truthful-narration + audit ledger already achieve it lighter); Twilio SMS (paid dep, marginal over
+  Telegram+approve-to-send); full-and-open-ONLY strategy (CONFLICTS with our set-aside lane — flagged as an
+  operator strategy decision, not auto-applied).
+- **Tracked (Idea Vault, phased):** Victor CFO credit/lendability tracker (his #1 idea; build after CAIVRS
+  confirmed) → financing plan + SCORE form; compliance matrix w/ citations; USASpending price-to-win;
+  pricing engine+contingency; sub primary/backup tiers; post-award lifecycle (Stages 8–10 + CPARS loop).
+- ⏭ Much of the GovCon Master Reference is ALREADY built (scoring, compliance self-heal, facts-check,
+  truthful narration, gov board, quick-wins, teaming, submit wizard, capture/debrief desk).
+
+### 🆕 2026-07-14 — FOCUS dashboard v3: FULL-WIDTH Forest-caliber (heatmap · donut · time-of-day · records · FAB)
 Operator (on a big monitor) wanted the full screen used, more info at once, a "+" to add (couldn't find
 the bottom log box), a better radar, and "everything Forest shows." Evals 508 green (backend byHour+records).
 - **Backend:** `summarize` now returns `byHour` (24 time-of-day buckets) + `records` (longest session,

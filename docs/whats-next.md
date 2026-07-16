@@ -2,7 +2,25 @@
 
 _Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-14 (latest) — RECONCILED 5 planning docs vs. the live build ("inspect, log everything, apply what's worth it")
+### 🆕 2026-07-16 (latest) — PHASE 2a: bulletproof always-on host (health watchdog + Tailscale tunnel recovery)
+Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack already restarts each piece on
+*crash* (run-loop.cmd) but couldn't see two failure modes; closed both. Evals 518 → **526** (+8 watchdog).
+- **`scripts/jarvis-watchdog.mjs` (new):** polls `/api/health` every 30s; after 3 straight fails (~90s) kills
+  the wedged :8095 listener so run-loop respawns it (**hang** recovery — run-loop only catches a full exit).
+  Also re-asserts `tailscale serve` for :8095 at boot + periodically (**tunnel** recovery — if the HTTPS
+  tunnel drops, phone/Mac get Jarvis back untouched). SAFETY: only kills a confirmed-`node.exe` listener on
+  :8095 after sustained failure — pure parse/decide core eval-pinned (`evals/watchdog.eval.mjs`).
+- Wired into `scripts/start-jarvis.cmd` (the "Jarvis Server" logon task) as a 4th run-loop-supervised piece.
+- New operator doc **`docs/always-on-host.md`**: the one task, what runs, verify/undo, cleanup of the 3
+  overlapping old tasks, and the 2 manual steps (netplwiz auto-login + BIOS restore-on-AC-power).
+- ⚠ **Found: NO jarvis scheduled task is currently registered** — the running companion was started manually,
+  so it won't survive a reboot. **Operator action to activate: run `scripts\install-autostart.cmd` once**
+  (registers "Jarvis Server" incl. the watchdog) + the 2 manual steps. Watchdog needs run-loop as its
+  respawn supervisor, so it activates WITH the task, not standalone.
+- ⏭ **Phase 2b:** consolidate the 3 overlapping autostart scripts into this one. Then **R1:** Victor CFO
+  business-credit tracker (EIN-based — independent of the CAIVRS question, safe to build now).
+
+### 🆕 2026-07-14 — RECONCILED 5 planning docs vs. the live build ("inspect, log everything, apply what's worth it")
 Operator handed 5 vault plans (Cross-Device PRD, Victor CFO Expanded PRD, GovCon Master Reference, CAIVRS/SBA
 Findings, Financing Plan brief) and asked: what's built / partial / missing, apply the worth-it items, and
 **log the reason** for anything not worth doing. Full audit written to the vault:

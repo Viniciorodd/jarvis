@@ -917,3 +917,23 @@ Built the calm cockpit **inside Jarvis** (not a separate page) + one plain gov b
 Open Claude Code **in `C:\Users\vinic\Desktop\jarvis`** and say:
 > "Read docs/whats-next.md and the memory. We left off with the gov pod live and my Operator Profile done.
 >  Let's [send the gov proposal / set up Slack / do the Gmail pods]."
+
+### 🆕 2026-07-18 — U3/U5 desktop redesign (left-rail nav + multi-column) + More cleanup + Ops routing
+Ported the Stitch desktop mockups as an ADDITIVE layer — `cockpit-desktop.css`, every rule inside
+`@media(min-width:1024px)`, no HTML/JS changes — so **mobile is byte-identical** (verified: shell flips
+grid↔flex, nav rail↔bottom-bar at 375px). Wide screens now get the layout the operator asked for:
+- **Left-rail nav** (220px, vertical, labelled "JARVIS") instead of the bottom bar.
+- **2-column Home** — left = ONE THING / needs-you / today; right = metrics (2×2) / gov pipeline / recent.
+  Verified: ONE THING at x=248, metrics at x=862, side by side.
+- **3-column Today** — tasks / calendar / capture (x=248/633/989). Selector counts the hero `<div>`, so the
+  sections are `nth-of-type(2/3/4)`, not (1/2/3) — fixed after catching it live.
+- **Centered** Jarvis + More (no full-width stretch).
+- **Ops hub routes to the new desks** (`businesses.js`): gov→/govcon-os, finance→/finances, realestate→/real-estate.
+- **More menu decluttered 13→7** — the gov junk drawer is gone (all under Ops / GovCon OS now); More = "Your
+  tools" (Ideas, Focus, Personal, Activity) + "Behind the scenes" (Floor, HQ, Command).
+All verified live at 1280 + 375px, 0 console errors, evals 595 green.
+- ⚠ **Jarvis screen is a DESIGN FORK, left for the operator:** `wall.js` is a deliberate cinematic "Trillion
+  Wall" (neural brain + big transcript + hands-free voice), the OPPOSITE of the Stitch calm-orb spec. Not a
+  bug — don't rip it out without his choice.
+- ⏭ **Left:** U2 deletions (17/18, soak a week first — see prompt §6); the Jarvis wall-vs-orb decision; the
+  NAS `sub-ladder-radar`/`tax-deadline-radar` are live (redeployed 2026-07-17); CAIVRS confirmation (operator).

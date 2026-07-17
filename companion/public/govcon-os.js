@@ -161,19 +161,67 @@
       if (a === 'passed') return disposition(id, 'passed', 'passed');
       return;
     }
-    if (card) openWizard(card.getAttribute('data-id'));
+    // A card body opens the DRAWER (decide first) — not the wizard (act). The wizard is one button in it.
+    if (card) openOpp(card.getAttribute('data-id'), findCard(card.getAttribute('data-id')));
   });
+
+  function openOpp(noticeId, card) {
+    var mod = window.GovConOpp;
+    if (mod && mod.open) return mod.open(noticeId, card);
+    openWizard(noticeId); // drawer module missing → still let him act
+  }
+  window.GovConOS = window.GovConOS || {};
+  window.GovConOS.openOpp = openOpp;
+  window.GovConOS.findCard = findCard;
+  window.GovConOS.disposition = disposition;
+
+  /* ── section switching ────────────────────────────────────────────────────────────────────────────
+   * Each section is its own file registering window.GovConSections[name] = { mount(el), refresh? }.
+   * The shell owns only: which one is visible, the nav pill state, and the board-only money band.
+   * mount() is called once (lazily, on first view) so a section costs nothing until it's opened. */
+  var SECS = { board: 'gosBoard', find: 'gosFind', subs: 'gosSubs', journal: 'gosJournal' };
+  var mounted = {}, current = 'board';
+
+  function show(sec) {
+    if (!SECS[sec]) sec = 'board';
+    current = sec;
+    Object.keys(SECS).forEach(function (k) { var el = $(SECS[k]); if (el) el.hidden = (k !== sec); });
+    $('gosMoney').hidden = sec !== 'board';           // the money band belongs to the board
+    $('gosNext').hidden = sec !== 'board' || !(DATA && DATA.yourNextAction);
+    [].forEach.call($('gosNav').querySelectorAll('button[data-sec]'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-sec') === sec);
+    });
+    $('gosSearch').placeholder = sec === 'subs' ? 'Search subcontractors…'
+      : sec === 'find' ? 'Search new work…' : sec === 'journal' ? 'Search decisions…' : 'Search opportunities…';
+
+    if (sec !== 'board') {
+      var mod = (window.GovConSections || {})[sec], el = $(SECS[sec]);
+      if (!mod) { el.innerHTML = '<div class="gos-loading">This section didn\'t load. Reload the page.</div>'; return; }
+      if (!mounted[sec]) { mounted[sec] = true; try { mod.mount(el); } catch (e) { el.innerHTML = '<div class="gos-loading">Could not open ' + sec + ': ' + esc(e.message) + '</div>'; } }
+      else if (mod.refresh) { try { mod.refresh(); } catch (e) { /* best-effort */ } }
+    }
+    try { history.replaceState(null, '', sec === 'board' ? '/govcon-os' : '/govcon-os#' + sec); } catch (e) { /* */ }
+  }
 
   $('gosNav').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-sec]'); if (!b) return;
-    var sec = b.getAttribute('data-sec');
-    if (sec === 'board') return;
-    // U1b–U1e land these; until then be honest rather than showing an empty shell.
-    alert(sec.charAt(0).toUpperCase() + sec.slice(1) + ' is being rebuilt into this screen next.\n\nFor now it still lives at its old page.');
+    show(b.getAttribute('data-sec'));
   });
+  window.GovConOS = window.GovConOS || {};
+  window.GovConOS.show = show;
+  window.GovConOS.section = function () { return current; };
 
   var si = $('gosSearch');
-  si.addEventListener('input', function () { FILTER = si.value.trim(); render(); });
+  si.addEventListener('input', function () {
+    FILTER = si.value.trim();
+    // The search box belongs to whichever section is open — sections filter their own data.
+    if (current !== 'board') {
+      var mod = (window.GovConSections || {})[current];
+      if (mod && mod.filter) { try { mod.filter(FILTER); } catch (e) { /* */ } }
+      return;
+    }
+    render();
+  });
   document.addEventListener('keydown', function (e) {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); si.focus(); si.select(); }
     if (e.key === 'Escape' && document.activeElement === si) { si.value = ''; FILTER = ''; render(); si.blur(); }
@@ -186,5 +234,11 @@
   }
   load();
   setInterval(load, 60000);
-  window.GovConOS = { reload: load };
+  window.GovConOS.reload = load;
+
+  // Deep link: /govcon-os#find|#subs|#journal (and ?opp=<noticeId> to open a drawer straight away).
+  var hash = (location.hash || '').replace('#', '');
+  if (SECS[hash] && hash !== 'board') show(hash);
+  var qOpp = new URLSearchParams(location.search).get('opp');
+  if (qOpp) setTimeout(function () { openOpp(qOpp, findCard(qOpp)); }, 300);
 })();

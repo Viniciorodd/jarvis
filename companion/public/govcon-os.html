@@ -60,13 +60,25 @@
   </div>
 </div>
 
-<!-- BOARD -->
+<!-- SECTIONS — the shell mounts one at a time. Each lives in its own file so they can be built and
+     changed independently; each registers itself on window.GovConSections (see govcon-os.js). -->
 <main class="gos-board" id="gosBoard"><div class="gos-loading">Loading the board…</div></main>
+<section class="gos-sec" id="gosFind" hidden></section>
+<section class="gos-sec" id="gosSubs" hidden></section>
+<section class="gos-sec" id="gosJournal" hidden></section>
 
-<!-- MONEY BAND -->
+<!-- MONEY BAND (board only) -->
 <div class="gos-money" id="gosMoney"></div>
 
+<!-- OPPORTUNITY DRAWER — opens over any section -->
+<div class="gos-drawer-mask" id="gosOppMask" hidden></div>
+<aside class="gos-drawer" id="gosOpp" hidden aria-label="Opportunity"></aside>
+
 <script src="submit-wizard.js"></script>
+<script src="govcon-find.js"></script>
+<script src="govcon-subs.js"></script>
+<script src="govcon-journal.js"></script>
+<script src="govcon-opp.js"></script>
 <script src="govcon-os.js"></script>
 </body>
 </html>

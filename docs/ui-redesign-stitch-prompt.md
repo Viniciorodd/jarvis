@@ -501,7 +501,9 @@ U2 deletes `/quickwins`, `/teaming`, `/dealroom`, the map overlay, the `ops.js` 
 gov-board renderers. **Deleting early destroys behaviour that exists nowhere else.** "Verified at parity" is
 this checklist, not a judgement call. Every line must be TRUE in `/govcon-os` before anything is deleted.
 
-**Status 2026-07-17 (night): 15/18 — U2 still BLOCKED on the Subs section.** (Idea Vault: `waiting`.)
+**Status 2026-07-18: 17/18 — all four sections BUILT. U2 is UNBLOCKED** (only #12 Patricia is linked, not
+reimplemented, which is acceptable). The prudent path is still: repoint links → run a week → then delete.
+(Idea Vault: `waiting` until the week's soak confirms nothing's missing in real use.)
 
 | # | Must work in /govcon-os | Ported from | ✔ |
 |---|---|---|---|
@@ -520,18 +522,21 @@ this checklist, not a judgement call. Every line must be TRUE in `/govcon-os` be
 | 13 | Quick wins: tag pills + why + capability attach + day select | govcon-find.js | ✅ |
 | 14 | Teaming: **editable** intro textarea + View award ↗ | govcon-find.js | ✅ |
 | 15 | Map: pins + federal-spend bubbles + deadline list + filters | govcon-find.js | ✅ |
-| 16 | Subs: CRM drawer w/ Google reviews + sub-reach **preview** | **govcon-subs.js — NOT BUILT** | ☐ |
-| 17 | **The approval-effect confirmation modal** (`ops.js:911`) — the doctrine's gate UI | **govcon-subs.js — NOT BUILT** | ☐ |
+| 16 | Subs: CRM drawer w/ Google reviews + sub-reach **preview** | govcon-subs.js | ✅ |
+| 17 | **The approval-effect confirmation modal** — the doctrine's gate UI | govcon-subs.js | ✅ |
 | 18 | Decision journal + win/loss + debriefs | govcon-journal.js | ✅ |
 
-**⚠ Only Subs (govcon-subs.js) is left — #16 + #17.** The subagent building it died on the session limit
-(resets 11am ET 2026-07-18) before writing the file. Its brief is the Subs spec in this session's history;
-rebuild it as `companion/public/govcon-subs.js` registering `window.GovConSections.subs`. **Key finding it
-surfaced before dying (saves the rebuild):** `ops.js` NEVER actually reads the GOV_AUTO_SEND state — its
-"confirmApprove" modal HEDGES the wording rather than reading a real flag. So the approval-effect modal
-(#17) must find where that state is truly exposed (`/api/connectors` or `/api/info` — verify) and, if it
-genuinely isn't exposed anywhere, add a tiny read-only route that reports `GOV_AUTO_SEND` so the modal can
-tell the truth instead of hedging. That is the doctrine's gate UI — it must never overstate.
+**#17 shipped with a real honesty fix:** `GOV_AUTO_SEND` was exposed to the client NOWHERE (confirmed —
+grep in server.js + `/api/connectors` don't carry it), which is why `ops.js`'s modal HEDGED. New read-only
+`GET /api/gov/send-mode` surfaces it; the modal now states the true effect (ON → really emails; OFF →
+dry-runs). **⚠ Nuance to verify before trusting the OFF copy:** send-mode reads the COMPANION's env (PC =
+autoSend:false), but the NAS control-plane may run `GOV_AUTO_SEND=1`. If `/api/sub-reach` sends via the NAS
+executor rather than staging a gate, the OFF wording could understate — trace the sub-reach path and lean
+the wording toward caution if so.
+
+**⚠ PWA cache gotcha (bit us once):** a NEW section file 404s from the service worker (stale-while-revalidate)
+on the FIRST load after deploy → the section shows "didn't load" until one reload registers it. When shipping
+a new `govcon-*.js`, bump the SW cache version or tell the operator to reload once.
 
 **Order of deletion (each step verified before the next):**
 1. Repoint the More menu + every internal link to `/govcon-os`; leave the old routes alive but unlinked.

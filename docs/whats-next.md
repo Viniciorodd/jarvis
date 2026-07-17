@@ -32,8 +32,13 @@ Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack alre
   asserted closed; EIDL is current → confirm CAIVRS first). Routes `GET /api/finance/credit` +
   POST `/tradeline|/payment|/snapshot|/foundation`. Briefing block added to operator-profile. Evals **526 → 537**.
   Verification discipline: a "reports to D&B" or "PAYDEX 80" claim without a source is surfaced, never asserted.
-- ⏭ **NEXT:** R1 has no cockpit UI yet (routes only) — a Victor "Lendability" card is the natural follow-up.
-  Then R2 (heavier reconciliation items: compliance matrix w/ citations, price-to-win).
+- ✅ **R1 UI DONE (2026-07-16):** `companion/public/lendability.html` — Victor's "Lendability" desk, wired
+  into the More menu (`jMoreLend` → `/lendability`, server static route added). Theme-aware (shared CSS vars,
+  mirrors the focus dashboard): readiness donut, 7-item packet checklist, foundation status, trade lines +
+  scores (with honest empty states), the CAIVRS-aware financing note, a needsVerification panel, and a "+"
+  FAB → add sheet (trade line / payment / score / foundation). Verified in-browser against live routes on a
+  throwaway :8096 instance (14% readiness renders, all labels clean, 0 console errors, all 4 forms open).
+- ⏭ **NEXT:** R2 — heavier reconciliation items (compliance matrix w/ citations, USASpending price-to-win).
 
 ### 🆕 2026-07-14 — RECONCILED 5 planning docs vs. the live build ("inspect, log everything, apply what's worth it")
 Operator handed 5 vault plans (Cross-Device PRD, Victor CFO Expanded PRD, GovCon Master Reference, CAIVRS/SBA

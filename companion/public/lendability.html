@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>💳 Lendability — Jarvis</title>
+<script>try{var _t=localStorage.getItem('jarvis-theme');document.documentElement.dataset.theme=(!_t||_t==='exec')?'black':_t;}catch(e){document.documentElement.dataset.theme='black';}</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  body{ margin:0; background:var(--ink); color:var(--cream); font-family:var(--font,'Inter',system-ui,sans-serif); -webkit-font-smoothing:antialiased; letter-spacing:-.011em; overflow-x:hidden; }
+  .wrap{ max-width:1200px; margin:0 auto; padding:20px 20px calc(120px + env(safe-area-inset-bottom,0)); }
+  .top{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  h1{ font-size:24px; font-weight:800; margin:0; letter-spacing:-.01em; }
+  .back{ font-size:13px; color:var(--teal); text-decoration:none; }
+  .sub{ color:var(--dim); font-size:13px; margin:5px 0 18px; }
+
+  .grid{ display:grid; gap:14px; grid-template-columns:1fr; align-items:start; }
+  @media(min-width:900px){
+    .grid{ grid-template-columns:repeat(12,1fr); }
+    .s12{ grid-column:span 12; } .s8{ grid-column:span 8; } .s7{ grid-column:span 7; }
+    .s6{ grid-column:span 6; } .s5{ grid-column:span 5; } .s4{ grid-column:span 4; }
+  }
+
+  .card{ background:var(--panel); border:1px solid rgba(var(--teal-rgb),.14); border-radius:16px; padding:16px 16px 14px; box-sizing:border-box; }
+  .ph{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+  .ph .t{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); }
+  .ph .meta{ font-size:11px; color:var(--dim); }
+
+  /* Readiness hero */
+  .hero{ display:flex; align-items:center; gap:20px; }
+  .ring{ flex:0 0 auto; width:118px; height:118px; }
+  .ring text.pct{ font-size:30px; font-weight:800; fill:var(--teal); }
+  .ring text.lab{ font-size:8.5px; letter-spacing:.14em; fill:var(--dim); text-transform:uppercase; }
+  .heroinfo .big{ font-size:18px; font-weight:800; color:var(--cream); letter-spacing:-.01em; }
+  .heroinfo .small{ font-size:13px; color:var(--dim); margin-top:6px; line-height:1.5; max-width:46ch; }
+  .heroinfo .small b{ color:var(--cream); font-weight:700; }
+
+  /* Checklist */
+  .check{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
+  .check li{ display:flex; align-items:flex-start; gap:11px; }
+  .ck{ flex:0 0 auto; width:19px; height:19px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; margin-top:1px; }
+  .ck.on{ background:var(--teal); color:var(--ink-on-accent); }
+  .ck.off{ background:transparent; border:1.5px solid rgba(var(--teal-rgb),.28); color:transparent; }
+  .ci .cl{ font-size:13.5px; font-weight:600; color:var(--cream); }
+  .ci .cl.off{ color:var(--dim); font-weight:500; }
+  .ci .cd{ font-size:11.5px; color:var(--dim); margin-top:2px; }
+
+  /* Chips / rows */
+  .rows{ display:flex; flex-direction:column; gap:9px; }
+  .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:rgba(var(--teal-rgb),.05); border:1px solid rgba(var(--teal-rgb),.12); border-radius:12px; padding:11px 13px; }
+  .row .l{ min-width:0; }
+  .row .nm{ font-size:13.5px; font-weight:700; color:var(--cream); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .dt{ font-size:11.5px; color:var(--dim); margin-top:2px; }
+  .row .r{ flex:0 0 auto; text-align:right; }
+  .badge{ display:inline-block; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:3px 9px; border-radius:20px; border:1px solid rgba(var(--teal-rgb),.3); color:var(--dim); }
+  .badge.ok{ background:var(--teal); color:var(--ink-on-accent); border-color:var(--teal); }
+  .badge.warn{ border-color:rgba(var(--teal-rgb),.4); color:var(--teal); background:rgba(var(--teal-rgb),.10); }
+  .badge.mut{ opacity:.75; }
+  .score{ font-size:22px; font-weight:800; color:var(--teal); letter-spacing:-.02em; line-height:1; }
+
+  .empty{ font-size:13px; color:var(--dim); padding:14px 4px; line-height:1.5; }
+  .empty b{ color:var(--cream); font-weight:700; }
+
+  /* Financing guidance — the CAIVRS-aware note */
+  .note{ background:rgba(var(--teal-rgb),.06); border:1px solid rgba(var(--teal-rgb),.22); border-radius:14px; padding:14px 15px; font-size:13.5px; line-height:1.6; color:var(--cream); }
+  .note .h{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--teal); margin-bottom:7px; font-weight:700; }
+
+  /* needsVerification */
+  .verify li{ font-size:12.5px; color:var(--dim); line-height:1.5; margin-bottom:6px; }
+  .verify li b{ color:var(--cream); }
+
+  /* FAB + add sheet (mirrors the focus dashboard) */
+  .fab{ position:fixed; right:calc(20px + env(safe-area-inset-right,0)); bottom:calc(22px + env(safe-area-inset-bottom,0)); z-index:40; width:58px; height:58px; border-radius:50%; border:none; background:var(--teal); color:var(--ink-on-accent); font-size:30px; line-height:1; cursor:pointer; box-shadow:0 10px 28px rgba(0,0,0,.4), 0 0 0 1px rgba(var(--teal-rgb),.4); display:flex; align-items:center; justify-content:center; transition:transform .12s; }
+  .fab:hover{ transform:scale(1.06); } .fab:active{ transform:scale(.96); }
+  .ovl{ position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.55); backdrop-filter:blur(3px); display:none; }
+  .ovl.on{ display:block; }
+  .ovl .sheet{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(560px,calc(100vw - 28px)); max-height:min(84vh,760px); overflow-y:auto; background:var(--panel); border:1px solid rgba(var(--teal-rgb),.2); border-radius:18px; padding:18px 18px calc(18px + env(safe-area-inset-bottom,0)); box-shadow:0 24px 60px rgba(0,0,0,.5); scrollbar-width:thin; box-sizing:border-box; }
+  .shead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .stitle{ font-size:16px; font-weight:800; }
+  .x{ appearance:none; border:none; background:transparent; color:var(--dim); font-size:18px; cursor:pointer; }
+  .seg{ display:flex; gap:5px; margin-bottom:14px; flex-wrap:wrap; }
+  .seg button{ appearance:none; border:1px solid rgba(var(--teal-rgb),.22); background:transparent; color:var(--dim); border-radius:20px; padding:6px 13px; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .seg button.on{ background:var(--teal); color:var(--ink-on-accent); border-color:var(--teal); }
+  .fld{ margin-bottom:11px; }
+  .fld label{ display:block; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); margin-bottom:5px; }
+  .fld input, .fld select{ width:100%; box-sizing:border-box; background:var(--panel2,rgba(var(--teal-rgb),.05)); border:1px solid rgba(var(--teal-rgb),.2); border-radius:10px; padding:10px 12px; color:var(--cream); font:inherit; font-size:14px; }
+  .fld.two{ display:flex; gap:10px; } .fld.two > div{ flex:1; }
+  .chkline{ display:flex; align-items:center; gap:9px; font-size:13.5px; color:var(--cream); }
+  .chkline input{ width:auto; }
+  .save{ width:100%; appearance:none; border:none; background:var(--teal); color:var(--ink-on-accent); border-radius:11px; padding:12px; font:inherit; font-size:14.5px; font-weight:700; cursor:pointer; margin-top:4px; }
+  .save:active{ transform:scale(.99); }
+  .hint{ font-size:11.5px; color:var(--dim); margin-top:8px; line-height:1.5; }
+  .msg{ font-size:12.5px; margin-top:10px; min-height:16px; }
+  .msg.ok{ color:var(--teal); } .msg.err{ color:#e88; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>💳 Lendability</h1>
+    <a class="back" href="/">← Home</a>
+  </div>
+  <div class="sub">Victor's desk — the road from no business credit to a lendable Rodgate LLC. EIN-based, so it moves independently of your personal credit.</div>
+
+  <div id="root" class="grid"><div class="card s12"><div class="empty">Loading…</div></div></div>
+</div>
+
+<button class="fab" id="fab" aria-label="Add credit record">+</button>
+<div class="ovl" id="addOvl"><div class="sheet" id="addSheet"></div></div>
+
+<script>
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+var CK_LABELS = { 'entity-ein':'EIN confirmed on file', 'duns':'D-U-N-S number obtained', 'reporting-tradelines':'Reporting trade lines', 'business-credit-score':'Business-credit score on file', 'business-bank-account':'Business bank account', 'debt-schedule':'Debt schedule disclosed', 'gov-past-performance':'Gov past performance / CPARS' };
+function ckLabel(key){ return CK_LABELS[key] || String(key||'').replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}); }
+
+// Readiness donut (SVG, theme-aware via CSS vars)
+function ring(pct){
+  var r=50, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,pct))/100);
+  return '<svg class="ring" viewBox="0 0 120 120" aria-label="'+pct+'% ready">'
+    +'<circle cx="60" cy="60" r="'+r+'" fill="none" stroke="rgba(var(--teal-rgb),.14)" stroke-width="11"/>'
+    +'<circle cx="60" cy="60" r="'+r+'" fill="none" stroke="var(--teal)" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 60 60)"/>'
+    +'<text class="pct" x="60" y="58" text-anchor="middle">'+pct+'%</text>'
+    +'<text class="lab" x="60" y="74" text-anchor="middle">READY</text></svg>';
+}
+
+function render(d){
+  var root=document.getElementById('root');
+  if(!d){ root.innerHTML='<div class="card s12"><div class="empty">Could not load the tracker.</div></div>'; return; }
+  var L=d.lendability||{items:[],have:0,total:0}, html='';
+
+  // Readiness hero
+  html+='<div class="card s7"><div class="hero">'+ring(d.readinessPct||0)
+    +'<div class="heroinfo"><div class="big">'+(L.have||0)+' of '+(L.total||0)+' packet items ready</div>'
+    +'<div class="small">The lendability packet is the living file you hand a factoring company or lender. Each item you complete moves you closer to financing bigger contracts. Nothing here is claimed without a source.</div></div></div></div>';
+
+  // Financing guidance (CAIVRS-aware)
+  html+='<div class="card s5"><div class="note"><div class="h">Financing paths</div>'+esc(d.financingNote||'')+'</div></div>';
+
+  // Packet checklist
+  html+='<div class="card s6"><div class="ph"><span class="t">Lendability packet</span><span class="meta">'+(L.have||0)+'/'+(L.total||0)+'</span></div><ul class="check">';
+  (L.items||[]).forEach(function(it){
+    var lab=ckLabel(it.key);
+    html+='<li><span class="ck '+(it.have?'on':'off')+'">'+(it.have?'✓':'')+'</span>'
+      +'<div class="ci"><div class="cl '+(it.have?'':'off')+'">'+esc(lab)+'</div>'
+      +(it.detail?'<div class="cd">'+esc(it.detail)+'</div>':'')+'</div></li>';
+  });
+  html+='</ul></div>';
+
+  // Foundation
+  var f=d.foundation||{}, gaps=d.foundationGaps||[];
+  html+='<div class="card s6"><div class="ph"><span class="t">Foundation</span><span class="meta">'+(gaps.length?gaps.length+' to fix':'all set')+'</span></div><div class="rows">';
+  html+=frow('EIN', f.einConfirmed?'Confirmed':'Not confirmed', f.einConfirmed?'ok':'mut');
+  html+=frow('D-U-N-S', f.dunsStatus==='obtained'?'Obtained':(f.dunsStatus==='pending'?'Pending':'None'), f.dunsStatus==='obtained'?'ok':(f.dunsStatus==='pending'?'warn':'mut'));
+  html+=frow('Business bank account', f.businessBankAccount?'Yes':'Missing', f.businessBankAccount?'ok':'mut');
+  html+=frow('Address / phone consistency', f.addressPhoneConsistent===true?'Consistent':(f.addressPhoneConsistent===false?'Inconsistent':'Unverified'), f.addressPhoneConsistent===true?'ok':'mut');
+  html+='</div></div>';
+
+  // Trade lines
+  var tls=d.tradelineHealth||[];
+  html+='<div class="card s6"><div class="ph"><span class="t">Trade lines</span><span class="meta">'+d.reportingTradelines+' reporting · '+d.tradelineCount+' total</span></div>';
+  if(!tls.length){ html+='<div class="empty">No trade lines yet. Add a <b>net-30</b> with a vendor that reports to the business bureaus (Uline, Quill, Grainger) — on-time payment is what builds a PAYDEX score.</div>'; }
+  else { html+='<div class="rows">'; tls.forEach(function(t){
+    var rb=t.reporting==='verified'?'<span class="badge ok">reports</span>':(t.reporting==='assumed'?'<span class="badge warn">reporting unverified</span>':'<span class="badge mut">no reporting</span>');
+    html+='<div class="row"><div class="l"><div class="nm">'+esc(t.vendor||'—')+'</div><div class="dt">'+(t.totalPayments?t.onTimePct+'% on-time · '+t.totalPayments+' payments':'no payments logged')+(t.status&&t.status!=='active'?' · '+esc(t.status):'')+'</div></div><div class="r">'+rb+'</div></div>';
+  }); html+='</div>'; }
+  html+='</div>';
+
+  // Scores
+  var sp=d.latestScorePerSource||{}, keys=Object.keys(sp);
+  html+='<div class="card s6"><div class="ph"><span class="t">Business-credit scores</span><span class="meta">'+(keys.length?'latest pull':'none yet')+'</span></div>';
+  if(!keys.length){ html+='<div class="empty">No business-credit pulls logged. Once trade lines report, pull <b>Nav</b> or a D&B PAYDEX and log it here (with a source link).</div>'; }
+  else { html+='<div class="rows">'; keys.forEach(function(k){ var s=sp[k];
+    html+='<div class="row"><div class="l"><div class="nm">'+esc(k)+'</div><div class="dt">'+(s.pulledDate?esc(s.pulledDate):'')+(s.verified?'':' · <span style="color:var(--teal)">unverified</span>')+'</div></div><div class="r"><span class="score">'+esc(s.score!=null?s.score:(s.rating||'—'))+'</span></div></div>';
+  }); html+='</div>'; }
+  html+='</div>';
+
+  // needsVerification (the discipline)
+  if((d.needsVerification||[]).length){
+    html+='<div class="card s12"><div class="ph"><span class="t">Needs verification</span><span class="meta">unsourced claims — not counted as fact</span></div><ul class="verify" style="margin:0;padding-left:2px;list-style:none">';
+    d.needsVerification.forEach(function(v){ html+='<li><b>'+esc(v.vendor||v.source||v.id)+'</b> — '+esc(v.why)+'</li>'; });
+    html+='</ul></div>';
+  }
+
+  root.innerHTML=html;
+}
+function frow(name,val,cls){ return '<div class="row"><div class="l"><div class="nm">'+esc(name)+'</div></div><div class="r"><span class="badge '+cls+'">'+esc(val)+'</span></div></div>'; }
+
+function load(){ fetch('/api/finance/credit').then(function(r){return r.json();}).then(render).catch(function(){ render(null); }); }
+
+// ---- add sheet ----
+var TRADELINES=[]; // populated from last load for the payment dropdown
+function openAdd(){ document.getElementById('addOvl').classList.add('on'); showForm('tradeline'); }
+function closeAdd(){ document.getElementById('addOvl').classList.remove('on'); }
+function showForm(kind){
+  var s=document.getElementById('addSheet');
+  var seg='<div class="seg">'+[['tradeline','Trade line'],['payment','Payment'],['snapshot','Score'],['foundation','Foundation']].map(function(o){return '<button data-k="'+o[0]+'"'+(o[0]===kind?' class="on"':'')+'>'+o[1]+'</button>';}).join('')+'</div>';
+  var body='';
+  if(kind==='tradeline'){
+    body='<div class="fld"><label>Vendor</label><input id="fVendor" placeholder="Uline, Quill, Grainger…"></div>'
+      +'<div class="fld two"><div><label>Type</label><input id="fType" placeholder="net-30 supplier"></div><div><label>Terms</label><input id="fTerms" placeholder="net-30"></div></div>'
+      +'<div class="fld"><label>Reports to (comma-sep)</label><input id="fReports" placeholder="D&B, Experian Biz"></div>'
+      +'<div class="fld two"><div><label>Status</label><select id="fStatus"><option value="applied">applied</option><option value="active">active</option><option value="closed">closed</option></select></div><div><label>Credit limit ($)</label><input id="fLimit" type="number" placeholder="1000"></div></div>'
+      +'<label class="chkline"><input type="checkbox" id="fVerified"> Reporting is <b>verified</b> (I confirmed it reports — not assumed)</label>'
+      +'<button class="save" data-post="tradeline">Add trade line</button>'
+      +'<div class="hint">Leave "verified" unchecked unless you\'ve confirmed the vendor actually reports — unverified reporting is flagged, never counted.</div>';
+  } else if(kind==='payment'){
+    var opts=TRADELINES.length?TRADELINES.map(function(t){return '<option value="'+esc(t.id)+'">'+esc(t.vendor||t.id)+'</option>';}).join(''):'<option value="">— no trade lines yet —</option>';
+    body='<div class="fld"><label>Trade line</label><select id="pId">'+opts+'</select></div>'
+      +'<div class="fld"><label>Payment date</label><input id="pDate" type="date"></div>'
+      +'<label class="chkline"><input type="checkbox" id="pOnTime" checked> Paid on time (or early)</label>'
+      +'<div class="fld"><label>Note (optional)</label><input id="pNote" placeholder="net-30 invoice #…"></div>'
+      +'<button class="save" data-post="payment">Log payment</button>';
+  } else if(kind==='snapshot'){
+    body='<div class="fld"><label>Source</label><select id="sSource"><option>D&B Paydex</option><option>Experian Biz</option><option>Equifax Biz</option><option>Nav</option></select></div>'
+      +'<div class="fld two"><div><label>Score</label><input id="sScore" type="number" placeholder="80"></div><div><label>Rating (optional)</label><input id="sRating" placeholder="Low risk"></div></div>'
+      +'<div class="fld"><label>Pulled date</label><input id="sDate" type="date"></div>'
+      +'<div class="fld"><label>Source ref (link / where pulled)</label><input id="sRef" placeholder="Nav dashboard 2026-07-16"></div>'
+      +'<button class="save" data-post="snapshot">Log score</button>'
+      +'<div class="hint">Without a source ref the score is kept but flagged unverified.</div>';
+  } else {
+    body='<div class="fld"><label>EIN</label><input id="oEin" placeholder="XX-XXXXXXX"></div>'
+      +'<label class="chkline"><input type="checkbox" id="oEinC"> EIN confirmed on file</label>'
+      +'<div class="fld two" style="margin-top:11px"><div><label>D-U-N-S #</label><input id="oDuns" placeholder="if obtained"></div><div><label>D-U-N-S status</label><select id="oDunsS"><option value="none">none</option><option value="pending">pending</option><option value="obtained">obtained</option></select></div></div>'
+      +'<label class="chkline"><input type="checkbox" id="oBank"> Dedicated business bank account exists</label>'
+      +'<label class="chkline" style="margin-top:9px"><input type="checkbox" id="oAddr"> Address/phone consistent across SAM/D&B/bank</label>'
+      +'<button class="save" data-post="foundation" style="margin-top:12px">Save foundation</button>';
+  }
+  s.innerHTML='<div class="shead"><div class="stitle">Add to Lendability</div><button class="x" id="addX" aria-label="Close">✕</button></div>'+seg+body+'<div class="msg" id="addMsg"></div>';
+}
+function val(id){ var e=document.getElementById(id); return e?e.value.trim():''; }
+function chk(id){ var e=document.getElementById(id); return !!(e&&e.checked); }
+function post(kind){
+  var url, payload;
+  if(kind==='tradeline'){ if(!val('fVendor')){ return msg('Vendor is required','err'); }
+    url='/api/finance/credit/tradeline'; payload={ vendor:val('fVendor'), accountType:val('fType'), terms:val('fTerms'), reportsTo:val('fReports').split(',').map(function(x){return x.trim();}).filter(Boolean), reportingVerified:chk('fVerified'), status:val('fStatus'), creditLimitCents:val('fLimit')?Math.round(parseFloat(val('fLimit'))*100):0 };
+  } else if(kind==='payment'){ if(!val('pId')){ return msg('Add a trade line first','err'); }
+    url='/api/finance/credit/payment'; payload={ tradelineId:val('pId'), date:val('pDate'), onTime:chk('pOnTime'), note:val('pNote') };
+  } else if(kind==='snapshot'){ if(!val('sSource')){ return msg('Source is required','err'); }
+    url='/api/finance/credit/snapshot'; payload={ source:val('sSource'), score:val('sScore')?parseFloat(val('sScore')):null, rating:val('sRating'), pulledDate:val('sDate'), sourceRef:val('sRef') };
+  } else { url='/api/finance/credit/foundation'; payload={ ein:val('oEin'), einConfirmed:chk('oEinC'), duns:val('oDuns'), dunsStatus:val('oDunsS'), businessBankAccount:chk('oBank'), addressPhoneConsistent:chk('oAddr') }; }
+  msg('Saving…','ok');
+  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(function(r){return r.json();}).then(function(res){
+      if(res&&res.ok!==false){ msg('Saved ✓','ok'); load(); setTimeout(closeAdd,650); }
+      else { msg((res&&res.error)||'Could not save','err'); }
+    }).catch(function(){ msg('Network error','err'); });
+}
+function msg(t,cls){ var m=document.getElementById('addMsg'); if(m){ m.textContent=t; m.className='msg '+(cls||''); } }
+
+document.getElementById('fab').addEventListener('click', openAdd);
+document.getElementById('addOvl').addEventListener('click', function(e){
+  if(e.target===this||e.target.id==='addX'){ closeAdd(); return; }
+  var seg=e.target.closest('.seg button'); if(seg){ showForm(seg.getAttribute('data-k')); return; }
+  var save=e.target.closest('[data-post]'); if(save){ post(save.getAttribute('data-post')); }
+});
+
+// keep tradelines list for the payment dropdown
+var _origRender=render;
+render=function(d){ if(d&&d.tradelineHealth){ TRADELINES=d.tradelineHealth.map(function(t){return {id:t.id,vendor:t.vendor};}); } _origRender(d); };
+
+load();
+</script>
+</body>
+</html>

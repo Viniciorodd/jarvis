@@ -3229,7 +3229,7 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
-  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname.replace(/^\/+/, '');
+  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));

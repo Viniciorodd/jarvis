@@ -92,6 +92,7 @@ var moreItems = {
   jMoreQuickwins: function(){ window.location.href = '/quickwins'; },  /* wide-net one-off/quick jobs */
   jMoreTeaming: function(){ window.location.href = '/teaming'; },  /* primes who need small-biz subs */
   jMoreCapability: function(){ window.open('/capability', '_blank'); },  /* 1-page capability statement → print-to-PDF */
+  jMoreLend:    function(){ window.location.href = '/lendability'; },  /* Victor's business-credit & lendability desk */
   jMoreMap:     function(){ triggerGhost('mapBtn'); },
   jMoreFloor:   function(){ triggerGhost('floorBtn'); },
   jMoreHQ:      function(){ triggerGhost('hqBtn'); },

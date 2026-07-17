@@ -2110,6 +2110,14 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   // ── SUB INFO: full profile + Google rating/reviews + an honest fit verdict for one CRM prospect. ──
+  // Send-mode — read-only, so the approval-effect gate UI can tell the TRUTH instead of hedging. GOV_AUTO_SEND
+  // was exposed NOWHERE to the client (2026-07-18), so ops.js's confirm modal could only say "it sends IF
+  // auto-send is on" without knowing. Now the new GovCon OS Subs modal reads this and states the real effect:
+  // ON → approving actually emails; OFF → approving dry-runs and nothing leaves the building. The gate itself
+  // is unchanged — nothing sends without a human tap; this only makes the WARNING honest.
+  if (req.method === 'GET' && url.pathname === '/api/gov/send-mode') {
+    return send(res, 200, JSON.stringify({ autoSend: String(process.env.GOV_AUTO_SEND || '') === '1' }));
+  }
   if (req.method === 'GET' && url.pathname === '/api/sub-info') {
     try {
       const id = url.searchParams.get('id');

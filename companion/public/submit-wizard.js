@@ -212,8 +212,14 @@
   // ── STEP 4 — compliance ───────────────────────────────────────────────────────────────────────────
   function doCompliance() {
     renderLoading("Jarvis is double-checking it follows the government’s rules…");
-    api('/api/compliance-check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ noticeId: S.noticeId, file: S.data.draftFile }) })
-      .then(function (c) { S.compliance = c || {}; step4(); }).catch(function () { S.compliance = { verdict: 'RISK', summary: "Couldn’t run the automatic check — review it yourself before sending.", gaps: [] }; step4(); });
+    // Run the holistic verdict AND the line-by-line requirements matrix together; the matrix is best-effort
+    // (some notices have no SOW text yet) so it never blocks the check.
+    var compP = api('/api/compliance-check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ noticeId: S.noticeId, file: S.data.draftFile }) })
+      .then(function (c) { return c || {}; })
+      .catch(function () { return { verdict: 'RISK', summary: "Couldn’t run the automatic check — review it yourself before sending.", gaps: [] }; });
+    var mxP = api('/api/gov/matrix?noticeId=' + encodeURIComponent(S.noticeId))
+      .then(function (m) { return (m && m.ok) ? m : null; }).catch(function () { return null; });
+    Promise.all([compP, mxP]).then(function (res) { S.compliance = res[0]; S.matrix = res[1]; step4(); });
   }
   function step4() {
     S.step = 4; dots(); bodyEl.innerHTML = '';
@@ -227,8 +233,26 @@
     ]));
     var gaps = (c.gaps || []).concat((c.items || []).filter(function (i) { return i && i.ok === false; }).map(function (i) { return (i.req || 'Requirement') + ': ' + (i.note || 'not addressed'); }));
     if (gaps.length) bodyEl.appendChild(h('ul', { class: 'sw-reasons' }, gaps.slice(0, 6).map(function (g) { return h('li', {}, [h('span', { text: '•' }), h('span', { text: g })]); })));
+
+    // Requirement-by-requirement coverage (the compliance matrix) — the precise "did we answer every shall?"
+    var mx = S.matrix, mxGapTexts = [];
+    if (mx && mx.summary && mx.summary.total) {
+      var cov = mx.summary.coveragePct, mgaps = mx.gaps || [];
+      mxGapTexts = mgaps.map(function (g) { return g.requirement; });
+      var covBox = h('div', { class: 'sw-verdict ' + (mgaps.length ? 'bad' : 'good') }, [
+        h('span', { class: 'ic', text: mgaps.length ? '📋' : '📋' }),
+        h('div', {}, [
+          h('b', { text: 'Requirements covered: ' + cov + '% (' + mx.summary.addressed + ' of ' + mx.summary.total + ')' }),
+          h('div', { class: 'sw-sub', style: 'margin:2px 0 0', text: mgaps.length ? (mgaps.length + ' requirement' + (mgaps.length > 1 ? 's' : '') + " the proposal doesn’t answer yet:") : 'Every requirement in the solicitation is addressed. ✅' }),
+        ]),
+      ]);
+      bodyEl.appendChild(covBox);
+      if (mgaps.length) bodyEl.appendChild(h('ul', { class: 'sw-reasons' }, mgaps.slice(0, 6).map(function (g) { return h('li', {}, [h('span', { text: '•' }), h('span', { text: g.requirement })]); })));
+    }
+
+    var allGaps = gaps.concat(mxGapTexts);
     var foot = [];
-    if (fail || gaps.length) foot.push(h('button', { class: 'sw-btn soft', text: '🔧 Have Jarvis fix these', onclick: function () { doRedraft('Fix these compliance gaps before submission: ' + gaps.join('; ')); } }));
+    if (fail || allGaps.length) foot.push(h('button', { class: 'sw-btn soft', text: '🔧 Have Jarvis fix these', onclick: function () { doRedraft('Fix these compliance gaps before submission: ' + allGaps.join('; ')); } }));
     foot.push(h('button', { class: 'sw-btn ' + (fail ? 'ghost' : 'primary'), text: fail ? 'Continue anyway ▸' : 'Looks safe — where do I send it? ▸', onclick: function () { S.step = 5; doWhere(); } }));
     setFoot(foot);
   }

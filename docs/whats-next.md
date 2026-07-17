@@ -47,8 +47,14 @@ Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack alre
   pure + eval-pinned. **No fabrication: a gap gets an EMPTY citation, never an invented one** (verified).
   `matrixForOp(op)` resolves SOW (via sow.mjs) + draft (deal `proposalFile`). Route `GET /api/gov/matrix?noticeId=`.
   Evals **537 → 547**. Reuses the pod slug so one notice → one predictable filename across sow/draft/matrix.
+- ✅ **R2a UI DONE (2026-07-16):** the compliance matrix is now surfaced in the **Submit Wizard's safety-check
+  step** (`submit-wizard.js` step 4). `doCompliance` fetches `/api/gov/matrix` alongside the holistic check;
+  step 4 shows "Requirements covered: X% (N of M)" + lists the specific unaddressed "shall" requirements in
+  plain English, and folds them into the "🔧 Have Jarvis fix these" redraft. Best-effort (skips cleanly when a
+  notice has no SOW/draft yet). Route now also returns structured `gaps` rows. Verified: cockpit boots 0
+  console errors; matrix route degrades gracefully. Evals still 547.
 - ⏭ **NEXT:** R2b — USASpending price-to-win (fold comparable-award pricing into bids; `pods/gov/pricing.mjs`
-  + `spending.mjs` already exist to build on). Then a UI surface for the matrix (route + artifact exist now).
+  + `spending.mjs` already exist to build on).
 
 ### 🆕 2026-07-14 — RECONCILED 5 planning docs vs. the live build ("inspect, log everything, apply what's worth it")
 Operator handed 5 vault plans (Cross-Device PRD, Victor CFO Expanded PRD, GovCon Master Reference, CAIVRS/SBA

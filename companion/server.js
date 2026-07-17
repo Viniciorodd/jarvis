@@ -3126,7 +3126,8 @@ const server = http.createServer(async (req, res) => {
       const r = await M.matrixForOp(op, { key: SAM_KEY });
       if (!r.ok || !r.matrix) return send(res, 404, JSON.stringify({ ok: false, error: r.error || 'could not build a matrix for this notice', noticeId }));
       if (!r.summary.total) return send(res, 404, JSON.stringify({ ok: false, error: 'no SOW requirements or draft found for this notice yet', noticeId, summary: r.summary }));
-      return send(res, 200, JSON.stringify({ ok: true, summary: r.summary, gapCount: r.gapCount, markdown: M.renderMatrixMarkdown(r.matrix), file: r.file }));
+      const gaps = (r.matrix.rows || []).filter((row) => row.status === 'gap').map((row) => ({ id: row.id, requirement: row.requirement, category: row.category }));
+      return send(res, 200, JSON.stringify({ ok: true, summary: r.summary, gapCount: r.gapCount, gaps, markdown: M.renderMatrixMarkdown(r.matrix), file: r.file }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
   // Curated top-N opportunity BRIEFS (a few quality ones w/ what-they-want + fit + win-chance + strategy).

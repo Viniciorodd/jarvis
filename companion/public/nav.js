@@ -131,8 +131,11 @@ if(mic){
 /* ── Escape always backs you out of any overlay (consistent exit everywhere) ── */
 document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeAllOverlays(); });
 
-/* ── Start on Talk (voice-first home): orb + today's to-dos + recent activity ── */
-showView('talk');
+/* ── Start on HOME — the calm glance (fixed 2026-07-17). We used to land on Talk, which meant the
+   ONE THING, the approvals ticker and today's tasks were all one tap AWAY from the front door, and
+   jNavHome carried class="active" while a different view was showing (the nav lied on every load).
+   Home is the doctrine's front door: lead with the ONE thing + who's next. Talk is one tap away. ── */
+showView('home');
 setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 60); /* let the orb canvas measure */
 
 })();

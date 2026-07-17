@@ -15,7 +15,12 @@
 
   /* Overlays that cover the normal bottom composer — when one is open we surface
      the floating Jarvis button so she's always one tap away. */
-  var OVERLAY_IDS = ['ops', 'mapView', 'floorView', 'commandView', 'activityView', 'hqView', 'settingsView', 'personalView'];
+  /* govView / bizView / taxReviewView were MISSING (fixed 2026-07-17) — so on the Gov board, on the
+     DEFAULT Ops screen, and on Tax Review, body.overlay-open never set, the FAB stayed hidden, and there
+     was no way to reach Jarvis at all: the exact failure this module exists to prevent, on the three
+     screens the operator uses most. Keep this list in sync with nav.js's OVERLAY_IDS. */
+  var OVERLAY_IDS = ['ops', 'mapView', 'floorView', 'commandView', 'activityView', 'hqView', 'settingsView',
+    'personalView', 'govView', 'bizView', 'taxReviewView'];
   function overlays() { return OVERLAY_IDS.map(function (id) { return document.getElementById(id); }).filter(Boolean); }
   function anyOverlayOpen() { return overlays().some(function (e) { return !e.hidden; }); }
 

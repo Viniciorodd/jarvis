@@ -246,10 +246,11 @@
   if (/[?&]cmd=1/.test(window.location.search)) open();
   window.JarvisCommand = { open, close, brief };
 
-  // Open the cinematic wall display as the LANDING / main page (the way Jarvis used to greet you).
-  // Turn it off with localStorage 'jarvis-landing-command' = 'off'.
-  try { if (localStorage.getItem('jarvis-landing-command') !== 'off') setTimeout(open, 250); }
-  catch { setTimeout(open, 250); }
+  // The wall display is OPT-IN now (fixed 2026-07-17). It used to auto-open over the app on EVERY load
+  // with the only escape hatch a localStorage key that had no UI — so the operator met a TV showpiece
+  // instead of his work, every single time, and couldn't turn it off without a console. It's a wall
+  // display for a TV: reach it from More → Command, or ?cmd=1. Opt in with 'jarvis-landing-command'='on'.
+  try { if (localStorage.getItem('jarvis-landing-command') === 'on') setTimeout(open, 250); } catch { /* never auto-open */ }
 
   setInterval(() => {
     try {

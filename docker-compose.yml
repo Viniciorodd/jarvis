@@ -100,6 +100,14 @@ services:
       # sends the email via RODGATE_GMAIL SMTP. Without it here, .env's flag never reaches the container
       # and every approval dry-runs. The gate stays the control — nothing sends without a human tap.
       GOV_AUTO_SEND: ${GOV_AUTO_SEND:-0}
+      # Gov money + ladder policy knobs. The control-plane is where the pod workers actually run, so these
+      # must be listed HERE — compose injects ONLY what this block names; a value in .env alone never
+      # reaches the container (the GOV_AUTO_SEND lesson, 2026-07-13). Every one has a safe code default,
+      # so leaving them unset is fine; listing them is what makes them tunable from .env without a rebuild.
+      GOV_MARKUP_PCT: ${GOV_MARKUP_PCT:-18}          # middleman markup, clamped 5–60 in code
+      GOV_CONTINGENCY_PCT: ${GOV_CONTINGENCY_PCT:-0} # reserve in the buildup; 0 = OFF (operator's pricing call)
+      GOV_SUB_WAIT_DAYS: ${GOV_SUB_WAIT_DAYS:-3}     # days a silent primary sub gets before the backup activates
+      PTW_MAX_AWARDS: ${PTW_MAX_AWARDS:-1000}        # price-to-win: max comparable awards read in full
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
       # Notion "Company Brain" sync (opportunities / subs / daily log / lessons). Without this the

@@ -2841,6 +2841,53 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // ── BUSINESS CREDIT & LENDABILITY (Victor / CFO): EIN-based tracker — read-only, never files/spends ──
+  if (req.method === 'GET' && url.pathname === '/api/finance/credit') {
+    try {
+      const bc = await import('../pods/finance/business-credit.mjs');
+      const st = bc.businessCreditStatus({
+        tradelines: bc.readTradelines({}), snapshots: bc.readSnapshots({}),
+        foundation: bc.readFoundation({}), debts: bc.loadDebts({}),
+      });
+      return send(res, 200, JSON.stringify(st));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/finance/credit/tradeline') {
+    try {
+      const { vendor, accountType, terms, reportsTo, reportingVerified, opened, creditLimitCents, status } = await readBody(req);
+      if (!vendor || !String(vendor).trim()) return send(res, 400, JSON.stringify({ error: 'vendor required' }));
+      const { addTradeline } = await import('../pods/finance/business-credit.mjs');
+      const r = addTradeline({ vendor, accountType, terms, reportsTo, reportingVerified, opened, creditLimitCents, status });
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/finance/credit/payment') {
+    try {
+      const { tradelineId, date, onTime, note } = await readBody(req);
+      if (!tradelineId) return send(res, 400, JSON.stringify({ error: 'tradelineId required' }));
+      const { addPayment } = await import('../pods/finance/business-credit.mjs');
+      const r = addPayment(tradelineId, { date, onTime, note });
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/finance/credit/snapshot') {
+    try {
+      const { source, pulledDate, score, rating, sourceRef } = await readBody(req);
+      if (!source || !String(source).trim()) return send(res, 400, JSON.stringify({ error: 'source required' }));
+      const { addSnapshot } = await import('../pods/finance/business-credit.mjs');
+      const r = addSnapshot({ source, pulledDate, score, rating, sourceRef }); // no sourceRef → kept but flagged unverified
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/finance/credit/foundation') {
+    try {
+      const patch = await readBody(req);
+      const { saveFoundation } = await import('../pods/finance/business-credit.mjs');
+      const r = saveFoundation(patch || {});
+      return send(res, r.ok ? 200 : 400, JSON.stringify(r));
+    } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+
   // ── COCKPIT: the one calm screen (🎯 Today · ✅ Tasks · 📅 Week · ⚡ Capture · approvals strip) ────
   if (req.method === 'GET' && url.pathname === '/api/cockpit') {
     const todayStr = new Date().toLocaleDateString('en-CA'); // local YYYY-MM-DD

@@ -22,7 +22,18 @@ Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack alre
   `scripts/start-jarvis.cmd` (the always-on task) + `companion/start-jarvis.cmd` (distinct: full local stack
   incl. Ollama/control-plane/scheduler/Slack — dev / NAS-down fallback). Documented in `docs/always-on-host.md`.
   **Auto-login confirmed** (`AutoAdminLogon=1`, user vrod). Operator: reboot to test + BIOS restore-on-AC.
-- ⏭ **R1 (in progress):** Victor CFO business-credit tracker — EIN-based, independent of the CAIVRS question.
+- ✅ **R1 DONE (2026-07-16):** Victor CFO **business-credit & lendability tracker** (`pods/finance/business-credit.mjs`).
+  EIN-based (independent of CAIVRS). Append-only JSONL ledgers (`finance-credit/`, gitignored): trade lines
+  (vendor/terms/reportsTo/`reportingVerified`/payments), business-credit snapshots (source/score/`sourceRef`),
+  foundation.json (EIN/DUNS/bank/address-consistency). Reuses `pods/tax/debts.json` for the debt schedule (no
+  dup). Pure/eval-pinned: `tradelineHealth`, `foundationGaps`, `lendabilityChecklist` (7-item packet,
+  deterministic readinessPct), `businessCreditStatus` (the ONE summary — latest score/source, gaps, readiness,
+  `needsVerification` for unsourced claims, and a `financingNote` that BAKES IN the CAIVRS caveat: SBA is NOT
+  asserted closed; EIDL is current → confirm CAIVRS first). Routes `GET /api/finance/credit` +
+  POST `/tradeline|/payment|/snapshot|/foundation`. Briefing block added to operator-profile. Evals **526 → 537**.
+  Verification discipline: a "reports to D&B" or "PAYDEX 80" claim without a source is surfaced, never asserted.
+- ⏭ **NEXT:** R1 has no cockpit UI yet (routes only) — a Victor "Lendability" card is the natural follow-up.
+  Then R2 (heavier reconciliation items: compliance matrix w/ citations, price-to-win).
 
 ### 🆕 2026-07-14 — RECONCILED 5 planning docs vs. the live build ("inspect, log everything, apply what's worth it")
 Operator handed 5 vault plans (Cross-Device PRD, Victor CFO Expanded PRD, GovCon Master Reference, CAIVRS/SBA

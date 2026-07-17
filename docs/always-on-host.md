@@ -65,16 +65,28 @@ type logs\jarvis-watchdog.log
 schtasks /delete /tn "Jarvis Server" /f
 ```
 
-## ⚠ Cleanup — retire the older duplicate autostart tasks
-Earlier iterations registered overlapping tasks under different names. **"Jarvis Server"** (this doc) is now
-the single source of truth. If any of these still exist, remove them so you don't run two companions:
+## The launchers, consolidated (Phase 2b)
+There is now ONE always-on mechanism and one manual full-stack launcher — no more overlapping duplicates:
+
+| Script | Role | When it runs |
+|---|---|---|
+| [`scripts/start-jarvis.cmd`](../scripts/start-jarvis.cmd) | **the always-on task** — companion + telegram + gov-watch + **watchdog**, each under run-loop | auto, at logon (the "Jarvis Server" task) |
+| [`companion/start-jarvis.cmd`](../companion/start-jarvis.cmd) | **full local stack** — also starts Ollama + control-plane + scheduler + Slack locally (dev, or a NAS-down fallback) | manual double-click only |
+
+Retired 2026-07-16 (deleted — they only duplicated the companion line above): `companion/jarvis-forever.cmd`
+and `companion/jarvis-autostart.ps1`.
+
+### Retire any older duplicate *tasks* (one-time)
+Earlier iterations may have registered tasks under other names. **"Jarvis Server"** is now the single source
+of truth. Remove any leftovers so you never run two companions:
 ```
 schtasks /query | findstr /i jarvis            # list any jarvis tasks
 schtasks /delete /tn "JarvisCompanion" /f       2>nul
 schtasks /delete /tn "JARVIS Companion" /f      2>nul
 Unregister-ScheduledTask -TaskName "JARVIS Companion" -Confirm:$false   # (PowerShell form, if present)
 ```
-The companion already refuses to start a second copy if :8095 is busy, so a lingering duplicate is harmless
-but wasteful — worth clearing. (Consolidating these three scripts into one is Phase 2b.)
+The companion refuses to start a second copy if :8095 is busy, so a lingering duplicate is harmless but
+wasteful — worth clearing.
 
-_Status: watchdog + tunnel-recovery shipped 2026-07-16. Manual steps 1–2 = operator homework._
+_Status: watchdog + tunnel-recovery + launcher consolidation shipped 2026-07-16. Auto-login set (AutoAdminLogon=1).
+Remaining operator homework: reboot to test + BIOS "Restore on AC Power Loss → Power On"._

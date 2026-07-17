@@ -17,8 +17,12 @@ Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack alre
   so it won't survive a reboot. **Operator action to activate: run `scripts\install-autostart.cmd` once**
   (registers "Jarvis Server" incl. the watchdog) + the 2 manual steps. Watchdog needs run-loop as its
   respawn supervisor, so it activates WITH the task, not standalone.
-- ⏭ **Phase 2b:** consolidate the 3 overlapping autostart scripts into this one. Then **R1:** Victor CFO
-  business-credit tracker (EIN-based — independent of the CAIVRS question, safe to build now).
+- ✅ **Phase 2b DONE (2026-07-16):** consolidated launchers. Deleted the 2 redundant companion-only
+  autostart scripts (`companion/jarvis-forever.cmd`, `companion/jarvis-autostart.ps1`); kept
+  `scripts/start-jarvis.cmd` (the always-on task) + `companion/start-jarvis.cmd` (distinct: full local stack
+  incl. Ollama/control-plane/scheduler/Slack — dev / NAS-down fallback). Documented in `docs/always-on-host.md`.
+  **Auto-login confirmed** (`AutoAdminLogon=1`, user vrod). Operator: reboot to test + BIOS restore-on-AC.
+- ⏭ **R1 (in progress):** Victor CFO business-credit tracker — EIN-based, independent of the CAIVRS question.
 
 ### 🆕 2026-07-14 — RECONCILED 5 planning docs vs. the live build ("inspect, log everything, apply what's worth it")
 Operator handed 5 vault plans (Cross-Device PRD, Victor CFO Expanded PRD, GovCon Master Reference, CAIVRS/SBA

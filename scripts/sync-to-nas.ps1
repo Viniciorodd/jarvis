@@ -3,10 +3,19 @@
 #
 # Usage (from the repo root):
 #   pwsh scripts/sync-to-nas.ps1 -Dest '\\192.168.6.121\docker\jarvis'
+#   pwsh scripts/sync-to-nas.ps1 -Dest '\\192.168.6.121\docker\jarvis' -IncludeEnv   # FIRST deploy only
 # Point -Dest at the folder on the NAS where the stack lives (the one with docker-compose.yml). If you
 # haven't deployed before, create an empty folder on a NAS share and use that path.
+#
+# ⚠ .env IS EXCLUDED BY DEFAULT (fixed 2026-07-17). The PC .env and the NAS .env legitimately DIVERGE —
+# the NAS had FINANCE_AUTO_INVOICE the PC doesn't, and the PC has 17 keys that are wrong or harmful on the
+# NAS (LOCAL_MODEL/OLLAMA_AUTOSTART — Ollama runs on the PC; JARVIS_ROOTS — Windows paths; CONTROL_PLANE_URL
+# — points AT the NAS). Copying it with /PURGE would have silently DESTROYED the NAS-only key and broken
+# config that was working. The NAS .env is its own source of truth; edit it there.
+# Use -IncludeEnv ONLY for a first-ever deploy to a NAS folder that has no .env yet.
 param(
-  [Parameter(Mandatory = $true)] [string]$Dest
+  [Parameter(Mandatory = $true)] [string]$Dest,
+  [switch]$IncludeEnv
 )
 $ErrorActionPreference = 'Stop'
 $src = (Resolve-Path "$PSScriptRoot\..").Path
@@ -20,10 +29,15 @@ if (-not (Test-Path $Dest)) {
   exit 1
 }
 
-# Copy code + .env + prompts (the NAS needs them). Skip build junk, local state, and work product.
-# NOTE: .env and prompts/ are gitignored but REQUIRED on the NAS, so robocopy (not git) is the right tool.
-$exclDirs = @('node_modules', 'dist', 'dev-dist', '.git', 'volumes', '.netlify', '.claude', 'fiverr-assets', 'gov-drafts')
+# Copy code + prompts (the NAS needs them). Skip build junk, local state, and work product.
+# NOTE: prompts/ is gitignored but REQUIRED on the NAS, so robocopy (not git) is the right tool.
+# The excluded dirs are the NAS's OWN state (volumes/) or per-machine ledgers that must never be
+# cross-copied — /XD also protects them from /PURGE, so the NAS keeps its data.
+$exclDirs = @('node_modules', 'dist', 'dev-dist', '.git', 'volumes', '.netlify', '.claude', 'fiverr-assets',
+  'gov-drafts', 'tax-inbox', 'tax-docs', 'tax-ledger', 'finance-credit', 'ideas-vault', 'reports')
 $exclFiles = @('*.log', '.commitmsg.tmp')
+if (-not $IncludeEnv) { $exclFiles += '.env' }   # see the header: PC .env != NAS .env; /PURGE would clobber it
+else { Write-Host "-IncludeEnv: the NAS .env WILL be overwritten by this PC's .env." -ForegroundColor Yellow }
 robocopy $src $Dest /E /PURGE /XD $exclDirs /XF $exclFiles /R:1 /W:1 /NFL /NDL /NJH /NP | Out-Null
 $rc = $LASTEXITCODE  # robocopy: 0-7 = success, >=8 = error
 

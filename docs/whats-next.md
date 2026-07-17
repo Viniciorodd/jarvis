@@ -89,9 +89,28 @@ Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack alre
   (b) a backup clears the SAME SAM exclusion hard-stop (failed check → `unverified` caution, never a silent
   clear); (c) activation only DRAFTS via `reachOutToSub` → human-gated send. Evals **581 → 595**.
 - ✅ **R2d wiring (2026-07-17):** `POST /maintenance/sub-ladder-check` (control-plane) + `sub-ladder-radar`
-  job in `schedule.json` (daily, 10:00). ⚠ **The control-plane runs on the NAS in Docker — this job only
-  starts firing after the next NAS redeploy** (same as `tax-deadline-radar`). Everything else this run is
-  PC-side and already live.
+  job in `schedule.json` (daily, 10:00).
+- ✅ **NAS REDEPLOY DONE + VERIFIED (2026-07-17).** NAS = `/volume1/docker/jarvis` (host `ThanesKeep`,
+  192.168.6.121; SSH open from the operator's shell, **port 22 closed to this agent**). Flow: robocopy over
+  SMB (`\\192.168.6.121\docker\jarvis`) → on the NAS `docker compose up -d --build control-plane scheduler
+  telegram-bridge`. Verified live: `wait=3 send=1 cont=0` · `POST /maintenance/sub-ladder-check` →
+  `{"checked":0,...}` · control-plane "Up 3 minutes". **Now live on the NAS:** sub-ladder-radar,
+  tax-deadline-radar (pending since 2026-07-07), exclusions gate, matrix, price-to-win, business-credit.
+  **Three traps hit + fixed — read before the next redeploy:**
+  1. **NO `.dockerignore` existed** → `context: .` (repo root) meant the build scanned `volumes/`, whose
+     postgres data is container-uid-owned → `checking context: can't stat .../volumes/postgres` and the build
+     **died silently** (compose still printed a green `ps`, `date` still said EDT — only the empty env knobs
+     + `{"error":"not found"}` exposed it). It had only ever "worked" under sudo. **Fixed: added
+     `.dockerignore`** (excludes volumes/ + trees the Dockerfile never COPYs + `.env` so secrets can't bake in).
+     ⚠ Keep it in sync with `control-plane/Dockerfile`'s COPY list.
+  2. **Compose only injects vars named in `environment:`** (the GOV_AUTO_SEND lesson, again): `GOV_SUB_WAIT_DAYS`
+     / `GOV_CONTINGENCY_PCT` / `PTW_MAX_AWARDS` / `GOV_MARKUP_PCT` were unlisted → untunable from `.env`.
+     Added to the control-plane service (where the pod workers run).
+  3. **`sync-to-nas.ps1` pushed `.env` with `/PURGE`** → would have **DESTROYED** the NAS-only
+     `FINANCE_AUTO_INVOICE` and pushed 17 PC-only keys that are wrong on the NAS (LOCAL_MODEL/OLLAMA_AUTOSTART
+     — Ollama is PC-side; JARVIS_ROOTS — Windows paths; CONTROL_PLANE_URL — points AT the NAS). **Fixed: `.env`
+     is now excluded by default; `-IncludeEnv` opts in for a first-ever deploy.** The NAS `.env` is its own
+     source of truth — edit it on the NAS. (It lacks `TZ`, which is fine: compose defaults `America/New_York`.)
 - 🚫 **R2e (post-award lifecycle / Stages 8–10 / CPARS) — deliberately NOT built. Reason logged:** it manages
   subcontract execution, delivery oversight, closeout and CPARS — all of which only exist AFTER a first award,
   which hasn't happened yet. Building it now means guessing workflows the first real award would immediately

@@ -21,7 +21,14 @@
     nx.appendChild(el('span','biz-who ' + (b.next.who === 'you' ? 'you' : 'jarvis'), b.next.who === 'you' ? 'You' : 'Jarvis'));
     nx.appendChild(el('div','biz-next-text', b.next.text));
     r.appendChild(nx);
-    r.addEventListener('click', function(){ openBusiness(b); });
+    // The three businesses that now have their own full desk (U1/U4/U5, 2026-07-18) route straight there;
+    // everything else keeps the original in-overlay detail. This makes the Ops hub the real front door to
+    // the new surfaces without a shell change — repoint, don't rebuild. (U2 step 1: link, don't delete.)
+    r.addEventListener('click', function(){
+      var DESK = { gov: '/govcon-os', finance: '/finances', realestate: '/real-estate' };
+      if (DESK[b.id]) { window.location.href = DESK[b.id]; return; }
+      openBusiness(b);
+    });
     return r;
   }
 

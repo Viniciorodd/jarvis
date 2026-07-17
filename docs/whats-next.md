@@ -937,3 +937,21 @@ All verified live at 1280 + 375px, 0 console errors, evals 595 green.
   bug — don't rip it out without his choice.
 - ⏭ **Left:** U2 deletions (17/18, soak a week first — see prompt §6); the Jarvis wall-vs-orb decision; the
   NAS `sub-ladder-radar`/`tax-deadline-radar` are live (redeployed 2026-07-17); CAIVRS confirmation (operator).
+
+### 🆕 2026-07-18 — New Jarvis screen (Calm default, Wall reversible) + NJ remote-access verified + vault notes
+Operator going to New Jersey; will test a week then decide Jarvis-design + U2 together.
+- **New calm Jarvis screen is the DEFAULT, cinematic Wall one tap away** (`wall.js` split into style + voice):
+  `jarvis-talk-style` localStorage, default 'calm' (orb + Today/Latest glance + transcript). Settings →
+  "Jarvis screen" toggles to 'wall' (the old neural-brain cinematic look). Open-conversation hands-free voice
+  is INDEPENDENT and works in both. Nothing deleted — reversible for the test week. Verified live: default
+  calm (orb+glances visible, no wall CSS), toggle → wall (wall CSS in, orb hidden) → back to calm, 0 errors.
+- **Remote access from the MacBook in NJ — verified operational 2026-07-18:** URL
+  `https://shisui.tailf46d22.ts.net` (Tailscale HTTPS serve → :8095). MacBook (`macbook-pro`, 100.81.15.13)
+  is ACTIVE on the tailnet. PC power: **sleep=0 + hibernate=0 on AC** (won't drop off), AutoAdminLogon=1,
+  "Jarvis Server" task Ready, watchdog running, companion reachable over the tunnel (HTTP 200). Telegram (NAS,
+  24/7) is the fallback if the PC is down. **The one gap = BIOS "Restore on AC Power Loss → Power On"
+  (operator's pending item) — a blackout otherwise leaves the PC off.**
+- **Vault notes written** (LiveSync → his devices): `00 - System/🛰️ Jarvis — Remote Access & Status (NJ
+  trip).md` (the access guide + operational status + test checklist + troubleshooting) and `00 - System/🗒️
+  Jarvis — Build Log (redesign week).md` (plain-English what-we-built). Both cross-linked; point back to the
+  CAIVRS reconciliation.

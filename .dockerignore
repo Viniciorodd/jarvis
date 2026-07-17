@@ -1,0 +1,62 @@
+# Docker build-context excludes.
+#
+# WHY THIS FILE EXISTS (2026-07-17): all three built services (control-plane, scheduler,
+# telegram-bridge) share control-plane/Dockerfile with `context: .` — the REPO ROOT — because the
+# Dockerfile COPYs pods/ + prompts/ + scripts/ alongside control-plane/. With no .dockerignore the
+# build context was the ENTIRE project, including volumes/ — whose postgres data is owned by the
+# container's uid. A non-root `docker compose build` then dies before it starts:
+#     checking context: can't stat '/volume1/docker/jarvis/volumes/postgres'
+# (It only "worked" before when run under sudo.) Excluding volumes/ fixes that permanently, and
+# dropping the trees the Dockerfile never copies makes the context tiny instead of gigabytes.
+#
+# ⚠ KEEP IN SYNC WITH control-plane/Dockerfile's COPY list. These must NOT be excluded:
+#     control-plane/  ·  pods/  ·  scripts/  ·  prompts/  ·  companion/telegram-bridge.mjs
+
+# ── the build breaker: runtime bind-mounts (root/container-owned) ────────────────────────────────
+volumes/
+
+# ── vcs, deps, build output ──────────────────────────────────────────────────────────────────────
+.git/
+.gitattributes
+**/node_modules/
+**/dist/
+**/dev-dist/
+
+# ── secrets + local machine state: never bake these into an image (env comes from compose) ───────
+.env
+.env.*
+.claude/
+*.log
+control-plane/data/
+
+# ── work product + local ledgers (regenerated at runtime; not needed to build) ───────────────────
+gov-drafts/
+fiverr-assets/
+tax-inbox/
+tax-docs/
+tax-ledger/
+finance-credit/
+ideas-vault/
+reports/
+
+# ── big trees the Dockerfile never COPYs ─────────────────────────────────────────────────────────
+jarvis-world/
+dealforge/
+desktop/
+hq/
+site/
+web-templates/
+docs/
+evals/
+n8n/
+Biography/
+UI Inspiration/
+
+# ── companion/: the image COPYs exactly one file from here (companion/telegram-bridge.mjs). We do
+# NOT do an exclude-then-negate dance on the folder — a negation slip would break that COPY and cost a
+# build cycle. Keeping the (small) source dir in context is cheap; just drop its heavy artifacts.
+companion/public/models/
+companion/public/_generated/
+companion/desktop/
+companion/.usage.json
+companion/.dashboard.json

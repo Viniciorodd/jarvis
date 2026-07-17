@@ -3113,6 +3113,22 @@ const server = http.createServer(async (req, res) => {
     try { const D = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'deals.mjs')).href); return send(res, 200, JSON.stringify(D.dealsBoard())); }
     catch (e) { return send(res, 200, JSON.stringify({ deals: [], counts: {}, needsYou: 0, pipeline: 0, profit: 0, error: e.message })); }
   }
+  // ── COMPLIANCE MATRIX (pods/gov/matrix.mjs): the requirements traceability matrix — every "shall/must"
+  //    in the SOW mapped to WHERE the draft answers it, and the GAPS (unaddressed = disqualification risk)
+  //    shown honestly with NO fabricated citation. Read-only analysis + artifact; no gate, nothing sent. ──
+  if (req.method === 'GET' && url.pathname === '/api/gov/matrix') {
+    try {
+      const noticeId = url.searchParams.get('noticeId');
+      if (!noticeId) return send(res, 400, JSON.stringify({ ok: false, error: 'noticeId required' }));
+      const M = await import('../pods/gov/matrix.mjs');
+      let op = { noticeId };
+      try { const D = await import('../pods/gov/deals.mjs'); const deal = D.getDeal(noticeId); if (deal) op = { ...deal, noticeId }; } catch { /* ledger best-effort */ }
+      const r = await M.matrixForOp(op, { key: SAM_KEY });
+      if (!r.ok || !r.matrix) return send(res, 404, JSON.stringify({ ok: false, error: r.error || 'could not build a matrix for this notice', noticeId }));
+      if (!r.summary.total) return send(res, 404, JSON.stringify({ ok: false, error: 'no SOW requirements or draft found for this notice yet', noticeId, summary: r.summary }));
+      return send(res, 200, JSON.stringify({ ok: true, summary: r.summary, gapCount: r.gapCount, markdown: M.renderMatrixMarkdown(r.matrix), file: r.file }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // Curated top-N opportunity BRIEFS (a few quality ones w/ what-they-want + fit + win-chance + strategy).
   if (req.method === 'GET' && url.pathname === '/api/gov/briefs') {
     try { const B = await import('../pods/gov/briefs.mjs'); return send(res, 200, JSON.stringify(await B.buildBriefs({ topN: Number(url.searchParams.get('n')) || 3, cpUrl: CP_URL }))); }

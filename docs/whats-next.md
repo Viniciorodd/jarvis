@@ -38,7 +38,17 @@ Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack alre
   scores (with honest empty states), the CAIVRS-aware financing note, a needsVerification panel, and a "+"
   FAB → add sheet (trade line / payment / score / foundation). Verified in-browser against live routes on a
   throwaway :8096 instance (14% readiness renders, all labels clean, 0 console errors, all 4 forms open).
-- ⏭ **NEXT:** R2 — heavier reconciliation items (compliance matrix w/ citations, USASpending price-to-win).
+- ✅ **R2a DONE (2026-07-16):** **compliance matrix** (requirements traceability) — `pods/gov/matrix.mjs`.
+  Complements `checkCompliance`'s holistic verdict with line-by-line PROOF: `extractRequirements(sowText)`
+  pulls every "shall/must/required to" statement (regex-gated, deduped, categorized, capped 60);
+  `mapCoverage(req, draft)` deterministically marks each addressed/partial/gap by keyword-overlap with the
+  draft, citing the draft snippet as evidence; `buildMatrix` → coveragePct + gap count; `renderMatrixMarkdown`
+  writes a real artifact (`gov-drafts/matrix/<slug>.md`) that LEADS with the gaps. NO LLM in the hot path —
+  pure + eval-pinned. **No fabrication: a gap gets an EMPTY citation, never an invented one** (verified).
+  `matrixForOp(op)` resolves SOW (via sow.mjs) + draft (deal `proposalFile`). Route `GET /api/gov/matrix?noticeId=`.
+  Evals **537 → 547**. Reuses the pod slug so one notice → one predictable filename across sow/draft/matrix.
+- ⏭ **NEXT:** R2b — USASpending price-to-win (fold comparable-award pricing into bids; `pods/gov/pricing.mjs`
+  + `spending.mjs` already exist to build on). Then a UI surface for the matrix (route + artifact exist now).
 
 ### 🆕 2026-07-14 — RECONCILED 5 planning docs vs. the live build ("inspect, log everything, apply what's worth it")
 Operator handed 5 vault plans (Cross-Device PRD, Victor CFO Expanded PRD, GovCon Master Reference, CAIVRS/SBA

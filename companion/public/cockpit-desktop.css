@@ -1,0 +1,106 @@
+/* cockpit-desktop.css — the U3/U5 desktop redesign, ported from the Stitch mockups.
+ *
+ * SAFETY BY CONSTRUCTION: every rule here lives inside `@media (min-width:1024px)`. On phones/tablets this
+ * file does NOTHING — the existing mobile layout is untouched, byte for byte. On a wide screen it reflows
+ * the SAME markup the shell already has (no HTML changes, no JS changes) into the Stitch layout: a left-rail
+ * nav + multi-column content that actually uses the width (the operator's original complaint was a phone
+ * layout stranded in the middle of a big monitor). If anything looks wrong, remove ONE <link> and we're back.
+ *
+ * Only existing theme vars — both themes just work. Geometry from the Stitch spec (220px rail, 1180 content).
+ */
+
+@media (min-width: 1024px) {
+
+  /* ── SHELL → left rail + content grid ─────────────────────────────────────────────────────────────
+   * .j-shell is a flex column of [top, main, composer, nav]. Re-lay it as a grid so nav becomes a left
+   * column spanning full height and the rest stacks to its right. */
+  .j-shell {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "nav top" "nav main" "nav composer";
+  }
+  .j-top { grid-area: top; }
+  .j-main { grid-area: main; }
+  .j-composer-bar { grid-area: composer; }
+  .j-nav { grid-area: nav; }
+
+  /* vertical rail */
+  .j-nav {
+    height: auto; flex-direction: column; justify-content: flex-start; align-items: stretch;
+    border-top: none; border-right: 0.5px solid var(--line); background: var(--ink);
+    padding: 14px 12px; gap: 3px;
+  }
+  .j-nav::before {
+    content: "JARVIS"; display: block; font-weight: 800; letter-spacing: .22em; font-size: 13px;
+    color: var(--cream); padding: 8px 14px 16px;
+  }
+  .j-nav-btn {
+    flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: 13px; width: 100%;
+    padding: 11px 14px; border-radius: 10px; font-size: 14px; letter-spacing: 0; color: var(--dim);
+    transition: background .14s, color .14s;
+  }
+  .j-nav-btn i { font-size: 20px; }
+  .j-nav-btn span { font-weight: 500; }
+  .j-nav-btn:hover { color: var(--cream); background: rgba(var(--teal-rgb), .05); }
+  .j-nav-btn.active { color: var(--teal); background: var(--panel2); }
+
+  /* top bar sits above the content column, hairline under it */
+  .j-top { border-bottom: 0.5px solid var(--line); }
+
+  /* ── HOME → two columns (left = act, right = glance) ──────────────────────────────────────────────
+   * The home sections are direct children of #jHomeView; place them explicitly so it's deterministic
+   * regardless of source order or which sections are hidden. Ticker + hero span the full width. */
+  #jHomeView.active {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+    column-gap: 24px; row-gap: 4px; align-content: start;
+    max-width: 1180px; width: 100%; margin: 0 auto; padding: 6px 28px 44px; box-sizing: border-box;
+  }
+  #jHomeView.active > * { min-width: 0; }
+  #jHomeView.active > #jTicker { grid-column: 1 / -1; grid-row: 1; }
+  #jHomeView.active > .j-hero { grid-column: 1 / -1; grid-row: 2; padding: 12px 4px 10px; }
+  /* left column (the doing) */
+  #jHomeView.active > #jOneThing { grid-column: 1; grid-row: 3; }
+  #jHomeView.active > #jNeedsSection { grid-column: 1; grid-row: 4; }
+  #jHomeView.active > #jTodaySection { grid-column: 1; grid-row: 5; }
+  /* right column (the glancing) */
+  #jHomeView.active > #homeMetrics { grid-column: 2; grid-row: 3; align-self: start; }
+  #jHomeView.active > .j-section:has(#jGovPipe) { grid-column: 2; grid-row: 4; }
+  #jHomeView.active > #jFeedSection { grid-column: 2; grid-row: 5; }
+  #jHomeView.active > .j-section:has(#wxBar) { grid-column: 2; grid-row: 6; }
+
+  /* the ONE THING gets room to breathe as the hero it is */
+  #jHomeView.active > #jOneThing { padding: 20px 22px; border-radius: 16px; }
+  /* metrics: a 2x2 grid on the right rail instead of a scrolling row */
+  #jHomeView.active #homeMetrics {
+    display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; overflow: visible !important; padding: 0 0 4px;
+  }
+
+  /* ── TODAY → three columns (tasks · calendar · capture) ───────────────────────────────────────────
+   * Scope to the Today view; its sections also carry .j-section, so target by the known child ids. */
+  #jTodayView.active {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) minmax(0, 0.9fr);
+    column-gap: 20px; align-content: start;
+    max-width: 1240px; width: 100%; margin: 0 auto; padding: 6px 28px 44px; box-sizing: border-box;
+  }
+  #jTodayView.active > * { min-width: 0; }
+  #jTodayView.active > .j-hero { grid-column: 1 / -1; padding: 14px 4px 8px; }
+  /* first content section (tasks) → col 1; calendar → col 2; capture → col 3.
+     The view's sections are in source order tasks, calendar, capture — nth-of-type after the hero. */
+  #jTodayView.active > .j-section:nth-of-type(1) { grid-column: 1; }
+  #jTodayView.active > .j-section:nth-of-type(2) { grid-column: 2; }
+  #jTodayView.active > .j-section:nth-of-type(3) { grid-column: 3; }
+
+  /* ── JARVIS (talk) → keep it centered, don't stretch the transcript full-width ────────────────────*/
+  #jTalkView.active { align-items: center; }
+  #jTalkView.active > * { width: 100%; max-width: 860px; }
+
+  /* ── MORE → a calm centered list, not a full-width stretch ────────────────────────────────────────*/
+  #jMoreView.active { align-items: center; }
+  #jMoreView.active > * { width: 100%; max-width: 720px; }
+
+  /* composer bar centered over the content column */
+  .j-composer-bar .j-composer { max-width: 1180px; margin: 0 auto; }
+}

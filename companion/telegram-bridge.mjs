@@ -21,8 +21,28 @@ function env(k, d = '') {
 const TOKEN = env('TELEGRAM_BOT_TOKEN');
 const ALLOWED = env('TELEGRAM_CHAT_ID'); // only this chat (your phone) is served; others get a polite no
 const COMPANION = env('COMPANION_URL', 'http://localhost:8095').replace(/\/$/, '');
-if (!TOKEN) { console.error('Need TELEGRAM_BOT_TOKEN in .env (create a bot via @BotFather). See the header.'); process.exit(1); }
 const API = 'https://api.telegram.org/bot' + TOKEN;
+
+// PURE (eval-pinned): does this message ask to SEE what's waiting (drafts / outreach / pending approvals)?
+// This exists because of a real trust bug (2026-07-18): the daily digest truthfully said "Hector drafted 2
+// sub outreach — waiting on approval", but "pull me the 2 sub outreach" fell through to the Chief-of-Staff
+// ROUTER, which routed a NEW task to Hector instead of READING the store the drafts live in — a
+// self-contradiction. The fix routes these asks straight to the ONE source of truth (/approvals/pending),
+// the same store the digest reads. Deliberately does NOT match a CREATE ("draft a proposal") — only retrieval.
+export function wantsPending(text) {
+  const t = String(text || '').trim().toLowerCase();
+  if (!t) return false;
+  if (/^\/(pending|drafts?|waiting|approvals?|outreach)\b/.test(t)) return true;
+  // A CREATE intent ("draft/write/compose … fresh/new") is NOT a retrieval — let it go to the brain, UNLESS
+  // it also clearly asks to SEE the existing one (show/pull/read/list/pending/waiting/existing/already).
+  if (/\b(draft|write|create|compose|make|generate|prepare|new)\b/.test(t)
+      && !/\b(show|pull|read|see|list|pending|waiting|existing|already)\b/.test(t)) return false;
+  const verb = /\b(pull|show|read|see|list|give|send|open|fetch|where|which|what)\b/.test(t);
+  const noun = /\b(outreach|drafts?|pending|approvals?|waiting|gates?|to\s+(approve|sign|decide))\b/.test(t);
+  if (verb && noun) return true;
+  if (/\b(the|those|these|my|any)\s+(\d+\s+)?(sub\s+)?(outreach|drafts?|pending|approvals?)\b/.test(t)) return true;
+  return false;
+}
 
 const history = []; // light conversation memory
 async function tg(method, body) { try { return await (await fetch(API + '/' + method, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(); } catch (e) { return { ok: false, error: e.message }; } }
@@ -81,6 +101,24 @@ function approvalText(a) {
     + `\n\n(${a.pod || ''} · ${a.action || ''})${note}`;
 }
 async function seedApprovals() { const list = await cp('/approvals/pending'); if (Array.isArray(list)) for (const a of list) pushedApprovals.add(a.id); }
+
+// ON-DEMAND retrieval + button REVIVAL. Reads /approvals/pending (the ONE source of truth the digest reads)
+// and re-sends each pending gate WITH its draft excerpt and its Approve/Skip buttons. This fixes BOTH bugs at
+// once: (A) "pull me the sub outreach" now shows the real, existing drafts instead of the router inventing a
+// new task; (B) after a bridge restart, seedApprovals() marks all pending gates as already-pushed so their
+// buttons are never re-sent — this brings them back on demand. Leads with the SEND gates (the outreach), caps
+// the burst so 20 pending items don't flood the phone.
+async function showPending(chat) {
+  const list = await cp('/approvals/pending');
+  if (!Array.isArray(list) || !list.length) { await send(chat, '✓ Nothing is waiting on you right now — no pending drafts or approvals.'); return; }
+  const sorted = list.slice().sort((a, b) => (isSendGate(b) ? 1 : 0) - (isSendGate(a) ? 1 : 0) || String(b.ts || '').localeCompare(String(a.ts || '')));
+  const CAP = 8;
+  await send(chat, `🟡 ${list.length} waiting on you. Here ${list.length === 1 ? 'it is' : 'they are'} — tap to decide${list.length > CAP ? ` (showing the first ${CAP})` : ''}:`);
+  for (const a of sorted.slice(0, CAP)) {
+    await tg('sendMessage', { chat_id: chat, text: approvalText(a), reply_markup: { inline_keyboard: [[{ text: '✅ Approve & send', callback_data: 'ap:' + a.id }, { text: '⏭ Skip', callback_data: 'sk:' + a.id }]] } });
+    pushedApprovals.add(a.id); // mark seen so the 15s auto-pusher doesn't double-send
+  }
+}
 async function pushApprovals() {
   if (!ALLOWED) return;
   const list = await cp('/approvals/pending');
@@ -224,6 +262,8 @@ async function handle(chat, text) {
   if (/^\/money/.test(text)) { const b = await get('/api/business?id=finance'); const m = b.money || {}; return send(chat, `Income ${m.month || 'this month'}: $${(m.mtd || 0).toLocaleString()} / $${(m.goal || 10000).toLocaleString()} (${m.pct || 0}%) · $${(m.remaining || 0).toLocaleString()} to go.`); }
   const cap = text.match(/^\/capture\s+([\s\S]+)/i);
   if (cap) { await fetch(COMPANION + '/api/cockpit/capture', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: cap[1] }) }).catch(() => {}); return send(chat, '✓ captured to your vault'); }
+  // "pull me the drafts / show my pending / the 2 sub outreach" → the REAL store, with buttons (see wantsPending).
+  if (wantsPending(text)) return showPending(chat);
   await tg('sendChatAction', { chat_id: chat, action: 'typing' });
   return send(chat, await askJarvis(text));
 }
@@ -242,13 +282,18 @@ async function poll() {
   setTimeout(poll, d && d.ok === false ? 3000 : 400); // back off on network errors
 }
 
-(async () => {
+async function main() {
+  if (!TOKEN) { console.error('Need TELEGRAM_BOT_TOKEN in .env (create a bot via @BotFather). See the header.'); process.exit(1); }
   const me = await tg('getMe', {});
   console.log('JARVIS Telegram bridge running as @' + ((me.result || {}).username || '?') + '  ·  brain: ' + COMPANION + '  ·  CP: ' + CP + (ALLOWED ? '' : '  ·  ⚠ no TELEGRAM_CHAT_ID — message the bot to learn yours'));
   await seedApprovals();               // mark the existing backlog as seen (don't blast it on boot)
   await seedEvents();                   // same for the activity feed
   setInterval(pushApprovals, 15000);   // push NEW gated actions as tap-to-approve buttons
   setInterval(pushNarration, 90000);   // narrate meaningful agent actions, signed by the agent
-  if (ALLOWED) tg('sendMessage', { chat_id: ALLOWED, text: '👥 Jarvis team is online — I\'ll tell you what each agent does, and send you approvals to tap. Let\'s make money.' }).catch(() => {});
+  if (ALLOWED) tg('sendMessage', { chat_id: ALLOWED, text: '👥 Jarvis team is online — I\'ll tell you what each agent does, and send you approvals to tap. Say "show my pending" any time to pull up what\'s waiting. Let\'s make money.' }).catch(() => {});
   poll();
-})();
+}
+
+// Only run the bridge when executed directly (node companion/telegram-bridge.mjs). Guarded so evals can
+// import the pure helpers (wantsPending) without starting the poller or exiting on a missing token.
+if (process.argv[1] && /telegram-bridge\.mjs$/.test(process.argv[1].replace(/\\/g, '/'))) main();

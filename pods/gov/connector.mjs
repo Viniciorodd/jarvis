@@ -141,6 +141,12 @@ export async function maybeConnect({ op, sc }) {
   const exclNote = excl && excl.unverified ? ' ⚠ exclusion check UNVERIFIED — confirm at SAM.gov before sending.' : '';
   const exclPayload = excl ? (excl.unverified ? { exclusionUnverified: true } : { exclusionChecked: true, exclusionCheckedAt: excl.checkedAt }) : {};
 
+  // TIER LADDER (pods/gov/sub-ladder.mjs): record the rated bench as tier 1 primary / tier 2 backup /
+  // tier 3+ backup-2 the moment we know it. Without this the bid depends entirely on the top sub replying —
+  // if he goes quiet nobody activates #2 and the deadline passes. Idempotent + best-effort: a ladder failure
+  // must never break the outreach flow that already works.
+  try { const L = await import('./sub-ladder.mjs'); L.startLadder({ op, trade, shortlist }); } catch { /* ladder best-effort */ }
+
   const d = await draftOutreach(op, top, trade, shortlist);
   fs.mkdirSync(DRAFTS, { recursive: true });
   const slug = (op.noticeId || op.title).replace(/[^\w]+/g, '-').slice(0, 44);
@@ -164,6 +170,9 @@ export async function maybeConnect({ op, sc }) {
     await gateApproval(
       { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send ${trade} outreach (SOW + ask for past performance + quote) for ${op.title} → ${top.contact_email}.${exclNote}`, payload: { noticeId: op.noticeId, trade, file, shortlist, to: top.contact_email, ...exclPayload } },
       { pod: 'Gov War Room', title: `Send ${trade} outreach: ${op.title}`, detail: detail + exclNote, xp: 20, verb: 'Review & send' });
+    // The primary's clock starts when the gate is RAISED (not when it's sent) — a draft the operator sits on
+    // is exactly the stall the ladder exists to break. Silence past GOV_SUB_WAIT_DAYS activates the backup.
+    try { const L = await import('./sub-ladder.mjs'); L.recordContact(op.noticeId, trade, top.id); } catch { /* ladder best-effort */ }
     await mirror('CONNECT-01', 'need', `${trade} outreach ready to send → ${top.name}`);
   } else {
     await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.needs_email', status: 'need', reversible: true, rationale: `${trade} outreach for ${op.title} is drafted but has NO recipient email — add one (enrich or manually) before it can send.`, payload: { noticeId: op.noticeId, trade, file, shortlist } });

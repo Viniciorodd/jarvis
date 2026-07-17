@@ -230,6 +230,19 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { result = { ok: false, note: e.message }; }
       return send(res, 200, result);
     }
+    // Sub ladder radar → when the PRIMARY sub has gone silent past the wait window (GOV_SUB_WAIT_DAYS),
+    // activate the backup so a bid never stalls on one unresponsive vendor before a federal deadline.
+    // Deterministic, no LLM. Doctrine-safe by construction: the ladder closes itself the moment any sub
+    // responds (so a backup is never chased after we have our sub), a backup must clear the SAME SAM
+    // exclusion hard-stop, and activation only DRAFTS a human-gated outreach — it never auto-sends.
+    if (req.method === 'POST' && p === '/maintenance/sub-ladder-check') {
+      let result;
+      try {
+        const sl = await import('../pods/gov/sub-ladder.mjs');
+        result = await sl.runSubLadder({});
+      } catch (e) { result = { ok: false, note: e.message }; }
+      return send(res, 200, result);
+    }
     // Gov growth digest → ONE calm weekday-morning Telegram with the freshest quick wins + teaming
     // primes (pods/gov/digest.mjs). Deduped via gov.digest.sent events (payload.date === today) so at
     // most ONE digest goes out per calendar day even if the scheduler fires twice; weekends rest.

@@ -75,10 +75,30 @@ Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack alre
   **⚠ POLICY: `GOV_CONTINGENCY_PCT` defaults to 0 (OFF) and `middlemanPrice()` is UNTOUCHED — live bids did
   NOT move.** Turning it on raises every bid by that %, which can lose a competitive set-aside; that's the
   operator's pricing call. An eval pins the 0-default so it can never silently drift on.
-- ⏭ **NEXT:** R2d — sub primary/backup tiers + auto-activation ladder. **R2e (post-award lifecycle /
-  Stages 8–10 / CPARS) = deliberately NOT built: premature.** It manages subcontract execution, delivery
-  oversight, closeout and CPARS — all of which only exist AFTER a first award, which hasn't happened. Building
-  it now means guessing workflows the first real award would immediately reshape. Build it the day he wins.
+- ✅ **R2d DONE (2026-07-17):** **sub primary/backup ladder** — `pods/gov/sub-ladder.mjs`. `maybeConnect`
+  rated 3 subs but only ever contacted #1; if that sub ghosted, the bid stalled silently into a federal
+  deadline. Now: append-only ledger `gov-drafts/sub-ladder.jsonl` (fold by `noticeId|trade`); pure/eval-pinned
+  `assignTiers` / `isStale` / `nextTierToActivate` / `ladderStatus`; `GOV_SUB_WAIT_DAYS` default 3 (clamp 1–14).
+  **The clock starts when the outreach GATE IS RAISED, not when sent** — a draft the operator sits on is the
+  exact stall this fixes. `runSubLadder()` activates the next tier; bench exhausted → closes + `mirror(need)`
+  so a dead bench becomes an operator decision, never a silent stall. Wired: `connector.mjs` (startLadder +
+  recordContact — startLadder is idempotent so a re-run can't wipe the clock), `replies.mjs` (recordResponse,
+  matches by subId OR email since replies match by email), route `GET /api/gov/sub-ladder`.
+  **Doctrine pinned by evals:** (a) ANY tier responded → `null` **checked BEFORE the staleness math**, so a
+  backup is never chased after a sub says yes (+ recordResponse hard-closes the ladder as a 2nd stop);
+  (b) a backup clears the SAME SAM exclusion hard-stop (failed check → `unverified` caution, never a silent
+  clear); (c) activation only DRAFTS via `reachOutToSub` → human-gated send. Evals **581 → 595**.
+- ✅ **R2d wiring (2026-07-17):** `POST /maintenance/sub-ladder-check` (control-plane) + `sub-ladder-radar`
+  job in `schedule.json` (daily, 10:00). ⚠ **The control-plane runs on the NAS in Docker — this job only
+  starts firing after the next NAS redeploy** (same as `tax-deadline-radar`). Everything else this run is
+  PC-side and already live.
+- 🚫 **R2e (post-award lifecycle / Stages 8–10 / CPARS) — deliberately NOT built. Reason logged:** it manages
+  subcontract execution, delivery oversight, closeout and CPARS — all of which only exist AFTER a first award,
+  which hasn't happened yet. Building it now means guessing workflows the first real award would immediately
+  reshape. Build it the day he wins. (Tracked in the Idea Vault.)
+- 🚫 **Financing plan + SCORE intake form — blocked on the OPERATOR, not code:** needs his real business
+  financials + the CAIVRS confirmation. The Lendability tracker (R1) is the vehicle; it reads 14% until he
+  enters EIN/DUNS/bank + trade lines.
 
 ### 🆕 2026-07-14 — RECONCILED 5 planning docs vs. the live build ("inspect, log everything, apply what's worth it")
 Operator handed 5 vault plans (Cross-Device PRD, Victor CFO Expanded PRD, GovCon Master Reference, CAIVRS/SBA

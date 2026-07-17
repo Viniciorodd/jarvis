@@ -3130,6 +3130,25 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, summary: r.summary, gapCount: r.gapCount, gaps, markdown: M.renderMatrixMarkdown(r.matrix), file: r.file }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // ── SUB TIER LADDER (pods/gov/sub-ladder.mjs): every open bid's sub bench — who's primary, who's the
+  //    backup, who we're waiting on and for how long, and whether the bench is exhausted. The connector only
+  //    ever contacts the TOP sub; this is the escalation clock that stops a bid stalling on his silence.
+  //    Read-only view of the append-only ladder ledger; no gate, nothing sent, nothing activated here. ──
+  if (req.method === 'GET' && url.pathname === '/api/gov/sub-ladder') {
+    try {
+      const L = await import('../pods/gov/sub-ladder.mjs');
+      const open = L.openLadders({});
+      const ladders = open.map((l) => L.ladderStatus(l));
+      return send(res, 200, JSON.stringify({
+        ok: true,
+        waitDays: L.subWaitDays(),
+        ladders,
+        total: ladders.length,
+        waiting: ladders.filter((s) => s.waitingOn && !s.responded).length,
+        exhausted: ladders.filter((s) => s.exhausted).length,
+      }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, ladders: [], total: 0 })); }
+  }
   // ── PRICE-TO-WIN (pods/gov/price-to-win.mjs): the MARKET REFERENCE for a bid. pricing.mjs says what we
   //    charge (sub quote × markup); this says whether that number is competitive against what the government
   //    ACTUALLY paid for comparable NAICS/state work (real USASpending awards). Deterministic math, no LLM,

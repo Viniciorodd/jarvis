@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, DRAFTS, env, emit, mirror, claude } from './lib.mjs';
-import { loadSubs, saveSubs } from './connector.mjs';
+import { loadSubs, saveSubs, inferTrade } from './connector.mjs';
 
 const slug = (op) => String(op.noticeId || op.title || 'op').replace(/[^\w]+/g, '-').slice(0, 44);
 export const procurementPath = (op) => path.join(ROOT, 'gov-drafts', `procurement-${slug(op)}.json`);
@@ -69,6 +69,12 @@ export async function gatherSubResponses({ op = null } = {}) {
     if (parsed.past_performance) sub.past_performance_notes = parsed.past_performance;
     sub.status = 'quoted'; sub.last_reply = m.date;
     updated++; found.push({ sub: sub.name, quote: sub.quote || '(none)', past_performance: parsed.past_performance || '' });
+    // TIER LADDER: a REAL reply landed → close this trade's ladder so no backup is ever chased behind a
+    // "yes" (pods/gov/sub-ladder.mjs). Only ever called from a matched inbound reply — the ladder can never
+    // fabricate a response. Needs an opportunity to know WHICH ladder; no op in scope → safely no-op.
+    if (op && op.noticeId) {
+      try { const L = await import('./sub-ladder.mjs'); L.recordResponse(op.noticeId, inferTrade(op), sub.id); } catch { /* ladder best-effort */ }
+    }
     // Deal ledger: record the quote on every deal that reached out to this sub — code prices the bid
     // (quote × markup) the moment the quote lands, and the deal advances quotes_in → priced.
     if (parsed.quote) {

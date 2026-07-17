@@ -53,8 +53,32 @@ Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack alre
   plain English, and folds them into the "🔧 Have Jarvis fix these" redraft. Best-effort (skips cleanly when a
   notice has no SOW/draft yet). Route now also returns structured `gaps` rows. Verified: cockpit boots 0
   console errors; matrix route degrades gracefully. Evals still 547.
-- ⏭ **NEXT:** R2b — USASpending price-to-win (fold comparable-award pricing into bids; `pods/gov/pricing.mjs`
-  + `spending.mjs` already exist to build on).
+- ✅ **R2b DONE (2026-07-17):** **price-to-win** — `pods/gov/price-to-win.mjs`. Pure/eval-pinned percentile
+  math (`percentile`/`summarizeAwards`/`confidenceOf`/`priceToWinVerdict`/`targetRange`/`priceToWinLine`);
+  NO LLM near the math. **⚠ THE KEY LESSON:** the obvious query (`sort:'Award Amount', order:'desc',
+  limit:100`) returns the LARGEST 100 awards, not a sample — it made PA 561720 read median **$713k**, so a
+  normal $61k bid looked "0th percentile, below-market" (confidently WRONG in the dangerous direction).
+  FIX = `countPopulation()` (`/spending_by_award_count/`, shared `buildFilters()` so count and search match)
+  then **paginate the FULL population** when N ≤ `PTW_MAX_AWARDS` (1000). Live: PA 561720 = **281 awards read
+  in full → median $78,289**, band $25.5k–$78k, a $61k bid = **42nd pct, competitive**. Over cap (nationwide
+  = 12,068) → `overCap:true` → **refuses a position** (`unknown`, null percentile) rather than emit a biased
+  one. `overCap` (we know it's too big → refuse) is deliberately SEPARATE from `complete` (did we read it all)
+  so a count-endpoint outage degrades to an honest disclosed read instead of silence. Route
+  `GET /api/gov/price-to-win?noticeId=&bid=`. Cache `pods/gov/.ptw-cache.json` (24h TTL, gitignored).
+  *Known nuance:* the time filter matches awards with ACTION in the window, so some rows show older start dates.
+- ✅ **R2c DONE (2026-07-17):** **contingency reserve + cash-flow float** in `pods/gov/pricing.mjs` (Victor
+  PRD §1), pure + eval-pinned (`evals/pricing.eval.mjs`, 14 cases). `priceBuildup()` = sub quote → **+ reserve
+  → loaded cost** → × markup → bid, with **profit measured against the LOADED cost** so the reserve absorbs
+  overruns and is never booked as profit. `cashFlowGap()` = you owe the sub day 30, gov pays ~day 35 → you
+  float the cost 5 days (its note names invoice factoring → ties to the Lendability packet). `buildupLine()`
+  shows the reserve explicitly (never a silent markup).
+  **⚠ POLICY: `GOV_CONTINGENCY_PCT` defaults to 0 (OFF) and `middlemanPrice()` is UNTOUCHED — live bids did
+  NOT move.** Turning it on raises every bid by that %, which can lose a competitive set-aside; that's the
+  operator's pricing call. An eval pins the 0-default so it can never silently drift on.
+- ⏭ **NEXT:** R2d — sub primary/backup tiers + auto-activation ladder. **R2e (post-award lifecycle /
+  Stages 8–10 / CPARS) = deliberately NOT built: premature.** It manages subcontract execution, delivery
+  oversight, closeout and CPARS — all of which only exist AFTER a first award, which hasn't happened. Building
+  it now means guessing workflows the first real award would immediately reshape. Build it the day he wins.
 
 ### 🆕 2026-07-14 — RECONCILED 5 planning docs vs. the live build ("inspect, log everything, apply what's worth it")
 Operator handed 5 vault plans (Cross-Device PRD, Victor CFO Expanded PRD, GovCon Master Reference, CAIVRS/SBA

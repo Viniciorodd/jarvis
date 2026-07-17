@@ -501,7 +501,7 @@ U2 deletes `/quickwins`, `/teaming`, `/dealroom`, the map overlay, the `ops.js` 
 gov-board renderers. **Deleting early destroys behaviour that exists nowhere else.** "Verified at parity" is
 this checklist, not a judgement call. Every line must be TRUE in `/govcon-os` before anything is deleted.
 
-**Status 2026-07-17: 5/18 — U2 is BLOCKED.** (Tracked in the Idea Vault as `waiting`.)
+**Status 2026-07-17 (night): 15/18 — U2 still BLOCKED on the Subs section.** (Idea Vault: `waiting`.)
 
 | # | Must work in /govcon-os | Ported from | ✔ |
 |---|---|---|---|
@@ -510,19 +510,28 @@ this checklist, not a judgement call. Every line must be TRUE in `/govcon-os` be
 | 3 | Fit stars + whose-move + deadline chips | 4 renderers | ✅ |
 | 4 | Won / Lost / Pass / Reopen dispositions | govboard.js | ✅ |
 | 5 | Money band w/ honest empty state | /dealroom | ✅ |
-| 6 | Opportunity drawer opens from a card | ops.js + govcon.js | ☐ |
-| 7 | Compliance matrix as a real TABLE (req → status → citation) | NEW (wizard had bullets) | ☐ |
-| 8 | Price-to-win distribution + your-bid marker | NEW (/api/gov/price-to-win) | ☐ |
-| 9 | Money waterfall: quote → contingency → loaded → markup → bid | NEW (pricing.mjs) | ☐ |
-| 10 | Red-team simulate | govcon.js | ☐ |
-| 11 | Opportunity Genome (win-prob ring + DNA rows) | govcon.js | ☐ |
-| 12 | Patricia chat on an opportunity | ops.js | ☐ |
-| 13 | Quick wins: tag pills + why + capability attach + day select | /quickwins | ☐ |
-| 14 | Teaming: **editable** intro textarea + View award ↗ | /teaming | ☐ |
-| 15 | Map: pins + federal-spend bubbles + deadline list + filters | map.js + govcon.js | ☐ |
-| 16 | Subs: CRM drawer w/ Google reviews + sub-reach **preview** | ops.js | ☐ |
-| 17 | **The approval-effect confirmation modal** (`ops.js:911`) — the doctrine's gate UI | ops.js | ☐ |
-| 18 | Decision journal + win/loss + debriefs | govcon.js + capture.mjs | ☐ |
+| 6 | Opportunity drawer opens from a card | govcon-opp.js | ✅ |
+| 7 | Compliance matrix as a real TABLE (req → status → citation) | govcon-opp.js | ✅ |
+| 8 | Price-to-win distribution + your-bid marker | govcon-opp.js | ✅ |
+| 9 | Money waterfall: quote → contingency → loaded → markup → bid | govcon-opp.js | ✅ |
+| 10 | Red-team simulate | govcon-opp.js (footer) | ✅ |
+| 11 | Opportunity Genome (win-prob ring + factor rows) | govcon-opp.js | ✅ |
+| 12 | Patricia chat on an opportunity | govcon-opp.js links to old /govcon?opp= | 🟡 (linked, not reimplemented) |
+| 13 | Quick wins: tag pills + why + capability attach + day select | govcon-find.js | ✅ |
+| 14 | Teaming: **editable** intro textarea + View award ↗ | govcon-find.js | ✅ |
+| 15 | Map: pins + federal-spend bubbles + deadline list + filters | govcon-find.js | ✅ |
+| 16 | Subs: CRM drawer w/ Google reviews + sub-reach **preview** | **govcon-subs.js — NOT BUILT** | ☐ |
+| 17 | **The approval-effect confirmation modal** (`ops.js:911`) — the doctrine's gate UI | **govcon-subs.js — NOT BUILT** | ☐ |
+| 18 | Decision journal + win/loss + debriefs | govcon-journal.js | ✅ |
+
+**⚠ Only Subs (govcon-subs.js) is left — #16 + #17.** The subagent building it died on the session limit
+(resets 11am ET 2026-07-18) before writing the file. Its brief is the Subs spec in this session's history;
+rebuild it as `companion/public/govcon-subs.js` registering `window.GovConSections.subs`. **Key finding it
+surfaced before dying (saves the rebuild):** `ops.js` NEVER actually reads the GOV_AUTO_SEND state — its
+"confirmApprove" modal HEDGES the wording rather than reading a real flag. So the approval-effect modal
+(#17) must find where that state is truly exposed (`/api/connectors` or `/api/info` — verify) and, if it
+genuinely isn't exposed anywhere, add a tiny read-only route that reports `GOV_AUTO_SEND` so the modal can
+tell the truth instead of hedging. That is the doctrine's gate UI — it must never overstate.
 
 **Order of deletion (each step verified before the next):**
 1. Repoint the More menu + every internal link to `/govcon-os`; leave the old routes alive but unlinked.

@@ -31,13 +31,41 @@ Also: **6 of the 28 screens are from a different prompt run** (`obsidian_protoco
   entry point** (it was unreachable at `needsReview===0`). Honesty: Stripe reports `mode:"test"` so the page
   SAYS so; the P&L states plainly that only Stripe income + real AI cost are visible. Live: $0/$10k test-flagged,
   net −$2.99, lendability 14%, 10 debt rows ($57,120 / $572mo / $32,792 charged off), 0 console errors.
-- ⏭ **NOT DONE — next session:** **U1b–e** (Opportunity drawer w/ the real compliance-matrix TABLE + price-to-win
-  distribution bar, Find = quickwins+teaming+map w/ 3 lenses, Subs bench+ladder, Journal) — the `/govcon-os` nav
-  honestly says "being rebuilt" rather than showing an empty shell. **U2** (delete `/quickwins` `/teaming`
-  `/dealroom` map-overlay `ops.js` gov tabs — ONLY after porting the must-survive list in the Stitch prompt §5).
-  **U3's Home/shell REDESIGN** (only the bug fixes landed — the Stitch Home layout + desktop left rail is
-  untouched; deliberately NOT half-done overnight since Home is the front door). **U5** (Today, Jarvis, Ops hub,
-  Real Estate, More).
+### 🆕 2026-07-17 (late night) — GovCon OS sections U1b/c/e + U5 Real Estate; U1d Subs blocked on session reset
+Section shell: `govcon-os.html/js/css` lazily mount **Find / Subs / Journal** modules
+(`window.GovConSections`) + an opportunity drawer, deep links (`#find`, `?opp=`), per-section search, money
+band scoped to the board. Cards now open the **drawer** (decide) not the wizard (act). All verified live at
+`/govcon-os`, 0 console errors, 0 hardcoded hex, no CDN; a missing module degrades to "This section didn't
+load" rather than crashing.
+- ✅ **U1b — `govcon-opp.js`** (opportunity drawer): win-prob ring + 5 star factors (past-performance honestly
+  capped — new prime), the 10-step line, **the compliance matrix as a REAL TABLE with gaps on top** (old
+  wizard rendered bullets), price-to-win distribution bar (refuses a position when over-cap/low-confidence),
+  money waterfall, sub ladder, sticky footer (wizard / red-team / Patricia / Won-Lost-Pass).
+- ✅ **U1c — `govcon-find.js`**: Quick wins + Teaming + Map as **3 lenses on one filter row** (replaces
+  `/quickwins` + `/teaming` + map overlay). us-geo.js (196KB) **lazy-loads only on the Map lens**; map pins
+  open the NEW drawer. Teaming intro stays an **editable textarea** ("nothing sends without approval").
+- ✅ **U1e — `govcon-journal.js`**: the learning loop. `/api/gov/journal` is the whole event feed (no
+  bid/no-bid "reason" field) → built as a filter lens, not an invented column. **Losses NEUTRAL, never
+  `--err`**; the standing "debrief every outcome" rule on screen; debrief drafts editable + he sends them.
+- ✅ **U5 — `/real-estate`** (unblocks U2): the portfolio was reachable ONLY through legacy `ops.js`. Now
+  standalone (reuses `finances.css`). **Handles the messy real data honestly**: 3 rent field names, the same
+  property in units AND rentals, a placeholder row — deduped by STREET+unit (my first key merged the two 218
+  W Ridge units AND missed the Brick Ave dupe; browser verify caught it: $8,000/5 → correct **$7,350/5**).
+  Ownership labelled (Brick Ave LLC 19% him via 1065; 218 W Ridge 100% mother's, off his return) so the roll
+  reads as GROSS, not "yours". Deal Analyzer NOT wired (it iframed a dead localhost:8096 → honest note).
+- ⏭ **THE ONE THING LEFT for U1/U2 parity: `govcon-subs.js` (U1d).** The subagent died on the session limit
+  (resets **11am ET 2026-07-18**) before writing it. Parity is **15/18** — Subs is #16 (CRM drawer w/ Google
+  reviews + sub-reach preview) + #17 (**the approval-effect confirmation modal — the doctrine's gate UI**).
+  ⚠ **Finding that saves the rebuild:** `ops.js` NEVER reads the real GOV_AUTO_SEND state — its confirm modal
+  HEDGES the wording. The new modal must read the true state (`/api/connectors` or `/api/info` — verify) or
+  add a tiny read-only route reporting `GOV_AUTO_SEND`, so it tells the truth instead of hedging.
+  `govcon-os.html` already `<script>`s govcon-subs.js (harmless 404 until built).
+- ⏭ **Still after that:** **U2** deletions (gated on the 18-point checklist in the prompt §6 — do NOT delete
+  `ops.js` before U5 Real Estate is linked as the portfolio's home, which it now is). **U3's Home/shell
+  REDESIGN** (only the 3 bug fixes landed; the Stitch Home layout + desktop left rail is untouched —
+  deliberately not half-done). **U5 remainder** (Today, Jarvis, Ops hub, More).
+
+### 🆕 2026-07-17 — UI REDESIGN: Stitch → real code. U1a (GovCon OS board) · 3 daily bugs · U4 (Finances)
 
 ### 🆕 2026-07-16 — PHASE 2a: bulletproof always-on host (health watchdog + Tailscale tunnel recovery)
 Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack already restarts each piece on

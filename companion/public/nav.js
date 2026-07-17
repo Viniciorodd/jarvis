@@ -93,6 +93,10 @@ var moreItems = {
   jMoreTeaming: function(){ window.location.href = '/teaming'; },  /* primes who need small-biz subs */
   jMoreCapability: function(){ window.open('/capability', '_blank'); },  /* 1-page capability statement → print-to-PDF */
   jMoreLend:    function(){ window.location.href = '/lendability'; },  /* Victor's business-credit & lendability desk */
+  /* The redesign (U1/U4, 2026-07-17): ONE gov system + ONE money desk. These supersede the scattered
+     pages above; the old ones stay reachable until U2 ports the last of their unique panels. */
+  jMoreGovconOs: function(){ window.location.href = '/govcon-os'; },
+  jMoreFinances: function(){ window.location.href = '/finances'; },
   jMoreMap:     function(){ triggerGhost('mapBtn'); },
   jMoreFloor:   function(){ triggerGhost('floorBtn'); },
   jMoreHQ:      function(){ triggerGhost('hqBtn'); },

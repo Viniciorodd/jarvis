@@ -1,0 +1,101 @@
+/* finances.css — the unified Finances desk (U4). Money lived in FIVE disconnected places: income in
+   bizDetail, deals in /dealroom, credit in /lendability, tax behind one Home link that vanishes at zero,
+   and AI spend in the Command wall. This is one screen. Same token contract as everything else — no
+   hardcoded hex, so both themes just work. Geometry matches govcon-os.css (the Stitch spec). */
+
+.fin, .fin * { box-sizing: border-box; }
+.fin {
+  margin: 0; background: var(--ink); color: var(--cream);
+  font-family: var(--font, 'Inter', system-ui, sans-serif); font-size: 14px; line-height: 1.5;
+  letter-spacing: -.011em; -webkit-font-smoothing: antialiased; overflow-x: hidden;
+}
+.fin-wrap { max-width: 1240px; margin: 0 auto; padding: 22px 20px calc(60px + env(safe-area-inset-bottom, 0)); }
+.fin-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
+.fin h1 { font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin: 0; }
+.fin-sub { color: var(--dim); font-size: 13.5px; margin-top: 5px; }
+.fin-back { color: var(--teal); text-decoration: none; font-size: 13px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+
+.fin-grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 900px) {
+  .fin-grid { grid-template-columns: repeat(12, 1fr); }
+  .s12 { grid-column: span 12; } .s8 { grid-column: span 8; } .s7 { grid-column: span 7; }
+  .s6 { grid-column: span 6; } .s5 { grid-column: span 5; } .s4 { grid-column: span 4; }
+}
+
+.fin-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 14px; }
+.fin-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+.fin-h .t { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.fin-h .m { font-size: 11px; color: var(--dim); }
+.fin-h a { color: var(--teal); text-decoration: none; font-size: 11px; }
+
+/* stat tiles */
+.fin-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 700px) { .fin-tiles { grid-template-columns: repeat(2, 1fr); } }
+.fin-tile { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; }
+.fin-tile .v { font-size: 21px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; color: var(--cream); }
+.fin-tile .v.good { color: var(--ok); } .fin-tile .v.bad { color: var(--err); } .fin-tile .v.accent { color: var(--teal); }
+.fin-tile .k { font-size: 9.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--dim); margin-top: 4px; }
+
+/* goal bar */
+.fin-bar { height: 8px; background: var(--panel2); border-radius: 99px; overflow: hidden; margin: 10px 0 6px; }
+.fin-bar i { display: block; height: 100%; background: var(--teal); border-radius: 99px; }
+.fin-goal { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--dim); }
+
+/* rows */
+.fin-rows { display: flex; flex-direction: column; gap: 8px; }
+.fin-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: rgba(var(--teal-rgb), .04); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px;
+}
+.fin-row .l { min-width: 0; }
+.fin-row .nm { font-size: 13.5px; font-weight: 600; color: var(--cream); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-row .dt { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+.fin-row .r { flex: none; text-align: right; }
+.fin-amt { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+
+.fin-chip {
+  display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--dim); background: var(--panel2);
+}
+.fin-chip.ok { background: var(--teal); color: var(--ink-on-accent); border-color: var(--teal); }
+.fin-chip.warn { color: var(--warn); border-color: rgba(240, 180, 92, .35); background: rgba(240, 180, 92, .1); }
+.fin-chip.bad { color: var(--err); border-color: rgba(255, 143, 128, .3); background: rgba(255, 143, 128, .1); }
+
+/* P&L table */
+.fin-pl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.fin-pl td { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.fin-pl tr:last-child td { border-bottom: none; }
+.fin-pl td:last-child { text-align: right; font-weight: 600; letter-spacing: -.01em; }
+.fin-pl .lbl { color: var(--dim); }
+.fin-pl .tot td { border-top: 1px solid var(--line); padding-top: 11px; font-weight: 700; font-size: 15px; }
+.fin-pl .tot td:first-child { color: var(--cream); }
+
+/* lendability donut */
+.fin-lend { display: flex; align-items: center; gap: 16px; }
+.fin-ring { flex: none; width: 96px; height: 96px; }
+.fin-ring text.p { font-size: 26px; font-weight: 800; fill: var(--teal); }
+.fin-ring text.l { font-size: 8px; letter-spacing: .14em; fill: var(--dim); }
+.fin-lend .i .b { font-size: 15px; font-weight: 700; color: var(--cream); }
+.fin-lend .i .s { font-size: 12px; color: var(--dim); margin-top: 4px; line-height: 1.5; }
+
+.fin-check { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.fin-check li { display: flex; align-items: flex-start; gap: 9px; font-size: 12.5px; }
+.fin-ck { flex: none; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; margin-top: 1px; }
+.fin-ck.on { background: var(--teal); color: var(--ink-on-accent); }
+.fin-ck.off { border: 1.5px solid var(--line); }
+.fin-check .cl { color: var(--cream); } .fin-check .cl.off { color: var(--dim); }
+
+.fin-note {
+  background: rgba(var(--teal-rgb), .06); border: 1px solid rgba(var(--teal-rgb), .22); border-radius: 12px;
+  padding: 12px 13px; font-size: 12.5px; line-height: 1.6; color: var(--cream);
+}
+.fin-note .h { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); margin-bottom: 6px; }
+
+.fin-empty { font-size: 13px; color: var(--dim); padding: 14px 4px; line-height: 1.55; }
+.fin-empty b { color: var(--cream); font-weight: 700; }
+.fin-cta {
+  appearance: none; border: 1px solid rgba(var(--teal-rgb), .4); background: transparent; color: var(--teal);
+  font: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 14px; border-radius: 9px; cursor: pointer;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all .15s;
+}
+.fin-cta:hover { background: var(--teal); color: var(--ink-on-accent); }

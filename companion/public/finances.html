@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Finances — Jarvis</title>
+<script>try{var _t=localStorage.getItem('jarvis-theme');document.documentElement.dataset.theme=(!_t||_t==='exec')?'black':_t;}catch(e){document.documentElement.dataset.theme='black';}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="finances.css">
+</head>
+<body class="fin">
+<div class="fin-wrap">
+
+  <div class="fin-top">
+    <div>
+      <h1>Finances</h1>
+      <div class="fin-sub" id="finSub">Loading…</div>
+    </div>
+    <a class="fin-back" href="/"><i class="ti ti-arrow-left"></i> Jarvis</a>
+  </div>
+
+  <div class="fin-grid" id="finRoot">
+    <div class="fin-card s12"><div class="fin-empty">Loading your money…</div></div>
+  </div>
+
+</div>
+<script src="finances.js"></script>
+</body>
+</html>

@@ -2731,6 +2731,27 @@ const server = http.createServer(async (req, res) => {
     try { const { taxStatus } = await import('../pods/tax/status.mjs'); return send(res, 200, JSON.stringify(await taxStatus())); }
     catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // The debt schedule, read-only — for the Finances page. It lives in pods/tax/debts.json (gitignored,
+  // real numbers) and had no route, so the only "view" was reading the file. Cents → dollars here so the
+  // client never does money math. Never writes; the operator edits the file (or the tax pod does).
+  if (req.method === 'GET' && url.pathname === '/api/finance/debts') {
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'pods', 'tax', 'debts.json'), 'utf8'));
+      const debts = (raw.debts || []).map((d) => ({
+        id: d.id, creditor: d.creditor, kind: d.kind, status: d.status,
+        balance: (d.balanceCents || 0) / 100,
+        monthlyPayment: (d.monthlyPaymentCents || 0) / 100,
+        aprPct: d.aprPct ?? null, dueDay: d.dueDay ?? null, note: d.note || '',
+      }));
+      const totals = debts.reduce((a, d) => {
+        a.balance += d.balance; a.monthly += d.monthlyPayment;
+        if (d.status === 'paying') a.paying += d.balance; else if (d.status === 'charged-off') a.chargedOff += d.balance;
+        else if (d.status === 'disputed') a.disputed += d.balance;
+        return a;
+      }, { balance: 0, monthly: 0, paying: 0, chargedOff: 0, disputed: 0 });
+      return send(res, 200, JSON.stringify({ ok: true, asOf: raw.asOf || '', scores: raw.scores || {}, debts, totals }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, debts: [], totals: null })); }
+  }
   if (req.method === 'POST' && url.pathname === '/api/tax/capture') {
     try {
       const { text } = await readBody(req);
@@ -3288,7 +3309,7 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
-  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname === '/govcon-os' ? 'govcon-os.html' : url.pathname.replace(/^\/+/, '');
+  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname === '/govcon-os' ? 'govcon-os.html' : url.pathname === '/finances' ? 'finances.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));

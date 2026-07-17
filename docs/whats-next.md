@@ -2,7 +2,44 @@
 
 _Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-16 (latest) — PHASE 2a: bulletproof always-on host (health watchdog + Tailscale tunnel recovery)
+### 🆕 2026-07-17 (latest) — UI REDESIGN: Stitch → real code. U1a (GovCon OS board) · 3 daily bugs · U4 (Finances)
+Operator generated the UI in **stitch.withgoogle.com** from `docs/ui-redesign-stitch-prompt.md` (28 screens in
+`stitch_solo_govcon_cockpit/`). ⚠ **The Stitch code is NOT usable as-is** — Tailwind-CDN + a Material-3 palette
+(`#131316`/`#34ddcb`) + Material Symbols + googleusercontent images. It's a **visual spec to PORT**, not paste:
+pasting it would have added a FIFTH palette (the audit already found 4 bootstraps + 3 palettes). Geometry is
+lifted faithfully (64px bar · 40px lane strip · 320px cols · 20px gutter · the type scale); colors are OUR vars.
+Also: **6 of the 28 screens are from a different prompt run** (`obsidian_protocol`, `crm_network`,
+`contracts_bids`, `compliance_security`, `cockpit_dashboard`, `three.js`) and carry a rival IA — ignore them.
+- ✅ **U1a — `/govcon-os`**: the ONE board renderer replacing **four** (`govboard.js`, `govcon.js:533`, the
+  paste-in at `govcon.html:224`, `home.js:299`). **Columns render from whatever `/api/gov-board` returns** —
+  no stage vocabulary is hardcoded in the UI, which is what structurally kills the drift. Cards deliberately
+  **not draggable** (a card is in a column because that's where the deal IS; dragging would let the board lie).
+  Live: 71 real opportunities (Found 48 / Reviewing 13 / Responding 10), 5 out-of-lane ⛔, 18 hot deadlines,
+  lane strip, fit stars, whose-move, dispositions, ⌘K. **money.pipeline is really 0 → prints "not priced yet"**
+  (Stitch's mocked "$420,000" would have been fabricated). Old `/govcon` untouched.
+- ✅ **3 bugs that hit EVERY load** (all audit finds, all verified fixed live):
+  1. App **landed on Talk, not Home** — the ONE THING/ticker/tasks were a tap away from the front door and
+     `jNavHome` rendered `active` while another view showed (the nav lied every load). → `showView('home')`.
+  2. **Command wall auto-opened over the app** every load; the only off switch was a localStorage key with no
+     UI. → now **opt-in** (`jarvis-landing-command='on'`); it's a TV wall display (More → Command / `?cmd=1`).
+  3. `assistant.js` OVERLAY_IDS **omitted `govView`/`bizView`/`taxReviewView`** → on the Gov board, the DEFAULT
+     Ops screen and Tax Review there was **no way to reach Jarvis**. → added (test async: the MutationObserver
+     is a microtask, a sync assertion reads stale).
+- ✅ **U4 — `/finances`**: money was in FIVE places; now one desk (Money in · P&L · Lendability · Financing
+  paths · Tax · Debt). **`/api/pl` + `/api/expense` had ZERO client callers — the P&L had never been rendered.**
+  New `GET /api/finance/debts` (debts.json had no API; cents→dollars server-side). **Tax finally has a permanent
+  entry point** (it was unreachable at `needsReview===0`). Honesty: Stripe reports `mode:"test"` so the page
+  SAYS so; the P&L states plainly that only Stripe income + real AI cost are visible. Live: $0/$10k test-flagged,
+  net −$2.99, lendability 14%, 10 debt rows ($57,120 / $572mo / $32,792 charged off), 0 console errors.
+- ⏭ **NOT DONE — next session:** **U1b–e** (Opportunity drawer w/ the real compliance-matrix TABLE + price-to-win
+  distribution bar, Find = quickwins+teaming+map w/ 3 lenses, Subs bench+ladder, Journal) — the `/govcon-os` nav
+  honestly says "being rebuilt" rather than showing an empty shell. **U2** (delete `/quickwins` `/teaming`
+  `/dealroom` map-overlay `ops.js` gov tabs — ONLY after porting the must-survive list in the Stitch prompt §5).
+  **U3's Home/shell REDESIGN** (only the bug fixes landed — the Stitch Home layout + desktop left rail is
+  untouched; deliberately NOT half-done overnight since Home is the front door). **U5** (Today, Jarvis, Ops hub,
+  Real Estate, More).
+
+### 🆕 2026-07-16 — PHASE 2a: bulletproof always-on host (health watchdog + Tailscale tunnel recovery)
 Moving toward Phase 2 (Option B: PC-as-host) in phases. The autostart stack already restarts each piece on
 *crash* (run-loop.cmd) but couldn't see two failure modes; closed both. Evals 518 → **526** (+8 watchdog).
 - **`scripts/jarvis-watchdog.mjs` (new):** polls `/api/health` every 30s; after 3 straight fails (~90s) kills

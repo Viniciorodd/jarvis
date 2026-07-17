@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GovCon OS — Jarvis</title>
+<script>try{var _t=localStorage.getItem('jarvis-theme');document.documentElement.dataset.theme=(!_t||_t==='exec')?'black':_t;}catch(e){document.documentElement.dataset.theme='black';}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="govcon-os.css">
+</head>
+<body class="gos">
+
+<!-- TOP BAR -->
+<header class="gos-top">
+  <div class="gos-left">
+    <div class="gos-brand">GovCon OS</div>
+    <nav class="gos-nav" id="gosNav">
+      <button class="on" data-sec="board"><i class="ti ti-layout-kanban"></i> Board</button>
+      <button data-sec="find"><i class="ti ti-search"></i> Find</button>
+      <button data-sec="subs"><i class="ti ti-users-group"></i> Subs</button>
+      <button data-sec="journal"><i class="ti ti-book"></i> Journal</button>
+    </nav>
+  </div>
+  <div class="gos-right">
+    <a class="gos-cap" href="/capability" target="_blank" rel="noopener"><i class="ti ti-file-certificate"></i> Capability statement</a>
+    <div class="gos-search">
+      <i class="ti ti-search"></i>
+      <input id="gosSearch" type="text" placeholder="Search opportunities…" autocomplete="off">
+      <kbd>⌘K</kbd>
+    </div>
+    <a class="gos-cap" href="/" title="Back to Jarvis"><i class="ti ti-home"></i></a>
+  </div>
+</header>
+
+<!-- LANE STRIP — the doctrine, always visible -->
+<div class="gos-lane">
+  <span class="gos-caps l">Your lane</span>
+  <span class="sep">•</span><span class="v">janitorial</span>
+  <span class="sep">•</span><span class="v">custodial</span>
+  <span class="sep">•</span><span class="v">grounds</span>
+  <span class="sep">•</span><span class="v">facilities</span>
+  <span class="sep">•</span><span class="v">under $150k</span>
+  <span class="sep">•</span><span class="v">Small-Business / SDB set-asides</span>
+</div>
+
+<!-- NEXT MOVE -->
+<div class="gos-next" id="gosNext" hidden>
+  <div class="box">
+    <div class="mid">
+      <div class="who"><i class="ti ti-bolt"></i></div>
+      <div>
+        <div class="gos-caps k">Your next move</div>
+        <div class="t" id="gosNextTitle">—</div>
+      </div>
+    </div>
+    <button class="gos-btn" id="gosNextBtn">Walk me through it <i class="ti ti-arrow-right"></i></button>
+  </div>
+</div>
+
+<!-- BOARD -->
+<main class="gos-board" id="gosBoard"><div class="gos-loading">Loading the board…</div></main>
+
+<!-- MONEY BAND -->
+<div class="gos-money" id="gosMoney"></div>
+
+<script src="submit-wizard.js"></script>
+<script src="govcon-os.js"></script>
+</body>
+</html>

@@ -1,0 +1,185 @@
+/* govcon-os.css — the UNIFIED GovCon OS (U1). This is the Stitch redesign ported onto Jarvis's real
+   theme contract. Stitch shipped Tailwind-CDN + a Material-3 palette (#131316 / #34ddcb) + Material
+   Symbols; none of that can ship here (dependency-free doctrine, PWA offline, and it would have become a
+   FIFTH palette — the audit found 4 bootstraps + 3 palettes already). So: same geometry, same hierarchy,
+   OUR tokens. Every color below is a var from style.css — no hardcoded hex, so both themes just work.
+
+   Geometry lifted from the Stitch spec: 64px top bar · 40px lane strip · 320px columns · 20px gutter ·
+   16px card padding · 8px radius on cards/columns, full on pills.
+   Type scale (Stitch): h1 32/600 · h2 24/600 · h3 18/500 · body 14/400 · label-caps 11/.12em/700 · data 13. */
+
+.gos, .gos * { box-sizing: border-box; }
+.gos {
+  --gos-bar: 64px; --gos-lane: 40px; --gos-col: 320px; --gos-gutter: 20px; --gos-pad: 40px;
+  margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--ink); color: var(--cream);
+  font-family: var(--font, 'Inter', system-ui, sans-serif);
+  font-size: 14px; line-height: 1.5; letter-spacing: -.011em; -webkit-font-smoothing: antialiased;
+}
+.gos-caps { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.gos-data { font-size: 13px; letter-spacing: .02em; }
+
+/* ── top bar ─────────────────────────────────────────────────────────────────────────────────────── */
+.gos-top {
+  flex: none; height: var(--gos-bar); padding: 0 var(--gos-pad); display: flex; align-items: center;
+  justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.gos-left { display: flex; align-items: center; gap: var(--gos-pad); min-width: 0; }
+.gos-brand { font-size: 18px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+.gos-nav { display: flex; gap: 2px; padding: 4px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink2); }
+.gos-nav button {
+  appearance: none; border: none; background: transparent; color: var(--dim); cursor: pointer;
+  font: inherit; font-size: 14px; padding: 6px 16px; border-radius: 999px; white-space: nowrap;
+  display: flex; align-items: center; gap: 7px; transition: background .15s, color .15s;
+}
+.gos-nav button:hover { color: var(--cream); background: var(--panel2); }
+.gos-nav button.on { background: var(--panel2); color: var(--teal); font-weight: 500; }
+.gos-right { display: flex; align-items: center; gap: 16px; }
+.gos-cap {
+  color: var(--dim); text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 6px;
+  white-space: nowrap; transition: color .15s;
+}
+.gos-cap:hover { color: var(--teal); }
+.gos-search { position: relative; display: flex; align-items: center; }
+.gos-search i { position: absolute; left: 11px; color: var(--dim); font-size: 15px; pointer-events: none; }
+.gos-search input {
+  background: var(--ink2); border: 1px solid var(--line); border-radius: 999px; color: var(--cream);
+  font: inherit; font-size: 14px; padding: 7px 44px 7px 32px; width: 190px; transition: width .3s, border-color .15s;
+}
+.gos-search input:focus { outline: none; border-color: var(--teal); width: 260px; }
+.gos-search kbd {
+  position: absolute; right: 11px; font: inherit; font-size: 11px; color: var(--dim); pointer-events: none;
+}
+
+/* ── lane strip ──────────────────────────────────────────────────────────────────────────────────── */
+.gos-lane {
+  flex: none; height: var(--gos-lane); padding: 0 var(--gos-pad); display: flex; align-items: center;
+  gap: 8px; border-bottom: 1px solid var(--line); background: var(--ink2);
+  overflow-x: auto; white-space: nowrap; scrollbar-width: none;
+}
+.gos-lane::-webkit-scrollbar { display: none; }
+.gos-lane .l { color: var(--dim); }
+.gos-lane .sep { color: var(--line); }
+.gos-lane .v { color: var(--dim); font-size: 13px; }
+
+/* ── next-move banner: the ONE accent element on the screen ──────────────────────────────────────── */
+.gos-next { flex: none; padding: 10px var(--gos-pad); }
+.gos-next .box {
+  background: rgba(var(--teal-rgb), .07); border: 1px solid rgba(var(--teal-rgb), .3); border-radius: 10px;
+  padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.gos-next .who {
+  flex: none; height: 32px; width: 32px; border-radius: 50%; background: rgba(var(--teal-rgb), .18);
+  color: var(--teal); display: flex; align-items: center; justify-content: center; font-size: 17px;
+}
+.gos-next .mid { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.gos-next .k { color: var(--teal); margin-bottom: 3px; }
+.gos-next .t { font-size: 18px; font-weight: 500; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gos-btn {
+  appearance: none; border: none; cursor: pointer; font: inherit; white-space: nowrap;
+  background: var(--teal); color: var(--ink-on-accent); font-size: 14px; font-weight: 600;
+  padding: 9px 18px; border-radius: 999px; display: flex; align-items: center; gap: 7px; transition: opacity .15s, transform .1s;
+}
+.gos-btn:hover { opacity: .9; } .gos-btn:active { transform: scale(.98); }
+
+/* ── board canvas ────────────────────────────────────────────────────────────────────────────────── */
+.gos-board {
+  flex: 1; min-height: 0; display: flex; gap: var(--gos-gutter);
+  padding: 4px var(--gos-pad) 8px; overflow-x: auto; overflow-y: hidden;
+}
+.gos-col {
+  width: var(--gos-col); flex: none; display: flex; flex-direction: column; min-height: 0;
+  background: rgba(var(--teal-rgb), .02); border: 1px solid var(--line); border-radius: 10px; padding: 8px;
+}
+.gos-colhead { display: flex; align-items: center; justify-content: space-between; padding: 6px 6px 0; margin-bottom: 8px; }
+.gos-colhead .n { display: flex; align-items: center; gap: 8px; }
+.gos-count {
+  background: var(--panel2); color: var(--dim); border-radius: 999px; padding: 2px 8px;
+  font-size: 10px; letter-spacing: .02em;
+}
+.gos-colhint { font-size: 10px; color: var(--dim); padding: 0 6px; margin-bottom: 8px; }
+.gos-cards { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 3px; scrollbar-width: thin; }
+.gos-cards::-webkit-scrollbar { width: 5px; }
+.gos-cards::-webkit-scrollbar-thumb { background: var(--panel2); border-radius: 3px; }
+
+/* ── the ONE card component (this replaces FOUR divergent renderers — audit 2026-07-17) ──────────── */
+.gos-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+  display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.gos-card:hover { border-color: rgba(var(--teal-rgb), .45); }
+.gos-card.out { border-color: rgba(255, 143, 128, .3); opacity: .78; }
+.gos-card.out:hover { border-color: rgba(255, 143, 128, .6); }
+.gos-card.hot { border-color: rgba(var(--teal-rgb), .5); background: var(--panel2); }
+.gos-card .ttl { font-size: 14px; font-weight: 500; line-height: 1.35; color: var(--cream); }
+.gos-card .meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); letter-spacing: .02em; }
+.gos-card .meta i { font-size: 13px; }
+.gos-stars { display: flex; gap: 2px; color: var(--warn); font-size: 12px; line-height: 1; }
+.gos-stars .off { color: var(--line); }
+.gos-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.gos-chip {
+  font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 999px; background: var(--panel2); color: var(--dim); border: 1px solid transparent;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.gos-chip.out { background: rgba(255, 143, 128, .1); border-color: rgba(255, 143, 128, .25); color: var(--err); }
+.gos-chip.due { background: rgba(240, 180, 92, .12); border-color: rgba(240, 180, 92, .3); color: var(--warn); }
+.gos-chip.due.now { background: rgba(255, 143, 128, .12); border-color: rgba(255, 143, 128, .3); color: var(--err); }
+.gos-cardfoot {
+  margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.gos-move { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--dim); letter-spacing: .02em; }
+.gos-av {
+  height: 20px; width: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; border: 1px solid var(--panel);
+}
+.gos-av.you { background: rgba(var(--teal-rgb), .2); color: var(--teal); }
+.gos-av.jarvis { background: var(--panel2); color: var(--dim); }
+.gos-val { font-size: 10px; color: var(--dim); letter-spacing: .02em; }
+
+/* card actions — revealed on hover (desktop) / always (touch) */
+.gos-acts { display: none; gap: 6px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--line); }
+.gos-card:hover .gos-acts, .gos-card.open .gos-acts { display: flex; }
+@media (hover: none) { .gos-acts { display: flex; } }
+.gos-act {
+  appearance: none; border: 1px solid var(--line); background: transparent; color: var(--dim);
+  font: inherit; font-size: 11px; padding: 4px 9px; border-radius: 7px; cursor: pointer; transition: all .12s;
+}
+.gos-act:hover { color: var(--cream); border-color: var(--dim); }
+.gos-act.pri { border-color: rgba(var(--teal-rgb), .4); color: var(--teal); }
+.gos-act.pri:hover { background: var(--teal); color: var(--ink-on-accent); border-color: var(--teal); }
+.gos-act.won:hover { color: var(--ok); border-color: var(--ok); }
+.gos-act.lost:hover { color: var(--warn); border-color: var(--warn); }
+
+/* ── money band ──────────────────────────────────────────────────────────────────────────────────── */
+.gos-money {
+  flex: none; height: 44px; padding: 0 var(--gos-pad); border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 20px; background: var(--panel);
+  font-size: 12px; color: var(--dim); overflow-x: auto; white-space: nowrap; scrollbar-width: none;
+}
+.gos-money::-webkit-scrollbar { display: none; }
+.gos-money .grp { display: flex; align-items: center; gap: 20px; }
+.gos-money b { color: var(--cream); font-weight: 600; }
+.gos-money .dot { height: 6px; width: 6px; border-radius: 50%; background: var(--teal); display: inline-block; margin-right: 6px; }
+
+.gos-empty { font-size: 12px; color: var(--dim); padding: 14px 8px; line-height: 1.5; text-align: center; }
+.gos-loading { padding: 40px; color: var(--dim); text-align: center; }
+
+/* ── mobile: columns become a swipeable stage picker ─────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .gos { --gos-pad: 14px; }
+  .gos-top { height: auto; padding: 10px 14px; flex-wrap: wrap; gap: 10px; }
+  .gos-left { gap: 12px; width: 100%; justify-content: space-between; }
+  .gos-nav { width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .gos-nav::-webkit-scrollbar { display: none; }
+  .gos-right { width: 100%; justify-content: space-between; }
+  .gos-search input { width: 100%; } .gos-search { flex: 1; }
+  .gos-next .box { flex-direction: column; align-items: stretch; gap: 12px; }
+  .gos-next .t { white-space: normal; }
+  .gos-btn { justify-content: center; }
+  .gos-board { padding: 4px 14px 8px; scroll-snap-type: x mandatory; }
+  .gos-col { width: 86vw; scroll-snap-align: center; }
+  .gos-money { height: auto; padding: 10px 14px; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .gos-money .grp { gap: 14px; flex-wrap: wrap; white-space: normal; }
+}

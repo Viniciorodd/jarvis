@@ -492,3 +492,45 @@ approval-effect confirmation modal (the gate UI) · red-team simulate · Genome 
 Deal Room's sub-quote money band · quick-wins tag pills + capability attach · teaming's editable
 intro · federal-spend layer · Patricia chat.
 ```
+
+---
+
+## §6 — U2 PARITY GATE (the only irreversible step — do not eyeball it)
+
+U2 deletes `/quickwins`, `/teaming`, `/dealroom`, the map overlay, the `ops.js` gov tabs, and 3 of the 4
+gov-board renderers. **Deleting early destroys behaviour that exists nowhere else.** "Verified at parity" is
+this checklist, not a judgement call. Every line must be TRUE in `/govcon-os` before anything is deleted.
+
+**Status 2026-07-17: 5/18 — U2 is BLOCKED.** (Tracked in the Idea Vault as `waiting`.)
+
+| # | Must work in /govcon-os | Ported from | ✔ |
+|---|---|---|---|
+| 1 | Board renders every column the API returns, no hardcoded stages | govboard.js | ✅ |
+| 2 | Lane strip + out-of-lane ⛔ marking | govboard.js | ✅ |
+| 3 | Fit stars + whose-move + deadline chips | 4 renderers | ✅ |
+| 4 | Won / Lost / Pass / Reopen dispositions | govboard.js | ✅ |
+| 5 | Money band w/ honest empty state | /dealroom | ✅ |
+| 6 | Opportunity drawer opens from a card | ops.js + govcon.js | ☐ |
+| 7 | Compliance matrix as a real TABLE (req → status → citation) | NEW (wizard had bullets) | ☐ |
+| 8 | Price-to-win distribution + your-bid marker | NEW (/api/gov/price-to-win) | ☐ |
+| 9 | Money waterfall: quote → contingency → loaded → markup → bid | NEW (pricing.mjs) | ☐ |
+| 10 | Red-team simulate | govcon.js | ☐ |
+| 11 | Opportunity Genome (win-prob ring + DNA rows) | govcon.js | ☐ |
+| 12 | Patricia chat on an opportunity | ops.js | ☐ |
+| 13 | Quick wins: tag pills + why + capability attach + day select | /quickwins | ☐ |
+| 14 | Teaming: **editable** intro textarea + View award ↗ | /teaming | ☐ |
+| 15 | Map: pins + federal-spend bubbles + deadline list + filters | map.js + govcon.js | ☐ |
+| 16 | Subs: CRM drawer w/ Google reviews + sub-reach **preview** | ops.js | ☐ |
+| 17 | **The approval-effect confirmation modal** (`ops.js:911`) — the doctrine's gate UI | ops.js | ☐ |
+| 18 | Decision journal + win/loss + debriefs | govcon.js + capture.mjs | ☐ |
+
+**Order of deletion (each step verified before the next):**
+1. Repoint the More menu + every internal link to `/govcon-os`; leave the old routes alive but unlinked.
+2. Run a week on the new surface. Anything missing shows up here as a real gap, not a guess.
+3. Delete the 3 redundant board renderers first (lowest risk — same endpoint, no unique behaviour).
+4. Delete `/quickwins`, `/teaming`, `/dealroom`, the map overlay.
+5. `ops.js` gov tabs LAST — it holds #12, #16, #17, and Real Estate still lives in that file (U5 must move
+   Real Estate out **before** ops.js can be touched at all).
+
+⚠ **`ops.js` is not just gov.** Real Estate (`🏢`, 5 tabs, `/api/real-estate`) has no other home. Deleting
+ops.js before U5 lands a Real Estate surface removes the only way to reach the portfolio.

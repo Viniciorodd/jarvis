@@ -955,3 +955,20 @@ Operator going to New Jersey; will test a week then decide Jarvis-design + U2 to
   trip).md` (the access guide + operational status + test checklist + troubleshooting) and `00 - System/🗒️
   Jarvis — Build Log (redesign week).md` (plain-English what-we-built). Both cross-linked; point back to the
   CAIVRS reconciliation.
+
+### 🆕 2026-07-18 — FIX: Telegram draft-retrieval contradiction + missing approval buttons (operator log)
+Operator logged a trust bug: the digest said "Hector drafted 2 sub outreach — waiting on approval", but
+"pull me the 2 sub outreach" said it couldn't find them (+ approval buttons had vanished). **Both root causes
+confirmed with live evidence, one fix, evals 595→601.**
+- **A (contradiction):** drafts DO exist — 20 pending gov gates in the CP with `gov-drafts/outreach-*.md`
+  files. The digest reads `/approvals/pending`; the retrieval query fell through to the Chief-of-Staff ROUTER,
+  which routed a NEW task to Hector instead of reading that store. Two paths, two stores.
+- **B (buttons):** `seedApprovals()` marks all pending gates already-pushed on boot → after the 2026-07-17
+  redeploy their Approve/Skip buttons were never re-sent, with no way back. (reply_markup was intact.)
+- **Fix (`companion/telegram-bridge.mjs`):** `wantsPending()` (eval-pinned) detects "show/pull me the
+  drafts/outreach/pending" (not a CREATE) → `showPending()` re-reads `/approvals/pending` (the SAME source of
+  truth the digest reads) and re-sends each draft WITH its excerpt AND its buttons. Guarded the startup so the
+  module is importable for tests. ⚠ **Runs on the NAS → needs a redeploy to go live** (`docker compose up -d
+  --build telegram-bridge`). Synced to the NAS 2026-07-18.
+- ⏭ **Deeper follow-up (Idea Vault):** make the CP Chief-of-Staff router itself retrieval-aware so ANY path
+  reads the store before routing a new task — not just this Telegram intent.

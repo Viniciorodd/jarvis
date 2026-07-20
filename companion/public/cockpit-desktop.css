@@ -9,7 +9,25 @@
  * Only existing theme vars — both themes just work. Geometry from the Stitch spec (220px rail, 1180 content).
  */
 
+/* the rail collapse toggle is desktop-only; hidden everywhere else (mobile keeps the bottom bar). */
+#railToggle { display: none; }
+
 @media (min-width: 1024px) {
+
+  /* ── COLLAPSIBLE RAIL (2026-07-18 fix — operator: "the panel is in the way and I can't close it") ──────
+   * A ☰ toggle in the rail hides it; content reclaims the full width. When collapsed the toggle floats at
+   * top-left to bring the rail back. Persisted in localStorage 'jarvis-rail' (see nav.js). */
+  #railToggle {
+    display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex: none;
+    border-radius: 9px; border: 1px solid var(--line); background: var(--panel2); color: var(--dim);
+    cursor: pointer; margin: 0 0 10px 2px; font-size: 18px; transition: color .14s, background .14s;
+  }
+  #railToggle:hover { color: var(--teal); background: var(--panel); }
+  html.rail-collapsed .j-shell { grid-template-columns: 0 minmax(0, 1fr); }
+  html.rail-collapsed .j-nav { width: 0; padding: 0; border-right: none; overflow: visible; }
+  html.rail-collapsed .j-nav::before { display: none; }
+  html.rail-collapsed .j-nav > *:not(#railToggle) { display: none; }
+  html.rail-collapsed #railToggle { position: fixed; top: 12px; left: 12px; z-index: 60; margin: 0; background: var(--panel); box-shadow: 0 2px 10px rgba(0,0,0,.3); }
 
   /* ── SHELL → left rail + content grid ─────────────────────────────────────────────────────────────
    * .j-shell is a flex column of [top, main, composer, nav]. Re-lay it as a grid so nav becomes a left

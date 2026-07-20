@@ -109,6 +109,24 @@ Object.keys(moreItems).forEach(function(id){
   if(btn) btn.addEventListener('click', moreItems[id]);
 });
 
+/* ── Collapsible desktop rail (2026-07-18) — operator: "the panel is in the way and I can't close it".
+   A ☰ button at the top of the rail hides it (content reclaims the width); tap again to bring it back.
+   Desktop-only (CSS hides #railToggle on mobile, where the bottom bar stays). Remembered across loads. ── */
+(function(){
+  var nav = document.getElementById('jNav'); if(!nav) return;
+  var t = document.createElement('button');
+  t.id = 'railToggle'; t.type = 'button'; t.setAttribute('aria-label','Hide or show the menu'); t.title = 'Hide / show the menu';
+  t.innerHTML = '<i class="ti ti-menu-2" aria-hidden="true"></i>';
+  nav.insertBefore(t, nav.firstChild);
+  function apply(){ document.documentElement.classList.toggle('rail-collapsed', localStorage.getItem('jarvis-rail') === 'collapsed'); }
+  t.addEventListener('click', function(){
+    var collapsed = localStorage.getItem('jarvis-rail') === 'collapsed';
+    try { localStorage.setItem('jarvis-rail', collapsed ? 'open' : 'collapsed'); } catch(e){}
+    apply();
+  });
+  apply();
+})();
+
 /* ── Composer bar always sends to Talk view ── */
 var composer = document.getElementById('composer');
 if(composer){

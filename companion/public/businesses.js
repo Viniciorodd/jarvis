@@ -25,7 +25,9 @@
     // everything else keeps the original in-overlay detail. This makes the Ops hub the real front door to
     // the new surfaces without a shell change — repoint, don't rebuild. (U2 step 1: link, don't delete.)
     r.addEventListener('click', function(){
-      var DESK = { gov: '/govcon-os', finance: '/finances', realestate: '/real-estate' };
+      // Gov → the ORIGINAL rich /govcon (operator prefers it, 2026-07-18: the new /govcon-os dropped the
+      // charts/maps/genome and split the screen). Finances/Real Estate → their new desks.
+      var DESK = { gov: '/govcon', finance: '/finances', realestate: '/real-estate' };
       if (DESK[b.id]) { window.location.href = DESK[b.id]; return; }
       openBusiness(b);
     });

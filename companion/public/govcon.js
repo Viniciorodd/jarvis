@@ -65,9 +65,67 @@
       + '</div><div class="gc-opp-result" id="gcOppResult"></div>'
       + '<div class="gc-opp-sec"><button class="gc-btn ghost" data-act="docs">📎 Load RFP documents + CO contact</button><div id="gcOppDocs"></div></div>'
       + (prop ? '<div class="gc-opp-sec"><button class="gc-btn ghost" data-act="readprop">📝 Read the drafted proposal</button><div id="gcOppProp"></div></div>' : '')
+      // The new pieces salvaged from /govcon-os (2026-07-18) — live INSIDE the opportunity drawer (a full
+      // overlay, never a bottom split): the real requirement-by-requirement compliance matrix, price-to-win
+      // vs comparable awards, and the sub bench/ladder for this bid.
+      + '<div class="gc-opp-sec"><div class="gc-h2">Compliance matrix</div><div id="gcOppMatrix"><div class="gc-empty">checking requirements…</div></div></div>'
+      + '<div class="gc-opp-sec"><div class="gc-h2">Price-to-win</div><div id="gcOppPtw"><div class="gc-empty">reading comparable awards…</div></div></div>'
+      + '<div class="gc-opp-sec"><div class="gc-h2">Subs on this bid</div><div id="gcOppSubs"><div class="gc-empty">checking the bench…</div></div></div>'
       + '<div class="gc-opp-sec"><div class="gc-h2">Ask Jarvis about this</div><form id="gcOppAsk"><input id="gcOppAskIn" placeholder="key requirements? do we qualify? competitors?"><button class="gc-btn" type="submit">Ask</button></form><div id="gcOppAskOut"></div></div>';
     body.querySelectorAll('button[data-act]').forEach((b) => { b.onclick = () => oppAction(b.dataset.act, o, lead, prop); });
     const f = $('gcOppAsk'); if (f) f.onsubmit = (e) => { e.preventDefault(); oppAction('ask', o, lead, prop); };
+    loadOppExtras(o); // fill matrix / price-to-win / subs in the background (best-effort, never blocks the drawer)
+  }
+
+  // Salvaged from /govcon-os (retired 2026-07-18): the compliance matrix TABLE, the price-to-win distribution,
+  // and the sub ladder — rendered into the opp drawer. Each is best-effort and degrades to an honest line.
+  async function loadOppExtras(o) {
+    const put = (id, html) => { const b = $(id); if (b) b.innerHTML = html; };
+    // Compliance matrix — a real table; gaps only (the route returns structured gaps), addressed count summarized.
+    (async () => {
+      try {
+        const m = await getJSON('/api/gov/matrix?noticeId=' + encodeURIComponent(o.noticeId));
+        if (!m || m.ok === false || !m.summary || !m.summary.total) { put('gcOppMatrix', '<div class="gc-empty">' + esc((m && m.error) || 'The matrix appears once the scope of work is pulled and a proposal is drafted.') + '</div>'); return; }
+        const s = m.summary, gaps = m.gaps || [];
+        let h = '<div style="font-weight:600;margin-bottom:8px">Requirements covered: ' + s.coveragePct + '% (' + s.addressed + ' of ' + s.total + ')' + (gaps.length ? ' · <span style="color:var(--danger)">' + gaps.length + ' gap' + (gaps.length > 1 ? 's' : '') + '</span>' : '') + '</div>';
+        if (gaps.length) {
+          h += '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>';
+          gaps.forEach((g) => { h += '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 6px;color:var(--danger);white-space:nowrap;vertical-align:top">⛔ gap</td><td style="padding:5px 6px;color:var(--ink)">' + esc(g.requirement) + (g.category ? ' <span style="color:var(--muted)">· ' + esc(g.category) + '</span>' : '') + '</td></tr>'; });
+          h += '</tbody></table><div style="font-size:12px;color:var(--muted);margin-top:6px">' + s.addressed + ' addressed; the above ' + gaps.length + ' are unanswered — fix before submitting.</div>';
+        } else { h += '<div class="gc-empty" style="color:var(--ok)">Every requirement is addressed. ✅</div>'; }
+        put('gcOppMatrix', h);
+      } catch (e) { put('gcOppMatrix', '<div class="gc-empty">Couldn’t load the matrix.</div>'); }
+    })();
+    // Price-to-win — distribution bar (min · p25 · median · p75 · max), competitive band shaded, your-bid marker.
+    (async () => {
+      try {
+        // The opp object often lacks naics (it comes from /api/operations); the board card carries it. Resolve
+        // naics + state from the board card by noticeId so the comparable-award read isn't blank.
+        let naics = o.naics || o.naicsCode || '', state = o.placeState || o.state || '';
+        if (!naics) { try { const bd = await getJSON('/api/gov-board'); const card = (bd && bd.columns || []).reduce((a, c) => a.concat(c.cards || []), []).find((c) => c.noticeId === o.noticeId); if (card) { naics = card.naics || ''; state = state || card.placeState || ''; } } catch (e) { /* */ } }
+        let p = await getJSON('/api/gov/price-to-win?noticeId=' + encodeURIComponent(o.noticeId));
+        if ((!p || p.ok === false) && naics) p = await getJSON('/api/gov/price-to-win?naics=' + encodeURIComponent(naics) + (state ? '&state=' + encodeURIComponent(state) : ''));
+        if (!p || p.ok === false || !p.stats || !p.stats.n) { put('gcOppPtw', '<div class="gc-empty">' + esc((p && p.line) || (p && p.error) || 'Not enough comparable awards to read a price yet.') + '</div>'); return; }
+        if (p.overCap || (p.verdict && p.verdict.position === 'unknown')) { put('gcOppPtw', '<div class="gc-empty">' + esc(p.line || 'Too many comparable awards to read reliably — narrow the lane.') + '</div>'); return; }
+        const s = p.stats, span = (s.max - s.min) || 1, at = (v) => Math.max(0, Math.min(100, ((v - s.min) / span) * 100));
+        let h = '<div style="position:relative;height:30px;margin:4px 0 8px">'
+          + '<div style="position:absolute;top:12px;left:0;right:0;height:6px;background:var(--line);border-radius:3px"></div>'
+          + '<div style="position:absolute;top:12px;left:' + at(s.p25) + '%;width:' + (at(s.median) - at(s.p25)) + '%;height:6px;background:var(--accent);border-radius:3px" title="competitive band ($' + Math.round(s.p25 / 1000) + 'k–$' + Math.round(s.median / 1000) + 'k)"></div>'
+          + '<div style="position:absolute;top:6px;left:' + at(s.median) + '%;width:2px;height:18px;background:var(--ink)" title="median $' + Math.round(s.median / 1000) + 'k"></div>'
+          + ((o.estimatedValue && typeof o.estimatedValue === 'number') ? '<div style="position:absolute;top:2px;left:' + at(o.estimatedValue) + '%;width:2px;height:26px;background:var(--warn)" title="your bid"></div>' : '')
+          + '</div><div style="font-size:12px;color:var(--muted);line-height:1.5">' + esc(p.line || '') + '</div>';
+        put('gcOppPtw', h);
+      } catch (e) { put('gcOppPtw', '<div class="gc-empty">Couldn’t load price-to-win.</div>'); }
+    })();
+    // Subs on this bid — the ladder tiers for this notice (primary/backup, contacted/responded/excluded).
+    (async () => {
+      try {
+        const d = await getJSON('/api/gov/sub-ladder');
+        const mine = ((d && d.ladders) || []).filter((l) => l.noticeId === o.noticeId);
+        if (!mine.length) { put('gcOppSubs', '<div class="gc-empty">No subs engaged on this bid yet.</div>'); return; }
+        put('gcOppSubs', mine.map((l) => '<div style="font-size:12.5px;margin-bottom:5px;color:var(--ink)">' + esc(l.trade || 'trade') + ': ' + (l.tiers || []).map((t) => '<b>' + esc(t.role || 'sub') + '</b> ' + esc(t.name || '—') + ' <span style="color:var(--muted)">(' + esc(t.status || 'pending') + ')</span>').join(' · ') + '</div>').join(''));
+      } catch (e) { put('gcOppSubs', '<div class="gc-empty">Couldn’t load subs.</div>'); }
+    })();
   }
   async function oppAction(act, o, lead, prop) {
     const res = $('gcOppResult'); const say = (m, ok) => { if (res) { res.textContent = m; res.style.color = ok === false ? 'var(--danger)' : 'var(--ok)'; } };

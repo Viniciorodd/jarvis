@@ -972,3 +972,15 @@ confirmed with live evidence, one fix, evals 595→601.**
   --build telegram-bridge`). Synced to the NAS 2026-07-18.
 - ⏭ **Deeper follow-up (Idea Vault):** make the CP Chief-of-Staff router itself retrieval-aware so ANY path
   reads the store before routing a new task — not just this Telegram intent.
+
+### 🆕 2026-07-18 — DEEPER FIX: Chief-of-Staff router is now retrieval-aware (no more route-instead-of-retrieve)
+Follow-up to the Telegram draft-retrieval bug. The bridge intercept was the first fix; this closes the class:
+`routeCommand` (pods/chief-of-staff/router.mjs) now checks `wantsPending()` BEFORE classifying — on a retrieval
+it reads the ONE source of truth (`store.pendingApprovals()`), logs only a trace, and returns
+`outcome.type:'retrieval'` with a reply affirming the drafts exist + listing them. It appends **no
+approval.request, no action** — so no path (Telegram fallback, cockpit chat, scheduler) can ever route a
+phantom task for a read again. New shared **pods/pending-intent.mjs** (`wantsPending` + `describePending`,
+pure, eval-pinned) is the single source both the router and telegram-bridge import (bridge's local copy
+removed). Also: `evals/run.mjs` now awaits each case's run() (backward-compatible) so async router cases can be
+pinned; `evals/pending-intent.eval.mjs` proves retrieve-not-route. Evals 601→606. **Synced to NAS; needs a
+control-plane redeploy** (`docker compose up -d --build control-plane telegram-bridge`). Idea Vault item done.

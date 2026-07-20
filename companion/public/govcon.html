@@ -107,14 +107,33 @@
       <!-- ── RIGHT ── -->
       <div class="gc-col">
         <section class="card gc-mapwrap">
-          <h2 class="gc-h2">Opportunity map <span class="gc-h2-hint" id="gcMapStat">where the work is</span></h2>
-          <div id="gcMap" class="gc-map"></div>
-          <div class="gc-map-legend">
-            <span><i class="lg good"></i> strong fit</span>
-            <span><i class="lg soon"></i> due ≤ 7d</span>
-            <span><i class="lg ok"></i> tracking</span>
-            <span><i class="lg spend"></i> federal $ (state)</span>
-            <span class="gc-map-hint" id="gcSpendTop"></span>
+          <!-- Map + relationship graph share ONE spot — toggle between them (operator request 2026-07-20). -->
+          <div class="gc-mapnet-head">
+            <div class="gc-seg" id="gcMapNetSeg">
+              <button class="on" data-view="map" type="button">Opportunity map</button>
+              <button data-view="net" type="button">Relationships</button>
+            </div>
+            <span class="gc-h2-hint" id="gcMapStat">where the work is</span>
+            <span class="gc-h2-hint" id="gcNetStat" hidden>your gov universe</span>
+          </div>
+          <div id="gcMapView">
+            <div id="gcMap" class="gc-map"></div>
+            <div class="gc-map-legend">
+              <span><i class="lg good"></i> strong fit</span>
+              <span><i class="lg soon"></i> due ≤ 7d</span>
+              <span><i class="lg ok"></i> tracking</span>
+              <span><i class="lg spend"></i> federal $ (state)</span>
+              <span class="gc-map-hint" id="gcSpendTop"></span>
+            </div>
+          </div>
+          <div id="gcNetView" hidden>
+            <div id="gcNet" class="gc-net"></div>
+            <div class="gc-net-legend">
+              <span><i class="lg" style="background:var(--accent)"></i> agency</span>
+              <span><i class="lg" style="background:var(--ok)"></i> in-lane opportunity</span>
+              <span><i class="lg" style="background:var(--faint)"></i> out-of-lane</span>
+              <span class="gc-map-hint">click a node to open it</span>
+            </div>
           </div>
         </section>
 
@@ -149,17 +168,7 @@
 
     </div>
 
-    <!-- Relationship graph / "company brain" — your gov universe -->
-    <section class="card gc-network">
-      <h2 class="gc-h2">Relationship graph <span class="gc-h2-hint" id="gcNetStat">your gov universe</span></h2>
-      <div id="gcNet" class="gc-net"></div>
-      <div class="gc-net-legend">
-        <span><i class="lg" style="background:var(--accent)"></i> agency</span>
-        <span><i class="lg" style="background:var(--ok)"></i> in-lane opportunity</span>
-        <span><i class="lg" style="background:var(--faint)"></i> out-of-lane</span>
-        <span class="gc-map-hint">click a node to open it</span>
-      </div>
-    </section>
+    <!-- (The relationship graph now lives inside the Opportunity-map card above, toggled via #gcMapNetSeg.) -->
 
     <footer class="gc-foot">
       <span id="gcFootStatus">Reading live data…</span>

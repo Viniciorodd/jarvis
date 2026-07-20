@@ -650,11 +650,29 @@
     loadTeaming();
   }
 
+  // Toggle the shared Opportunity-map / Relationship-graph panel (operator request 2026-07-20). Both SVGs
+  // scale via viewBox (no JS width measurement), so rendering into the hidden one is fine — the toggle just
+  // shows/hides. renderMap + renderNetwork keep filling both on every refresh.
+  function initMapNet() {
+    const seg = $('gcMapNetSeg'); if (!seg) return;
+    seg.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-view]'); if (!b) return;
+      const view = b.getAttribute('data-view');
+      seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      const mapV = $('gcMapView'), netV = $('gcNetView'), mS = $('gcMapStat'), nS = $('gcNetStat');
+      if (mapV) mapV.hidden = view !== 'map';
+      if (netV) netV.hidden = view !== 'net';
+      if (mS) mS.hidden = view !== 'map';
+      if (nS) nS.hidden = view !== 'net';
+    });
+  }
+
   initTheme();
   initPalette();
   initSim();
   initSimulator();
   initOpp();
+  initMapNet();
   load();
   setInterval(load, 60000); // calm refresh
 })();

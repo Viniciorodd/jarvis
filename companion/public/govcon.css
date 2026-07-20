@@ -185,6 +185,13 @@ body {
 .gc-agent .dot.on { background: var(--ok); } .gc-agent .dot.idle { background: var(--faint); }
 
 /* ── living US opportunity map ───────────────────────────── */
+/* map ↔ relationship-graph toggle header */
+.gc-mapnet-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.gc-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); }
+.gc-seg button { appearance: none; border: none; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 13px; border-radius: 999px; transition: background .14s, color .14s; }
+.gc-seg button:hover { color: var(--ink); }
+.gc-seg button.on { background: var(--accent); color: var(--ink-on-accent, #00201c); }
+.gc-mapnet-head .gc-h2-hint[hidden] { display: none; }
 .gc-map { width: 100%; }
 .gc-map svg { width: 100%; height: auto; display: block; }
 .gc-map .us-state { fill: color-mix(in srgb, var(--accent) 9%, transparent); stroke: color-mix(in srgb, var(--accent) 38%, transparent); stroke-width: .7px; stroke-linejoin: round; }
@@ -322,21 +329,24 @@ body {
 .gc-h2-hint a { color: var(--accent); text-decoration: none; }
 .gc-h2-hint a:hover { text-decoration: underline; }
 .gc-qw-list { display: flex; flex-direction: column; }
-.gc-qw-item { display: flex; align-items: baseline; gap: 9px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; min-width: 0; }
+/* aligned as a row: score pill · title (flexes + truncates) · meta · open. The title MUST flex:1 + truncate,
+   or a long title overflows the card ("out of the box") and pushes meta/open off — the 2026-07-20 fix. */
+.gc-qw-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; min-width: 0; }
 .gc-qw-item:last-child { border-bottom: 0; }
-.gc-qw-score { font-weight: 800; font-size: 11px; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 8px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.gc-qw-t { font-weight: 600; color: var(--ink); line-height: 1.35; min-width: 0; }
-.gc-qw-meta { color: var(--muted); font-size: 11.5px; margin-left: auto; white-space: nowrap; flex-shrink: 0; }
-.gc-qw-open { color: var(--accent); text-decoration: none; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.gc-qw-score { font-weight: 800; font-size: 11px; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 8px; flex: none; min-width: 26px; text-align: center; font-variant-numeric: tabular-nums; }
+.gc-qw-t { flex: 1 1 auto; min-width: 0; font-weight: 600; color: var(--ink); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gc-qw-meta { color: var(--muted); font-size: 11.5px; white-space: nowrap; flex: none; }
+.gc-qw-open { color: var(--accent); text-decoration: none; font-size: 12px; font-weight: 600; flex: none; }
 .gc-qw-open:hover { text-decoration: underline; }
 
 /* ── teaming radar (primes to reach up to) ───────────────── */
-.gc-team-item { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.gc-team-item { padding: 9px 0; border-bottom: 1px solid var(--line); }
 .gc-team-item:last-child { border-bottom: 0; }
-.gc-team-row { display: flex; align-items: center; gap: 9px; font-size: 13px; min-width: 0; }
-.gc-team-prime { font-weight: 600; color: var(--ink); line-height: 1.35; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gc-team-meta { color: var(--muted); font-size: 11.5px; margin-left: auto; white-space: nowrap; flex-shrink: 0; }
-.gc-team-row .gc-btn { padding: 5px 10px; font-size: 12px; flex-shrink: 0; }
+.gc-team-row { display: flex; align-items: center; gap: 10px; font-size: 13px; min-width: 0; }
+/* prime name flexes + truncates so a long name can't push the meta/button out of the card (2026-07-20 fix). */
+.gc-team-prime { flex: 1 1 auto; min-width: 0; font-weight: 600; color: var(--ink); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gc-team-meta { color: var(--muted); font-size: 11.5px; white-space: nowrap; flex: none; }
+.gc-team-row .gc-btn { padding: 5px 10px; font-size: 12px; flex: none; white-space: nowrap; }
 .gc-team-letter { margin: 8px 0 2px; }
 .gc-team-note { font-size: 11px; color: var(--warn); margin-bottom: 6px; }
 .gc-team-text { font: inherit; font-size: 12.5px; white-space: pre-wrap; line-height: 1.5; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0 0 8px; max-height: 260px; overflow-y: auto; }

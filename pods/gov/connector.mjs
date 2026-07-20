@@ -164,9 +164,15 @@ export async function maybeConnect({ op, sc }) {
   // Deal ledger: the outreach now EXISTS but has NOT gone out — the Deal Room shows it as your move
   // until the send is approved (this is the "researchers aren't reaching out" fix: it can't float).
   try { const D = await import('./deals.mjs'); D.recordOutreach(op.noticeId, { file, sub: top ? top.id : null, trade }); } catch { /* ledger best-effort */ }
-  // Only raise a SEND gate when there's a real recipient — a send gate on a draft with no To: can ONLY
-  // fail (the audit-ledger "no To:/Subject" class, 2026-07-13). No email → a needs-email task instead.
+  // Only raise a SEND gate when the WRITTEN DRAFT is actually sendable — a real recipient AND a To:/Subject:/
+  // body that passes the SAME parser the executor uses (draft-check, 2026-07-18). A gate that can only fail
+  // must never reach the operator; no email / malformed → a needs-email task instead. Belt-and-suspenders over
+  // the source: the daily prune sweep catches anything that slips through, but this stops it at the source.
+  let draftSendable = false;
   if (top && top.contact_email) {
+    try { const { parseEmailFile } = await import('./sender.mjs'); draftSendable = parseEmailFile(fs.readFileSync(path.join(ROOT, file), 'utf8')).ok; } catch { draftSendable = false; }
+  }
+  if (top && top.contact_email && draftSendable) {
     await gateApproval(
       { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send ${trade} outreach (SOW + ask for past performance + quote) for ${op.title} → ${top.contact_email}.${exclNote}`, payload: { noticeId: op.noticeId, trade, file, shortlist, to: top.contact_email, ...exclPayload } },
       { pod: 'Gov War Room', title: `Send ${trade} outreach: ${op.title}`, detail: detail + exclNote, xp: 20, verb: 'Review & send' });

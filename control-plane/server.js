@@ -243,6 +243,17 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { result = { ok: false, note: e.message }; }
       return send(res, 200, result);
     }
+    // Prune UNSENDABLE gates → a send gate whose draft has no To:/Subject:/body can only fail; it must never
+    // sit in the queue as "Approve = SENDS" (operator log 2026-07-18). Validates with the executor's own
+    // parser, auto-passes the dead ones, re-queues a "draft incomplete" fix task. Deterministic, sends nothing.
+    if (req.method === 'POST' && p === '/maintenance/prune-unsendable-gates') {
+      let result;
+      try {
+        const dc = await import('../pods/gov/draft-check.mjs');
+        result = await dc.pruneUnsendableGates({ store });
+      } catch (e) { result = { ok: false, note: e.message }; }
+      return send(res, 200, result);
+    }
     // Gov growth digest → ONE calm weekday-morning Telegram with the freshest quick wins + teaming
     // primes (pods/gov/digest.mjs). Deduped via gov.digest.sent events (payload.date === today) so at
     // most ONE digest goes out per calendar day even if the scheduler fires twice; weekends rest.

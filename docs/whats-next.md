@@ -984,3 +984,22 @@ pure, eval-pinned) is the single source both the router and telegram-bridge impo
 removed). Also: `evals/run.mjs` now awaits each case's run() (backward-compatible) so async router cases can be
 pinned; `evals/pending-intent.eval.mjs` proves retrieve-not-route. Evals 601→606. **Synced to NAS; needs a
 control-plane redeploy** (`docker compose up -d --build control-plane telegram-bridge`). Idea Vault item done.
+
+### 🆕 2026-07-18 — DIRECTION REVERSAL: old rich /govcon wins; collapsible rail; new pieces salvaged in
+Operator's week-of-testing feedback: prefers the OLD rich /govcon (charts/maps/genome); the new /govcon-os
+"splits the screen" (bad) and dropped the visuals; the desktop left rail "is in the way and I can't close it."
+Actions (all live, evals 606):
+- **Collapsible desktop rail** — ☰ toggle hides it (grid col→0, content full width), floats to reopen;
+  persisted (localStorage `jarvis-rail`). Desktop-only; mobile bottom bar untouched.
+- **Ops → Gov → `/govcon`** (the old rich one) instead of /govcon-os (businesses.js DESK map). Finances/Real
+  Estate still go to their new desks.
+- **New pieces salvaged INTO the old govcon's opportunity DRAWER** (govcon.js `loadOppExtras`): the real
+  compliance-matrix TABLE, the price-to-win distribution bar (resolves naics/state from the board card when the
+  opp object lacks them), and the sub ladder — full overlay, never a bottom split. Styled to govcon.css's own
+  vars. Verified live: 3 sections mount, honest empty/over-cap states, 0 console errors.
+- **`/govcon-os` retired** (unlinked; Ops repointed; More entry already gone). Files kept as salvage source
+  (the full subs bench + approval-effect modal from govcon-subs.js can be pulled into the old govcon later if
+  wanted). ⚠ This REVERSES the old "U2 = delete the old gov pages" plan — the OLD /govcon is now the keeper.
+- ⏭ **Open:** the two week-decisions are effectively made (Jarvis = Calm default w/ Wall toggle kept;
+  GovCon = old rich one kept). Optional next: pull the full subs bench (exclusion states + approval-effect
+  modal) into the old govcon; consider retiring /quickwins//teaming//dealroom (old govcon already covers them).

@@ -11,6 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rollupNarrations } from '../pods/narrate.mjs';
+import { wantsPending } from '../pods/pending-intent.mjs'; // shared with the Chief-of-Staff router (one source)
+export { wantsPending }; // re-exported so evals importing it from here keep working
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 function env(k, d = '') {
@@ -23,26 +25,7 @@ const ALLOWED = env('TELEGRAM_CHAT_ID'); // only this chat (your phone) is serve
 const COMPANION = env('COMPANION_URL', 'http://localhost:8095').replace(/\/$/, '');
 const API = 'https://api.telegram.org/bot' + TOKEN;
 
-// PURE (eval-pinned): does this message ask to SEE what's waiting (drafts / outreach / pending approvals)?
-// This exists because of a real trust bug (2026-07-18): the daily digest truthfully said "Hector drafted 2
-// sub outreach — waiting on approval", but "pull me the 2 sub outreach" fell through to the Chief-of-Staff
-// ROUTER, which routed a NEW task to Hector instead of READING the store the drafts live in — a
-// self-contradiction. The fix routes these asks straight to the ONE source of truth (/approvals/pending),
-// the same store the digest reads. Deliberately does NOT match a CREATE ("draft a proposal") — only retrieval.
-export function wantsPending(text) {
-  const t = String(text || '').trim().toLowerCase();
-  if (!t) return false;
-  if (/^\/(pending|drafts?|waiting|approvals?|outreach)\b/.test(t)) return true;
-  // A CREATE intent ("draft/write/compose … fresh/new") is NOT a retrieval — let it go to the brain, UNLESS
-  // it also clearly asks to SEE the existing one (show/pull/read/list/pending/waiting/existing/already).
-  if (/\b(draft|write|create|compose|make|generate|prepare|new)\b/.test(t)
-      && !/\b(show|pull|read|see|list|pending|waiting|existing|already)\b/.test(t)) return false;
-  const verb = /\b(pull|show|read|see|list|give|send|open|fetch|where|which|what)\b/.test(t);
-  const noun = /\b(outreach|drafts?|pending|approvals?|waiting|gates?|to\s+(approve|sign|decide))\b/.test(t);
-  if (verb && noun) return true;
-  if (/\b(the|those|these|my|any)\s+(\d+\s+)?(sub\s+)?(outreach|drafts?|pending|approvals?)\b/.test(t)) return true;
-  return false;
-}
+// wantsPending() now lives in pods/pending-intent.mjs (shared with the Chief-of-Staff router) — imported above.
 
 const history = []; // light conversation memory
 async function tg(method, body) { try { return await (await fetch(API + '/' + method, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(); } catch (e) { return { ok: false, error: e.message }; } }

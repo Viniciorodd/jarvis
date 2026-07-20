@@ -6,6 +6,7 @@
 
 import { ROSTER, POD_IDS, matchPerson, peopleInPod, findPerson, modelFor } from '../org.mjs';
 import { workflowFor, findWorkflow, getLevel, HARD_GATE_KINDS } from '../../control-plane/autonomy.mjs';
+import { wantsPending, describePending } from '../pending-intent.mjs';
 
 const ELLE = findPerson('MAILROOM-01'); // the default routee (Chief of Staff)
 
@@ -137,6 +138,24 @@ function mirrorToHQ(c, gate) {
  * @param store the control-plane store module (appendEvent)
  */
 export async function routeCommand({ text, source = 'api', commandId = null, store, anthropicKey = null }) {
+  // RETRIEVAL COMES FIRST (the 2026-07-18 deeper fix). "pull me the drafts / show my pending / the 2 sub
+  // outreach" is a READ of what ALREADY EXISTS — it must NEVER be re-classified into a new task. The bug: the
+  // router routed a "create" to Hector while 20 real drafts sat in the store, so the system contradicted its
+  // own digest. Here we read the ONE source of truth (control-plane pendingApprovals) and reply — no classify,
+  // no dispatch, no approval.request. Only a trace is logged. This makes every path retrieval-aware, not just
+  // the Telegram bridge's own intercept.
+  if (wantsPending(text)) {
+    const pending = (store && typeof store.pendingApprovals === 'function') ? store.pendingApprovals() : [];
+    if (store && store.appendEvent) {
+      store.appendEvent({ kind: 'trace', actor: 'chief-of-staff', pod: 'chief-of-staff', action: 'router.retrieve', rationale: `retrieval intent — ${pending.length} pending (read, not routed)`, ref: commandId });
+    }
+    return {
+      classification: { pod: 'chief-of-staff', intent: 'retrieve_pending', action_kind: 'read', reversible: true, stakes: 'low', method: 'deterministic', summary: String(text || '').slice(0, 140) },
+      gate: { gate: false, reason: 'read of existing pending items — no new task created' },
+      outcome: { type: 'retrieval', count: pending.length },
+      reply: describePending(pending),
+    };
+  }
   const c = await classifyWithClaude(text, anthropicKey);
   // Finance: PREPARING an invoice/payment link is a reversible draft — the money gate is on CREATING the
   // Stripe link, which Victor raises after drafting. So route the prep at L0 (don't let a "pay"/"payment"

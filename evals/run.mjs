@@ -21,7 +21,7 @@ for (const f of files) {
   const results = [];
   for (const c of mod.cases) {
     let pass = false, detail = '';
-    try { const r = c.run(); if (typeof r === 'object') { pass = !!r.pass; detail = r.detail || ''; } else pass = !!r; }
+    try { const r = await c.run(); if (r && typeof r === 'object') { pass = !!r.pass; detail = r.detail || ''; } else pass = !!r; }
     catch (e) { pass = false; detail = 'threw: ' + e.message; }
     results.push({ name: c.name, pass, detail });
     pass ? totalPass++ : totalFail++;

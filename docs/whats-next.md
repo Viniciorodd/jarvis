@@ -1003,3 +1003,21 @@ Actions (all live, evals 606):
 - ⏭ **Open:** the two week-decisions are effectively made (Jarvis = Calm default w/ Wall toggle kept;
   GovCon = old rich one kept). Optional next: pull the full subs bench (exclusion states + approval-effect
   modal) into the old govcon; consider retiring /quickwins//teaming//dealroom (old govcon already covers them).
+
+### 🆕 2026-07-18 — FIX: malformed draft reaching the approval gate + triaged the tech-stack/strategy docs
+Operator shared 6 vault docs. One was a bug (malformed draft reached "Approve = SENDS"); the rest are
+strategy/reference (logged to the Idea Vault).
+- **Bug fix** (`pods/gov/draft-check.mjs`): a send gate's draft is validated with the executor's OWN parser
+  (`parseEmailFile`) so "valid-to-show" === "sendable". `pruneUnsendableGates` auto-passes any pending send
+  gate that can't send (+ re-queues a `draft.incomplete` task); wired as CP route
+  `/maintenance/prune-unsendable-gates` + a 6-hourly job. `connector.mjs` also validates the WRITTEN draft
+  before gating (source + sweep = defense in depth). Confirmed the real June-27 Mount Dora draft put the
+  subject as bold markdown in the body, no To:/header → correctly flagged unsendable. Evals 606→613.
+  ⚠ **Runs on the NAS control-plane → redeploy, then POST /maintenance/prune-unsendable-gates once** (or wait
+  ≤6h) to clear the stale backlog. Synced to NAS 2026-07-18.
+- **Idea Vault (logged, not built):** proactive sub database (Stage-3 upgrade — warm bench + pricing
+  benchmarks); Perplexity Sonar market-intel agent; professional email (you@rodgatellc.com via Cloudflare);
+  Resend for outreach sends (delivery-confirmation artifact).
+- ⚠ **SECURITY (operator action, flagged in Tech Stack Inventory.md):** the self-hosted Bitwarden install key
+  has reportedly been in plaintext + unrotated since 2026-07-09 — rotate it BEFORE centralizing secrets into
+  Bitwarden, or the "centralize secrets" fix inherits a compromised master key. Not something code touches.

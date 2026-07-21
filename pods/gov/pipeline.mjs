@@ -166,6 +166,7 @@ export function buildBoard({ opportunities = [], approvals = [], awards = [], di
       title: o.title || 'Untitled solicitation',
       agency: shortAgency(o.agency),
       place: [o.place, o.placeState].filter(Boolean).join(', '),
+      placeState: o.placeState || '',
       trade, naics,
       setAside: shortSetAside(o.setAside),
       inLane: lane,

@@ -127,6 +127,48 @@
       } catch (e) { put('gcOppSubs', '<div class="gc-empty">Couldn’t load subs.</div>'); }
     })();
   }
+  // ── board-card chips: coverage% + price-to-win, visible ON the card so you read fit without opening it ──
+  // Best-effort and lazy — the board renders instantly; chips fill in and only appear where there's real signal.
+  const _covCache = {}, _ptwCache = {}; // covCache: noticeId→html string · ptwCache: "naics|state"→pending JSON promise
+  async function covFor(nid) {
+    if (nid in _covCache) return _covCache[nid];
+    try {
+      const m = await getJSON('/api/gov/matrix?noticeId=' + encodeURIComponent(nid));
+      let chip = '';
+      if (m && m.ok !== false && m.summary && m.summary.total) {
+        const s = m.summary, gaps = (m.gaps || []).length;
+        chip = gaps
+          ? `<span class="gc-cchip gap" title="${gaps} requirement${gaps > 1 ? 's' : ''} still unanswered — fix before submitting">⚠ ${s.coveragePct}% · ${gaps} gap${gaps > 1 ? 's' : ''}</span>`
+          : `<span class="gc-cchip ok" title="every requirement addressed">✓ ${s.coveragePct}% covered</span>`;
+      }
+      _covCache[nid] = chip; return chip;
+    } catch (e) { _covCache[nid] = ''; return ''; }
+  }
+  async function ptwFor(naics, state, value) {
+    const key = naics + '|' + (state || '');
+    if (!(key in _ptwCache)) _ptwCache[key] = getJSON('/api/gov/price-to-win?naics=' + encodeURIComponent(naics) + (state ? '&state=' + encodeURIComponent(state) : ''));
+    let p; try { p = await _ptwCache[key]; } catch (e) { return ''; }
+    if (!p || p.ok === false || !p.stats || !p.stats.n || p.overCap) return '';
+    const med = Number(p.stats.median) || 0; if (!med) return '';
+    const ratio = value / med;
+    const k = (n) => '$' + Math.round(n / 1000) + 'k';
+    let cls, lab;
+    if (ratio <= 0.9) { cls = 'low'; lab = 'under market'; }
+    else if (ratio >= 1.1) { cls = 'high'; lab = 'over market'; }
+    else { cls = 'mid'; lab = 'at market'; }
+    return `<span class="gc-cchip ptw ${cls}" title="your ${k(value)} vs market median ${k(med)} (n=${p.stats.n})">≈ ${lab}</span>`;
+  }
+  async function enrichOne(el, card) {
+    const box = el.querySelector('.gc-card-chips'); if (!box) return;
+    const chips = [];
+    // coverage only where a proposal likely exists (responding/submitted) — otherwise the matrix is empty by design
+    if (card.noticeId && (card.stage === 'responding' || card.stage === 'submitted')) { const c = await covFor(card.noticeId); if (c) chips.push(c); }
+    // price-to-win only where the operator set a $ value — that's when "vs market" actually means something
+    if (card.naics && (card.value || 0) > 0) { const p = await ptwFor(card.naics, card.placeState || '', card.value); if (p) chips.push(p); }
+    if (chips.length && box.isConnected) box.innerHTML = chips.join('');
+  }
+  function enrichCards(list) { (list || []).forEach(({ el, card }) => { enrichOne(el, card); }); }
+
   async function oppAction(act, o, lead, prop) {
     const res = $('gcOppResult'); const say = (m, ok) => { if (res) { res.textContent = m; res.style.color = ok === false ? 'var(--danger)' : 'var(--ok)'; } };
     try {
@@ -589,6 +631,7 @@
 
     // ── board ──
     const bEl = $('gcBoard'); bEl.innerHTML = '';
+    const enrichList = []; // cards to decorate (async, after render) with coverage% + price-to-win chips
     (board.columns || []).forEach((col) => {
       const c = document.createElement('div'); c.className = 'gc-col';
       const total = (col.cards || []).length;
@@ -602,14 +645,17 @@
           + `<div class="gc-card-meta">${stars(card.fit, 5, 'gc-stars')}`
           + `${card.agency ? `<span>${esc(card.agency)}</span>` : ''}`
           + `${dd != null && dd >= 0 ? `<span>· ${dd}d</span>` : ''}`
-          + `${whoChip(card.next)}</div>`;
+          + `${whoChip(card.next)}</div>`
+          + `<div class="gc-card-chips"></div>`; // fit-at-a-glance chips fill in async (coverage / price-to-win)
         // EVERY card is clickable → opens the full detail drawer (RFP, proposal, approve/pass/pursue/email/ask)
         if (card.noticeId) { el.style.cursor = 'pointer'; el.title = 'Open details'; el.onclick = () => openOppDrawer(card.noticeId); }
         c.appendChild(el);
+        enrichList.push({ el, card });
       });
       if (!(col.cards || []).length) c.innerHTML += `<div class="gc-empty">—</div>`;
       bEl.appendChild(c);
     });
+    enrichCards(enrichList); // non-blocking: attach coverage + price-to-win chips where there's real signal
 
     // ── genome ──
     const focus = pickFocus(board);

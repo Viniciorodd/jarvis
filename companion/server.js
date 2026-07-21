@@ -3275,6 +3275,24 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: r.ok, noticeId: noticeId || null, naics: r.naics, state: r.state, bid: r.bid, stats: r.stats, confidence: r.confidence, population: r.population ?? null, complete: !!r.complete, overCap: !!r.overCap, truncated: !!r.truncated, verdict: r.verdict, targetRange: r.targetRange, sampleAwards: r.sampleAwards, source: r.source, line: P.priceToWinLine(r), ...(r.ok ? {} : { error: r.reason }) }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // ── BID-WINNER RESEARCH (pods/gov/bid-winners.mjs): who actually wins this lane, from the SAME comparable
+  // awards price-to-win fetches. Feeds the debrief (know the incumbent) + pricing. No new network call. ──
+  if (req.method === 'GET' && url.pathname === '/api/gov/bid-winners') {
+    try {
+      const noticeId = url.searchParams.get('noticeId');
+      let naics = url.searchParams.get('naics') || '', state = url.searchParams.get('state') || '';
+      if (noticeId && !naics) {
+        try { const D = await import('../pods/gov/deals.mjs'); const deal = D.getDeal(noticeId); if (deal) { naics = deal.naics || ''; state = state || deal.placeState || ''; } } catch { /* best-effort */ }
+      }
+      if (!naics) return send(res, 400, JSON.stringify({ ok: false, error: 'naics required (pass ?naics= or a ?noticeId= whose deal carries one)', noticeId: noticeId || null }));
+      const P = await import('../pods/gov/price-to-win.mjs');
+      const BW = await import('../pods/gov/bid-winners.mjs');
+      const comp = await P.fetchComparableAwards({ naics, state });
+      const agg = BW.topWinners(comp.awards || []);
+      const summary = BW.winnerSummary(agg);
+      return send(res, 200, JSON.stringify({ ok: true, noticeId: noticeId || null, naics, state: state || null, ...agg, summary, source: comp.source, complete: !!comp.complete }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // Curated top-N opportunity BRIEFS (a few quality ones w/ what-they-want + fit + win-chance + strategy).
   if (req.method === 'GET' && url.pathname === '/api/gov/briefs') {
     try { const B = await import('../pods/gov/briefs.mjs'); return send(res, 200, JSON.stringify(await B.buildBriefs({ topN: Number(url.searchParams.get('n')) || 3, cpUrl: CP_URL }))); }

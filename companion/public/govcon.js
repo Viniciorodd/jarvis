@@ -70,6 +70,7 @@
       // vs comparable awards, and the sub bench/ladder for this bid.
       + '<div class="gc-opp-sec"><div class="gc-h2">Compliance matrix</div><div id="gcOppMatrix"><div class="gc-empty">checking requirements…</div></div></div>'
       + '<div class="gc-opp-sec"><div class="gc-h2">Price-to-win</div><div id="gcOppPtw"><div class="gc-empty">reading comparable awards…</div></div></div>'
+      + '<div class="gc-opp-sec"><div class="gc-h2">Who wins this work</div><div id="gcOppWinners"><div class="gc-empty">checking who wins this lane…</div></div></div>'
       + '<div class="gc-opp-sec"><div class="gc-h2">Subs on this bid</div><div id="gcOppSubs"><div class="gc-empty">checking the bench…</div></div></div>'
       + '<div class="gc-opp-sec"><div class="gc-h2">Ask Jarvis about this</div><form id="gcOppAsk"><input id="gcOppAskIn" placeholder="key requirements? do we qualify? competitors?"><button class="gc-btn" type="submit">Ask</button></form><div id="gcOppAskOut"></div></div>';
     body.querySelectorAll('button[data-act]').forEach((b) => { b.onclick = () => oppAction(b.dataset.act, o, lead, prop); });
@@ -116,6 +117,25 @@
           + '</div><div style="font-size:12px;color:var(--muted);line-height:1.5">' + esc(p.line || '') + '</div>';
         put('gcOppPtw', h);
       } catch (e) { put('gcOppPtw', '<div class="gc-empty">Couldn’t load price-to-win.</div>'); }
+    })();
+    // Who wins this work — top recipients in this NAICS lane (feeds pricing + the debrief). Same comps as PTW.
+    (async () => {
+      try {
+        let naics = o.naics || o.naicsCode || '', state = o.placeState || o.state || '';
+        if (!naics) { try { const bd = await getJSON('/api/gov-board'); const card = (bd && bd.columns || []).reduce((a, c) => a.concat(c.cards || []), []).find((c) => c.noticeId === o.noticeId); if (card) { naics = card.naics || ''; state = state || card.placeState || ''; } } catch (e) { /* */ } }
+        if (!naics) { put('gcOppWinners', '<div class="gc-empty">No NAICS on this notice yet — can’t look up who wins the lane.</div>'); return; }
+        const w = await getJSON('/api/gov/bid-winners?naics=' + encodeURIComponent(naics) + (state ? '&state=' + encodeURIComponent(state) : ''));
+        if (!w || w.ok === false || !w.totalAwards) { put('gcOppWinners', '<div class="gc-empty">' + esc((w && w.error) || 'No comparable awards found — no incumbent signal yet.') + '</div>'); return; }
+        let h = '<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">' + esc((w.summary && w.summary.text) || '') + '</div>';
+        h += '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>';
+        (w.winners || []).slice(0, 6).forEach((x) => {
+          h += '<tr style="border-top:1px solid var(--line)"><td style="padding:5px 6px;color:var(--ink)">' + esc(x.recipient) + '</td>'
+            + '<td style="padding:5px 6px;text-align:right;white-space:nowrap;color:var(--muted)">' + x.wins + ' win' + (x.wins === 1 ? '' : 's') + ' · ' + x.winSharePct + '%</td>'
+            + '<td style="padding:5px 6px;text-align:right;white-space:nowrap">$' + Math.round(x.avg / 1000) + 'k avg</td></tr>';
+        });
+        h += '</tbody></table><div style="font-size:12px;color:var(--muted);margin-top:6px">' + w.uniqueWinners + ' distinct winners across ' + w.totalAwards + ' awards' + (w.complete ? '' : ' (top slice)') + '.</div>';
+        put('gcOppWinners', h);
+      } catch (e) { put('gcOppWinners', '<div class="gc-empty">Couldn’t load who wins this lane.</div>'); }
     })();
     // Subs on this bid — the ladder tiers for this notice (primary/backup, contacted/responded/excluded).
     (async () => {

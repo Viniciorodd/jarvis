@@ -27,13 +27,17 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
   each to the business system it could improve, emit a "make a concrete change" card (2,642 actionable
   across your 254 books, gov-first). `/api/vault/book-ops` (read + mark-reviewed) → a 📚 Book → Ops section
   on `/ideas`. READ-ONLY on the vault. 8 evals. *(vault: [[Jarvis]])*
+- ⚙️ **Bid-winner research — core done, one part not buildable** — `pods/gov/bid-winners.mjs`: aggregate
+  the comparable-award sample (same one price-to-win fetches) by recipient → who wins this lane, win/dollar
+  share, incumbent-vs-open read. `/api/gov/bid-winners` → a "Who wins this work" panel in the opp drawer.
+  Feeds pricing + the debrief. 8 evals. Verified live (CHIMES 22.6% of 270 janitorial awards). **Still open**:
+  per-award *scope* text (needs the award-detail API, a later add); "see their winning proposals" is **not
+  public** — FOIA request only, so not API-buildable. *(vault: [[Jarvis]] / [[Gov contracting]])*
 
 ## 🔨 Mine — buildable next without blocking on you (priority order)
 1. **Post-loss debrief wiring** — the core is built; needs your OK (new outbound class) to fire on "lost"
    and stage behind the gate. *(one yes away)*
-2. **Bid-winner research feature for Gideon/Patricia** (`[[Jarvis]]` / `[[Gov contracting]]`): given a lost
-   or awarded notice, pull who won + why (USAspending) to feed the debrief + future pricing. Scope first.
-4. **Bench-first sourcing wire-up** — the `benchFirstMatch()` primitive exists; wire it so Stage-3 sourcing
+2. **Bench-first sourcing wire-up** — the `benchFirstMatch()` primitive exists; wire it so Stage-3 sourcing
    queries the warm bench before cold-sourcing (the query side of the Strategic Pivot; capture side shipped).
 
 ## 🧑 Needs you — input, your hands, or credentials (I cannot do these; they stay visible here)

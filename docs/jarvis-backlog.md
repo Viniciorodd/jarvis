@@ -10,6 +10,15 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
 ---
 
 ## ✅ Done (2026-07-20)
+- ✅ **Bid Fit Index** (PRD L-013) — `pods/gov/bid-fit.mjs` + `POST /api/gov/bid-fit`: disqualifier-aware
+  weighted 0–100 bid scorer with bands, portal-gate/bond flags, no-shame output. All 6 PRD backtests pass.
+  12 evals. SOP: vault `🎯 Bid Fit Index (scoring SOP).md`.
+- ✅ **Watcher Health Contract** (PRD L-013) — `control-plane/watcher-health.mjs` + seed +
+  `GET /api/gov/watcher-health`: three-state, BLIND-by-default; fiverr-order-watch reports BLIND. 13 evals.
+  SOP: vault `Watcher Health Contract.md`.
+- ✅ **Mobile/desktop nav + scroll fixes** — standalone pages scroll again (Deal Calculator reachable);
+  one flat left drawer with all 10 destinations; network-first service worker so shipped UI actually reaches
+  the desktop app (was serving stale files).
 - ✅ **Deal Calculator + wire into Jarvis** — `pods/real-estate/deal-calc.mjs` (deterministic underwriting:
   cap · cash-on-cash · DSCR · cashflow · 1% rule · GRM · max-offer), `/api/real-estate/deal-calc`, live
   calculator card on `/real-estate`. 13 evals. *(vault: [[Jarvis]] 2026-07-03)*
@@ -47,8 +56,14 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
   public** — FOIA request only, so not API-buildable. *(vault: [[Jarvis]] / [[Gov contracting]])*
 
 ## 🔨 Mine — buildable next without blocking on you (priority order)
-*(empty — the whole 🔨 list is shipped. Post-loss debrief wiring was the last item; done 2026-07-20 with
-the operator's OK — see ✅ below. Next work comes from the vault sweep or new asks.)*
+1. **Wire `recordRun()` into the live watchers** so the Watcher Health ledger self-updates on real runs.
+   The engine + ledger + endpoint exist; each watcher still needs the contract prepended + its control
+   probe added (the control-plane's `fiverr-order-poll` first, so it reports BLIND on its next live run).
+   *(NAS redeploy for the control-plane side.)*
+2. **Wire the Bid Fit Index into the flow** — a score on each Gov Pipeline Board card + a "score this bid"
+   panel in the opp drawer (operator inputs doc-takers / drive-hours / evaluation type → verdict). *(companion UI)*
+
+*(The 7/12-audit and vault-sweep 🔨 items are all shipped — see ✅.)*
 
 ## 🧑 Needs you — input, your hands, or credentials (I cannot do these; they stay visible here)
 - **Rotate the OpenRouter key** (`2026-07-03`) + the exposed Bitwarden self-hosted install key (flagged

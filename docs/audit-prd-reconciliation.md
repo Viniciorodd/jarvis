@@ -72,8 +72,14 @@ Almost entirely **your** hands — Jarvis can draft/track but not photograph a u
   drafts this week · replies awaiting you · AI spend (today/week/month) · revenue banked this week. Rendered
   as a one-line strip (`kpiLine`) on every report and eval-pinned (7 new cases, 620 green). *("Primes
   contacted" and "$/mo flowing" need the gov CRM + finance pod respectively — folded in as those mature.)*
-- ⚙️ **OPEN** — **post-loss debrief rule** (every lost bid → an agent-drafted debrief request to the CO,
-  staged like any other send). Not built yet. *(candidate build)*
+- ⚙️ **CORE DONE / WIRING PENDING YOUR OK (2026-07-20)** — **post-loss debrief rule.** The pure core is
+  built + eval-pinned (`pods/gov/debrief.mjs`, 8 cases): it selects only genuinely-*lost* bids (won/passed
+  excluded, dedup by noticeId) and drafts a courteous CO debrief request in the exact sendable format —
+  and a draft with no known CO email is intentionally *unsendable* so it can never reach a blank gate.
+  **Not yet wired to a trigger**, because it introduces a NEW outbound class (Jarvis emailing Contracting
+  Officers) — per doctrine that's a "new autonomy" call for you. Proposed wiring: when you mark a bid
+  **lost** in the board, stage the debrief draft **behind the normal approval gate** (never auto-send),
+  dedup via a `gov.debrief.staged` event. Awaiting your OK on the wording + the gate-only guarantee.
 - ⚙️ **DONE (this file)** — the audit/PRD now has a home in the repo, not just the vault.
 
 ---

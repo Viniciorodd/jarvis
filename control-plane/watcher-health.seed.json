@@ -1,0 +1,72 @@
+{
+  "fiverr-order-watch": {
+    "channel": "gmail:rodgategroup@gmail.com from:fiverr.com",
+    "ever_received": false,
+    "last_signal_at": null,
+    "last_checked_at": null,
+    "expected_max_silence_days": 30,
+    "state": "BLIND",
+    "blocking_fix": "Fiverr → Settings → Notifications → Email is ON; Settings → Account → confirm rodgategroup@gmail.com is the address on file. Vinicio-only.",
+    "control_probe": "gmail search with no sender filter returns >0 results (proves the connector works, so silence = empty channel not a dead one)"
+  },
+  "gov-inbox-watch": {
+    "channel": "gmail: SAM.gov + PA eAlert notices",
+    "ever_received": true,
+    "last_signal_at": null,
+    "last_checked_at": null,
+    "expected_max_silence_days": 14,
+    "state": "VERIFIED_CLEAR",
+    "blocking_fix": null,
+    "control_probe": "gmail search from:sam.gov returns >0 results"
+  },
+  "gov-inbox-pulse": {
+    "channel": "gmail: gov inbox mid-day pulse",
+    "ever_received": true,
+    "last_signal_at": null,
+    "last_checked_at": null,
+    "expected_max_silence_days": 14,
+    "state": "VERIFIED_CLEAR",
+    "blocking_fix": null,
+    "control_probe": "same mailbox as gov-inbox-watch"
+  },
+  "gmail-triage": {
+    "channel": "gmail: personal + rodgate inbox triage",
+    "ever_received": true,
+    "last_signal_at": null,
+    "last_checked_at": null,
+    "expected_max_silence_days": 7,
+    "state": "VERIFIED_CLEAR",
+    "blocking_fix": null,
+    "control_probe": "gmail search in:inbox returns >0 results"
+  },
+  "gov-scout": {
+    "channel": "SAM.gov Opportunities API (NAICS 561210/561720/561990)",
+    "ever_received": true,
+    "last_signal_at": null,
+    "last_checked_at": null,
+    "expected_max_silence_days": 7,
+    "state": "VERIFIED_CLEAR",
+    "blocking_fix": null,
+    "control_probe": "SAM search with no NAICS filter returns >0 opportunities"
+  },
+  "capture-processor": {
+    "channel": "vault: Quick Capture markdown",
+    "ever_received": true,
+    "last_signal_at": null,
+    "last_checked_at": null,
+    "expected_max_silence_days": 30,
+    "state": "VERIFIED_CLEAR",
+    "blocking_fix": null,
+    "control_probe": "the capture file exists and is readable"
+  },
+  "business-credit-builder": {
+    "channel": "business-credit signals (unproven)",
+    "ever_received": false,
+    "last_signal_at": null,
+    "last_checked_at": null,
+    "expected_max_silence_days": 30,
+    "state": "BLIND",
+    "blocking_fix": "confirm the credit-monitoring source is wired and has ever returned a real datapoint. Vinicio to verify the account/source.",
+    "control_probe": "the credit source returns any datapoint at all"
+  }
+}

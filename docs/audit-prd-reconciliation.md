@@ -32,10 +32,12 @@ The nervous system that was "dark" (NAS/Tailscale) is now **live**.
   can reach a gate (`prune-unsendable-gates` job + `pods/gov/draft-check.mjs`).
 - ⚙️ **DONE** — Two-way Telegram (free-text + "show my pending" reads the real draft store; router is
   retrieval-aware).
-- ⚙️ **OPEN** — **WS2 #8: every status-reporting scheduled job must read the Pipeline Board BEFORE
-  reporting**, to kill the "false-overdue" class (a job reconstructing state from email reported an
-  already-sent item as overdue). Candidates: `morning-brief`, `deadline-radar`, `gov-growth-digest`.
-  *(This is the clearest open ⚙️ item; needs a prompt line + NAS redeploy — see "Next" below.)*
+- ⚙️ **DONE (2026-07-20)** — **WS2 #8: board-first status reporting.** The two LLM status jobs
+  (`morning-brief`, `weekly-reflection`) now carry a first-line directive: *"Read the Gov Pipeline Board
+  and the deterministic KPI report BEFORE reporting status — the board outranks any email reconstruction;
+  never call a sent/submitted item overdue."* Root cause of the original false-overdue (Mac Cowork jobs
+  reconstructing from email) was already retired in the move to the control-plane scheduler; this closes
+  the residual risk in the surviving LLM briefs. *(Activates on next NAS control-plane redeploy.)*
 - 🧑 **OPEN (yours, 5-min)** — Fiverr Settings → Notifications → point order alerts at the mailbox Jarvis
   watches, so the order watch can actually fire.
 - 🧑 **OPEN (yours)** — confirm the PC's duplicate Cowork scheduled tasks are deleted (avoid double runs).
@@ -43,7 +45,9 @@ The nervous system that was "dark" (NAS/Tailscale) is now **live**.
 ## WS3 · Cost-efficient AI ops (the pay-per-use hedge)  — owner: ⚙️ Jarvis config
 - ⚙️ **DONE** — Model tiering is real and eval-pinned: `pods/model-router.mjs` + `claudeCost` (Haiku =
   scan/triage, Sonnet = draft, Opus = price/audit/decide). Model IDs pinned in CLAUDE.md.
-- ⚙️ **PARTIAL** — per-job token budgets + a monthly "AI spend" line aren't surfaced yet. *(candidate build)*
+- ⚙️ **DONE (2026-07-20)** — the **AI-spend line** is now surfaced deterministically: `operatorKpis()` in
+  `control-plane/reports.mjs` reports AI spend today / this week / this month, and it rides on every report's
+  `text` via `kpiLine()`. *(Per-job hard token budgets remain a later refinement.)*
 - ⚙️ **ongoing principle** — "the vault IS the cost control": every SOP/template written downgrades the
   model needed to run it. Keep writing specs (we do — `docs/superpowers/specs/`).
 
@@ -64,8 +68,10 @@ Almost entirely **your** hands — Jarvis can draft/track but not photograph a u
 ## WS6 · Governance (the evergreen loop itself)  — owner: ⚙️ Weekly reflection + this file
 - ⚙️ **DONE** — `weekly-reflection` scheduled job (the Sunday synthesis) + `eod-log` exist.
 - ⚙️ **DONE** — Lessons ledger + canonical-facts guard (catches drift; the L-005…L-009 class of error).
-- ⚙️ **PARTIAL** — KPI panel in the morning brief (sends this week · primes contacted · replies pending ·
-  $/mo · AI spend) is not fully assembled. *(candidate build)*
+- ⚙️ **DONE (2026-07-20)** — **KPI panel** assembled deterministically (`operatorKpis`): sends this week ·
+  drafts this week · replies awaiting you · AI spend (today/week/month) · revenue banked this week. Rendered
+  as a one-line strip (`kpiLine`) on every report and eval-pinned (7 new cases, 620 green). *("Primes
+  contacted" and "$/mo flowing" need the gov CRM + finance pod respectively — folded in as those mature.)*
 - ⚙️ **OPEN** — **post-loss debrief rule** (every lost bid → an agent-drafted debrief request to the CO,
   staged like any other send). Not built yet. *(candidate build)*
 - ⚙️ **DONE (this file)** — the audit/PRD now has a home in the repo, not just the vault.

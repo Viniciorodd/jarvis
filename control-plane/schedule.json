@@ -6,7 +6,7 @@
   "jobs": [
     { "id": "morning-brief", "person": "MAILROOM-01", "pod": "chief-of-staff", "type": "brief",
       "cadence_hours": 24, "at_hour": 7, "tier": "cheap",
-      "command": "compile the morning brief: what needs me, money, and today's priorities" },
+      "command": "Read the Gov Pipeline Board and the deterministic KPI report BEFORE reporting status — the board outranks any email reconstruction; never call a sent/submitted item overdue. Then compile the morning brief: what needs me, money, and today's priorities" },
     { "id": "gov-daily-scan", "person": "SAM-SCOUT", "pod": "gov", "type": "scan",
       "cadence_hours": 24, "at_hour": 8, "tier": "cheap",
       "command": "scan SAM.gov and state portals for new janitorial opportunities; score bid/no-bid" },
@@ -24,7 +24,7 @@
       "command": "read + triage the personal inbox, digest what needs a reply, queue gated cleanup" },
     { "id": "weekly-reflection", "person": "EXEC-01", "pod": "exec", "type": "reflect",
       "cadence_hours": 168, "at_hour": 18, "at_dow": 0, "tier": "reflect",
-      "command": "weekly strategy review: KPIs, human-edit rate, where to push or pull back" },
+      "command": "Read the Gov Pipeline Board and the deterministic KPI report BEFORE reporting status — the board outranks any email reconstruction; never call a sent/submitted item overdue. Then run the weekly strategy review: KPIs, human-edit rate, where to push or pull back" },
     { "id": "deadline-radar", "person": "SAM-SCOUT", "pod": "gov", "type": "maintenance",
       "cadence_hours": 24, "at_hour": 9, "endpoint": "/maintenance/deadline-check",
       "command": "check bid response deadlines and remind before any close (deterministic, no LLM)" },

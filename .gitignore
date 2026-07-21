@@ -121,3 +121,4 @@ audit-log/
 # Stitch UI generation output (6.6MB of PNGs + Tailwind-CDN html) — a VISUAL SPEC we port from, never ship.
 # Kept locally; the brief that produced it is docs/ui-redesign-stitch-prompt.md (committed).
 stitch_solo_govcon_cockpit/
+pods/vault/book-ops-state.json

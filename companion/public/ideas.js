@@ -38,6 +38,29 @@
 
   async function load() { const data = await getJSON('/api/ideas'); if (data.error) { $('idEmpty').textContent = 'Error: ' + data.error; return; } render(data); }
 
+  // Book → Ops: highlights mapped to a business system, with a prompt to make a concrete change.
+  async function loadBooks() {
+    const d = await getJSON('/api/vault/book-ops?limit=8');
+    const list = $('boList'); if (!list) return;
+    if (!d || !d.ok) { list.innerHTML = `<div class="gc-empty">Couldn’t read your book highlights${d && d.error ? ': ' + esc(d.error) : ''}.</div>`; return; }
+    const stat = $('boStat'); if (stat) stat.textContent = `${d.total} actionable across ${d.books} books · showing ${d.cards.length}`;
+    if (!d.cards.length) { list.innerHTML = `<div class="gc-empty">No un-reviewed highlights map to a business system right now.</div>`; return; }
+    list.innerHTML = d.cards.map((c) => `
+      <div class="id-row" data-bo="${esc(c.id)}">
+        <div class="id-eff">${esc((c.systems[0] || 'ops').slice(0, 4))}</div>
+        <div class="id-body">
+          <div class="id-title">“${esc(c.text.slice(0, 200))}${c.text.length > 200 ? '…' : ''}”</div>
+          <div class="id-meta">${esc(c.book)}${c.author ? ' · ' + esc(c.author) : ''} → <b>${esc(c.systems.join(' / '))}</b></div>
+        </div>
+        <button class="id-act" data-boid="${esc(c.id)}" title="Mark reviewed — stops resurfacing">✓ reviewed</button>
+      </div>`).join('');
+    list.querySelectorAll('[data-boid]').forEach((b) => { b.onclick = async () => {
+      const row = b.closest('[data-bo]'); b.disabled = true;
+      await getJSON('/api/vault/book-ops', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.getAttribute('data-boid') }) });
+      if (row) row.remove();
+    }; });
+  }
+
   $('idMine').onclick = async () => {
     const b = $('idMine'); b.disabled = true; const t = b.textContent; b.textContent = '⏳ Mining (local)…';
     $('idStatus').textContent = 'Scanning your vault on the free local model — this can take a moment…';
@@ -48,4 +71,5 @@
   };
 
   load();
+  loadBooks();
 })();

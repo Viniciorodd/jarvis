@@ -23,13 +23,15 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
 - ✅ **Agents visibly confirm they're running (no silent clicks)** — `control-plane/heartbeats.mjs`
   (last run per agent, rests included) → `/api/activity` `heartbeats` → a 🫀 heartbeat strip in the
   activity view. 5 evals. *(vault: [[Jarvis]])*
+- ✅ **Book → operations review step** — `pods/vault/book-to-ops.mjs`: parse Apple-Books highlights, map
+  each to the business system it could improve, emit a "make a concrete change" card (2,642 actionable
+  across your 254 books, gov-first). `/api/vault/book-ops` (read + mark-reviewed) → a 📚 Book → Ops section
+  on `/ideas`. READ-ONLY on the vault. 8 evals. *(vault: [[Jarvis]])*
 
 ## 🔨 Mine — buildable next without blocking on you (priority order)
 1. **Post-loss debrief wiring** — the core is built; needs your OK (new outbound class) to fire on "lost"
    and stage behind the gate. *(one yes away)*
-2. **Book → operations review step** (`[[Jarvis]]`): a light Absorb-pod step that turns a saved highlight
-   into a concrete change to a business system, not just a filed note. Design + small wiring.
-3. **Bid-winner research feature for Gideon/Patricia** (`[[Jarvis]]` / `[[Gov contracting]]`): given a lost
+2. **Bid-winner research feature for Gideon/Patricia** (`[[Jarvis]]` / `[[Gov contracting]]`): given a lost
    or awarded notice, pull who won + why (USAspending) to feed the debrief + future pricing. Scope first.
 4. **Bench-first sourcing wire-up** — the `benchFirstMatch()` primitive exists; wire it so Stage-3 sourcing
    queries the warm bench before cold-sourcing (the query side of the Strategic Pivot; capture side shipped).

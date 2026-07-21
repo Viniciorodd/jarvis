@@ -2166,6 +2166,26 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // ── BOOK → OPS REVIEW (pods/vault/book-to-ops.mjs): turn saved book highlights into system-targeted
+  // "make a concrete change" cards. READ-ONLY on the vault. GET returns the top un-reviewed cards; POST
+  // marks card ids reviewed so they stop resurfacing.
+  if (url.pathname === '/api/vault/book-ops') {
+    try {
+      const BO = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'vault', 'book-to-ops.mjs')).href);
+      const vaultDir = process.env.VAULT_DIR || path.join(require('node:os').homedir(), 'Documents', 'Second Brain');
+      if (req.method === 'GET') {
+        const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit')) || 12));
+        const r = BO.scanBooks({ vaultDir, limit });
+        return send(res, 200, JSON.stringify({ ok: true, ...r }));
+      }
+      const body = await readBody(req);
+      const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
+      if (!ids.length) return send(res, 400, JSON.stringify({ ok: false, error: 'id or ids required' }));
+      const count = BO.markReviewed(ids);
+      return send(res, 200, JSON.stringify({ ok: true, reviewed: count }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
   // ── SUB PRICING INTELLIGENCE (pods/gov/sub-pricing.mjs): the proactive-database pricing layer.
   // GET returns per-trade benchmarks (median $/sqft, hourly, minimum) across the whole bench so a new
   // quote can be checked against YOUR network, not trusted in isolation. POST captures a sub's pricing.

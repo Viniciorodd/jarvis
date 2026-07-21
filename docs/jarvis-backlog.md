@@ -17,21 +17,22 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
   `00 - System/Templates/Journal.md` with a reflection skeleton. *(vault: [[Jarvis]])*
 - ✅ **Board-first status reporting (WS2 #8)** + **KPI/AI-spend panel (WS3/WS6)** + **post-loss debrief core
   (WS6)** — see [audit-prd-reconciliation.md](audit-prd-reconciliation.md).
+- ✅ **Sub pricing intelligence** — `pods/gov/sub-pricing.mjs` (capture per-sub rates, per-trade network
+  benchmarks, price-check a quote vs your own comps, bench-first sourcing) + `/api/gov/sub-pricing` + a
+  "Pricing intelligence" panel & capture form on the subs bench. 12 evals. *(Strategic Pivot doc)*
+- ✅ **Agents visibly confirm they're running (no silent clicks)** — `control-plane/heartbeats.mjs`
+  (last run per agent, rests included) → `/api/activity` `heartbeats` → a 🫀 heartbeat strip in the
+  activity view. 5 evals. *(vault: [[Jarvis]])*
 
 ## 🔨 Mine — buildable next without blocking on you (priority order)
-1. **Proactive sub database upgrade** (`Strategic Pivot - Proactive Sub Database.md`): make Stage-3 sourcing
-   query the existing bench FIRST, cold-source only for gaps; add **pricing-benchmark** capture per sub
-   (price/sqft, hourly rate, minimums) so future quotes are checked against our own history, not one quote
-   in isolation. Extends the subs bench already on `/govcon`.
-2. **Post-loss debrief wiring** — the core is built; needs your OK (new outbound class) to fire on "lost"
+1. **Post-loss debrief wiring** — the core is built; needs your OK (new outbound class) to fire on "lost"
    and stage behind the gate. *(one yes away)*
-3. **"Agents visibly confirm they're running (no silent clicks)"** (`[[Jarvis]]`): audit each pod's
-   run/append-event so every scheduled action leaves a visible trace on the board/Home. Partly true already
-   (event log) — the gap is surfacing it in the UI.
-4. **Book → operations review step** (`[[Jarvis]]`): a light Absorb-pod step that turns a saved highlight
+2. **Book → operations review step** (`[[Jarvis]]`): a light Absorb-pod step that turns a saved highlight
    into a concrete change to a business system, not just a filed note. Design + small wiring.
-5. **Bid-winner research feature for Gideon/Patricia** (`[[Jarvis]]` / `[[Gov contracting]]`): given a lost
+3. **Bid-winner research feature for Gideon/Patricia** (`[[Jarvis]]` / `[[Gov contracting]]`): given a lost
    or awarded notice, pull who won + why (USAspending) to feed the debrief + future pricing. Scope first.
+4. **Bench-first sourcing wire-up** — the `benchFirstMatch()` primitive exists; wire it so Stage-3 sourcing
+   queries the warm bench before cold-sourcing (the query side of the Strategic Pivot; capture side shipped).
 
 ## 🧑 Needs you — input, your hands, or credentials (I cannot do these; they stay visible here)
 - **Rotate the OpenRouter key** (`2026-07-03`) + the exposed Bitwarden self-hosted install key (flagged

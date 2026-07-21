@@ -1952,7 +1952,15 @@ const server = http.createServer(async (req, res) => {
         .reverse();
       const byDay = {};
       for (const it of items) { const day = (it.ts || '').slice(0, 10); if (day) byDay[day] = (byDay[day] || 0) + 1; }
-      return send(res, 200, JSON.stringify({ items: items.slice(0, 300), byDay, archivedCount: archived.size }));
+      // Heartbeats — last run PER AGENT incl. rests (trace), so a scheduled agent that ran but found no
+      // work still visibly confirms it ran (vault [[Jarvis]] "no silent clicks").
+      let heartbeats = [], heartbeatSummary = null;
+      try {
+        const HB = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'control-plane', 'heartbeats.mjs')).href);
+        heartbeats = HB.agentHeartbeats(list);
+        heartbeatSummary = HB.heartbeatSummary(heartbeats, 24);
+      } catch { /* heartbeats are best-effort */ }
+      return send(res, 200, JSON.stringify({ items: items.slice(0, 300), byDay, archivedCount: archived.size, heartbeats, heartbeatSummary }));
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], byDay: {}, error: e.message })); }
   }
   if (req.method === 'POST' && url.pathname === '/api/activity/archive') {

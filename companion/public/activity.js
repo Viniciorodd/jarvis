@@ -7,13 +7,14 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const when = (t) => new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  let items = [], byDay = {}, sel = null, calMonth = null, archivedCount = 0;
+  let items = [], byDay = {}, sel = null, calMonth = null, archivedCount = 0, hb = [], hbSum = null;
+  const ago = (m) => m == null ? 'never' : m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago';
 
   async function load() {
     el('activityLog').innerHTML = '<div class="ops-empty">loading…</div>';
     const arch = el('actShowArchived') && el('actShowArchived').checked ? '?archived=1' : '';
     let d; try { d = await (await fetch('/api/activity' + arch)).json(); } catch (e) { el('activityLog').innerHTML = `<div class="ops-empty">${esc(e.message)}</div>`; return; }
-    items = d.items || []; byDay = d.byDay || {}; archivedCount = d.archivedCount || 0;
+    items = d.items || []; byDay = d.byDay || {}; archivedCount = d.archivedCount || 0; hb = d.heartbeats || []; hbSum = d.heartbeatSummary || null;
     if (!calMonth) { const f = items[0] ? new Date(items[0].ts) : new Date(); calMonth = new Date(f.getFullYear(), f.getMonth(), 1); }
     renderCal(); renderLog();
   }
@@ -39,12 +40,25 @@
       ${sel ? `<button class="btn ghost cal-clear" id="calClear">showing ${esc(sel)} — show all</button>` : '<div class="cal-hint">click a day to filter</div>'}`;
   }
 
+  // Heartbeats — proof each agent actually ran (rests included). No silent clicks.
+  function heartbeatStrip() {
+    if (!hb.length) return '';
+    const chips = hb.map((h) => {
+      const stale = h.minsAgo == null || h.minsAgo > 1440;
+      const cls = stale ? 'hb-stale' : h.rested ? 'hb-rest' : 'hb-work';
+      const note = h.rested ? 'rested' : esc(h.action || 'ran');
+      return `<span class="hb-chip ${cls}" title="${esc(h.pod)} · ${esc(h.action)} · ${esc(h.rationale || '')}">${esc(h.actor)} <em>${note} · ${ago(h.minsAgo)}</em></span>`;
+    }).join('');
+    return `<div class="hb-wrap"><div class="hb-head">🫀 Agent heartbeats${hbSum ? ` — ${esc(hbSum.text)}` : ''}</div><div class="hb-chips">${chips}</div></div>`;
+  }
+
   function renderLog() {
     let view = items.slice();
     if (sel) view = view.filter((it) => (it.ts || '').slice(0, 10) === sel);
     el('activityStat').textContent = `${view.length} activit${view.length === 1 ? 'y' : 'ies'}${sel ? ' on ' + sel : ''} · ${archivedCount} archived`;
-    if (!view.length) { el('activityLog').innerHTML = `<div class="ops-empty">No activity${sel ? ' on ' + esc(sel) : ' yet'}.</div>`; return; }
-    el('activityLog').innerHTML = view.map((it) => `
+    const strip = sel ? '' : heartbeatStrip(); // heartbeats are "now", not per-day — hide when filtering a day
+    if (!view.length) { el('activityLog').innerHTML = strip + `<div class="ops-empty">No activity${sel ? ' on ' + esc(sel) : ' yet'}.</div>`; return; }
+    el('activityLog').innerHTML = strip + view.map((it) => `
       <div class="act-row${it.status === 'error' ? ' err' : ''}${it.archived ? ' archived' : ''}" data-id="${esc(it.id)}">
         <div class="act-main">
           <div class="act-top"><span class="tag tag-act">${esc(it.action)}</span><span class="act-pod">${esc(it.pod)}</span><span class="act-t">${esc(when(it.ts))}</span>${it.archived ? '<span class="act-arch-tag">archived</span>' : ''}</div>

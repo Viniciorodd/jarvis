@@ -127,6 +127,32 @@ Object.keys(moreItems).forEach(function(id){
   apply();
 })();
 
+/* ── Left nav drawer (2026-07-20): ONE flat, toggleable menu with every destination. Each item delegates
+   to its existing nav button (.click()) so ALL routing logic is reused — no navigation is re-implemented.
+   Replaces the bottom-bar + "More" drill-down at every screen size. ── */
+(function(){
+  var burger = document.getElementById('jBurger');
+  var drawer = document.getElementById('jDrawer');
+  var backdrop = document.getElementById('jDrawerBackdrop');
+  if(!burger || !drawer || !backdrop) return;
+  function openD(){ drawer.classList.add('open'); backdrop.hidden = false; requestAnimationFrame(function(){ backdrop.classList.add('show'); }); document.documentElement.classList.add('drawer-open'); }
+  function closeD(){ drawer.classList.remove('open'); backdrop.classList.remove('show'); document.documentElement.classList.remove('drawer-open'); setTimeout(function(){ backdrop.hidden = true; }, 220); }
+  burger.addEventListener('click', function(){ drawer.classList.contains('open') ? closeD() : openD(); });
+  backdrop.addEventListener('click', closeD);
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeD(); });
+  var items = drawer.querySelectorAll('.j-drawer-item');
+  items.forEach(function(item){
+    item.addEventListener('click', function(){
+      var target = document.getElementById(item.getAttribute('data-nav'));
+      items.forEach(function(b){ b.classList.remove('active'); });
+      item.classList.add('active');
+      closeD();
+      if(target) setTimeout(function(){ target.click(); }, 70); /* let the drawer close first */
+    });
+  });
+  var home = drawer.querySelector('[data-nav="jNavHome"]'); if(home) home.classList.add('active');
+})();
+
 /* ── Composer bar always sends to Talk view ── */
 var composer = document.getElementById('composer');
 if(composer){

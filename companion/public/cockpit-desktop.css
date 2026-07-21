@@ -32,16 +32,17 @@
   /* ── SHELL → left rail + content grid ─────────────────────────────────────────────────────────────
    * .j-shell is a flex column of [top, main, composer, nav]. Re-lay it as a grid so nav becomes a left
    * column spanning full height and the rest stacks to its right. */
+  /* The left drawer (jBurger + jDrawer) is now the single nav at every size, so the desktop rail is gone —
+     the shell is a simple top/main/composer stack and content reclaims the full width (2026-07-20). */
   .j-shell {
     display: grid;
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
-    grid-template-areas: "nav top" "nav main" "nav composer";
+    grid-template-areas: "top" "main" "composer";
   }
   .j-top { grid-area: top; }
   .j-main { grid-area: main; }
   .j-composer-bar { grid-area: composer; }
-  .j-nav { grid-area: nav; }
 
   /* vertical rail */
   .j-nav {

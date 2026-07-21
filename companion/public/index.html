@@ -25,6 +25,25 @@
 </head>
 <body>
 
+<!-- Left nav drawer (2026-07-20): ONE flat, toggleable menu with every destination — replaces the
+     bottom-bar + "More" drill-down (operator: "put everything on the left side, let me toggle it").
+     Items delegate to the existing nav buttons via .click(), so all routing logic is reused. -->
+<button id="jBurger" class="j-burger" type="button" aria-label="Open menu" title="Menu"><i class="ti ti-menu-2" aria-hidden="true"></i></button>
+<div id="jDrawerBackdrop" class="j-drawer-backdrop" hidden></div>
+<nav id="jDrawer" class="j-drawer" aria-label="Main menu">
+  <div class="j-drawer-brand"><span class="j-drawer-logo">◆</span> JARVIS</div>
+  <button class="j-drawer-item" type="button" data-nav="jNavHome"><i class="ti ti-home" aria-hidden="true"></i><span>Home</span></button>
+  <button class="j-drawer-item" type="button" data-nav="jNavToday"><i class="ti ti-checklist" aria-hidden="true"></i><span>Today</span></button>
+  <button class="j-drawer-item" type="button" data-nav="jNavTalk"><i class="ti ti-sparkles" aria-hidden="true"></i><span>Jarvis</span></button>
+  <button class="j-drawer-item" type="button" data-nav="jNavOps"><i class="ti ti-briefcase" aria-hidden="true"></i><span>Ops</span></button>
+  <button class="j-drawer-item" type="button" data-nav="jMoreIdeas"><i class="ti ti-bulb" aria-hidden="true"></i><span>Ideas</span></button>
+  <button class="j-drawer-item" type="button" data-nav="jMoreFocus"><i class="ti ti-chart-bar" aria-hidden="true"></i><span>Focus</span></button>
+  <button class="j-drawer-item" type="button" data-nav="jMorePersonal"><i class="ti ti-notebook" aria-hidden="true"></i><span>Personal</span></button>
+  <button class="j-drawer-item" type="button" data-nav="jMoreActivity"><i class="ti ti-calendar" aria-hidden="true"></i><span>Activity</span></button>
+  <button class="j-drawer-item" type="button" data-nav="jMoreHQ"><i class="ti ti-dashboard" aria-hidden="true"></i><span>HQ</span></button>
+  <button class="j-drawer-item" type="button" data-nav="jMoreCommand"><i class="ti ti-device-tv" aria-hidden="true"></i><span>Command</span></button>
+</nav>
+
 <!-- ══════════════════════════════ MAIN SHELL ══ -->
 <div class="j-shell">
 

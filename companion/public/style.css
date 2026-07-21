@@ -85,11 +85,33 @@ body:has(#jTalkView.active) #neuralMap{ opacity:1; }
 /* ── Top bar ── */
 .j-top{
   height:46px; flex:none; display:flex; align-items:center; gap:12px;
-  padding:0 16px;
+  padding:0 16px 0 56px; /* left room for the fixed ☰ burger */
   background:var(--ink);
   border-bottom:0.5px solid rgba(var(--teal-rgb),.1);
   -webkit-app-region:drag;
 }
+
+/* ══ Left nav drawer — ONE flat, toggleable menu with every destination (replaces bottom-bar + More) ══ */
+.j-burger{ position:fixed; top:8px; left:10px; z-index:200; width:40px; height:40px; display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--line); border-radius:11px; background:color-mix(in srgb, var(--ink) 80%, transparent); backdrop-filter:blur(8px);
+  color:var(--cream); font-size:20px; cursor:pointer; -webkit-app-region:no-drag; }
+.j-burger:hover{ color:var(--teal); border-color:rgba(var(--teal-rgb),.4); }
+.j-drawer-backdrop{ position:fixed; inset:0; z-index:198; background:rgba(0,0,0,.5); opacity:0; transition:opacity .2s; }
+.j-drawer-backdrop.show{ opacity:1; }
+.j-drawer{ position:fixed; top:0; left:0; bottom:0; z-index:199; width:264px; max-width:82vw; background:var(--panel);
+  border-right:1px solid var(--line); padding:14px 10px calc(14px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:2px;
+  transform:translateX(-102%); transition:transform .22s cubic-bezier(.4,0,.2,1); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.j-drawer.open{ transform:translateX(0); box-shadow:2px 0 26px rgba(0,0,0,.45); }
+.j-drawer-brand{ font-weight:700; letter-spacing:.14em; font-size:13px; color:var(--cream); padding:6px 12px 14px; display:flex; align-items:center; gap:9px; }
+.j-drawer-logo{ color:var(--teal); }
+.j-drawer-item{ display:flex; align-items:center; gap:14px; width:100%; padding:12px 13px; border:none; background:none;
+  color:var(--dim); font-family:inherit; font-size:15px; font-weight:500; border-radius:11px; cursor:pointer; text-align:left; }
+.j-drawer-item i{ font-size:20px; width:22px; text-align:center; flex:none; }
+.j-drawer-item:hover{ color:var(--cream); background:rgba(var(--teal-rgb),.06); }
+.j-drawer-item.active{ color:var(--teal); background:var(--panel2); }
+html.drawer-open{ overflow:hidden; }
+/* the drawer is now the single nav — retire the old bottom bar / desktop rail everywhere */
+.j-nav{ display:none !important; }
 [data-theme="arc"] .j-top{
   background:rgba(2,4,10,.82);
   backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);

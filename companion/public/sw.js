@@ -9,7 +9,7 @@
 //   • /api/* (live data)          → network-only, never cached (tasks/calendar/approvals must be fresh).
 //   • same-origin static assets   → stale-while-revalidate (instant + self-updating).
 //   • cross-origin (fonts/icons)  → cache-first, best-effort.
-const VERSION = 'jarvis-v1';
+const VERSION = 'jarvis-v2'; // bump on any shell asset change (style.css/nav.js/etc.) to push it to installed PWAs
 const SHELL = VERSION + '-shell';
 const RUNTIME = VERSION + '-runtime';
 

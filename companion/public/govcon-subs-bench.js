@@ -8,8 +8,9 @@
  *   • THE APPROVAL-EFFECT MODAL — reads /api/gov/send-mode and tells the truth (really sends vs dry-runs).
  * Reads live data; sends nothing without an explicit approval. */
 (function () {
-  var EL, SUBS = [], LADDERS = [], AUTO_SEND = null;
+  var EL, SUBS = [], LADDERS = [], AUTO_SEND = null, BENCH_PRICING = [];
   var $ = function (id) { return document.getElementById(id); };
+  function usdRate(n) { n = Number(n) || 0; return n < 10 ? '$' + n.toFixed(2) : '$' + Math.round(n).toLocaleString(); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function daysSince(iso) { if (!iso) return null; var t = Date.parse(iso); if (isNaN(t)) return null; return Math.floor((Date.now() - t) / 86400000); }
 
@@ -76,6 +77,22 @@
         }).join('') +
         '<div class="gc-sub-meta" style="margin-top:6px"><i class="ti ti-info-circle"></i> A backup only ever DRAFTS an email for your approval — it never sends on its own.</div></div>';
     }
+    // Pricing intelligence — the proactive-DB payoff: median $/sqft · hourly · minimum across YOUR network,
+    // per trade, so any incoming quote is checked against your own comps (not trusted in isolation).
+    var priced = (BENCH_PRICING || []).filter(function (b) { return b.metrics && Object.keys(b.metrics).length; });
+    h += '<div class="gc-subs-ladder"><div class="lab">Pricing intelligence <span style="text-transform:none;letter-spacing:0;color:var(--muted)">— your network\'s own comps</span></div>';
+    if (!priced.length) {
+      h += '<div class="gc-sub-meta">No pricing captured yet. Open a sub → <b>Record pricing</b> to start building the benchmark. Once ~2+ subs per trade have a rate, every new quote gets price-checked against your own network.</div>';
+    } else {
+      h += priced.map(function (b) {
+        var m = b.metrics, parts = [];
+        if (m.perSqft) parts.push('$/sqft ' + usdRate(m.perSqft.min) + '–' + usdRate(m.perSqft.max) + ' (med ' + usdRate(m.perSqft.median) + ', n=' + m.perSqft.n + ')');
+        if (m.hourly) parts.push('hourly ' + usdRate(m.hourly.min) + '–' + usdRate(m.hourly.max) + ' (med ' + usdRate(m.hourly.median) + ')');
+        if (m.minimum) parts.push('min ' + usdRate(m.minimum.median));
+        return '<div class="gc-subs-line"><b>' + esc(b.trade || 'trade') + ':</b> ' + parts.join(' · ') + '</div>';
+      }).join('');
+    }
+    h += '</div>';
     if (!SUBS.length) { h += '<div class="gc-empty">No subcontractors on the bench yet. Hector adds them as opportunities need a trade — or say “find janitorial subs near Scranton”.</div>'; }
     else {
       h += '<div class="gc-subs-grid">' + SUBS.map(function (s) {
@@ -112,9 +129,32 @@
       if (p && p.rating) h += '<div class="gc-sub-block"><div class="k">Google · ' + p.rating + '★ (' + (p.total || 0) + ')</div>' + ((p.reviews || []).map(function (rv) { return '“' + esc((rv.text || '').slice(0, 220)) + '” — ' + esc(rv.author || 'anon') + (rv.rating ? ' (' + rv.rating + '★)' : ''); }).join('<br><br>') || 'No review text.') + '</div>';
       else h += '<div class="gc-sub-block">No Google rating found for this vendor.</div>';
       if (fit && fit.why) h += '<div class="gc-sub-block"><div class="k" style="color:var(--accent)">Hector’s fit verdict</div>' + esc(fit.why) + '</div>';
+      // Pricing capture — build the proactive pricing DB. Show what's on file + a form to add/update it.
+      var pr = sub.pricing || {};
+      var onfile = ['perSqft', 'hourly', 'monthly', 'minimum'].filter(function (k) { return pr[k]; }).map(function (k) { return (k === 'perSqft' ? '$/sqft ' : k === 'hourly' ? 'hourly ' : k === 'monthly' ? 'monthly ' : 'min ') + usdRate(pr[k]); });
+      h += '<div class="gc-sub-block"><div class="k">Pricing on file' + (pr.capturedAt ? ' · ' + String(pr.capturedAt).slice(0, 10) : '') + '</div>' +
+        (onfile.length ? onfile.join(' · ') : 'None yet — add a rate below to feed the network benchmark.') +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px">' +
+          '<input class="gc-sub-inp" id="gcPxSqft" placeholder="$/sqft" style="width:88px" value="' + (pr.perSqft || '') + '">' +
+          '<input class="gc-sub-inp" id="gcPxHr" placeholder="$/hr" style="width:80px" value="' + (pr.hourly || '') + '">' +
+          '<input class="gc-sub-inp" id="gcPxMin" placeholder="minimum" style="width:96px" value="' + (pr.minimum || '') + '">' +
+          '<button class="gc-btn" data-px="' + esc(id) + '">Save pricing</button>' +
+        '</div><div class="gc-sub-meta" id="gcPxOut" style="margin-top:7px"></div></div>';
       h += '<button class="gc-btn primary" data-act="reach" data-id="' + esc(id) + '">Reach out to ' + esc(sub.name || 'them') + '</button>';
       el.innerHTML = h;
       el.querySelector('[data-act="reach"]').onclick = function () { m.close(); reach(id); };
+      var pxBtn = el.querySelector('[data-px]');
+      if (pxBtn) pxBtn.onclick = function () {
+        var body = { id: id, perSqft: el.querySelector('#gcPxSqft').value, hourly: el.querySelector('#gcPxHr').value, minimum: el.querySelector('#gcPxMin').value };
+        var out = el.querySelector('#gcPxOut'); out.textContent = 'Saving…';
+        fetch('/api/gov/sub-pricing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          .then(function (r) { return r.json(); }).then(function (d) {
+            if (!d.ok) { out.textContent = d.error || 'Could not save.'; return; }
+            var b = d.benchmark && d.benchmark.metrics && d.benchmark.metrics.perSqft;
+            out.innerHTML = '✓ Saved.' + (b && b.n >= 2 ? ' Network $/sqft median now ' + usdRate(b.median) + ' (n=' + b.n + ').' : '');
+            load(); // refresh the bench pricing panel
+          }).catch(function () { out.textContent = 'Could not save.'; });
+      };
     }).catch(function () { var el = m.el.querySelector('#gcSubDetail'); if (el) el.innerHTML = '<div class="gc-empty">Could not load this sub’s details.</div>'; });
   }
 
@@ -164,10 +204,12 @@
   function load() {
     Promise.all([
       fetch('/api/operations').then(function (r) { return r.json(); }).catch(function () { return { crm: [] }; }),
-      fetch('/api/gov/sub-ladder').then(function (r) { return r.json(); }).catch(function () { return { ladders: [] }; })
+      fetch('/api/gov/sub-ladder').then(function (r) { return r.json(); }).catch(function () { return { ladders: [] }; }),
+      fetch('/api/gov/sub-pricing').then(function (r) { return r.json(); }).catch(function () { return { benchmarks: [] }; })
     ]).then(function (r) {
       SUBS = ((r[0] && r[0].crm) || []).filter(function (s) { return s && s.name && !/^SUB-EXAMPLE/i.test(s.id || ''); });
       LADDERS = (r[1] && r[1].ladders) || [];
+      BENCH_PRICING = (r[2] && r[2].benchmarks) || [];
       render();
     });
   }

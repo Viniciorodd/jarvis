@@ -2158,6 +2158,40 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // ── SUB PRICING INTELLIGENCE (pods/gov/sub-pricing.mjs): the proactive-database pricing layer.
+  // GET returns per-trade benchmarks (median $/sqft, hourly, minimum) across the whole bench so a new
+  // quote can be checked against YOUR network, not trusted in isolation. POST captures a sub's pricing.
+  if (url.pathname === '/api/gov/sub-pricing') {
+    try {
+      const SP = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'sub-pricing.mjs')).href);
+      const SUBS_PATH = path.join(__dirname, '..', 'pods', 'gov', 'subs.json');
+      const crm = await fetch(`${CP_URL}/crm`, { signal: AbortSignal.timeout(4000) }).then((r) => r.json()).catch(() => ({ subs: [] }));
+      let local = {}; try { local = JSON.parse(fs.readFileSync(SUBS_PATH, 'utf8')); } catch { local = { subs: [] }; }
+      const localSubs = local.subs || [];
+      const all = [...((crm && crm.subs) || []), ...localSubs];
+      if (req.method === 'GET') {
+        const trade = url.searchParams.get('trade');
+        const trades = trade ? [trade] : [...new Set(all.map((s) => String(s.trade || '').toLowerCase()).filter(Boolean))];
+        const benchmarks = trades.map((t) => SP.benchmarkForTrade(all, t)).filter((b) => Object.keys(b.metrics).length || b.subsWithPricing);
+        const check = url.searchParams.get('value') ? SP.priceCheckQuote({ subs: all, trade, metric: url.searchParams.get('metric') || 'perSqft', value: url.searchParams.get('value') }) : null;
+        return send(res, 200, JSON.stringify({ ok: true, benchmarks, check }));
+      }
+      // POST: record pricing on a LOCAL sub (the proactive DB) by id — merges into its structured pricing.
+      const body = await readBody(req);
+      if (!body.id) return send(res, 400, JSON.stringify({ ok: false, error: 'id required' }));
+      const idx = localSubs.findIndex((s) => String(s.id) === String(body.id));
+      if (idx < 0) return send(res, 404, JSON.stringify({ ok: false, error: 'sub not found in the local bench (subs.json)' }));
+      const pnum = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : undefined; };
+      const incoming = { perSqft: pnum(body.perSqft), hourly: pnum(body.hourly), monthly: pnum(body.monthly), minimum: pnum(body.minimum) };
+      const merged = { ...(localSubs[idx].pricing || {}) };
+      for (const k of Object.keys(incoming)) if (incoming[k] !== undefined) merged[k] = incoming[k];
+      merged.capturedAt = new Date().toISOString(); if (body.note) merged.note = String(body.note).slice(0, 200);
+      localSubs[idx].pricing = merged;
+      fs.writeFileSync(SUBS_PATH, JSON.stringify(local, null, 2));
+      return send(res, 200, JSON.stringify({ ok: true, id: body.id, pricing: merged, benchmark: SP.benchmarkForTrade([...((crm && crm.subs) || []), ...localSubs], localSubs[idx].trade) }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
   // ── SUB REACH PREVIEW: generate outreach email without creating a lead yet ──
   if (req.method === 'GET' && url.pathname === '/api/sub-reach-preview') {
     try {

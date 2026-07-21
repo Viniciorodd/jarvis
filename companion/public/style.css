@@ -59,8 +59,12 @@
 
 /* ══════════════════════════════════════════ BASE ══ */
 *{ box-sizing:border-box; margin:0; padding:0; }
-html,body{ height:100%; overflow:hidden; }
-body{ background:var(--ink); color:var(--cream); font-family:var(--font); height:100dvh; letter-spacing:-.011em; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+/* Only the SHELL pages (cockpit .j-shell, gov/ideas .gc-app) lock the document and scroll an inner pane.
+   Standalone pages (real-estate, finances, focus, tax…) load style.css but have NO inner scroller — they
+   must scroll the DOCUMENT. Locking them was clipping content below the fold (e.g. the Deal Calculator). */
+html,body{ min-height:100%; }
+html:has(.j-shell), html:has(.gc-app), body:has(.j-shell), body:has(.gc-app){ height:100%; overflow:hidden; }
+body{ background:var(--ink); color:var(--cream); font-family:var(--font); min-height:100dvh; letter-spacing:-.011em; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
 h1,h2,h3,h4,h5,h6,button,input,select,textarea{ font-family:var(--font); }
 /* the old pixel-brand class → SAME typeface, just spaced + bold so the JARVIS wordmark still reads as a mark */
 .px{ font-family:var(--font); font-weight:700; letter-spacing:.15em; }

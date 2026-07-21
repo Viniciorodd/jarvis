@@ -3293,6 +3293,33 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, noticeId: noticeId || null, naics, state: state || null, ...agg, summary, source: comp.source, complete: !!comp.complete }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // ── BID FIT INDEX (pods/gov/bid-fit.mjs, PRD L-013): score WHETHER to bid — disqualifiers + weighted
+  // signals → 0–100 → band. POST the signals you know (naics, docTakers, driveHours, evaluation, portal…);
+  // it fills unknowns with a neutral middle and returns the arithmetic verdict + the exact PRD output line.
+  if (req.method === 'POST' && url.pathname === '/api/gov/bid-fit') {
+    try {
+      const BF = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'bid-fit.mjs')).href);
+      let opp = await readBody(req) || {};
+      if (opp.noticeId && !opp.naics) { try { const D = await import('../pods/gov/deals.mjs'); const deal = D.getDeal(opp.noticeId); if (deal) opp = { ...deal, ...opp, naics: opp.naics || deal.naics }; } catch { /* */ } }
+      return send(res, 200, JSON.stringify({ ok: true, ...BF.bidFit(opp) }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
+  // ── WATCHER HEALTH (control-plane/watcher-health.mjs, L-013): the three-state contract — which sensors
+  // are VERIFIED-CLEAR vs BLIND vs SIGNAL vs SUSPECT. A BLIND watcher's "no results" is meaningless. Read
+  // the ledger + recompute each state so the morning brief / cockpit can surface blind sensors honestly.
+  if (req.method === 'GET' && url.pathname === '/api/gov/watcher-health') {
+    try {
+      const WH = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'control-plane', 'watcher-health.mjs')).href);
+      const ledger = WH.loadLedger();
+      const now = new Date();
+      const watchers = Object.entries(ledger).map(([name, e]) => {
+        const state = WH.computeState(e, { newItems: 0, now });
+        return { name, channel: e.channel || '', state, everReceived: !!e.ever_received, blockingFix: e.blocking_fix || null, lastCheckedAt: e.last_checked_at || null, headline: WH.headline(name, e, state, {}) };
+      });
+      const blind = watchers.filter((w) => w.state === 'BLIND');
+      return send(res, 200, JSON.stringify({ ok: true, watchers, blindCount: blind.length, blind: blind.map((w) => w.name) }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // Curated top-N opportunity BRIEFS (a few quality ones w/ what-they-want + fit + win-chance + strategy).
   if (req.method === 'GET' && url.pathname === '/api/gov/briefs') {
     try { const B = await import('../pods/gov/briefs.mjs'); return send(res, 200, JSON.stringify(await B.buildBriefs({ topN: Number(url.searchParams.get('n')) || 3, cpUrl: CP_URL }))); }

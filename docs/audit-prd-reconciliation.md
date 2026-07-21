@@ -72,14 +72,12 @@ Almost entirely **your** hands — Jarvis can draft/track but not photograph a u
   drafts this week · replies awaiting you · AI spend (today/week/month) · revenue banked this week. Rendered
   as a one-line strip (`kpiLine`) on every report and eval-pinned (7 new cases, 620 green). *("Primes
   contacted" and "$/mo flowing" need the gov CRM + finance pod respectively — folded in as those mature.)*
-- ⚙️ **CORE DONE / WIRING PENDING YOUR OK (2026-07-20)** — **post-loss debrief rule.** The pure core is
-  built + eval-pinned (`pods/gov/debrief.mjs`, 8 cases): it selects only genuinely-*lost* bids (won/passed
-  excluded, dedup by noticeId) and drafts a courteous CO debrief request in the exact sendable format —
-  and a draft with no known CO email is intentionally *unsendable* so it can never reach a blank gate.
-  **Not yet wired to a trigger**, because it introduces a NEW outbound class (Jarvis emailing Contracting
-  Officers) — per doctrine that's a "new autonomy" call for you. Proposed wiring: when you mark a bid
-  **lost** in the board, stage the debrief draft **behind the normal approval gate** (never auto-send),
-  dedup via a `gov.debrief.staged` event. Awaiting your OK on the wording + the gate-only guarantee.
+- ✅ **WIRED (2026-07-20, operator OK'd)** — **post-loss debrief rule.** Core (`pods/gov/debrief.mjs`, 8
+  evals) + wiring: marking a bid **lost** stages a courteous CO debrief-request **behind the normal approval
+  gate** (`connector.stageLossDebrief` → `control-plane /maintenance/stage-debrief`, deduped on
+  `gov.debrief.staged`; companion fires on the lost *transition* and resolves the CO email from SAM). The
+  gate appears ONLY if the draft is sendable (real CO email); no email → a needs-contact task, never a blank
+  gate. Nothing auto-sends — the operator's tap is the send. Activates on the NAS redeploy.
 - ⚙️ **DONE (this file)** — the audit/PRD now has a home in the repo, not just the vault.
 
 ---

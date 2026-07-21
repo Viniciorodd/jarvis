@@ -355,6 +355,20 @@ const server = http.createServer(async (req, res) => {
       catch (e) { result = { ok: false, error: e.message }; }
       return send(res, 200, result);
     }
+    // Stage a post-loss DEBRIEF request to the CO (operator OK'd 2026-07-20). Writes the draft where the
+    // executor reads it + raises a gate ONLY if sendable — nothing auto-sends. Deduped on gov.debrief.staged
+    // so a re-marked bid doesn't stack gates. Fired by the companion when a bid is marked LOST.
+    if (req.method === 'POST' && p === '/maintenance/stage-debrief') {
+      const b = await readBody(req);
+      if (!b.noticeId && !b.title) return send(res, 400, { error: 'noticeId or title required' });
+      if (b.noticeId && store.readEvents({ kind: 'gov.debrief.staged' }).some((e) => e.payload && e.payload.noticeId === b.noticeId)) {
+        return send(res, 200, { ok: true, deduped: true, note: 'debrief already staged for this notice' });
+      }
+      let result;
+      try { const c = await import('../pods/gov/connector.mjs'); result = await c.stageLossDebrief({ noticeId: b.noticeId, title: b.title, contact: b.contact || {} }); }
+      catch (e) { result = { ok: false, error: e.message }; }
+      return send(res, 200, result);
+    }
 
     if (req.method === 'POST' && p === '/spend/check') {
       const b = await readBody(req);

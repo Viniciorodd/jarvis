@@ -3303,6 +3303,7 @@ const server = http.createServer(async (req, res) => {
       const { noticeId, stage, title: bodyTitle, agency: bodyAgency } = await readBody(req);
       if (!noticeId || ['won', 'lost', 'passed', 'reset'].indexOf(stage) < 0) return send(res, 400, JSON.stringify({ error: 'noticeId + stage (won|lost|passed|reset) required' }));
       const st = loadGovState(); st.dispositions = st.dispositions || {};
+      const prevDisposition = st.dispositions[noticeId] || null;
       if (stage === 'reset') delete st.dispositions[noticeId]; else st.dispositions[noticeId] = stage;
       saveGovState(st);
       if (stage !== 'reset') fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'meta', actor: 'operator', pod: 'gov', action: 'disposition', rationale: `marked ${stage}`, payload: { noticeId } }) }).catch(() => {});
@@ -3310,19 +3311,31 @@ const server = http.createServer(async (req, res) => {
       // recorded in the capture ledger and gets a debrief-request draft, automatically. "If we ask for
       // the debrief, no loss is a real loss." The draft is returned + written to gov-drafts/ — the
       // operator sends it himself (nothing auto-sends). Best-effort: a failure here never blocks the board.
-      let debrief = null, debriefFile = null;
+      let debrief = null, debriefStaged = null;
+      let dTitle = String(bodyTitle || ''), dAgency = String(bodyAgency || '');
       if (stage === 'won' || stage === 'lost') {
         try {
           const CAP = await import('../pods/gov/capture.mjs');
-          let title = String(bodyTitle || ''), agency = String(bodyAgency || '');
-          if (!title) { try { const ev = await cp('/events?pod=gov'); const hit = (Array.isArray(ev) ? ev : []).find((e) => e.payload && e.payload.noticeId === noticeId && (e.payload.title || e.payload.agency)); if (hit) { title = title || hit.payload.title || ''; agency = agency || hit.payload.agency || ''; } } catch { /* */ } }
-          CAP.recordOutcome({ noticeId, title, agency, result: stage, lessons: [], debriefRequested: false });
-          debrief = CAP.debriefRequestEmail({ opp: { title, noticeId, agency }, result: stage });
-          debriefFile = path.join('gov-drafts', `debrief-${noticeId}.md`);
-          fs.writeFileSync(path.join(__dirname, '..', debriefFile), `Subject: ${debrief.subject}\n\n${debrief.body}\n`);
-        } catch { debrief = null; debriefFile = null; }
+          if (!dTitle) { try { const ev = await cp('/events?pod=gov'); const hit = (Array.isArray(ev) ? ev : []).find((e) => e.payload && e.payload.noticeId === noticeId && (e.payload.title || e.payload.agency)); if (hit) { dTitle = dTitle || hit.payload.title || ''; dAgency = dAgency || hit.payload.agency || ''; } } catch { /* */ } }
+          CAP.recordOutcome({ noticeId, title: dTitle, agency: dAgency, result: stage, lessons: [], debriefRequested: false });
+          debrief = CAP.debriefRequestEmail({ opp: { title: dTitle, noticeId, agency: dAgency }, result: stage }); // text shown in the UI right away
+        } catch { debrief = null; }
       }
-      return send(res, 200, JSON.stringify({ ok: true, debrief, debriefFile }));
+      // GATED CO DEBRIEF on a LOST transition (operator OK'd 2026-07-20). Resolve the CO email from SAM, then
+      // stage the draft + raise the gate on the CONTROL-PLANE (where the executor's filesystem lives). The
+      // gate only appears if the draft is sendable; NOTHING auto-sends — the operator's tap is the send.
+      if (stage === 'lost' && prevDisposition !== 'lost') {
+        try {
+          let contact = {};
+          try {
+            const docs = await fetch(`http://127.0.0.1:${PORT}/api/opp-docs?noticeId=${encodeURIComponent(noticeId)}`, { signal: AbortSignal.timeout(20000) }).then((r) => r.json());
+            const co = ((docs && docs.contact) || []).find((c) => c && c.email);
+            if (co) contact = { email: co.email, name: co.name || '' };
+          } catch { /* CO lookup best-effort — no email → the CP stages a needs-contact task, never a gate */ }
+          debriefStaged = await fetch(CP_URL + '/maintenance/stage-debrief', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ noticeId, title: dTitle, contact }), signal: AbortSignal.timeout(30000) }).then((r) => r.json()).catch(() => null);
+        } catch { debriefStaged = null; }
+      }
+      return send(res, 200, JSON.stringify({ ok: true, debrief, debriefStaged }));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   // Operator sets a $ value estimate for an opportunity → drives Pipeline $ / Est. revenue (their numbers).

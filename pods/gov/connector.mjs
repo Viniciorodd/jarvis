@@ -227,3 +227,34 @@ export async function reachOutToSub({ id } = {}) {
   }
   return { ok: true, file, email: sub.contact_email || '', name: sub.name };
 }
+
+// POST-LOSS DEBRIEF (operator's 2026-07-12 rule; wired 2026-07-20 with his explicit OK): when a bid is
+// marked LOST, stage a courteous debrief-request to the Contracting Officer — "losses become intel."
+// SAME law as every send: the draft is written where the executor reads it, validated with the executor's
+// OWN parser, and a gate is raised ONLY when it's actually sendable (a real CO email). No email → a
+// needs-contact task, never a gate that can only fail. NOTHING auto-sends — the operator's tap is the send.
+export async function stageLossDebrief({ noticeId = '', title = '', contact = {} } = {}) {
+  if (!noticeId && !title) return { ok: false, error: 'noticeId or title required' };
+  const { buildDebriefDraft, renderDebriefFile } = await import('./debrief.mjs');
+  const op = { noticeId, title: title || 'the recent solicitation' };
+  const draft = buildDebriefDraft(op, contact || {});
+  fs.mkdirSync(DRAFTS, { recursive: true });
+  const slug = String(noticeId || title).replace(/[^\w]+/g, '-').slice(0, 44);
+  const file = path.join('gov-drafts', `debrief-${slug}.md`);
+  fs.writeFileSync(path.join(ROOT, file), renderDebriefFile(draft));
+  await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'debrief.draft', reversible: true, rationale: `Post-loss debrief request drafted for "${op.title}"${contact && contact.email ? ' → ' + contact.email : ' (no CO email yet)'}`, payload: { noticeId, file, to: (contact && contact.email) || '' } });
+  // Gate ONLY a sendable draft (real CO email + To:/Subject:/body that passes the executor's parser).
+  let sendable = false;
+  if (contact && contact.email) { try { const { parseEmailFile } = await import('./sender.mjs'); sendable = parseEmailFile(fs.readFileSync(path.join(ROOT, file), 'utf8')).ok; } catch { sendable = false; } }
+  if (contact && contact.email && sendable) {
+    await gateApproval(
+      { kind: 'approval.request', actor: 'CONNECT-01', pod: 'gov', action: 'send', status: 'pending', reversible: false, rationale: `Send a post-loss debrief request to the CO for "${op.title}" → ${contact.email}. A courteous ask for why we didn't win — losses become intel for the next bid.`, payload: { noticeId, file, to: contact.email, debrief: true } },
+      { pod: 'Gov War Room', title: `Send debrief request: ${op.title}`, detail: `Post-award debrief request to the CO · ${contact.email} · ${file}`, xp: 15, verb: 'Review & send' });
+    await emit({ kind: 'gov.debrief.staged', actor: 'CONNECT-01', pod: 'gov', action: 'debrief.staged', reversible: true, rationale: `Debrief send gate raised for "${op.title}"`, payload: { noticeId, file, to: contact.email } });
+    await mirror('CONNECT-01', 'need', `Debrief request ready to send → CO for ${op.title}`);
+    return { ok: true, staged: true, gated: true, file, to: contact.email };
+  }
+  await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'debrief.needs-contact', status: 'need', reversible: true, rationale: `Debrief for "${op.title}" is drafted but has NO Contracting Officer email — add the CO's email to send it.`, payload: { noticeId, file } });
+  await mirror('CONNECT-01', 'need', `Debrief for ${op.title} needs the CO's email before it can send`);
+  return { ok: true, staged: false, needsContact: true, file };
+}

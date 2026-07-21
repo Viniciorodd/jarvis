@@ -27,6 +27,13 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
   each to the business system it could improve, emit a "make a concrete change" card (2,642 actionable
   across your 254 books, gov-first). `/api/vault/book-ops` (read + mark-reviewed) → a 📚 Book → Ops section
   on `/ideas`. READ-ONLY on the vault. 8 evals. *(vault: [[Jarvis]])*
+- ✅ **Post-loss debrief WIRING** (operator OK'd 2026-07-20) — marking a bid **lost** now stages a courteous
+  CO debrief-request behind the normal approval gate: `connector.stageLossDebrief` writes the sendable draft
+  on the executor's filesystem + raises the gate ONLY if a CO email resolves (else a needs-contact task,
+  never a blank gate); `control-plane /maintenance/stage-debrief` (deduped on `gov.debrief.staged`); the
+  companion disposition handler fires it on the lost *transition*, resolving the CO email from SAM. Nothing
+  auto-sends. Functionally verified both paths (email → gated & sendable; no email → needs-contact).
+  *(activates on the NAS redeploy)*
 - ✅ **Bench-first sourcing** — `discoverSubs()` now checks the warm bench (`benchFirstMatch`) BEFORE the
   Google Places + SAM cold-source: if ≥3 ready subs cover the trade+area, it uses them and skips the cold
   search (a `force` flag overrides; thin benches still cold-source). Completes the query side of the
@@ -40,8 +47,8 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
   public** — FOIA request only, so not API-buildable. *(vault: [[Jarvis]] / [[Gov contracting]])*
 
 ## 🔨 Mine — buildable next without blocking on you (priority order)
-1. **Post-loss debrief wiring** — the core is built; needs your OK (new outbound class) to fire on "lost"
-   and stage behind the gate. *(one yes away — this is the only 🔨 item left, and it's gated on you)*
+*(empty — the whole 🔨 list is shipped. Post-loss debrief wiring was the last item; done 2026-07-20 with
+the operator's OK — see ✅ below. Next work comes from the vault sweep or new asks.)*
 
 ## 🧑 Needs you — input, your hands, or credentials (I cannot do these; they stay visible here)
 - **Rotate the OpenRouter key** (`2026-07-03`) + the exposed Bitwarden self-hosted install key (flagged

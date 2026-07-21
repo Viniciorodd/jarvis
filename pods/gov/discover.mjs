@@ -40,14 +40,31 @@ async function viaSam({ naics, state }) {
   } catch (e) { return { error: 'SAM: ' + e.message }; }
 }
 
-export async function discoverSubs({ trade = 'janitorial', location = '', naics = '', enrich = false } = {}) {
+// How many READY warm subs (priced / past-perf / SAM-clear) make cold-sourcing unnecessary. The Strategic
+// Pivot: query the warm database first, cold-source only for genuine gaps.
+const WARM_ENOUGH = 3;
+
+export async function discoverSubs({ trade = 'janitorial', location = '', naics = '', enrich = false, force = false } = {}) {
   naics = naics || TRADE_NAICS[trade] || '';
   const state = stateOf(location);
-  await mirror('CONNECT-01', 'work', `Discovering ${trade} subs near ${location || state || 'region'}…`);
+  const existing = loadSubs();
+
+  // BENCH-FIRST: is the warm bench already deep enough for this trade+area? If so, skip the cold-source
+  // (saves the Google Places + SAM calls) unless the caller forces a fresh search.
+  let warm = [];
+  try { const { benchFirstMatch } = await import('./sub-pricing.mjs'); warm = benchFirstMatch({ subs: existing, trade, state }).map((m) => m.sub); }
+  catch { /* bench-first is best-effort; fall through to cold-source */ }
+  const ready = warm.filter((s) => (s.contact_email || s.past_performance > 0 || (s.pricing && Object.keys(s.pricing).length)));
+  if (!force && ready.length >= WARM_ENOUGH) {
+    await mirror('CONNECT-01', 'idle', `Bench already has ${warm.length} ${trade} sub(s) near ${location || state || 'region'} (${ready.length} ready) — using the warm bench, no cold search needed.`);
+    await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'subs.bench-first', rationale: `Warm bench covered ${trade} near ${location || state} (${ready.length} ready of ${warm.length}) — cold-source skipped`, payload: { trade, location, warm: warm.slice(0, 10).map((s) => s.name) } });
+    return { added: 0, names: [], benchFirst: true, warm: warm.map((s) => s.name), ready: ready.length, notes: [], enriched: null };
+  }
+
+  await mirror('CONNECT-01', 'work', `Bench thin for ${trade} near ${location || state || 'region'} (${ready.length} ready) — cold-sourcing…`);
   const [places, sam] = await Promise.all([viaPlaces({ trade, location }), viaSam({ naics, state })]);
   const found = [...(places.results || []), ...(sam.results || [])];
 
-  const existing = loadSubs();
   const known = new Set(existing.map((s) => String(s.name).toLowerCase().trim()));
   const added = [];
   for (const f of found) {

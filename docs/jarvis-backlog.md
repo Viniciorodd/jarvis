@@ -27,6 +27,11 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
   each to the business system it could improve, emit a "make a concrete change" card (2,642 actionable
   across your 254 books, gov-first). `/api/vault/book-ops` (read + mark-reviewed) → a 📚 Book → Ops section
   on `/ideas`. READ-ONLY on the vault. 8 evals. *(vault: [[Jarvis]])*
+- ✅ **Bench-first sourcing** — `discoverSubs()` now checks the warm bench (`benchFirstMatch`) BEFORE the
+  Google Places + SAM cold-source: if ≥3 ready subs cover the trade+area, it uses them and skips the cold
+  search (a `force` flag overrides; thin benches still cold-source). Completes the query side of the
+  Strategic Pivot (capture side already shipped). Verified on the real bench (20 warm / 5 ready janitorial
+  → gate fires). *(activates where the gov worker runs — NAS redeploy)*
 - ⚙️ **Bid-winner research — core done, one part not buildable** — `pods/gov/bid-winners.mjs`: aggregate
   the comparable-award sample (same one price-to-win fetches) by recipient → who wins this lane, win/dollar
   share, incumbent-vs-open read. `/api/gov/bid-winners` → a "Who wins this work" panel in the opp drawer.
@@ -36,9 +41,7 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
 
 ## 🔨 Mine — buildable next without blocking on you (priority order)
 1. **Post-loss debrief wiring** — the core is built; needs your OK (new outbound class) to fire on "lost"
-   and stage behind the gate. *(one yes away)*
-2. **Bench-first sourcing wire-up** — the `benchFirstMatch()` primitive exists; wire it so Stage-3 sourcing
-   queries the warm bench before cold-sourcing (the query side of the Strategic Pivot; capture side shipped).
+   and stage behind the gate. *(one yes away — this is the only 🔨 item left, and it's gated on you)*
 
 ## 🧑 Needs you — input, your hands, or credentials (I cannot do these; they stay visible here)
 - **Rotate the OpenRouter key** (`2026-07-03`) + the exposed Bitwarden self-hosted install key (flagged

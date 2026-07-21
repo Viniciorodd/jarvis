@@ -4,12 +4,14 @@
 // live data over the network. Requires a secure context (HTTPS via Tailscale Serve, or localhost) — over
 // plain http it never registers, which is fine (index.html only registers it on https/localhost).
 //
-// Strategy:
+// Strategy (2026-07-20 — fixed stale UI on the desktop app + installed PWA):
 //   • navigations (the app shell) → network-first, fall back to the cached shell (never blank).
 //   • /api/* (live data)          → network-only, never cached (tasks/calendar/approvals must be fresh).
-//   • same-origin static assets   → stale-while-revalidate (instant + self-updating).
+//   • same-origin static assets   → NETWORK-FIRST (this PC serves them locally, so "online" is ~always
+//     true): the live file always wins, the cache is only a fallback when the server is unreachable.
+//     The old stale-while-revalidate served last-session's CSS/JS first, so shipped fixes never showed.
 //   • cross-origin (fonts/icons)  → cache-first, best-effort.
-const VERSION = 'jarvis-v2'; // bump on any shell asset change (style.css/nav.js/etc.) to push it to installed PWAs
+const VERSION = 'jarvis-v3'; // bump on any shell asset change to push it to installed PWAs / the desktop app
 const SHELL = VERSION + '-shell';
 const RUNTIME = VERSION + '-runtime';
 
@@ -35,6 +37,8 @@ self.addEventListener('activate', (e) => {
     const keys = await caches.keys();
     await Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k)));
     await self.clients.claim();
+    // NOTE: intentionally do NOT auto-reload clients here — network-first (below) already serves fresh
+    // assets on the next load, and force-navigating on activate risks a reload loop.
   })());
 });
 
@@ -61,7 +65,23 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Static assets — stale-while-revalidate: serve cache instantly, refresh in the background.
+  // Same-origin static assets — NETWORK-FIRST. The live file (from this PC's local server) always wins;
+  // the cache is only a fallback for a genuinely offline launch. This is the fix for shipped CSS/JS not
+  // showing up: the old stale-while-revalidate returned the previous session's file every time.
+  if (sameOrigin) {
+    e.respondWith((async () => {
+      try {
+        const net = await fetch(req);
+        if (net && net.ok) caches.open(RUNTIME).then((c) => c.put(req, net.clone())).catch(() => {});
+        return net;
+      } catch {
+        return (await caches.match(req)) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  // Cross-origin (fonts/icon CDNs) — cache-first, best-effort.
   e.respondWith((async () => {
     const cached = await caches.match(req);
     const fetching = fetch(req).then((net) => {

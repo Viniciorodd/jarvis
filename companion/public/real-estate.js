@@ -17,6 +17,26 @@
  */
 (function () {
   var $ = function (id) { return document.getElementById(id); };
+  (function injectCss() {
+    if (document.getElementById('rcCss')) return;
+    var s = document.createElement('style'); s.id = 'rcCss';
+    s.textContent = [
+      '.rc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:6px}',
+      '.rc-f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim)}',
+      '.rc-f em{font-style:normal;opacity:.7}',
+      '.rc-f input{background:var(--panel2,var(--panel));border:1px solid var(--line);border-radius:9px;color:var(--cream);font:inherit;font-size:14px;padding:8px 10px;width:100%;box-sizing:border-box}',
+      '.rc-f input:focus{outline:none;border-color:var(--teal)}',
+      '.rc-out .v.ok{color:var(--teal)}',
+      '.rc-out .v.bad{color:#ff8f80}',
+      '.rc-lines{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px 18px;margin-top:14px}',
+      '.rc-lines>div{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)}',
+      '.rc-lines span{color:var(--dim)}.rc-lines b{color:var(--cream)}',
+      '.rc-verdict{margin-top:14px;padding:11px 14px;border-radius:11px;font-size:13px;line-height:1.5}',
+      '.rc-verdict.ok{background:rgba(var(--teal-rgb,45,212,191),.12);border:1px solid rgba(var(--teal-rgb,45,212,191),.3);color:var(--cream)}',
+      '.rc-verdict.bad{background:rgba(255,143,128,.12);border:1px solid rgba(255,143,128,.32);color:var(--cream)}',
+    ].join('');
+    document.head.appendChild(s);
+  })();
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function usd0(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('en-US'); }
 
@@ -115,15 +135,77 @@
         : '<div class="fin-empty">Nothing under construction.</div>') +
     '</section>';
 
-    // Deal analyzer — honest about what it actually is
-    h += '<section class="fin-card s12"><div class="fin-h"><span class="t">Deal analyzer</span></div>' +
-      '<div class="fin-empty">The analyzer is a separate app (DealForge) that ran at <code>localhost:8096</code>. ' +
-      'The old screen embedded it in an iframe with a fallback that could never fire — so if it wasn\'t running you got a blank box and no explanation. ' +
-      'It is <b>not wired in here</b> until it\'s a real, running service. ' +
-      '<a class="fin-cta" style="margin-top:10px" href="http://localhost:8096" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> Try DealForge anyway</a></div>' +
+    // Deal calculator — REAL, wired in (pods/real-estate/deal-calc.mjs). Deterministic underwriting; the
+    // numbers come from code, never a model. Replaces the old dead DealForge-iframe placeholder.
+    var f = function (id, label, val, step, suffix) {
+      return '<label class="rc-f"><span>' + label + (suffix ? ' <em>' + suffix + '</em>' : '') + '</span>' +
+        '<input id="' + id + '" type="number" step="' + (step || 'any') + '" value="' + (val == null ? '' : val) + '"></label>';
+    };
+    h += '<section class="fin-card s12"><div class="fin-h"><span class="t">Deal calculator</span>' +
+      '<span class="m">deterministic underwriting — cap · cash-on-cash · DSCR · cashflow</span></div>' +
+      '<div class="rc-grid">' +
+        f('rcPrice', 'Purchase price', 200000, '1000', '$') +
+        f('rcDown', 'Down payment', 20, '1', '%') +
+        f('rcRate', 'Interest rate', 7, '0.125', '%') +
+        f('rcTerm', 'Loan term', 30, '1', 'yrs') +
+        f('rcRent', 'Monthly rent', 2000, '25', '$') +
+        f('rcTax', 'Taxes / yr', 3000, '50', '$') +
+        f('rcIns', 'Insurance / yr', 1200, '50', '$') +
+        f('rcVac', 'Vacancy', 5, '1', '%') +
+        f('rcMgmt', 'Management', 8, '1', '%') +
+        f('rcClose', 'Closing costs', 6000, '100', '$') +
+        f('rcRehab', 'Rehab', 0, '500', '$') +
+        f('rcTargetCap', 'Target cap', 8, '0.5', '%') +
+      '</div>' +
+      '<button id="rcRun" class="fin-cta" style="margin-top:12px"><i class="ti ti-calculator"></i> Run the numbers</button>' +
+      '<div id="rcOut" class="rc-out"></div>' +
     '</section>';
 
     $('reRoot').innerHTML = h;
+    wireDealCalc();
+  }
+
+  // ── Deal calculator wiring ──────────────────────────────────────────────────────────────────────
+  function wireDealCalc() {
+    var btn = $('rcRun'); if (!btn) return;
+    var val = function (id) { var e = $(id); return e ? e.value : ''; };
+    function run() {
+      var body = {
+        price: val('rcPrice'), downPct: val('rcDown'), rate: val('rcRate'), termYears: val('rcTerm'),
+        monthlyRent: val('rcRent'), taxesAnnual: val('rcTax'), insuranceAnnual: val('rcIns'),
+        vacancyPct: val('rcVac'), mgmtPct: val('rcMgmt'), closingCosts: val('rcClose'), rehab: val('rcRehab'),
+        targetCapPct: val('rcTargetCap'),
+      };
+      var out = $('rcOut'); out.innerHTML = '<div class="fin-empty">Running…</div>';
+      fetch('/api/real-estate/deal-calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json(); }).then(renderResult)
+        .catch(function () { out.innerHTML = '<div class="fin-empty">Could not run the calculator.</div>'; });
+    }
+    function renderResult(d) {
+      var out = $('rcOut'); if (!d || !d.ok) { out.innerHTML = '<div class="fin-empty">' + esc((d && d.error) || 'No result.') + '</div>'; return; }
+      var r = d.returns, badVerdict = (d.flags && d.flags.length);
+      var tile = function (v, k, cls) { return '<div class="fin-tile"><div class="v ' + (cls || '') + '">' + v + '</div><div class="k">' + k + '</div></div>'; };
+      var pctS = function (n) { return (Number(n) || 0).toFixed(2) + '%'; };
+      out.innerHTML =
+        '<div class="fin-tiles" style="margin-top:14px">' +
+          tile(pctS(r.capRate), 'Cap rate', r.capRate >= 6 ? 'ok' : '') +
+          tile(pctS(r.cashOnCash), 'Cash-on-cash', r.cashOnCash >= 8 ? 'ok' : '') +
+          tile(usd0(r.monthlyCashflow) + '/mo', 'Cashflow', r.monthlyCashflow >= 0 ? 'ok' : 'bad') +
+          tile(r.dscr == null ? '—' : r.dscr.toFixed(2), 'DSCR', (r.dscr || 0) >= 1.2 ? 'ok' : (r.dscr || 0) < 1 ? 'bad' : '') +
+        '</div>' +
+        '<div class="rc-lines">' +
+          '<div><span>NOI (annual)</span><b>' + usd0(r.noi) + '</b></div>' +
+          '<div><span>Monthly P&amp;I</span><b>' + usd0(d.financing.monthlyPI) + '</b></div>' +
+          '<div><span>Cash invested</span><b>' + usd0(r.totalCashInvested) + '</b></div>' +
+          '<div><span>1% rule</span><b>' + pctS(r.onePctRule) + (r.onePctRule >= 1 ? ' ✓' : '') + '</b></div>' +
+          '<div><span>GRM</span><b>' + (r.grm == null ? '—' : r.grm.toFixed(2)) + '</b></div>' +
+          '<div><span>Expense ratio</span><b>' + pctS(d.expenses.expenseRatio) + '</b></div>' +
+          '<div><span>Max offer @ ' + pctS(d.inputs && d.inputs.targetCapPct ? d.inputs.targetCapPct : (val('rcTargetCap') || 8)) + ' cap</span><b>' + usd0(d.maxOfferForTargetCap) + '</b></div>' +
+        '</div>' +
+        '<div class="rc-verdict ' + (badVerdict ? 'bad' : 'ok') + '">' + esc(d.verdict) + '</div>';
+    }
+    btn.onclick = run;
+    run(); // show the default deal immediately
   }
 
   fetch('/api/real-estate').then(function (r) { return r.json(); }).then(render)

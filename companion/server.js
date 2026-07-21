@@ -2226,6 +2226,18 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/real-estate') {
     return send(res, 200, JSON.stringify(loadJson(PORTFOLIO_FILE, { units: [], flips: [], new_builds: [], rentals: [] })));
   }
+  // Deal Calculator — deterministic rental underwriting (pods/real-estate/deal-calc.mjs). Money math is
+  // code, never an LLM. GET returns the defaults for the form; POST scores a deal from the posted numbers.
+  if (url.pathname === '/api/real-estate/deal-calc') {
+    try {
+      const M = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'real-estate', 'deal-calc.mjs')).href);
+      if (req.method === 'GET') return send(res, 200, JSON.stringify({ ok: true, defaults: M.DEFAULTS }));
+      const body = await readBody(req);
+      const result = M.analyzeDeal(body || {});
+      const maxOffer8 = M.maxOfferForCapRate(body || {}, body && body.targetCapPct ? body.targetCapPct : 8);
+      return send(res, 200, JSON.stringify({ ok: true, ...result, maxOfferForTargetCap: maxOffer8 }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
   if (req.method === 'POST' && url.pathname === '/api/real-estate') {
     try {
       const body = await readBody(req);

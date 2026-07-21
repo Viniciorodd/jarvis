@@ -170,6 +170,13 @@
 
     <!-- (The relationship graph now lives inside the Opportunity-map card above, toggled via #gcMapNetSeg.) -->
 
+    <!-- Subcontractor bench — salvaged from the retired /govcon-os (2026-07-20): Google-review vetting, the
+         always-visible SAM exclusion status, the reach-out PREVIEW, and the honest approval-effect modal. -->
+    <section class="card gc-subs">
+      <h2 class="gc-h2">🧰 Subcontractor bench <span class="gc-h2-hint" id="gcSubsStat">your vetted crew</span></h2>
+      <div id="gcSubs"><div class="gc-empty">Loading the bench…</div></div>
+    </section>
+
     <footer class="gc-foot">
       <span id="gcFootStatus">Reading live data…</span>
       <span class="gc-foot-note">Preview surface · reads your real pipeline · changes nothing · delete <code>govcon.*</code> to remove</span>
@@ -246,5 +253,6 @@
 <script src="us-geo.js"></script>
 <script src="submit-wizard.js"></script>
 <script src="govcon.js"></script>
+<script src="govcon-subs-bench.js"></script>
 </body>
 </html>

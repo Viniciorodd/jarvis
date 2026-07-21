@@ -4,6 +4,20 @@
 > [`reference/jarvis-build-plan.md`](reference/jarvis-build-plan.md)) vs. what actually exists.
 > Last assessed: **2026-07-10**. Legend: ✅ done · 🟡 partial · ❌ missing.
 
+> **Addendum 2026-07-20:** eval harness now **674 green** (was 408). Shipped since (all eval-pinned + verified
+> live; NAS control-plane/scheduler redeployed to activate the server-side pieces):
+> **Applied the 7/12 Audit/PRD** — board-first status reporting (WS2 #8), a deterministic **KPI/AI-spend panel**
+> (`control-plane/reports.mjs operatorKpis`), and the **post-loss debrief WIRED gate-only** (mark a bid lost →
+> `connector.stageLossDebrief` → `control-plane /maintenance/stage-debrief`, CO email from SAM; nothing auto-sends).
+> **Cleared the entire `#jarvis` vault backlog** (tracked in [`jarvis-backlog.md`](jarvis-backlog.md)):
+> **Deal Calculator** (`pods/real-estate/deal-calc.mjs`, deterministic underwriting), **sub pricing intelligence**
+> (`pods/gov/sub-pricing.mjs`, network benchmarks + price-check), **bench-first sourcing** (`discoverSubs` queries
+> the warm bench before cold-sourcing), **agent heartbeats** (`control-plane/heartbeats.mjs` → 🫀 activity strip,
+> "no silent clicks"), **Book → Ops** (`pods/vault/book-to-ops.mjs`, 2,642 highlight→system cards on `/ideas`),
+> **bid-winner research** (`pods/gov/bid-winners.mjs`, "who wins this lane"), and **board-card fit chips** on
+> `/govcon`. Still the operator's, by rule: rotate OpenRouter + Bitwarden keys (overdue); Perplexity/Resend/Sentry
+> keys; cold-outreach sending domain.
+
 > **Addendum 2026-07-10 (since the 2026-06-30 scorecard below):** eval harness now **408 green** (was 218).
 > Shipped since: **Tax & Wealth pod** (Phases 1→3B — engine, CSV importer, deadline radar, docs indexer);
 > **Florida-ops layer** — the **Telegram bridge as a 24/7 NAS service** (approve-from-phone + agent activity

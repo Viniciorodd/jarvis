@@ -1,6 +1,47 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-07-12. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+_Updated 2026-07-20. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+
+### 🆕 2026-07-20 (latest) — Audit/PRD applied + the whole `#jarvis` backlog cleared + debrief wired + NAS redeploy
+Big session. Operator's frame: "we log tasks and never resurface them." The fix + the work:
+- **The resurfacing mechanism** — [`docs/jarvis-backlog.md`](jarvis-backlog.md) now tracks every `#jarvis` vault
+  task, triaged (✅ done / 🔨 mine / 🧑 needs-you / 🗄️ superseded). Swept the whole Second Brain. **Standing
+  rule (in memory): read it each session; mark the vault checkbox `- [x]` + a note on where each landed.**
+- **From the 7/12 Audit/PRD** ([`audit-prd-reconciliation.md`](audit-prd-reconciliation.md)): **board-first
+  status** (morning-brief + weekly-reflection lead with "read the Pipeline Board before reporting; never call
+  a sent item overdue"); **deterministic KPI/AI-spend panel** (`operatorKpis`/`kpiLine` in
+  `control-plane/reports.mjs` — sends this week · drafts · approvals-pending · AI spend today/wk/mo · revenue
+  banked; on every report's `text`).
+- **The 🔨 backlog — fully cleared, all eval-pinned + verified live:**
+  - **Deal Calculator** (`pods/real-estate/deal-calc.mjs` → `/api/real-estate/deal-calc` → live card on
+    `/real-estate`): deterministic underwriting (P&I, NOI, cap, cash-on-cash, DSCR, cashflow, 1% rule, GRM,
+    max-offer). 13 evals.
+  - **Sub pricing intelligence** (`pods/gov/sub-pricing.mjs` → `/api/gov/sub-pricing`): capture $/sqft·hourly·
+    minimum per sub, per-trade network benchmarks, price-check a quote vs your own comps, `benchFirstMatch`.
+    Panel + capture form on the subs bench. 12 evals.
+  - **Bench-first sourcing** (`discoverSubs` in `pods/gov/discover.mjs`): checks the warm bench before the
+    Google Places + SAM cold-source (≥3 ready → skip cold; `force` overrides). Query side of the Strategic Pivot.
+  - **Agent heartbeats** (`control-plane/heartbeats.mjs` → `/api/activity` → 🫀 strip in the activity view):
+    last run per agent, **rests included** — no silent clicks. 5 evals.
+  - **Book → Ops** (`pods/vault/book-to-ops.mjs` → `/api/vault/book-ops` → 📚 section on `/ideas`): maps each
+    Apple-Books highlight to the business system it improves + a "make a concrete change" prompt. **2,642
+    actionable across your 254 books**, gov-first. READ-ONLY on the vault. 8 evals.
+  - **Bid-winner research** (`pods/gov/bid-winners.mjs` → `/api/gov/bid-winners` → "Who wins this work" panel
+    in the opp drawer): aggregates the comparable-award sample by recipient (win/dollar share, incumbent-vs-open).
+    8 evals. **Partial by design:** per-award *scope* is a later add; winning *proposals* aren't public (FOIA only).
+  - **Board-card fit chips** (`/govcon` cards): coverage% + price-to-win chips, lazy, only where there's signal.
+- **Post-loss debrief — WIRED with the operator's explicit OK** (new outbound class): marking a bid **lost**
+  stages a courteous CO debrief-request **behind the normal approval gate** — `connector.stageLossDebrief`
+  writes the sendable draft where the executor reads it + gates ONLY if a CO email resolves (else a
+  needs-contact task, never a blank gate); `control-plane /maintenance/stage-debrief` (deduped on
+  `gov.debrief.staged`); companion disposition handler fires on the lost *transition*, resolving the CO email
+  from SAM. **Nothing auto-sends.** Untested end-to-end (won't mark a real bid lost to smoke-test).
+- **Eval harness 641 → 674 green.** **NAS redeploy DONE** (robocopy `/E` excluding `volumes/`+`.env`, then
+  `docker compose up -d --build control-plane scheduler telegram-bridge`) — confirmed: all containers Up,
+  `curl :8787/report` shows `operator_kpis`. Companion features were already live via its restart.
+- **Still the operator's, by rule (🧑):** rotate the OpenRouter + Bitwarden keys (overdue); cold-outreach tool
+  + sending domain; API keys for Perplexity/Resend/Sentry. The "6 files" the operator meant = the Rodgate Ideas
+  folder (sub-DB pivot, tech-stack inventory, free-email setup, Perplexity) — folded into the backlog.
 
 ### 🆕 2026-07-17 (latest) — UI REDESIGN: Stitch → real code. U1a (GovCon OS board) · 3 daily bugs · U4 (Finances)
 Operator generated the UI in **stitch.withgoogle.com** from `docs/ui-redesign-stitch-prompt.md` (28 screens in

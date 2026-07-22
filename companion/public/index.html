@@ -624,10 +624,16 @@
 /* Register the service worker so "Add to Home Screen" launches reliably (no blank screen) on iPhone/iPad/Mac.
    Only over a secure context — HTTPS (Tailscale Serve) or localhost; over plain http it's a harmless no-op. */
 (function(){
+  // SERVICE WORKER REMOVED (2026-07-20). This app is served from localhost (the companion runs on this PC,
+  // so it is ALWAYS online). A service worker bought nothing here and caused repeated stale/blank screens
+  // — it kept serving last-session's home.js/today.js. Instead of registering, we now actively UNREGISTER
+  // any worker still installed and clear its caches on every load, so the app always comes fresh from the
+  // live server. Self-heals any device stuck on an old worker.
   try{
-    if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost' || location.hostname==='127.0.0.1')){
-      window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); });
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.unregister(); }); }).catch(function(){});
     }
+    if(window.caches && caches.keys){ caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k); }); }).catch(function(){}); }
   }catch(e){}
 })();
 </script>

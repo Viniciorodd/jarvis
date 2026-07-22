@@ -51,6 +51,10 @@
   <header class="j-top" id="jTop">
     <span class="j-brand px">J A R V I S</span>
     <span class="j-state" id="state">standby</span>
+    <div class="wx-top-wrap">
+      <button class="wx-top" id="wxTop" hidden aria-label="Weather — tap for the forecast"></button>
+      <div class="wx-drop" id="wxDrop" hidden></div>
+    </div>
     <button class="j-icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
       <i class="ti ti-settings" aria-hidden="true"></i>
     </button>
@@ -106,10 +110,7 @@
         <div id="jFeedList"></div>
       </div>
 
-      <!-- Weather (loaded by app.js) -->
-      <div class="j-section">
-        <div class="wx-bar" id="wxBar" hidden></div>
-      </div>
+      <!-- Weather moved to the top bar (2026-07-20) — see #wxTop in the header. -->
     </div>
 
     <!-- ── TODAY VIEW (tasks · calendar · capture — vault-backed) ── -->

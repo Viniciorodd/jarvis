@@ -485,20 +485,27 @@ document.querySelector('.dash-grid').addEventListener('click', () => tap('comman
 // ── weather widget ───────────────────────────────────────────────────────────
 let wxExpanded = false;
 const WX_COND_COLOR = (code) => [95,96,99,65,82,86].includes(code) ? 'var(--err)' : [71,73,75,77,85].includes(code) ? '#8bb8ff' : 'var(--teal)';
+const WX_EMOJI = (c) => [95,96,99].includes(c) ? '⛈' : [71,73,75,77,85,86].includes(c) ? '🌨' : [61,63,65,80,81,82].includes(c) ? '🌧' : [51,53,55].includes(c) ? '🌦' : [45,48].includes(c) ? '🌫' : [3].includes(c) ? '☁' : [2].includes(c) ? '⛅' : [1].includes(c) ? '🌤' : '☀';
 async function loadWeather() {
-  const bar = $('wxBar'); if (!bar) return;
+  const top = $('wxTop'); if (!top) return;
   try {
     const wx = await fetch('/api/weather?days=5').then((r) => r.json());
-    if (wx.error) { bar.hidden = true; return; }
+    if (wx.error) { top.hidden = true; return; }
     const alertStyle = wx.severe ? `color:var(--err);font-weight:600;` : '';
     const color = WX_COND_COLOR(wx.code);
+    // compact pill in the header (strip any emoji the API already put in front of cond → no double icon)
+    const condText = String(wx.cond || '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
+    top.innerHTML = `<span class="wx-ic">${WX_EMOJI(wx.code)}</span><span class="wx-t" style="color:${color}">${wx.temp}°</span><span class="wx-c">${esc(condText)}</span>${wx.severe ? '<span class="wx-sev">⚠</span>' : ''}`;
+    top.hidden = false;
+    // expanded forecast → a dropdown under the header
     const fcastHtml = (wx.forecast || []).map((f) => {
       const rain = f.rain > 20 ? `<span class="wx-rain">${f.rain}%🌧</span>` : '';
       return `<div class="wx-day"><div class="wx-day-name">${esc(f.day)}</div><div class="wx-day-hi" style="color:${WX_COND_COLOR(0)};">${f.hi}°</div><div class="wx-day-lo">${f.lo}°</div>${rain}</div>`;
     }).join('');
-    const expanded = `<div class="wx-full">
+    const drop = $('wxDrop');
+    if (drop) drop.innerHTML = `<div class="wx-full">
       <div class="wx-main-row">
-        <span class="wx-cond" style="${alertStyle}color:${color}">${esc(wx.cond)}</span>
+        <span class="wx-cond" style="${alertStyle}color:${color}">${WX_EMOJI(wx.code)} ${esc(wx.cond)}</span>
         <span class="wx-temp-big">${wx.temp}°F</span>
         <span class="wx-feels">feels ${wx.feels}°</span>
       </div>
@@ -511,11 +518,10 @@ async function loadWeather() {
       <div class="wx-forecast">${fcastHtml}</div>
       ${wx.severe ? `<div class="wx-alert">⚠ SEVERE WEATHER — ${esc(wx.cond)}</div>` : ''}
     </div>`;
-    const compact = `<span class="wx-compact" style="color:${color}">${esc(wx.cond)} ${wx.temp}°F</span><span class="wx-compact-sub"> · UV ${wx.uv} · ${esc(wx.sunrise)} / ${esc(wx.sunset)}</span>`;
-    bar.innerHTML = `<div class="wx-toggle" id="wxToggle">${wxExpanded ? expanded : compact}<button class="wx-chevron" title="Toggle weather details">${wxExpanded ? '▲' : '▼'}</button></div>`;
-    bar.hidden = false;
-    $('wxToggle') && $('wxToggle').addEventListener('click', () => { wxExpanded = !wxExpanded; loadWeather(); });
-  } catch { if ($('wxBar')) $('wxBar').hidden = true; }
+    top.onclick = () => { if (drop) drop.hidden = !drop.hidden; };
+    // close the dropdown when clicking elsewhere
+    if (drop && !drop._wired) { drop._wired = true; document.addEventListener('click', (e) => { if (!drop.hidden && !drop.contains(e.target) && e.target !== top && !top.contains(e.target)) drop.hidden = true; }); }
+  } catch { if ($('wxTop')) $('wxTop').hidden = true; }
 }
 
 // ── focus mode ────────────────────────────────────────────────────────────────

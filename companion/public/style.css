@@ -645,7 +645,7 @@ select.map-filter{ background:rgba(var(--teal-rgb),.06); color:var(--cream); bor
   background:radial-gradient(1100px 700px at 50% -10%, var(--ink2) 0%, transparent 70%), var(--ink); }
 .activityview[hidden]{ display:none; }
 .activity-wrap{ flex:1; display:flex; gap:14px; padding:16px 18px; overflow:hidden; }
-.activity-cal{ width:300px; flex:none; }
+.activity-cal{ width:300px; flex:none; align-self:flex-start; } /* content-height, not stretched → compact cells, not 700px-tall boxes */
 .activity-log{ flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
 @media (max-width:760px){ .activity-wrap{ flex-direction:column; } .activity-cal{ width:auto; } }
 .cal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
@@ -744,6 +744,18 @@ select.map-filter{ background:rgba(var(--teal-rgb),.06); color:var(--cream); bor
 .wx-day-lo{ font-size:11px; color:var(--dim); }
 .wx-rain{ font-size:10px; color:var(--teal); }
 .wx-alert{ margin-top:6px; font-size:12px; color:var(--err); font-weight:600; letter-spacing:.05em; padding:4px 8px; border:1px solid color-mix(in srgb, var(--err) 30%, transparent); border-radius:6px; background:color-mix(in srgb, var(--err) 7%, transparent); }
+/* Weather in the TOP BAR (2026-07-20) — a compact pill + a click-to-open forecast dropdown */
+.wx-top-wrap{ position:relative; margin-left:auto; -webkit-app-region:no-drag; }
+.wx-top{ display:flex; align-items:center; gap:6px; background:rgba(var(--teal-rgb),.06); border:1px solid rgba(var(--teal-rgb),.16); border-radius:999px; padding:4px 11px; cursor:pointer; color:var(--cream); font-family:inherit; font-size:12.5px; line-height:1; }
+.wx-top[hidden]{ display:none; }
+.wx-top:hover{ background:rgba(var(--teal-rgb),.11); }
+.wx-top .wx-ic{ font-size:14px; }
+.wx-top .wx-t{ font-weight:600; }
+.wx-top .wx-c{ color:var(--dim); font-size:11.5px; }
+.wx-top .wx-sev{ color:var(--err); }
+@media (max-width:640px){ .wx-top .wx-c{ display:none; } }
+.wx-drop{ position:absolute; top:calc(100% + 8px); right:0; z-index:120; width:320px; max-width:88vw; background:var(--panel,#111); border:1px solid rgba(var(--teal-rgb),.2); border-radius:12px; padding:12px 14px; box-shadow:0 10px 30px rgba(0,0,0,.45); -webkit-app-region:no-drag; }
+.wx-drop[hidden]{ display:none; }
 
 /* ══════════════════════════════════════════ FIVERR STUDIO ══ */
 .studio-wrap{ grid-column:1/-1; }

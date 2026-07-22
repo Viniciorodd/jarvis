@@ -11,7 +11,7 @@
 //     true): the live file always wins, the cache is only a fallback when the server is unreachable.
 //     The old stale-while-revalidate served last-session's CSS/JS first, so shipped fixes never showed.
 //   • cross-origin (fonts/icons)  → cache-first, best-effort.
-const VERSION = 'jarvis-v4'; // bump on shell asset change (app.js silent-greeting) to push to installed PWAs
+const VERSION = 'jarvis-v5'; // bump on shell asset change (weather-to-top, today scroll)
 const SHELL = VERSION + '-shell';
 const RUNTIME = VERSION + '-runtime';
 

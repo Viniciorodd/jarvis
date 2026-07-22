@@ -34,8 +34,8 @@ export function env(k, d = '') {
 
 // ── config getters ────────────────────────────────────────────────────────────────────────────────
 const OLLAMA_URL = () => env('OLLAMA_URL', 'http://localhost:11434/v1').replace(/\/$/, '');
-const LOCAL_SMART = () => env('LOCAL_MODEL', 'qwen3.6');          // reasoning / drafts (slower, smarter)
-const LOCAL_FAST = () => env('LOCAL_MODEL_FAST', 'gemma4');       // bulk / classification (fast, light)
+const LOCAL_SMART = () => env('LOCAL_MODEL', 'qwen3.6');            // reasoning / drafts (slower, smarter)
+const LOCAL_FAST = () => env('LOCAL_MODEL_FAST', 'hermes3:latest'); // voice/chat + bulk (fast; gemma4 was broken on the box)
 const OR_FREE = () => env('OPENROUTER_MODEL_FREE', 'meta-llama/llama-3.3-70b-instruct:free');
 const OR_CHEAP = () => env('OPENROUTER_MODEL_CHEAP', OR_FREE());
 const TIERS_BIG = new Set(['draft', 'reflect']);                 // "real work" tiers (quality-first)

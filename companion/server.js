@@ -1224,9 +1224,19 @@ function pickModel(messages) {
   return (text.length > 300 || SONNET_TRIGGERS.test(text)) ? 'claude-sonnet-5' : 'claude-haiku-4-5';
 }
 
+// The runtime brain-mode chip (control-plane/brain-mode.json): 'auto'|'local'|'openrouter'|'claude'.
+function brainPrefer() {
+  try { const m = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'control-plane', 'brain-mode.json'), 'utf8')).mode; if (m) return String(m).toLowerCase(); } catch { /* none */ }
+  return String(process.env.LLM_PREFER || 'auto').toLowerCase();
+}
+
 async function callClaude(messages) {
   const model = pickModel(messages);
-  if (API_KEY) {
+  // COST RULE (operator, 2026-07-20): voice/chat is CONVERSATIONAL and runs on the FREE brain by default —
+  // paid Claude credit is reserved for big business ACTIONS with a real return, not a greeting or simple
+  // chat. Only the explicit "Claude" brain-mode (the top-bar chip) spends credit + unlocks tools. Auto /
+  // local / openrouter → free. This is intentional, not a fallback.
+  if (API_KEY && brainPrefer() === 'claude') {
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -1234,10 +1244,10 @@ async function callClaude(messages) {
         body: JSON.stringify({ model, max_tokens: 1200, system: buildSystem(), tools: TOOLS, messages }),
       });
       if (r.ok) return r.json();
-      // not ok (429 rate-limit / 401 no-credit / 5xx) → fall through to the FREE backup brain
+      // credit/rate error (400 low-balance / 429 / 5xx) → fall through to the free brain rather than die
     } catch { /* network error → fall through */ }
   }
-  // FREE fallback: a plain (tool-less) reply via local Ollama / OpenRouter so chat never dies on "no tokens".
+  // FREE brain (the default): a plain (tool-less) reply via local Ollama / OpenRouter — $0.
   return freeBackupReply(messages, model);
 }
 
@@ -1249,9 +1259,9 @@ async function freeBackupReply(messages, model) {
     ? last.content.map((c) => (typeof c === 'string' ? c : (c.text || (c.type === 'tool_result' ? String(c.content) : '')))).join('\n')
     : (last?.content || '');
   const tier = /opus|sonnet/i.test(model) ? 'draft' : 'cheap';
-  const sys = buildSystem() + '\n\n[You are temporarily on a FREE backup brain (local/OpenRouter) because Claude is unavailable. You cannot run tools right now — answer conversationally, and if the request needs a tool action (files, email, image, web), say it needs the full Claude brain.]';
+  const sys = buildSystem() + '\n\n[You are on the free everyday brain (local Hermes / OpenRouter) — the DEFAULT for conversation, and it costs nothing. You have NO tools and you CANNOT see the operator\'s live data (calendar, tasks, email, gov pipeline, numbers). CRITICAL: never invent or guess that data — do not make up meetings, tasks, times, dollar amounts, or names. If asked about anything real/live, say plainly: "I can\'t see your live data on the free brain — flip the brain chip to Claude and I\'ll pull it." For a real ACTION (send, draft, submit, edit files, image, web) say the same. For general questions, thinking-through, or brainstorming, just help normally and briefly. Do not apologize for being the free brain; it is the intended default.]';
   const out = await R.llm({ system: sys, user: String(userText || 'Hello'), tier, maxTokens: 1000 });
-  const text = out.text || "I'm on the free backup brain right now and couldn't complete that. Try again in a moment, or top up Claude for full tool actions.";
+  const text = out.text || "I'm on the free everyday brain (the default — $0). I can chat and answer, but for a real action like sending or drafting, flip the brain chip to Claude and ask again.";
   return { content: [{ type: 'text', text }], stop_reason: 'end_turn', usage: out.usage || null, _provider: out.provider };
 }
 

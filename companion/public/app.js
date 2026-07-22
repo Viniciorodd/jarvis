@@ -555,9 +555,15 @@ setInterval(loadWeather, 30 * 60 * 1000); // refresh every 30 min
 fetch('/api/focus').then((r) => r.json()).then((d) => { if (d.mode) setFocus(d.mode); }).catch(() => {});
 
 setState('idle', 'standby');
-// Greet once per calendar day — not on every toggle/reopen of the Electron window
-const _todayKey = new Date().toISOString().slice(0, 10);
-if (localStorage.getItem('jarvis-last-greet') !== _todayKey) {
-  localStorage.setItem('jarvis-last-greet', _todayKey);
-  setTimeout(() => { const g = "Online. Good to see you, Vinicio — what are we working on?"; addMsg('j', g); speak(g); }, 700);
-}
+// SILENT ON OPEN (operator, 2026-07-20): no unsolicited greeting or speech when the app opens — sometimes
+// you just want to work in quiet. Jarvis speaks only when YOU start it ("Hey Jarvis" / the mic / a reply).
+// Opt back in any time with:  localStorage.setItem('jarvis-greet-on-open','1')
+try {
+  if (localStorage.getItem('jarvis-greet-on-open') === '1') {
+    const _todayKey = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem('jarvis-last-greet') !== _todayKey) {
+      localStorage.setItem('jarvis-last-greet', _todayKey);
+      setTimeout(() => { const _h = new Date().getHours(); const g = (_h < 12 ? 'Good morning' : _h < 18 ? 'Good afternoon' : 'Good evening') + ', Vinicio.'; addMsg('j', g); speak(g); }, 700);
+    }
+  }
+} catch (e) { /* silent by default */ }

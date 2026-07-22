@@ -66,8 +66,8 @@ async function claude(body, timeoutMs = 150000) {
     return (d.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
   } finally { clearTimeout(timer); }
 }
-const visionOCR = (buf, media) => claude({ model: 'claude-sonnet-4-6', max_tokens: 1500, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: media, data: buf.toString('base64') } }, { type: 'text', text: 'Transcribe ALL text in this image verbatim (handwritten or typed), preserving line breaks. Mark unclear words [unclear]. If no text, reply "(no readable text)".' }] }] });
-const pdfOCR = (buf) => claude({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buf.toString('base64') } }, { type: 'text', text: 'Transcribe ALL text from every page of this document verbatim (including handwriting), preserving structure and page breaks. Mark unclear words [unclear].' }] }] });
+const visionOCR = (buf, media) => claude({ model: 'claude-sonnet-5', max_tokens: 1500, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: media, data: buf.toString('base64') } }, { type: 'text', text: 'Transcribe ALL text in this image verbatim (handwritten or typed), preserving line breaks. Mark unclear words [unclear]. If no text, reply "(no readable text)".' }] }] });
+const pdfOCR = (buf) => claude({ model: 'claude-sonnet-5', max_tokens: 8000, messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buf.toString('base64') } }, { type: 'text', text: 'Transcribe ALL text from every page of this document verbatim (including handwriting), preserving structure and page breaks. Mark unclear words [unclear].' }] }] });
 
 function noteTyped(buf) {
   const JUNK = /(Key|Color|Font|Layout|Object|Array|Coords|Mode|Style|UUID|Index|Version|Number|Attributes|Origin|Dimension|Platform|Orientation|Document|Canvas|Media|Paper|Session|RGB|Alpha|class|hint|points|curves|groups|archiver|NSString|NSDictionary)/;

@@ -39,7 +39,7 @@ async function visionOCR(pngBuf, label) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST', headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6', max_tokens: 900,
+      model: 'claude-sonnet-5', max_tokens: 900,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/png', data: pngBuf.toString('base64') } },
         { type: 'text', text: 'This is a page (or thumbnail) from a handwritten/typed Notability note. Transcribe ALL text you can read, verbatim, preserving line breaks. Mark unclear words [unclear]. If there is no readable text, reply exactly "(no readable text)".' },

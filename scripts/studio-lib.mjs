@@ -50,7 +50,7 @@ export async function defaultClaude(system, user, { maxTokens = 700, model } = {
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: model || env('MODEL_DRAFT', 'claude-sonnet-4-6'), max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }),
+      body: JSON.stringify({ model: model || env('MODEL_DRAFT', 'claude-sonnet-5'), max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }),
     });
     if (!r.ok) return { text: '' };
     const d = await r.json();

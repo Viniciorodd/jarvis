@@ -34,7 +34,7 @@ async function ocrChunk(bytes) {
       method: 'POST', signal: ctrl.signal,
       headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6', max_tokens: 8000,
+        model: 'claude-sonnet-5', max_tokens: 8000,
         messages: [{ role: 'user', content: [
           { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: Buffer.from(bytes).toString('base64') } },
           { type: 'text', text: 'Transcribe ALL text from every page verbatim (including handwriting), preserving structure and page breaks. Mark unclear words [unclear].' },

@@ -2,7 +2,7 @@
 // then switches between Jarvis World (localhost:8095) and HQ (NAS). Stays in tray;
 // summon with Ctrl/Cmd+Shift+J.
 'use strict';
-const { app, BrowserWindow, globalShortcut, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, globalShortcut, Tray, Menu, nativeImage, shell, session } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -70,7 +70,14 @@ if (!app.requestSingleInstanceLock()) {
     else createWindow();
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    // This app is served from localhost (always online) — a stale cache buys nothing and causes blank/half-
+    // rendered screens when shipped UI changes only partly land. Clear the webview's HTTP cache + service
+    // workers on every launch so the latest UI always shows. (2026-07-20 — fix for blank Home/Today.)
+    try {
+      await session.defaultSession.clearCache();
+      await session.defaultSession.clearStorageData({ storages: ['serviceworkers', 'cachestorage', 'shadercache'] });
+    } catch { /* best-effort — never block launch on a cache clear */ }
     startCompanion();
     createWindow();
     makeTray();

@@ -26,7 +26,13 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
   alerts once (Telegram+HQ) and invalidates the stale attachment cache so the matrix rebuilds fresh. New
   `/maintenance/amendment-check` + `amendment-radar` schedule job. 11 evals (747→758). Final opus review
   caught + fixed a byte-noise false-alert Critical. Spec `docs/superpowers/specs/2026-07-24-gov-amendment-radar-phase2-design.md`.
-- 🔨 **Phase 3 — Past-Performance & Snippet Library** — reusable records + boilerplate that auto-insert into drafts.
+- ✅ **Phase 3 — Past-Performance & Snippet Library** (done 2026-07-24). `pods/gov/library.mjs`: deterministic
+  tag/trade/NAICS retrieval (`matchScore`/`pastPerformanceFor`/`snippetsFor`/`libraryFor`) over a git-tracked
+  seed of 7 Rodgate janitorial snippet templates (QC/staffing/transition/safety/overview + carpet/grounds) +
+  gitignored runtime (real past-perf + edits). NEVER fabricates a citation (empty store → []). Marking a bid
+  **won** adds a `needsReview` past-perf stub (id-keyed upsert). `/api/gov/library(/for)` + POST. 9 evals
+  (758→767). Final review: Ready to merge. Phase 4 consumes `libraryFor`; must skip `needsReview` stubs.
+  Spec `docs/superpowers/specs/2026-07-24-gov-library-phase3-design.md`.
 - 🔨 **Phase 4 — Matrix-Grounded Drafting** — draft each section to answer the Phase-1 matrix rows, grounded
   in the Phase-3 library; existing `checkCompliance` verifies coverage. (Also lifts the AI reader's L/M recall.)
 - 🔨 **Phase 5 — Incumbent & Extended Discovery** — who holds this / recompete timing / SLED beyond SAM (the

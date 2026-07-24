@@ -91,6 +91,8 @@ export async function ingestAttachments(op = {}, key = '', { max = Number(proces
         const sep = url.includes('?') ? '&' : '?';
         const r = await fetchImpl(`${url}${sep}api_key=${key}`, { signal: AbortSignal.timeout(timeoutMs) });
         if (!r.ok) { files.push({ url, hash, type: 'unknown', bytes: 0, chars: 0, ok: false, error: `http ${r.status}`, textFile: null }); continue; }
+        const declared = Number((r.headers && r.headers.get && r.headers.get('content-length')) || 0);
+        if (declared && declared > maxBytesEach) { files.push({ url, hash, type: 'skip', bytes: declared, chars: 0, ok: false, error: 'too large', textFile: null }); continue; }
         const buf = Buffer.from(await r.arrayBuffer());
         if (buf.length > maxBytesEach) { files.push({ url, hash, type: 'skip', bytes: buf.length, chars: 0, ok: false, error: 'too large', textFile: null }); continue; }
         const ct = (r.headers && r.headers.get && r.headers.get('content-type')) || '';

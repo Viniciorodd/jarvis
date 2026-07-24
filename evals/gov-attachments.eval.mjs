@@ -65,5 +65,13 @@ export default {
       const r = await ingestAttachments({ noticeId: 'X', resourceLinks: ['https://sam.gov/a'] }, '');
       return ok(r.ok === false && r.combinedText === '' && r.files.length === 0, JSON.stringify(r.files));
     } },
+    { name: 'ingestAttachments skips an attachment whose declared content-length exceeds the cap (no buffering)', run: async () => {
+      const { ingestAttachments } = await import('../pods/gov/attachments.mjs');
+      let bodyRead = false;
+      const fetchImpl = async () => ({ ok: true, headers: { get: (h) => (h.toLowerCase() === 'content-length' ? String(999 * 1024 * 1024) : 'application/pdf') }, arrayBuffer: async () => { bodyRead = true; return Buffer.from('x').buffer; } });
+      const r = await ingestAttachments({ noticeId: 'ATT-BIG-' + hashUrl(String(Math.random())), resourceLinks: ['https://sam.gov/big'] }, 'FAKEKEY', { fetchImpl });
+      const f = r.files[0];
+      return ok(f && f.ok === false && f.error === 'too large' && bodyRead === false && r.combinedText === '', JSON.stringify({ f, bodyRead }));
+    } },
   ],
 };

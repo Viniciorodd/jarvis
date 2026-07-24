@@ -55,7 +55,9 @@ export default {
       const os = await import('node:os'); const fs = await import('node:fs'); const path = await import('node:path');
       const { ingestAttachments } = await import('../pods/gov/attachments.mjs');
       // fake fetch returns a tiny text "PDF-less" body typed as txt
-      const fetchImpl = async () => ({ ok: true, headers: { get: () => 'text/plain' }, arrayBuffer: async () => Buffer.from('The contractor shall maintain insurance coverage.').buffer });
+      // NOTE: use TextEncoder (exactly-sized ArrayBuffer). `Buffer.from(str).buffer` exposes Node's SHARED
+      // pool — reading it back yields pooled garbage, not the string, which made this test flaky.
+      const fetchImpl = async () => ({ ok: true, headers: { get: () => 'text/plain' }, arrayBuffer: async () => new TextEncoder().encode('The contractor shall maintain insurance coverage.').buffer });
       const op = { noticeId: 'ATT-TEST-' + hashUrl(String(Math.random())), resourceLinks: ['https://sam.gov/a', 'https://sam.gov/b'] };
       const r = await ingestAttachments(op, 'FAKEKEY', { fetchImpl });
       return ok(r.ok && r.files.length === 2 && /maintain insurance coverage/i.test(r.combinedText), JSON.stringify({ files: r.files.length, chars: r.combinedText.length }));

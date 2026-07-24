@@ -201,55 +201,58 @@ export function mapCoverage(requirement = '', draftText = '') {
   return { status, citation, matchedTerms: matched };
 }
 
-// ── PURE: assemble the full matrix. coveragePct is deterministic: partial credit 0.5, 100 when no reqs. ──
-export function buildMatrix({ sowText = '', draft = '', meta = {} } = {}) {
-  const reqs = extractRequirements(sowText);
+// ── PURE: assemble the full matrix. `requirements` (precomputed, section-tagged) is preferred; if absent we
+// fall back to the deterministic regex extractor over fullText||sowText (backward compatible). coveragePct
+// math is UNCHANGED (partial credit 0.5; 100 when no reqs). bySection gives the same math per L/M/C/form. ──
+export function buildMatrix({ sowText = '', fullText = '', draft = '', meta = {}, requirements = null } = {}) {
+  const text = fullText || sowText;
+  const reqs = requirements || extractRequirements(text).map((r) => ({ ...r, section: 'C' }));
   const rows = reqs.map((r) => {
     const cov = mapCoverage(r.text, draft);
-    return { id: r.id, requirement: r.text, category: r.category, status: cov.status, citation: cov.citation };
+    return { id: r.id, requirement: r.text, category: r.category || categorize(r.text), section: r.section || 'C', status: cov.status, citation: cov.citation };
   });
-  const total = rows.length;
-  const addressed = rows.filter((r) => r.status === 'addressed').length;
-  const partial = rows.filter((r) => r.status === 'partial').length;
-  const gap = rows.filter((r) => r.status === 'gap').length;
-  const coveragePct = total ? Math.round(((addressed + 0.5 * partial) / total) * 100) : 100;
-  return { meta: meta || {}, rows, summary: { total, addressed, partial, gap, coveragePct } };
+  const count = (arr, s) => arr.filter((r) => r.status === s).length;
+  const pct = (arr) => (arr.length ? Math.round(((count(arr, 'addressed') + 0.5 * count(arr, 'partial')) / arr.length) * 100) : 100);
+  const total = rows.length, addressed = count(rows, 'addressed'), partial = count(rows, 'partial'), gap = count(rows, 'gap');
+  const bySection = {};
+  for (const sec of ['L', 'M', 'C', 'form']) { const sr = rows.filter((r) => r.section === sec); bySection[sec] = { total: sr.length, gap: count(sr, 'gap'), coveragePct: pct(sr) }; }
+  return { meta: meta || {}, rows, summary: { total, addressed, partial, gap, coveragePct: pct(rows), bySection } };
 }
 
-// ── PURE: render the matrix as a real Markdown artifact. HONEST — leads with the GAPS (the disqualifiers). ──
+// ── PURE: render the matrix as a Markdown artifact. HONEST — leads with the GAPS, now grouped by section. ──
 export function renderMatrixMarkdown(matrix) {
   const { meta = {}, rows = [], summary = {} } = matrix || {};
-  const { total = 0, addressed = 0, partial = 0, gap = 0, coveragePct = 100 } = summary;
+  const { total = 0, addressed = 0, partial = 0, gap = 0, coveragePct = 100, bySection = {} } = summary;
   const glyph = (s) => (s === 'addressed' ? '✅' : s === 'partial' ? '🟡' : '⛔');
   const esc = (s) => String(s == null ? '' : s).replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
   const clip = (s, n) => { const e = esc(s); return e.length > n ? e.slice(0, n - 1) + '…' : e; };
   const title = meta.title || meta.noticeId || 'Opportunity';
-  const gaps = rows.filter((r) => r.status === 'gap');
   const out = [];
   out.push(`# Compliance Matrix — ${esc(title)}`);
-  if (meta.noticeId) out.push(`<!-- notice ${meta.noticeId} · generated ${meta.generatedAt || new Date().toISOString()} -->`);
+  if (meta.noticeId) out.push(`<!-- notice ${meta.noticeId} · ${meta.attachments ? meta.attachments + ' attachment(s) read · ' : ''}generated ${meta.generatedAt || new Date().toISOString()} -->`);
   out.push('');
-  out.push(`**Coverage: ${coveragePct}%** · ${gap} gap${gap === 1 ? '' : 's'} · ${total} requirement${total === 1 ? '' : 's'} (✅ ${addressed} addressed · 🟡 ${partial} partial · ⛔ ${gap} gap)`);
+  out.push(`**Coverage: ${coveragePct}%** · ${gap} gap${gap === 1 ? '' : 's'} · ${total} requirement${total === 1 ? '' : 's'} (✅ ${addressed} · 🟡 ${partial} · ⛔ ${gap})`);
+  const secLine = ['L', 'M', 'C', 'form'].filter((s) => (bySection[s] || {}).total).map((s) => `${s}: ${bySection[s].coveragePct}% (${bySection[s].gap} gap)`).join(' · ');
+  if (secLine) out.push('', `By section — ${secLine}`);
   out.push('');
-  out.push('> A gov proposal that fails to answer a single "shall/must" requirement can be ruled non-responsive. Every ⛔ below is a disqualification risk — close it, or decide not to bid.');
-  out.push('');
-  out.push('**Legend:** ✅ addressed · 🟡 partial · ⛔ gap (unaddressed)');
-  out.push('');
-  // Lead with the GAPS — these are the reasons a bid gets thrown out.
-  if (gaps.length) {
-    out.push(`## ⛔ GAPS — ${gaps.length} unaddressed requirement${gaps.length === 1 ? '' : 's'} (fix before submitting)`);
-    for (const g of gaps) out.push(`- **${g.id}** (${g.category}) — ${esc(g.requirement)}`);
-    out.push('');
-  } else if (total > 0) {
-    out.push('## ✅ No gaps — every extracted requirement is addressed in the draft');
-    out.push('');
-  }
-  // Full traceability table.
+  out.push('> A gov proposal that fails a single "shall/must" requirement — or omits a required form — can be ruled non-responsive. Every ⛔ below is a disqualification risk: close it, or decide not to bid.');
+  out.push('', '**Legend:** ✅ addressed · 🟡 partial · ⛔ gap (unaddressed)', '');
+  const groups = [['L', '⛔ Submission gaps (Section L)'], ['form', '⛔ Missing / unconfirmed required forms'], ['M', '⛔ Evaluation-factor gaps (Section M)'], ['C', '⛔ Unaddressed SOW (Section C)']];
+  const anyGap = rows.some((r) => r.status === 'gap');
+  if (anyGap) {
+    for (const [sec, heading] of groups) {
+      const g = rows.filter((r) => r.status === 'gap' && r.section === sec);
+      if (!g.length) continue;
+      out.push(`## ${heading} — ${g.length}`);
+      for (const r of g) out.push(`- **${r.id}** (${r.category}) — ${esc(r.requirement)}`);
+      out.push('');
+    }
+  } else if (total > 0) { out.push('## ✅ No gaps — every extracted requirement is addressed in the draft', ''); }
   out.push('## Requirements traceability');
-  out.push('| # | Requirement | Category | Status | Where addressed (citation) |');
-  out.push('| --- | --- | --- | --- | --- |');
-  for (const r of rows) out.push(`| ${r.id} | ${clip(r.requirement, 180)} | ${r.category} | ${glyph(r.status)} ${r.status} | ${r.citation ? clip(r.citation, 160) : '—'} |`);
-  if (!rows.length) out.push('| — | _No shall/must requirements extracted from the SOW text._ | — | — | — |');
+  out.push('| # | Requirement | Section | Category | Status | Where addressed (citation) |');
+  out.push('| --- | --- | --- | --- | --- | --- |');
+  for (const r of rows) out.push(`| ${r.id} | ${clip(r.requirement, 170)} | ${r.section} | ${r.category} | ${glyph(r.status)} ${r.status} | ${r.citation ? clip(r.citation, 150) : '—'} |`);
+  if (!rows.length) out.push('| — | _No requirements extracted from the solicitation text._ | — | — | — | — |');
   out.push('');
   return out.join('\n');
 }

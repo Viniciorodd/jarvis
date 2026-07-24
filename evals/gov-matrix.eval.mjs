@@ -75,10 +75,24 @@ export default {
     { name: 'renderMatrixMarkdown has the table header + a GAPS section when a gap exists', run: () => {
       const m = buildMatrix({ sowText: SOW, draft: DRAFT_2OF3, meta: { noticeId: 'TEST-1', title: 'Janitorial — Bldg 3' } });
       const md = renderMatrixMarkdown(m);
-      const hasHeader = md.includes('| # | Requirement | Category | Status | Where addressed (citation) |');
-      const hasGaps = /##\s*⛔\s*GAPS/.test(md);
-      const gapRowNoCite = /\| R\d+ \| .*insurance.* \| insurance\/bonding \| ⛔ gap \| — \|/.test(md);
+      const hasHeader = md.includes('| # | Requirement | Section | Category | Status | Where addressed (citation) |');
+      const hasGaps = /##\s*⛔/.test(md);
+      const gapRowNoCite = /\| R\d+ \| .*insurance.* \| C \| insurance\/bonding \| ⛔ gap \| — \|/.test(md);
       return ok(hasHeader && hasGaps && gapRowNoCite, `header=${hasHeader} gaps=${hasGaps} gapRowNoCite=${gapRowNoCite}`);
+    } },
+    { name: 'buildMatrix accepts precomputed section-tagged requirements + per-section summary', run: () => {
+      const reqs = [
+        { id: 'R1', text: 'Offerors shall submit a 10-page technical volume', section: 'L', category: 'general' },
+        { id: 'R2', text: 'The contractor shall provide daily janitorial services including trash removal', section: 'C', category: 'reporting/deliverables' },
+      ];
+      const m = buildMatrix({ fullText: 'x', draft: 'Rodgate provides daily janitorial services including trash removal.', meta: {}, requirements: reqs });
+      return ok(m.summary.bySection.L.total === 1 && m.summary.bySection.C.total === 1 && m.rows.find((r) => r.id === 'R1').section === 'L', JSON.stringify(m.summary.bySection));
+    } },
+    { name: 'renderMatrixMarkdown includes a Section column + groups gaps by section', run: () => {
+      const reqs = [{ id: 'R1', text: 'Offerors shall submit a technical volume not to exceed 10 pages', section: 'L', category: 'general' }];
+      const m = buildMatrix({ fullText: 'x', draft: '', meta: { title: 'T' }, requirements: reqs });
+      const md = renderMatrixMarkdown(m);
+      return ok(/\| Section \|/.test(md) && /Submission gaps \(Section L\)/.test(md), md.slice(0, 200));
     } },
     { name: 'groundRows KEEPS a row whose quote is verbatim in the source', run: () => {
       const src = 'Offerors shall submit a technical volume not to exceed 10 pages.';

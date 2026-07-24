@@ -3472,7 +3472,9 @@ const server = http.createServer(async (req, res) => {
         try {
           const L = await import('../pods/gov/library.mjs');
           const { inferTrade } = await import('../pods/gov/pipeline.mjs');
-          L.addPastPerformance({ title: dTitle || 'Awarded contract', agency: dAgency, trade: inferTrade(dTitle || '').trade, periodEnd: new Date().toISOString().slice(0, 10), outcome: 'Awarded', noticeId, scope: '' });
+          // id keyed on the notice → a win→lost→win correction UPSERTS the same record (no duplicate). needsReview
+          // flags it as a stub to flesh out — Phase 4 drafting must not cite a needsReview record as substance.
+          L.addPastPerformance({ id: 'pp-won-' + noticeId, title: dTitle || 'Awarded contract', agency: dAgency, trade: inferTrade(dTitle || '').trade, periodEnd: new Date().toISOString().slice(0, 10), outcome: 'Awarded', noticeId, scope: '', needsReview: true });
         } catch { /* library grow is best-effort */ }
       }
       // GATED CO DEBRIEF on a LOST transition (operator OK'd 2026-07-20). Resolve the CO email from SAM, then

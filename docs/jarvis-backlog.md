@@ -41,9 +41,10 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
     teaming + top risks/mitigations), reusing `pods/gov/pdf.mjs`. Markets Rodgate as bigger than a solo shop to teaming partners.
 - 🔨 **Phase 8 (LAST) — Tonight PRD follow-ups** (`docs/prd-2026-07-24-followups.md`). Cross-cutting infra/UX,
   NOT gov-pod — different domain, gated on live infra for 2 of 3 items:
-  - **Item 1 — on-demand Gmail drafting** (doc marks URGENT; small + PC-doable): extract `appendGmailDraft` out of
-    `stageDrafts` (shared helper, no dup) + add a `draft_gmail_reply` tool to `/api/chat` TOOLS so "draft a reply to
-    X" writes a real `[Gmail]/Drafts` message. DRAFT-ONLY, never sends (truth-contract). **Could be pulled forward.**
+  - ✅ **Item 1 — on-demand Gmail drafting** (done 2026-07-24, pulled forward per operator). `pods/inbox/compose.mjs`
+    owns the ONE draft mechanism (`replySubject` + `appendGmailDraft` → IMAP append to `[Gmail]/Drafts`, `\Draft`,
+    NEVER sends); `stageDrafts` refactored onto it (dedup); new `draft_gmail_reply` tool + handler in `/api/chat`
+    with a truthful "drafted, never sent" reply. Verified live end-to-end vs Gmail. 747 evals green.
   - **Item 2 — Telegram per-agent topics**: verify + fix the Cowork-built `companion/telegram-topics.mjs` +
     `telegram-bridge.mjs` (currently UNCOMMITTED in the tree) — needs a real phone + a forum group + the NAS bridge
     running; check the `createForumTopic` flat-chat fallback + that `narrate-rollup`/`narrate-truth` evals stay green.

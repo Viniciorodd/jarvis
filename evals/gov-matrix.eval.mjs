@@ -4,7 +4,7 @@
 // categories bucket correctly, coverage is deterministic keyword-overlap, and — the doctrine line — a GAP
 // carries an EMPTY citation (coverage is NEVER fabricated). No network: everything runs on fixture strings.
 
-import { extractRequirements, mapCoverage, buildMatrix, renderMatrixMarkdown, categorize } from '../pods/gov/matrix.mjs';
+import { extractRequirements, mapCoverage, buildMatrix, renderMatrixMarkdown, categorize, groundRows } from '../pods/gov/matrix.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -79,6 +79,24 @@ export default {
       const hasGaps = /##\s*⛔\s*GAPS/.test(md);
       const gapRowNoCite = /\| R\d+ \| .*insurance.* \| insurance\/bonding \| ⛔ gap \| — \|/.test(md);
       return ok(hasHeader && hasGaps && gapRowNoCite, `header=${hasHeader} gaps=${hasGaps} gapRowNoCite=${gapRowNoCite}`);
+    } },
+    { name: 'groundRows KEEPS a row whose quote is verbatim in the source', run: () => {
+      const src = 'Offerors shall submit a technical volume not to exceed 10 pages.';
+      const rows = groundRows([{ section: 'L', text: 'Technical volume max 10 pages', quote: 'shall submit a technical volume not to exceed 10 pages' }], src);
+      return ok(rows.length === 1 && rows[0].section === 'L', JSON.stringify(rows));
+    } },
+    { name: 'groundRows DROPS a hallucinated row (quote not in source)', run: () => {
+      const src = 'Offerors shall submit a technical volume not to exceed 10 pages.';
+      const rows = groundRows([{ section: 'M', text: 'Past performance weighted 40%', quote: 'past performance is weighted at forty percent of the total score' }], src);
+      return ok(rows.length === 0, JSON.stringify(rows));
+    } },
+    { name: 'groundRows rejects too-short quotes and invalid sections', run: () => {
+      const src = 'The contractor shall maintain insurance at all times during performance.';
+      const rows = groundRows([
+        { section: 'L', text: 'x', quote: 'shall' },                               // < 20 chars
+        { section: 'Z', text: 'bad section', quote: 'shall maintain insurance at all times' },
+      ], src);
+      return ok(rows.length === 0, JSON.stringify(rows));
     } },
   ],
 };

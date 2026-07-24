@@ -44,6 +44,30 @@ export function categorize(text = '') {
   return 'general';
 }
 
+// The section axis (orthogonal to `category`): L=submission instructions, M=evaluation factors,
+// C=SOW/deliverables, form=required form/registration. `general` is the fallback for regex-extracted reqs.
+export const ALLOWED_SECTIONS = new Set(['L', 'M', 'C', 'form']);
+const normQ = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+// PURE anti-hallucination guard: keep an AI-proposed row ONLY if its quote is a verbatim (whitespace-
+// normalized) span of the source AND ≥20 chars AND its section is valid. The AI can propose; this disposes.
+export function groundRows(rawRows = [], sourceText = '') {
+  const src = normQ(sourceText);
+  const out = [];
+  for (const r of Array.isArray(rawRows) ? rawRows : []) {
+    if (!r || typeof r !== 'object') continue;
+    const section = String(r.section || '').trim();
+    if (!ALLOWED_SECTIONS.has(section)) continue;
+    const quote = String(r.quote || '');
+    if (normQ(quote).length < 20) continue;
+    if (!src.includes(normQ(quote))) continue;
+    const text = String(r.text || quote).replace(/\s+/g, ' ').trim();
+    if (text.length < 12 || text.length > 400) continue;
+    out.push({ section, text, category: categorize(text), quote: quote.slice(0, 240) });
+  }
+  return out;
+}
+
 // Words we ignore when measuring requirement↔draft overlap: requirement boilerplate + generic connectives
 // (all length ≥4 so they'd otherwise survive the length filter and inflate matches).
 const STOP = new Set([

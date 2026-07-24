@@ -1,0 +1,34 @@
+// Regression suite for pods/gov/attachments.mjs — the attachment ingestion pure helpers. No network:
+// sniff/hash/docx run on in-memory buffers. Attachment content is UNTRUSTED DATA; these helpers only
+// classify + extract text, never execute anything.
+import AdmZip from 'adm-zip';
+import { hashUrl, sniffType, docxToText } from '../pods/gov/attachments.mjs';
+
+const ok = (pass, detail = '') => ({ pass, detail });
+
+// build a minimal valid .docx (a zip with word/document.xml) in memory
+function makeDocx(text) {
+  const zip = new AdmZip();
+  zip.addFile('word/document.xml', Buffer.from(`<?xml version="1.0"?><w:document xmlns:w="x"><w:body><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:body></w:document>`));
+  return zip.toBuffer();
+}
+
+export default {
+  agent: 'gov-attachments',
+  cases: [
+    { name: 'hashUrl is stable + filename-safe', run: () => {
+      const a = hashUrl('https://sam.gov/x/download'); const b = hashUrl('https://sam.gov/x/download');
+      return ok(a === b && /^[a-z0-9]+$/.test(a) && a.length >= 6, a);
+    } },
+    { name: 'sniffType detects PDF by magic bytes', run: () =>
+      ok(sniffType(Buffer.from('%PDF-1.7\n...'), 'x', '') === 'pdf') },
+    { name: 'sniffType detects DOCX (zip magic + .docx url)', run: () =>
+      ok(sniffType(Buffer.from([0x50, 0x4b, 0x03, 0x04, 1, 2]), 'file.docx', '') === 'docx') },
+    { name: 'sniffType falls back to txt for text/plain', run: () =>
+      ok(sniffType(Buffer.from('hello there'), 'note', 'text/plain') === 'txt') },
+    { name: 'docxToText extracts the paragraph text', run: () => {
+      const t = docxToText(makeDocx('The contractor shall provide daily service.'));
+      return ok(/contractor shall provide daily service/i.test(t), t.slice(0, 60));
+    } },
+  ],
+};

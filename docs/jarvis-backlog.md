@@ -19,8 +19,13 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
   L/M/C + required-forms checklist; grounded AI reader that can't hallucinate a requirement; deterministic
   coverage). Live-proven: 4 attachment PDFs read → 63-gap matrix on a real notice. +20 evals (725→745).
   Spec `docs/superpowers/specs/2026-07-24-gov-rfp-shredder-phase1-design.md`, plan `…/plans/2026-07-24-gov-rfp-shredder-phase1.md`.
-- 🔨 **Phase 2 — Amendment & Deadline Radar** — diff the attachment cache/manifest across scans → alert on
-  amendments + shifted deadlines. Extends the deadline radar + Watcher-Health.
+- ✅ **Phase 2 — Amendment & Deadline-Change Radar** (done 2026-07-24). `pods/gov/amendments.mjs` (mirrors
+  `deadlines.mjs`): `runScan` emits a per-bid `gov.snapshot` (deadline + attachment-hash-set signature +
+  Amendment-N); `detectAmendments` (PURE, eval-pinned) flags a moved deadline / changed attachment set /
+  bumped amendment on **pursued** bids only, idempotent via `gov.amendment.flagged`; `runAmendmentRadar`
+  alerts once (Telegram+HQ) and invalidates the stale attachment cache so the matrix rebuilds fresh. New
+  `/maintenance/amendment-check` + `amendment-radar` schedule job. 11 evals (747→758). Final opus review
+  caught + fixed a byte-noise false-alert Critical. Spec `docs/superpowers/specs/2026-07-24-gov-amendment-radar-phase2-design.md`.
 - 🔨 **Phase 3 — Past-Performance & Snippet Library** — reusable records + boilerplate that auto-insert into drafts.
 - 🔨 **Phase 4 — Matrix-Grounded Drafting** — draft each section to answer the Phase-1 matrix rows, grounded
   in the Phase-3 library; existing `checkCompliance` verifies coverage. (Also lifts the AI reader's L/M recall.)

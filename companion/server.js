@@ -3423,6 +3423,26 @@ const server = http.createServer(async (req, res) => {
     try { const B = await import('../pods/gov/briefs.mjs'); return send(res, 200, JSON.stringify(await B.buildBriefs({ topN: Number(url.searchParams.get('n')) || 3, cpUrl: CP_URL }))); }
     catch (e) { return send(res, 200, JSON.stringify({ briefs: [], text: '', error: e.message })); }
   }
+  // Past-performance & snippet LIBRARY (pods/gov/library.mjs): reusable proposal content. GET = the whole
+  // library; /for?noticeId= = the records + snippets relevant to one bid (Phase 4 + the Bid Brief use this);
+  // POST /past-performance = add a citable record. Read/write of curated content — no gate, nothing sent.
+  if (req.method === 'GET' && url.pathname === '/api/gov/library') {
+    try { const L = await import('../pods/gov/library.mjs'); return send(res, 200, JSON.stringify({ ok: true, ...L.loadLibrary() })); }
+    catch (e) { return send(res, 200, JSON.stringify({ ok: false, snippets: [], pastPerformance: [], error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/gov/library/for') {
+    try {
+      const noticeId = url.searchParams.get('noticeId');
+      const L = await import('../pods/gov/library.mjs');
+      let op = { noticeId };
+      try { const D = await import('../pods/gov/deals.mjs'); const deal = D.getDeal(noticeId); if (deal) op = { ...deal, noticeId }; } catch { /* ledger best-effort → core snippets still returned */ }
+      return send(res, 200, JSON.stringify({ ok: true, ...L.libraryFor(op) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/gov/library/past-performance') {
+    try { const rec = await readBody(req); const L = await import('../pods/gov/library.mjs'); const stored = L.addPastPerformance(rec || {}); return send(res, 200, JSON.stringify({ ok: !stored.error, record: stored })); }
+    catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   if (req.method === 'POST' && url.pathname === '/api/gov-board/disposition') {
     try {
       const { noticeId, stage, title: bodyTitle, agency: bodyAgency } = await readBody(req);
@@ -3445,6 +3465,15 @@ const server = http.createServer(async (req, res) => {
           CAP.recordOutcome({ noticeId, title: dTitle, agency: dAgency, result: stage, lessons: [], debriefRequested: false });
           debrief = CAP.debriefRequestEmail({ opp: { title: dTitle, noticeId, agency: dAgency }, result: stage }); // text shown in the UI right away
         } catch { debrief = null; }
+      }
+      // Grow the past-performance library from a real WIN (Phase 3): a won bid becomes a citable record the
+      // operator fleshes out later. Best-effort, only on the transition INTO won (not a re-mark); never blocks.
+      if (stage === 'won' && prevDisposition !== 'won') {
+        try {
+          const L = await import('../pods/gov/library.mjs');
+          const { inferTrade } = await import('../pods/gov/pipeline.mjs');
+          L.addPastPerformance({ title: dTitle || 'Awarded contract', agency: dAgency, trade: inferTrade(dTitle || '').trade, periodEnd: new Date().toISOString().slice(0, 10), outcome: 'Awarded', noticeId, scope: '' });
+        } catch { /* library grow is best-effort */ }
       }
       // GATED CO DEBRIEF on a LOST transition (operator OK'd 2026-07-20). Resolve the CO email from SAM, then
       // stage the draft + raise the gate on the CONTROL-PLANE (where the executor's filesystem lives). The

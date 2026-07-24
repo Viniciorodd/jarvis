@@ -33,8 +33,14 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
   **won** adds a `needsReview` past-perf stub (id-keyed upsert). `/api/gov/library(/for)` + POST. 9 evals
   (758→767). Final review: Ready to merge. Phase 4 consumes `libraryFor`; must skip `needsReview` stubs.
   Spec `docs/superpowers/specs/2026-07-24-gov-library-phase3-design.md`.
-- 🔨 **Phase 4 — Matrix-Grounded Drafting** — draft each section to answer the Phase-1 matrix rows, grounded
-  in the Phase-3 library; existing `checkCompliance` verifies coverage. (Also lifts the AI reader's L/M recall.)
+- ✅ **Phase 4 — Matrix-Grounded Drafting** (done 2026-07-24, capstone). `pods/gov/grounding.mjs` `groundingBlock`
+  (PURE): lists every matrix requirement (grouped, gaps-first) + library snippets + REAL past-performance only
+  (filters `needsReview`; empty→explicit no-fabricate). `draft()` (worker.mjs) self-resolves the SAM key, folds
+  in the block, strengthens the system prompt (answer every requirement; cite only provided past-perf;
+  fabrication prohibited), trims the raw-SOW dump. Both call sites (scan + pursue) grounded; still fully gated,
+  nothing auto-sends; existing facts-guard + compliance self-heal still run. 7 evals (767→774). Verified live
+  (real notice → grounding block w/ requirements + 5 sections + no-fab). **Deferred:** coverage-% on the submit
+  gate (viewable via `/api/gov/matrix`). Spec `docs/superpowers/specs/2026-07-24-gov-grounded-drafting-phase4-design.md`.
 - 🔨 **Phase 5 — Incumbent & Extended Discovery** — who holds this / recompete timing / SLED beyond SAM (the
   build-it-ourselves HigherGov replacement).
 - 🔨 **Phase 6 — SCA-Wage Bid-Price Builder** — parse the cached SCLS wage determination → labor-loaded bid price.

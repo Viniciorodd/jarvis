@@ -4,7 +4,7 @@
 // categories bucket correctly, coverage is deterministic keyword-overlap, and — the doctrine line — a GAP
 // carries an EMPTY citation (coverage is NEVER fabricated). No network: everything runs on fixture strings.
 
-import { extractRequirements, mapCoverage, buildMatrix, renderMatrixMarkdown, categorize, groundRows } from '../pods/gov/matrix.mjs';
+import { extractRequirements, mapCoverage, buildMatrix, renderMatrixMarkdown, categorize, groundRows, detectForms } from '../pods/gov/matrix.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -98,5 +98,12 @@ export default {
       ], src);
       return ok(rows.length === 0, JSON.stringify(rows));
     } },
+    { name: 'detectForms finds SF1449, reps&certs, and an SCLS/SCA wage determination', run: () => {
+      const t = 'Complete SF 1449 and submit. Offerors must have an active SAM registration and current representations and certifications. Comply with the attached Service Contract Labor Standards wage determination.';
+      const codes = detectForms(t).map((r) => r.formCode);
+      return ok(codes.includes('SF1449') && codes.includes('reps-certs') && codes.includes('wage-det'), JSON.stringify(codes));
+    } },
+    { name: 'detectForms returns none on clean prose (no false forms)', run: () =>
+      ok(detectForms('We provide excellent janitorial services with trained staff.').length === 0) },
   ],
 };

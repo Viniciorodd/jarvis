@@ -68,6 +68,25 @@ export function groundRows(rawRows = [], sourceText = '') {
   return out;
 }
 
+// PURE: deterministic required-forms / submission-mechanics checklist. These are the omissions that make a
+// bid non-responsive even when the SOW is fully answered. Each hit → one 'form' row (the disposer, not the LLM).
+const FORM_RULES = [
+  ['SF1449',     /\bSF[-\s]?1449\b|standard form 1449/i,                                                              'Submit a completed SF1449 (solicitation/offer/award form).'],
+  ['SF33',       /\bSF[-\s]?33\b|standard form 33/i,                                                                   'Submit a completed SF33 (solicitation/offer/award).'],
+  ['SF18',       /\bSF[-\s]?18\b|standard form 18/i,                                                                   'Submit a completed SF18 (request for quotation).'],
+  ['reps-certs', /reps?\s*(?:&|and)\s*certs?|representations?\s+and\s+certifications?|52\.204-8|active\s+(?:registration\s+in\s+)?sam|sam\s+registration/i, 'Include current representations & certifications / active SAM registration.'],
+  ['bond',       /\b(?:bid|performance|payment)\s+bond\b|surety/i,                                                     'Provide the required bond (bid/performance/payment).'],
+  ['wage-det',   /service\s+contract\s+labor\s+standards|\bscls\b|\bsca\b|wage\s+determination|davis[-\s]?bacon/i,      'Comply with the attached wage determination (SCLS/SCA/Davis-Bacon).'],
+  ['page-format',/page\s+limit|not\s+to\s+exceed\s+\d+\s+pages|\bfont\b|times\s+new\s+roman|single[-\s]?spaced|volume\s+[ivx1-9]/i, 'Meet the page/format/volume limits in the instructions.'],
+  ['submission', /\b(?:quotes?|offers?|proposals?)\s+(?:are\s+)?due\b|submit\s+(?:via|to|by|through)|no\s+later\s+than\b[^.\n]*\d/i, 'Submit by the stated method + deadline.'],
+];
+export function detectForms(fullText = '') {
+  const t = String(fullText || '');
+  const rows = [];
+  for (const [formCode, re, text] of FORM_RULES) if (re.test(t)) rows.push({ section: 'form', category: 'required-form', formCode, text });
+  return rows;
+}
+
 // Words we ignore when measuring requirement↔draft overlap: requirement boilerplate + generic connectives
 // (all length ≥4 so they'd otherwise survive the length filter and inflate matches).
 const STOP = new Set([

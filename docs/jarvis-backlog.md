@@ -9,10 +9,11 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
 
 ---
 
-## 🏛 GovCon capability build — 6-phase plan (2026-07-24)
+## 🏛 GovCon capability build — 8-phase plan (2026-07-24)
 From a review of GovDash / GovGPT / the GovCon AI-tool landscape vs. what Jarvis already has. We build the
 gaps ourselves (no $500/yr HigherGov). Order = win-rate leverage first, then dependency. Each phase = its own
-spec → plan → build cycle.
+spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator request: 7 = REDOS bid-engine ports,
+8 = the tonight PRD, kept LAST per operator.)
 - ✅ **Phase 1 — RFP Shredder → Compliance Matrix** (done 2026-07-24). `pods/gov/attachments.mjs` (PDF via
   `unpdf` / DOCX via `adm-zip`, cached to `gov-drafts/att/`) + section-aware `pods/gov/matrix.mjs` (Section
   L/M/C + required-forms checklist; grounded AI reader that can't hallucinate a requirement; deterministic
@@ -26,6 +27,29 @@ spec → plan → build cycle.
 - 🔨 **Phase 5 — Incumbent & Extended Discovery** — who holds this / recompete timing / SLED beyond SAM (the
   build-it-ourselves HigherGov replacement).
 - 🔨 **Phase 6 — SCA-Wage Bid-Price Builder** — parse the cached SCLS wage determination → labor-loaded bid price.
+- 🔨 **Phase 7 — REDOS → Rodgate transferable patterns** (vault `🔁 REDOS → Rodgate — Transferable Patterns.md`).
+  Three ports onto the existing bid engine — all code, eval-pinnable, PC-doable, independent of Phases 2–6:
+  - **① Bid Coach** — extend `pods/gov/bid-fit.mjs` output from one "next action" to a ranked, severity-tagged
+    mitigation set (🚨 Dealbreaker → ⚠️ Fix → 💡 Tip → 💡 Price move → ✅ Strength); every line a *move*, not an
+    observation. Deterministic (from the same signals + disqualifiers + gates + price). Surfaces on the board card + brief.
+  - **② Projected-vs-Actual win-rate engine** (the doc's "real gem", highest value) — a per-bid ledger row
+    (Bid Fit score/verdict, win-prob, price-to-win, LOE, margin) captured at bid, filled at award; grade forecast
+    accuracy (were PURSUEs winning? price-to-win biased? LOE under-estimated?) → a recalibration signal for the Bid
+    Fit weights. Ties into `pods/gov/capture.mjs` (win/loss) + the [[🧠 Lessons Ledger]]. Fully independent — could
+    be pulled earlier if the operator wants the win-rate loop sooner.
+  - **③ Bid Brief one-pager** — branded capture/bid brief (opportunity + Bid Fit + verdict + price-to-win +
+    teaming + top risks/mitigations), reusing `pods/gov/pdf.mjs`. Markets Rodgate as bigger than a solo shop to teaming partners.
+- 🔨 **Phase 8 (LAST) — Tonight PRD follow-ups** (`docs/prd-2026-07-24-followups.md`). Cross-cutting infra/UX,
+  NOT gov-pod — different domain, gated on live infra for 2 of 3 items:
+  - **Item 1 — on-demand Gmail drafting** (doc marks URGENT; small + PC-doable): extract `appendGmailDraft` out of
+    `stageDrafts` (shared helper, no dup) + add a `draft_gmail_reply` tool to `/api/chat` TOOLS so "draft a reply to
+    X" writes a real `[Gmail]/Drafts` message. DRAFT-ONLY, never sends (truth-contract). **Could be pulled forward.**
+  - **Item 2 — Telegram per-agent topics**: verify + fix the Cowork-built `companion/telegram-topics.mjs` +
+    `telegram-bridge.mjs` (currently UNCOMMITTED in the tree) — needs a real phone + a forum group + the NAS bridge
+    running; check the `createForumTopic` flat-chat fallback + that `narrate-rollup`/`narrate-truth` evals stay green.
+  - **Item 3 — converge the two Jarvises**: execute `docs/one-source-of-truth.md`'s migration (point Morning Brief /
+    Gov Inbox Watch at `/api/gov-board`, emit events not vault-note status guesses). Touches Mac-worker job prompts +
+    n8n on the NAS — the PRD says this is its OWN session, run from the Mac (Tailscale access). I can't reach it from the PC.
 
 ## ✅ Done (2026-07-20)
 - ✅ **Bid Fit Index** (PRD L-013) — `pods/gov/bid-fit.mjs` + `POST /api/gov/bid-fit`: disqualifier-aware

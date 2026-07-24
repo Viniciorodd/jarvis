@@ -87,6 +87,26 @@ export function detectForms(fullText = '') {
   return rows;
 }
 
+// PURE: fuse the three requirement sources into one deduped, section-tagged, capped list. Dedup by normalized
+// text; when the same text appears in two sources, the more SPECIFIC section wins (form/L/M beat C beat general).
+const SECTION_RANK = { form: 4, L: 3, M: 3, C: 2, general: 1 };
+export function mergeRequirements(regexRows = [], groundedRows = [], formRows = [], { cap = 80 } = {}) {
+  const byKey = new Map();
+  const add = (row, sectionDefault) => {
+    const text = String(row.text || '').replace(/\s+/g, ' ').trim();
+    if (text.length < 12) return;
+    const key = normQ(text);
+    const section = row.section || sectionDefault || 'general';
+    const cur = byKey.get(key);
+    if (!cur) byKey.set(key, { text, section, category: row.category || categorize(text) });
+    else if ((SECTION_RANK[section] || 0) > (SECTION_RANK[cur.section] || 0)) cur.section = section;
+  };
+  for (const r of Array.isArray(formRows) ? formRows : []) add(r, 'form');
+  for (const r of Array.isArray(groundedRows) ? groundedRows : []) add(r);
+  for (const r of Array.isArray(regexRows) ? regexRows : []) add(r, 'C');
+  return [...byKey.values()].slice(0, cap).map((r, i) => ({ id: `R${i + 1}`, text: r.text, section: r.section, category: r.category }));
+}
+
 // Words we ignore when measuring requirement↔draft overlap: requirement boilerplate + generic connectives
 // (all length ≥4 so they'd otherwise survive the length filter and inflate matches).
 const STOP = new Set([

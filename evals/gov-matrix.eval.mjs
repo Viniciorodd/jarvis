@@ -4,7 +4,7 @@
 // categories bucket correctly, coverage is deterministic keyword-overlap, and — the doctrine line — a GAP
 // carries an EMPTY citation (coverage is NEVER fabricated). No network: everything runs on fixture strings.
 
-import { extractRequirements, mapCoverage, buildMatrix, renderMatrixMarkdown, categorize, groundRows, detectForms } from '../pods/gov/matrix.mjs';
+import { extractRequirements, mapCoverage, buildMatrix, renderMatrixMarkdown, categorize, groundRows, detectForms, mergeRequirements } from '../pods/gov/matrix.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -105,5 +105,18 @@ export default {
     } },
     { name: 'detectForms returns none on clean prose (no false forms)', run: () =>
       ok(detectForms('We provide excellent janitorial services with trained staff.').length === 0) },
+    { name: 'mergeRequirements dedupes, prefers specific section over general, caps, ids R1..Rn', run: () => {
+      const regex = [{ id: 'R1', text: 'The contractor shall provide daily service', category: 'general' }]; // regex → default C
+      const ai = [{ section: 'L', text: 'The contractor shall provide daily service', category: 'general' }, // dup of regex, but Section L
+                  { section: 'M', text: 'Award is best value tradeoff', category: 'general' }];
+      const forms = [{ section: 'form', category: 'required-form', formCode: 'SF1449', text: 'Submit a completed SF1449.' }];
+      const rows = mergeRequirements(regex.map((r) => ({ ...r, section: 'C' })), ai, forms);
+      const daily = rows.filter((r) => /daily service/i.test(r.text));
+      return ok(daily.length === 1 && daily[0].section === 'L' && rows.some((r) => r.section === 'form') && rows.every((r, i) => r.id === `R${i + 1}`), JSON.stringify(rows.map((r) => [r.id, r.section])));
+    } },
+    { name: 'mergeRequirements caps at 80', run: () => {
+      const many = Array.from({ length: 200 }, (_, i) => ({ section: 'C', text: `The contractor shall deliver item number ${i} on schedule`, category: 'general' }));
+      return ok(mergeRequirements([], many, []).length === 80);
+    } },
   ],
 };

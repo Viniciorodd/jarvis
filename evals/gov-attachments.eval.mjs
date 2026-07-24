@@ -30,5 +30,21 @@ export default {
       const t = docxToText(makeDocx('The contractor shall provide daily service.'));
       return ok(/contractor shall provide daily service/i.test(t), t.slice(0, 60));
     } },
+    { name: 'extractText reads DOCX text', run: async () => {
+      const { extractText } = await import('../pods/gov/attachments.mjs');
+      const t = await extractText(makeDocx('shall provide restroom sanitation daily'), 'docx');
+      return ok(/restroom sanitation daily/i.test(t), t.slice(0, 60));
+    } },
+    { name: 'extractText reads PDF text via unpdf', run: async () => {
+      const fs = await import('node:fs');
+      const { extractText } = await import('../pods/gov/attachments.mjs');
+      const buf = fs.readFileSync(new URL('./fixtures/sample.pdf', import.meta.url));
+      const t = await extractText(buf, 'pdf');
+      return ok(/contractor shall provide daily janitorial/i.test(t), t.slice(0, 80));
+    } },
+    { name: 'extractText returns "" for unknown type (never throws)', run: async () => {
+      const { extractText } = await import('../pods/gov/attachments.mjs');
+      return ok((await extractText(Buffer.from('??'), 'unknown')) === '');
+    } },
   ],
 };

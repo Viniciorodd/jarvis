@@ -13,7 +13,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, env, emit, mirror, hqApproval, notifyTelegram, claudeBatch } from '../lib.mjs';
+import { ROOT, env, emit, mirror, hqApproval, notifyTelegram, claudeBatch, noteWatch } from '../lib.mjs';
 
 const REPORT = path.join(ROOT, 'control-plane', 'data', 'inbox-triage-latest.json');
 
@@ -139,6 +139,8 @@ export async function runTriage({ account = 'personal', days = 3, max = 40, stag
   await mirror('MAILROOM-01', 'work', `Reading the ${account} inbox…`, 'chief-of-staff');
   const inbox = await readInbox(account, { days, max });
   if (inbox.error) {
+    // Watcher Health (L-013): the inbox connector is down → record BLIND (control probe failed) + push once.
+    if (account === 'personal') noteWatch('gmail-triage', { newItems: 0, controlProbeOk: false });
     await emit({ kind: 'trace', actor: 'MAILROOM-01', pod: 'chief-of-staff', action: 'inbox.triage.skip', status: 'error', rationale: inbox.error });
     await mirror('MAILROOM-01', 'idle', inbox.error, 'chief-of-staff');
     return { ok: false, note: inbox.error };
@@ -163,15 +165,26 @@ export async function runTriage({ account = 'personal', days = 3, max = 40, stag
 
   const spend = 0; // per-call batch cost is already logged by the router's consumers
   const counts = merged.reduce((a, m) => { a[m.category] = (a[m.category] || 0) + 1; return a; }, {});
+  // Watcher Health (L-013): the inbox returned mail → connector proven live this run. SIGNAL (needs_reply)
+  // is NOT pushed here — the digest below already surfaces it; noteWatch only pushes sensor-health problems.
+  if (account === 'personal') noteWatch('gmail-triage', { newItems: counts.needs_reply || 0, controlProbeOk: (inbox.msgs || []).length > 0 });
 
   // Stage review-ready reply drafts into Gmail for the emails that need one — draft-only, you review + send.
+  // Cap is generous + configurable (STAGE_DRAFTS_MAX, default 10) so a flooded inbox doesn't spawn 40 rushed
+  // drafts; whatever's over the cap is never HIDDEN — the digest lists it so you still handle it.
   let draftsStaged = 0;
+  const needReply = merged.filter((m) => m.category === 'needs_reply');
+  const draftCap = Number(env('STAGE_DRAFTS_MAX', '10')) || 10;
   if (stageReplies) {
-    try { const d = await stageDrafts(account, merged.filter((m) => m.category === 'needs_reply'), inbox.user, { max: 5 }); draftsStaged = d.staged || 0; }
+    try { const d = await stageDrafts(account, needReply, inbox.user, { max: draftCap }); draftsStaged = d.staged || 0; }
     catch { /* best-effort — never break the triage over a draft */ }
   }
   let text = digestText(account, merged);
-  if (draftsStaged) text += `\n\n📝 ${draftsStaged} reply draft(s) staged in your Gmail Drafts — open Gmail, review + send.`;
+  if (draftsStaged) {
+    const overflow = needReply.length - draftsStaged;
+    const extra = overflow > 0 ? ` (${overflow} more need you — listed above, handle those directly)` : '';
+    text += `\n\n📝 ${draftsStaged} reply draft(s) staged in your Gmail Drafts${extra} — open Gmail, review + send.`;
+  }
 
   // persist the full report (the UI + the cleanup executor read this)
   try { fs.mkdirSync(path.dirname(REPORT), { recursive: true }); fs.writeFileSync(REPORT, JSON.stringify({ account, at: new Date().toISOString(), counts, draftsStaged, messages: merged }, null, 2)); } catch { /* */ }

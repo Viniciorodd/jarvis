@@ -22,6 +22,16 @@
     if(meta.childNodes.length) d.appendChild(meta);
     var tags = el('div','gov-tags');
     tags.appendChild(el('span','gov-fit', fitStars(card.fit)));
+    // Bid Fit Index — deterministic go/no-go badge (a NO-BID is arithmetic, never a verdict).
+    if(card.bidFit){
+      var bf=card.bidFit, band=(bf.band||'').toLowerCase();
+      var chip=el('span','gov-bidfit '+band, bf.verdict + ' ' + bf.score);
+      var tip=[bf.note];
+      if(bf.disqualified && bf.reasons && bf.reasons.length) tip.push('Why: '+bf.reasons.join('; '));
+      if(bf.gates && bf.gates.length) tip.push('⚠️ '+bf.gates.join(' · '));
+      chip.title=tip.filter(Boolean).join(' — ');
+      tags.appendChild(chip);
+    }
     tags.appendChild(el('span','gov-tag' + (card.inLane?'':' bad'), card.setAside + (card.inLane?'':' ⛔')));
     if(card.naics) tags.appendChild(el('span','gov-tag', card.trade + ' · ' + card.naics));
     if(card.deadline) tags.appendChild(el('span','gov-tag due', 'due ' + card.deadline));

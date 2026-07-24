@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { llm, llmBatch } from './model-router.mjs';
 import { getSecret } from '../control-plane/vault.mjs';
+import { recordRun as whRecordRun } from '../control-plane/watcher-health.mjs';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // pods/ -> repo root
 
@@ -87,6 +88,20 @@ export function notifyTelegram(text) {
 export async function notify({ title, detail = '', pod = 'Operations', verb = 'Open', xp = 0 } = {}) {
   await hqApproval({ pod, title, detail, verb, xp });
   notifyTelegram(`${title}\n${detail}`);
+}
+
+// WATCHER HEALTH CONTRACT (L-013): a live watcher calls this at the end of each run to self-update the
+// health ledger (control-plane/watcher-health.mjs) — so "no results" from an unproven/broken channel reads
+// BLIND, never a false all-clear. It PUSHES only sensor-health problems (BLIND/SUSPECT, transition-aware so
+// no spam) by default — a real SIGNAL is already surfaced by the domain (the inbox digest, the board), so
+// `pushOn` excludes SIGNAL unless a caller (e.g. a channel nothing else notifies) opts in. Best-effort.
+//   obs = { newItems:int, controlProbeOk:bool|null, now?:Date|iso }
+export function noteWatch(watcher, obs = {}, { pushOn = ['BLIND', 'SUSPECT'] } = {}) {
+  try {
+    const r = whRecordRun(watcher, obs);
+    if (r.push && pushOn.includes(r.state)) notifyTelegram(r.headline); // r.push already encodes anti-spam
+    return r;
+  } catch { return null; }
 }
 
 // The pod-facing LLM call. Delegates to the model-router (pods/model-router.mjs), which picks the

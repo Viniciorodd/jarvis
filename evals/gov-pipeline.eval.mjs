@@ -90,5 +90,21 @@ export default {
       ] });
       return ok(board.yourNextAction === null, JSON.stringify(board.yourNextAction));
     } },
+
+    { name: 'buildBoard attaches a Bid Fit Index badge to every card', run: () => {
+      const board = buildBoard({ opportunities: [
+        { noticeId: 'A', title: 'Janitorial Services Base X', naics: '561720', score: 82, recommendation: 'bid', setAside: 'Total Small Business' },
+      ] });
+      const c = board.columns.flatMap((col) => col.cards).find((x) => x.noticeId === 'A');
+      return ok(c && c.bidFit && typeof c.bidFit.score === 'number' && /PURSUE|REVIEW|THIN|NO-BID/.test(c.bidFit.band) && typeof c.bidFit.verdict === 'string', JSON.stringify(c && c.bidFit));
+    } },
+
+    { name: 'Bid Fit on a card auto-NO-BIDs an over-cap value (arithmetic, with the reason)', run: () => {
+      const board = buildBoard({ opportunities: [
+        { noticeId: 'B', title: 'Custodial Y', naics: '561720', score: 70, recommendation: 'bid', setAside: 'Total Small Business', value: 500000 },
+      ] });
+      const c = board.columns.flatMap((col) => col.cards).find((x) => x.noticeId === 'B');
+      return ok(c && c.bidFit.band === 'NO-BID' && c.bidFit.disqualified === true && c.bidFit.reasons.some((r) => /cap/.test(r)), JSON.stringify(c && c.bidFit));
+    } },
   ],
 };

@@ -9,6 +9,8 @@
 // Lane (operator is SDB / minority small business — NOT 8(a)/HUBZone/SDVOSB/WOSB):
 //   janitorial · custodial · grounds · facilities, sub-$150k, Total Small Business / SDB set-asides.
 
+import { bidFit, CORE_NAICS } from './bid-fit.mjs'; // the deterministic Bid Fit Index — a badge per card
+
 // ── PURE: fit score 0–100 → 1–5 (what the operator glances at) ────────────────────────────────────
 export function fitScore(score) {
   const s = Number(score) || 0;
@@ -161,6 +163,10 @@ export function buildBoard({ opportunities = [], approvals = [], awards = [], di
     const lane = inLane(o.setAside);
     const { trade, naics } = inferTrade(o.title);
     const value = Number(o.value) || Number(estimates[o.noticeId]) || 0; // SAM rarely gives $; operator estimates fill in
+    // Bid Fit Index (deterministic go/no-go arithmetic) as a per-card badge. Only feed NAICS we're sure of
+    // (the card's is inferred from the title) so an inference never wrongly auto-disqualifies; set-aside +
+    // value are the reliable inputs. A NO-BID is arithmetic, never a verdict — the UI renders it calmly.
+    const bf = bidFit({ naics: CORE_NAICS.includes(o.naics || naics) ? (o.naics || naics) : '', setAside: o.setAside, value, portal: o.portal });
     cards.push({
       noticeId: o.noticeId,
       title: o.title || 'Untitled solicitation',
@@ -173,6 +179,7 @@ export function buildBoard({ opportunities = [], approvals = [], awards = [], di
       deadline: o.deadline || '',
       score: Number(o.score) || 0,
       fit: fitScore(o.score),
+      bidFit: { score: bf.score, band: bf.band, verdict: bf.verdict, note: bf.note, disqualified: bf.disqualified, reasons: bf.reasons.map((r) => r.reason), gates: bf.gates },
       stage,
       next: nextAction(o, stage, ctx),
       url: o.url || '',

@@ -12,6 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, DRAFTS, env, secret, profile, emit, mirror, hqApproval, gateApproval, claude, claudeBatch } from './lib.mjs';
+import { noteWatch } from '../lib.mjs'; // Watcher Health Contract (L-013)
 import { maybeConnect } from './connector.mjs';
 import { procurementPath } from './replies.mjs';
 import { checkCompliance } from './compliance.mjs';
@@ -159,6 +160,10 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
 
   const { opps, source: feed } = await scout();
   await emit({ kind: 'action', actor: 'SAM-SCOUT', pod: 'gov', action: 'scan.done', status: 'done', rationale: `${opps.length} opportunities from ${feed}`, payload: { count: opps.length, feed } });
+  // Watcher Health (L-013): an empty feed means the SAM/PA connector may be DOWN (BLIND), not a real
+  // "nothing out there" all-clear. newItems:0 — finding opps is the board's job to surface, not a push;
+  // noteWatch only alerts a sensor-health problem (transition-aware, so no spam while it stays down).
+  noteWatch('gov-scout', { newItems: 0, controlProbeOk: Array.isArray(opps) && opps.length > 0 });
 
   // Fill in REAL descriptions before anyone scores anything — SAM v2's `description` is a URL, and until
   // this step the analysts were literally scoring a link string. Free SAM fetches, 5 at a time.

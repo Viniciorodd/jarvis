@@ -136,7 +136,17 @@ export function parseScore(text) {
 
 // ── D. CLOSER — draft the proposal (FAR/DFARS-aware, leads with SDB/minority, 50% sub rule) ──────
 async function draft(op, sc, prof) {
-  const sys = `You are the GovCon Proposal Writer for this firm. Draft a proposal RESPONSE for the opportunity. Elite, compliant, concise. Sections: 1) Cover/Compliance summary (cite the set-aside and the firm's SDB/Minority/Hispanic status as the win theme), 2) Technical Approach, 3) Management Plan & Staffing, 4) Past Performance (note: new prime — emphasize PA registrations + disaster registry; if a subcontractor's past performance is provided below, cite it), 5) Subcontracting Plan (respect the 50% limit-on-subcontracting on small-business set-aside services; if a selected subcontractor + quote is provided, name them and reflect the quote in pricing/management), 6) FAR/DFARS compliance checklist (list the key clauses to verify, e.g. 52.219-14 Limitations on Subcontracting, 52.222 labor standards). End with "[HUMAN REVIEW REQUIRED — Vinicio signs & submits]". Markdown. Firm profile:\n${prof}`;
+  const sys = `You are the GovCon Proposal Writer for this firm. Draft a proposal RESPONSE for the opportunity. Elite, compliant, concise. Sections: 1) Cover/Compliance summary (cite the set-aside and the firm's SDB/Minority/Hispanic status as the win theme), 2) Technical Approach, 3) Management Plan & Staffing, 4) Past Performance (note: new prime — emphasize PA registrations + disaster registry; if a subcontractor's past performance is provided below, cite it), 5) Subcontracting Plan (respect the 50% limit-on-subcontracting on small-business set-aside services; if a selected subcontractor + quote is provided, name them and reflect the quote in pricing/management), 6) FAR/DFARS compliance checklist (list the key clauses to verify, e.g. 52.219-14 Limitations on Subcontracting, 52.222 labor standards). RULES (Phase 4 grounding): you MUST address EVERY requirement in the REQUIREMENTS block below — a missed shall/must or a missing required form makes the bid non-responsive. USE the PROVEN SECTIONS provided (adapt them to this solicitation; don't copy verbatim). Cite ONLY the PAST PERFORMANCE provided — inventing past performance, certifications, or a socio-economic status the firm does not hold is PROHIBITED. End with "[HUMAN REVIEW REQUIRED — Vinicio signs & submits]". Markdown. Firm profile:\n${prof}`;
+  // Phase 4 grounding: the compliance matrix (answer every requirement) + the curated library (real reusable
+  // sections + REAL past-performance only). All code-provided; best-effort — a failure falls back to the SOW dump.
+  let ground = '';
+  try {
+    const key = secret('SAM-SCOUT', 'SAM_API_KEY');
+    const [{ matrixForOp }, { libraryFor }, { groundingBlock }] = await Promise.all([import('./matrix.mjs'), import('./library.mjs'), import('./grounding.mjs')]);
+    const mx = await matrixForOp(op, { key });
+    const lib = libraryFor(op);
+    ground = groundingBlock({ matrixRows: (mx.matrix && mx.matrix.rows) || [], pastPerformance: lib.pastPerformance, snippets: lib.snippets });
+  } catch { /* grounding best-effort — draft still works off the SOW below */ }
   // Fold in Hector's procurement package (selected sub + quote + past performance + CODE-priced bid).
   let extra = '';
   try {
@@ -146,9 +156,10 @@ async function draft(op, sc, prof) {
   } catch { /* none gathered yet */ }
   // Fold in the REAL scope of work if the scout pulled it — the proposal must answer the requirement.
   let sowTxt = '';
-  try { sowTxt = fs.readFileSync(sowPath(op), 'utf8').slice(0, 6000); } catch { /* not pulled */ }
-  const sowBlock = sowTxt ? `\n\nSCOPE OF WORK (pulled from SAM — answer THIS, not the headline):\n${sowTxt}` : '';
-  const r = await claude(sys, `OPPORTUNITY:\n${JSON.stringify(op, null, 2)}\n\nSCORE/ANALYSIS:\n${JSON.stringify(sc, null, 2)}${extra}${sowBlock}`, { tier: 'draft', maxTokens: 1800, agent: 'GOV-ANALYST' });
+  try { sowTxt = fs.readFileSync(sowPath(op), 'utf8').slice(0, 3000); } catch { /* not pulled */ }
+  const sowBlock = sowTxt ? `\n\nSCOPE OF WORK excerpt (context only — the REQUIREMENTS block is the authoritative checklist):\n${sowTxt}` : '';
+  const groundBlock = ground ? `\n\n===== GROUNDING (answer every requirement; use these sections; cite only this past performance) =====\n${ground}` : '';
+  const r = await claude(sys, `OPPORTUNITY:\n${JSON.stringify(op, null, 2)}\n\nSCORE/ANALYSIS:\n${JSON.stringify(sc, null, 2)}${extra}${groundBlock}${sowBlock}`, { tier: 'draft', maxTokens: 2400, agent: 'GOV-ANALYST' });
   return { md: r.text || '# (no draft — model unavailable)\n', cost: r.cost || 0 };
 }
 

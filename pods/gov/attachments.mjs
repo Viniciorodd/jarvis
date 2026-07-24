@@ -65,3 +65,56 @@ export async function extractText(buffer, type) {
   } catch { /* best-effort */ }
   return '';
 }
+
+// Best-effort orchestrator: download a notice's attachments (capped), extract + cache each to
+// gov-drafts/att/<slug>/<hash>.txt, write a manifest, and return the combined UNTRUSTED text. Requires a SAM
+// key (attachment downloads are authenticated); with no key it degrades to empty so the matrix uses notice
+// text alone. `fetchImpl` is injectable for tests. Never throws.
+export async function ingestAttachments(op = {}, key = '', { max = Number(process.env.SHRED_MAX_ATT) || 8, maxBytesEach = 25 * 1024 * 1024, timeoutMs = 20000, force = false, fetchImpl = fetch } = {}) {
+  const empty = { ok: false, dir: null, files: [], combinedText: '', manifestFile: null };
+  try {
+    let links = Array.isArray(op.resourceLinks) ? op.resourceLinks.filter(Boolean) : [];
+    if (!links.length) links = attachmentsFromSowFile(op);           // re-shred later: read the SOW file's list
+    if (!links.length || !key) return empty;
+    const dir = attDir(op);
+    fs.mkdirSync(dir, { recursive: true });
+    const files = [];
+    for (const url of links.slice(0, max)) {
+      const hash = hashUrl(url);
+      const textFile = path.join(dir, `${hash}.txt`);
+      if (!force && fs.existsSync(textFile)) {                        // cached — parse once
+        const text = safeRead(textFile);
+        files.push({ url, hash, type: 'cached', bytes: 0, chars: text.length, ok: true, error: null, textFile: path.relative(ROOT, textFile) });
+        continue;
+      }
+      try {
+        const sep = url.includes('?') ? '&' : '?';
+        const r = await fetchImpl(`${url}${sep}api_key=${key}`, { signal: AbortSignal.timeout(timeoutMs) });
+        if (!r.ok) { files.push({ url, hash, type: 'unknown', bytes: 0, chars: 0, ok: false, error: `http ${r.status}`, textFile: null }); continue; }
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (buf.length > maxBytesEach) { files.push({ url, hash, type: 'skip', bytes: buf.length, chars: 0, ok: false, error: 'too large', textFile: null }); continue; }
+        const ct = (r.headers && r.headers.get && r.headers.get('content-type')) || '';
+        const type = sniffType(buf, url, ct);
+        const text = await extractText(buf, type);
+        fs.writeFileSync(textFile, text);
+        files.push({ url, hash, type, bytes: buf.length, chars: text.length, ok: true, error: text ? null : 'no extractable text', textFile: path.relative(ROOT, textFile) });
+      } catch (e) { files.push({ url, hash, type: 'unknown', bytes: 0, chars: 0, ok: false, error: e.message, textFile: null }); }
+    }
+    const manifestFile = path.join(dir, 'manifest.json');
+    try { fs.writeFileSync(manifestFile, JSON.stringify(files, null, 2)); } catch { /* best-effort */ }
+    const combinedText = files
+      .filter((f) => f.ok && f.textFile)
+      .map((f, i) => `\n\n===== ATTACHMENT ${i + 1} (${f.type}) =====\n${safeRead(path.join(ROOT, f.textFile))}`)
+      .join('');
+    return { ok: true, dir: path.relative(ROOT, dir), files, combinedText, manifestFile: path.relative(ROOT, manifestFile) };
+  } catch { return empty; }
+}
+
+function safeRead(p) { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } }
+// re-shred path: the SOW file lists attachment URLs under "## Attachments"; parse them back out.
+function attachmentsFromSowFile(op) {
+  try {
+    const raw = fs.readFileSync(sowPath(op), 'utf8');
+    return [...raw.matchAll(/^\s*\d+\.\s+(https?:\/\/\S+)\s*$/gim)].map((m) => m[1]);
+  } catch { return []; }
+}

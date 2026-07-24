@@ -51,5 +51,19 @@ export default {
       const r = await extractText(12345, 'pdf');   // a number is not a Buffer/string
       return ok(r === '', JSON.stringify(r));
     } },
+    { name: 'ingestAttachments downloads via injected fetch, caches text, builds combinedText', run: async () => {
+      const os = await import('node:os'); const fs = await import('node:fs'); const path = await import('node:path');
+      const { ingestAttachments } = await import('../pods/gov/attachments.mjs');
+      // fake fetch returns a tiny text "PDF-less" body typed as txt
+      const fetchImpl = async () => ({ ok: true, headers: { get: () => 'text/plain' }, arrayBuffer: async () => Buffer.from('The contractor shall maintain insurance coverage.').buffer });
+      const op = { noticeId: 'ATT-TEST-' + hashUrl(String(Math.random())), resourceLinks: ['https://sam.gov/a', 'https://sam.gov/b'] };
+      const r = await ingestAttachments(op, 'FAKEKEY', { fetchImpl });
+      return ok(r.ok && r.files.length === 2 && /maintain insurance coverage/i.test(r.combinedText), JSON.stringify({ files: r.files.length, chars: r.combinedText.length }));
+    } },
+    { name: 'ingestAttachments with no key returns empty (notice-only fallback)', run: async () => {
+      const { ingestAttachments } = await import('../pods/gov/attachments.mjs');
+      const r = await ingestAttachments({ noticeId: 'X', resourceLinks: ['https://sam.gov/a'] }, '');
+      return ok(r.ok === false && r.combinedText === '' && r.files.length === 0, JSON.stringify(r.files));
+    } },
   ],
 };

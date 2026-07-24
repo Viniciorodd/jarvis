@@ -1,0 +1,65 @@
+[
+  {
+    "id": "seed-company-overview",
+    "key": "company-overview",
+    "title": "Company Overview",
+    "trade": [],
+    "topics": ["overview", "capability"],
+    "core": true,
+    "body": "Rodgate, LLC (dba Rodgate Group) is an owner-managed, Small Disadvantaged, Minority-Owned (Hispanic American Owned) small business (self-certified) providing custodial, janitorial, floor care, grounds, and facilities support services. Registered and active in SAM.gov (UEI Z1SWBFEK7EM4, CAGE 18S75) and a Pennsylvania Commonwealth / COSTARS cooperative vendor, Rodgate fields scalable American crews sized to each requirement, with direct owner accountability and no management layers between the customer and the work. Primary NAICS: 561720 Janitorial, 561210 Facilities Support, 561990 All Other Support Services."
+  },
+  {
+    "id": "seed-quality-control-plan",
+    "key": "quality-control-plan",
+    "title": "Quality Control Plan (QCP)",
+    "trade": [],
+    "topics": ["quality", "qc", "qcp", "inspection"],
+    "core": true,
+    "body": "Rodgate operates a three-tier Quality Control Plan. (1) Self-inspection: each crew member follows a task checklist tied to the PWS performance standards and signs off per shift. (2) Supervisor spot-checks: the on-site supervisor performs random daily inspections against the same standards and logs deficiencies with corrective-action timelines. (3) Joint QC walkthroughs: a monthly scheduled walkthrough with the COR/QAE, documented on a shared inspection form, with any deficiency corrected within 24 hours and root-caused to prevent recurrence. All inspection records are retained and available to the Government on request."
+  },
+  {
+    "id": "seed-staffing-plan",
+    "key": "staffing-plan",
+    "title": "Staffing & Management Plan",
+    "trade": [],
+    "topics": ["staffing", "personnel", "management", "labor"],
+    "core": true,
+    "body": "Rodgate staffs each contract with a dedicated, American workforce sized to the SOW and the facility's square footage and frequency requirements. Each shift is led by an on-site supervisor responsible for quality, safety, and customer communication. Crews are cross-trained and backed by on-call relief staff so that scheduled coverage is never missed due to absence. All personnel are onboarded with background checks and badging per the contract's security requirements, and Rodgate complies with the applicable Service Contract Labor Standards (SCLS) wage determination for the place of performance."
+  },
+  {
+    "id": "seed-transition-in",
+    "key": "transition-in",
+    "title": "Transition-In Plan",
+    "trade": [],
+    "topics": ["transition", "phase-in", "mobilization"],
+    "core": true,
+    "body": "Rodgate executes a 30-day transition-in with zero disruption to operations. Week 1: hiring, badging, background checks, and supply/equipment procurement. Week 2: facility walkthroughs, keying/access setup, and staging of consumables and equipment. Week 3: crew shadowing and knowledge transfer with the incumbent (where applicable) and establishment of the QC baseline. Week 4: full performance assumption with the supervisor on site, first joint QC walkthrough scheduled, and an open line to the COR. A named transition lead owns the schedule and reports status weekly."
+  },
+  {
+    "id": "seed-safety-osha",
+    "key": "safety-osha",
+    "title": "Safety & OSHA Compliance",
+    "trade": [],
+    "topics": ["safety", "osha", "hazard"],
+    "core": true,
+    "body": "Rodgate maintains an OSHA-compliant safety program. Safety Data Sheets (SDS) for all chemicals are kept on site and accessible; personal protective equipment (PPE) is issued and its use enforced; and monthly safety briefings are documented. Wet-floor and hazard signage is used during all applicable operations. Incidents and near-misses are reported to the supervisor and the COR within 24 hours, investigated, and corrected. Rodgate targets an incident-free workplace and tracks safety performance as part of its quality metrics."
+  },
+  {
+    "id": "seed-carpet-floor-care",
+    "key": "carpet-floor-care",
+    "title": "Carpet & Floor Care Approach",
+    "trade": ["Janitorial"],
+    "topics": ["floor", "carpet", "strip", "wax", "buff"],
+    "core": false,
+    "body": "Rodgate performs carpet and hard-floor care to commercial standards: hot-water extraction for carpet; strip, seal, and refinish cycles for VCT; scrub-and-recoat maintenance to extend finish life; and burnishing to a uniform gloss where specified. Frequencies and methods follow the PWS, and all products are compatible with the substrate and any Government green-cleaning requirements. Work is scheduled to avoid disruption to building operations and verified against the QC standards before sign-off."
+  },
+  {
+    "id": "seed-grounds-maintenance",
+    "key": "grounds-maintenance",
+    "title": "Grounds Maintenance Approach",
+    "trade": ["Grounds"],
+    "topics": ["grounds", "landscaping", "mowing", "vegetation"],
+    "core": false,
+    "body": "Rodgate provides grounds maintenance to the PWS standards: mowing, edging, trimming, and blowing on the specified cycle; seasonal pruning, mulching, and bed maintenance; and litter and debris removal. Equipment is maintained and operated safely, with traffic and pedestrian safety controls during work near occupied areas. Service is scheduled around the site's operations and weather, and completion is verified against the QC standards."
+  }
+]

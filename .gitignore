@@ -124,3 +124,7 @@ stitch_solo_govcon_cockpit/
 pods/vault/book-ops-state.json
 
 browser-stage/
+
+# Gov library — seed is tracked; the operator's real past-performance + snippet edits are private
+gov-library/*.json
+!gov-library/snippets.seed.json

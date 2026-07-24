@@ -222,6 +222,17 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { result = { ok: false, note: e.message }; }
       return send(res, 200, result);
     }
+    // Amendment radar → detect when a PURSUED solicitation CHANGED (moved deadline / revised attachment / new
+    // Amendment 000N) across scans, alert once, and invalidate the stale attachment cache (deterministic, no LLM).
+    if (req.method === 'POST' && p === '/maintenance/amendment-check') {
+      await readBody(req);
+      let result;
+      try {
+        const am = await import('../pods/gov/amendments.mjs');
+        result = await am.runAmendmentRadar();
+      } catch (e) { result = { ok: false, note: e.message }; }
+      return send(res, 200, result);
+    }
     // Tax deadline radar → remind before a statutory/estimate deadline closes (final-stage only; idempotent).
     if (req.method === 'POST' && p === '/maintenance/tax-deadline-check') {
       const b = await readBody(req);

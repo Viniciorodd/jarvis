@@ -240,6 +240,21 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     }
   }
 
+  // SNAPSHOT for the amendment radar (pods/gov/amendments.mjs): record deadline + attachment-set signature +
+  // amendment level per bid opp, so the next scan can detect what CHANGED (moved deadline / revised file / new
+  // Amendment 000N). Reads the Phase-1 manifest + SOW text. Best-effort — a snapshot never fails the scan.
+  try {
+    const { attSignature, amendmentLevel } = await import('./amendments.mjs');
+    const { attDir } = await import('./attachments.mjs');
+    const { sowPath } = await import('./sow.mjs');
+    for (const { op } of scored.filter((s) => s.sc.recommendation === 'bid')) {
+      let files = [], sowText = '';
+      try { files = JSON.parse(fs.readFileSync(path.join(attDir(op), 'manifest.json'), 'utf8')); } catch { /* no manifest yet */ }
+      try { sowText = fs.readFileSync(sowPath(op), 'utf8'); } catch { /* no SOW pulled */ }
+      await emit({ kind: 'trace', actor: 'SAM-SCOUT', pod: 'gov', action: 'gov.snapshot', status: 'done', payload: { noticeId: op.noticeId, title: op.title, url: op.url, deadline: op.deadline || '', attSig: attSignature(files), amendmentN: amendmentLevel(sowText) } });
+    }
+  } catch { /* snapshot best-effort */ }
+
   // Mirror the actionable pipeline (bid + watch) into the Notion company brain. Fire-and-forget, sequential
   // to respect Notion's rate limit, capped, and graceful (no key / page not shared → skips silently).
   import('../notion.mjs').then(async (N) => {

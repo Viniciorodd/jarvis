@@ -1,6 +1,34 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-07-20. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+_Updated 2026-07-24. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+
+### 🆕 2026-07-24 (latest) — reliability restored + browser automation + inbox now produces drafts
+Frame: "reliability first; anything we left undone?" Cleared the two blockers, added the browser, closed two gaps.
+- **Tailscale back up** — expired auth key; operator generated a fresh reusable `TS_AUTHKEY`, `force-recreate
+  tailscale`. `jarvis-nas` MagicDNS name back on the mesh (desktop Away mode now targets `jarvis-nas`, not a
+  stale IP). Operator revoked the key that got pasted in chat.
+- **Personal Gmail connected** — root cause was NOT a missing .env value; it was the **compose-injection
+  footgun**: `PERSONAL_GMAIL_*` were in `.env` but not in the control-plane `environment:` block, so the
+  container never saw them. Added the two lines + `--force-recreate`. Triage verified `ok:true`.
+- **Browser automation (Playwright, in-repo)** — `pods/browser.mjs`: `readPage` (untrusted-data read),
+  `stageFormFill` (fills + screenshots + **never submits**, dismisses cookie banners, blocks submit/pay/
+  password/cvv/ssn fields). Companion routes `/api/browser/{read,stage-form,shot}`. 7 safety evals.
+- **Hector integration** — `/api/gov/sub-form-fill` resolves a sub → builds Rodgate outreach → stages a
+  filled contact form for your review (screenshot in the subs-bench modal, "🌐 Fill their contact form").
+  Never submits. Auto-reachout deferred until "Hector proves himself."
+- **#3 env-health footgun detector** — `control-plane/env-health.mjs` (`checkEnv/envHealth/missingHint/
+  credError`, pure, eval-pinned): every integration cred it depends on, and for any missing one it names the
+  var **and the exact compose fix**. Startup logs it loudly; `GET /env-health` exposes it. So nobody hunts
+  for hours again. 7 evals.
+- **#1 Gmail draft-staging** — morning triage now writes a **review-ready reply draft into `[Gmail]/Drafts`**
+  for each `needs_reply` email (`stageDrafts` in `pods/inbox/triage.mjs`): free brain ($0), Rodgate voice,
+  incoming email treated as untrusted, capped 5/run, `STAGE_DRAFTS` (default on), digest/mirror/report show
+  `draftsStaged`. **Never sends** — you open Gmail, review, edit, send. Verified live end-to-end against Gmail
+  (append + full glue path; test drafts cleaned up). `replySubject` pinned. Evals 699→**718**.
+- **Still open (backlog, not tonight):** Watcher Health Contract not wired into live watchers; Bid Fit Index
+  not on board cards. **Your hands (🧑):** rotate OpenRouter + Bitwarden keys (overdue); top up Anthropic
+  credit (only the Claude chip needs it — voice/chat/drafts are free on Hermes).
+
 
 ### 🆕 2026-07-20 (latest) — Audit/PRD applied + the whole `#jarvis` backlog cleared + debrief wired + NAS redeploy
 Big session. Operator's frame: "we log tasks and never resurface them." The fix + the work:

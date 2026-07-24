@@ -253,7 +253,8 @@ async function govBoardData() {
   // attach the pre-built compliance-matrix summary (coverage % + gap count) so the board can badge it
   try {
     const D = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'deals.mjs')).href);
-    for (const o of oppMap.values()) { const deal = D.getDeal(o.noticeId); if (deal && deal.matrix) o.matrix = deal.matrix; }
+    const dealsMap = (D.loadDeals() || {}).deals || {};   // one read of deals.json for the whole board, not one per card
+    for (const o of oppMap.values()) { const deal = dealsMap[o.noticeId]; if (deal && deal.matrix) o.matrix = deal.matrix; }
   } catch { /* ledger best-effort — board still renders without badges */ }
   return P.buildBoard({ opportunities: [...oppMap.values()], approvals, awards, dispositions, estimates: gs.estimates || {}, submissions });
 }

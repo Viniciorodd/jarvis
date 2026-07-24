@@ -88,6 +88,9 @@ export async function ingestAttachments(op = {}, key = '', { max = Number(proces
         continue;
       }
       try {
+        let host = '';
+        try { host = new URL(url).hostname; } catch { host = ''; }
+        if (!/(^|\.)sam\.gov$/i.test(host)) { files.push({ url, hash, type: 'skip', bytes: 0, chars: 0, ok: false, error: 'non-SAM host — api_key withheld', textFile: null }); continue; }
         const sep = url.includes('?') ? '&' : '?';
         const r = await fetchImpl(`${url}${sep}api_key=${key}`, { signal: AbortSignal.timeout(timeoutMs) });
         if (!r.ok) { files.push({ url, hash, type: 'unknown', bytes: 0, chars: 0, ok: false, error: `http ${r.status}`, textFile: null }); continue; }
@@ -117,6 +120,10 @@ function safeRead(p) { try { return fs.readFileSync(p, 'utf8'); } catch { return
 function attachmentsFromSowFile(op) {
   try {
     const raw = fs.readFileSync(sowPath(op), 'utf8');
-    return [...raw.matchAll(/^\s*\d+\.\s+(https?:\/\/\S+)\s*$/gim)].map((m) => m[1]);
+    // SECURITY: parse URLs ONLY from the "## Attachments" section — the "## Description" body is UNTRUSTED
+    // solicitation content and a crafted URL there must never receive the SAM api_key.
+    const after = raw.split(/^##\s*Attachments\b[^\n]*$/im)[1] || '';
+    const block = after.split(/^##\s/m)[0] || ''; // stop at the next heading (e.g. "## Description")
+    return [...block.matchAll(/^\s*\d+\.\s+(https?:\/\/\S+)\s*$/gim)].map((x) => x[1]);
   } catch { return []; }
 }

@@ -73,5 +73,13 @@ export default {
       const f = r.files[0];
       return ok(f && f.ok === false && f.error === 'too large' && bodyRead === false && r.combinedText === '', JSON.stringify({ f, bodyRead }));
     } },
+    { name: 'ingestAttachments withholds the SAM key from a non-sam.gov host (no exfiltration / SSRF)', run: async () => {
+      const { ingestAttachments } = await import('../pods/gov/attachments.mjs');
+      let called = '';
+      const fetchImpl = async (u) => { called = u; return { ok: true, headers: { get: () => 'text/plain' }, arrayBuffer: async () => Buffer.from('x').buffer }; };
+      const r = await ingestAttachments({ noticeId: 'ATT-EVIL-' + hashUrl(String(Math.random())), resourceLinks: ['https://evil.example.com/collect'] }, 'SECRETKEY', { fetchImpl });
+      const f = r.files[0];
+      return ok(f && f.ok === false && /non-SAM/i.test(f.error) && called === '', JSON.stringify({ f, called }));
+    } },
   ],
 };

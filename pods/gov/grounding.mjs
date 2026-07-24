@@ -29,7 +29,7 @@ export function groundingBlock({ matrixRows = [], pastPerformance = [], snippets
   const snips = (Array.isArray(snippets) ? snippets : []).filter((s) => s && s.body);
   if (snips.length) {
     out.push('PROVEN SECTIONS — adapt these to THIS solicitation (rewrite specifics; do not copy verbatim if the scope differs):');
-    for (const s of snips) out.push(`\n### ${s.title || s.key}\n${String(s.body).trim()}`);
+    for (const s of snips) out.push(`\n### ${s.title || s.key}\n${String(s.body).trim().slice(0, 1200)}`); // cap so an oversized operator-edited snippet can't balloon the prompt
     out.push('');
   }
 

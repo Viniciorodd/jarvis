@@ -45,6 +45,8 @@ Before `draft(...)`, compute (best-effort):
 - `const library = await import('./library.mjs').then(L => L.libraryFor(op));`
 Pass `{ matrixRows, library }` into `draft()`. After the draft is written + self-healed, re-run `matrixForOp(op)` (now the draft exists on disk) to get the **drafted proposal's coverage %**, and include it in the `proposal.draft`/compliance emit + the submit-gate detail so the operator sees "matrix coverage: X%, N gaps" before approving. Best-effort — a failure never blocks the draft or the gate.
 
+**Implementation note (2026-07-24):** grounding was computed INSIDE `draft()` (self-resolves the SAM key) rather than plumbing a 4th arg — more robust (no call site can forget it), and both the scan loop and pursue path get it. **Deferred:** the submit-gate coverage-% line is NOT yet wired — the drafted proposal's coverage is already viewable on demand via `GET /api/gov/matrix?noticeId=` (which reads the grounded draft from disk), so gate-line surfacing is a low-value follow-up, tracked in the backlog rather than built now.
+
 ## 5. Testing (`evals/gov-grounding.eval.mjs`)
 - `groundingBlock` lists every requirement, grouped, gaps-first (a ⛔ gap requirement appears before an addressed one).
 - Includes each provided snippet's title + body.

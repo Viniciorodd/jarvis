@@ -1,0 +1,12 @@
+---
+const { num, eyebrow, title, lead } = Astro.props;
+---
+<section class="relative overflow-hidden border-b border-[rgba(198,151,73,.22)]"
+  style="background:radial-gradient(120% 120% at 85% 0%, rgba(41,72,150,.4), transparent 55%), linear-gradient(160deg,var(--navy-900),var(--ink));color:var(--hero-fg)">
+  <div class="container py-16 md:py-24">
+    {eyebrow && <p class="kicker" data-num={num} style="color:rgba(234,240,251,.65)">{eyebrow}</p>}
+    <hr class="rule-gold" style="margin:20px 0 22px" />
+    <h1 class="display" style="font-size:clamp(2rem,4.4vw,3.5rem);color:#fff">{title}</h1>
+    {lead && <p class="mt-5 max-w-2xl text-lg text-white/75">{lead}</p>}
+  </div>
+</section>

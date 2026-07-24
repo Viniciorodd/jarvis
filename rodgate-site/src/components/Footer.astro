@@ -1,0 +1,52 @@
+---
+import Icon from './Icon.astro';
+import { company, nav } from '../data/company.js';
+const year = new Date().getFullYear();
+---
+<footer class="mt-24 border-t border-border bg-muted/60">
+  <div class="mx-auto grid max-w-content gap-10 px-5 py-14 md:grid-cols-[1.4fr_1fr_1fr]">
+    <div>
+      <div class="flex items-center gap-2.5 font-heading text-lg font-bold text-fg">
+        <span class="grid h-9 w-9 place-items-center rounded-md bg-primary text-[var(--on-primary)]">
+          <Icon name="shield-check" size={20} />
+        </span>
+        RODGATE GROUP
+      </div>
+      <p class="mt-4 max-w-sm text-sm text-muted-fg">
+        {company.legalName} (DBA {company.dba}) — a self-certified Small Disadvantaged,
+        Minority-Owned (Hispanic American) small business serving federal, state, and local
+        government across {company.serviceAreaAbbr.join(', ')}.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-x-5 gap-y-1 text-xs font-semibold text-muted-fg">
+        <span>UEI {company.uei}</span>
+        <span>CAGE {company.cage}</span>
+        <span>SAM.gov Active</span>
+      </div>
+    </div>
+
+    <nav aria-label="Footer">
+      <h2 class="font-heading text-sm font-bold uppercase tracking-wide text-fg">Company</h2>
+      <ul class="mt-4 space-y-2 text-sm text-muted-fg">
+        {nav.map((item) => (
+          <li><a href={item.href} class="transition-colors hover:text-fg">{item.label}</a></li>
+        ))}
+      </ul>
+    </nav>
+
+    <div>
+      <h2 class="font-heading text-sm font-bold uppercase tracking-wide text-fg">Contact</h2>
+      <ul class="mt-4 space-y-2.5 text-sm text-muted-fg">
+        <li class="flex items-start gap-2"><Icon name="map-pin" size={16} class="mt-0.5 shrink-0" /> {company.address}</li>
+        <li class="flex items-center gap-2"><Icon name="mail" size={16} class="shrink-0" /><a href={`mailto:${company.email}`} class="hover:text-fg">{company.email}</a></li>
+        <li class="flex items-center gap-2"><Icon name="phone" size={16} class="shrink-0" /><a href={`tel:${company.phoneHref}`} class="hover:text-fg">{company.phone}</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="border-t border-border">
+    <div class="mx-auto flex max-w-content flex-col gap-1 px-5 py-6 text-xs text-muted-fg md:flex-row md:items-center md:justify-between">
+      <p>© {year} {company.legalName} (DBA {company.dba}). All rights reserved.</p>
+      <p>An American-owned, Small Disadvantaged, Minority-Owned small business.</p>
+    </div>
+  </div>
+</footer>

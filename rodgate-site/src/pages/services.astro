@@ -1,0 +1,64 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Icon from '../components/Icon.astro';
+import { services, company } from '../data/company.js';
+---
+<Base title="Services" description="Custodial & janitorial, grounds & landscaping, trash & haul-away, and facilities support for federal, state, and local government.">
+  <PageHeader
+    num="—"
+    eyebrow="Services"
+    title="Facilities services, one point of accountability"
+    lead="Recurring custodial, grounds, haul-away, and facilities support — delivered through vetted regional crews across PA, NJ, NY, and FL, coordinated under an owner-managed firm."
+  />
+
+  <div class="container section-tight">
+    <div class="space-y-6">
+      {services.map((s) => (
+        <article id={s.slug} class="reveal card scroll-mt-28 p-7 md:p-9">
+          <div class="grid gap-7 md:grid-cols-[auto_1fr]">
+            <span class="grid h-14 w-14 place-items-center rounded-xl bg-muted text-primary">
+              <Icon name={s.icon} size={28} />
+            </span>
+            <div>
+              <h2 class="font-heading text-2xl font-bold text-fg">{s.name}</h2>
+              <p class="mt-2 text-muted-fg">{s.short}</p>
+
+              <h3 class="mt-6 font-heading text-sm font-bold uppercase tracking-wider text-primary">Scope</h3>
+              <ul class="mt-3 space-y-2">
+                {s.scope.map((item) => (
+                  <li class="flex items-start gap-2.5 text-[15px] text-fg">
+                    <Icon name="check" size={18} class="mt-0.5 shrink-0 text-accent" /> {item}
+                  </li>
+                ))}
+              </ul>
+
+              <div class="mt-6 flex flex-wrap gap-6">
+                <div>
+                  <p class="text-xs font-bold uppercase tracking-wider text-muted-fg">Typical engagement</p>
+                  <p class="mt-1 text-[15px] text-fg">{s.engagement}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-bold uppercase tracking-wider text-muted-fg">Relevant PSC / FSC</p>
+                  <div class="mt-1.5 flex flex-wrap gap-2">
+                    {s.psc.map((code) => (
+                      <span class="tag tag--navy">{code}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+
+    <div class="reveal mt-12 flex flex-col items-start gap-4 rounded-[var(--r-lg)] border border-border bg-[var(--color-muted)] p-8 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="font-heading text-xl font-semibold text-fg">Have a requirement in {company.serviceAreaAbbr.join(', ')}?</h2>
+        <p class="mt-1 text-muted-fg">Request a capability briefing and we'll respond promptly.</p>
+      </div>
+      <a href="/contact" class="btn btn-gold shrink-0">Request a briefing <Icon name="arrow-right" size={17} /></a>
+    </div>
+  </div>
+</Base>

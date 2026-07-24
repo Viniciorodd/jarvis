@@ -1,0 +1,25 @@
+# Netlify config for the Rodgate Group site (rodgategroup.com).
+# This is a separate deploy from the legacy jarvis/site/ build — keep the
+# old site live until this one is verified, then repoint DNS.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Security headers (mirrors the legacy site's posture).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Long-cache static assets
+[[headers]]
+  for = "/*.pdf"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"

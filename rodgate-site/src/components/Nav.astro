@@ -1,0 +1,86 @@
+---
+import Icon from './Icon.astro';
+import { nav, company } from '../data/company.js';
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const isActive = (href) => (href === '/' ? path === '/' : path.startsWith(href));
+---
+<!-- thin utility bar — instant credibility, enterprise density -->
+<div class="hidden border-b border-white/10 bg-[var(--ink)] text-[13px] text-white/70 md:block">
+  <div class="container flex items-center justify-between py-1.5">
+    <div class="flex items-center gap-5">
+      <span class="inline-flex items-center gap-1.5 font-medium text-white/85"><Icon name="badge-check" size={14} /> SAM.gov Active</span>
+      <span>UEI {company.uei}</span>
+      <span>CAGE {company.cage}</span>
+    </div>
+    <div class="flex items-center gap-5">
+      <a href={`tel:${company.phoneHref}`} class="inline-flex items-center gap-1.5 hover:text-white"><Icon name="phone" size={13} /> {company.phone}</a>
+      <a href={`mailto:${company.email}`} class="inline-flex items-center gap-1.5 hover:text-white"><Icon name="mail" size={13} /> {company.email}</a>
+    </div>
+  </div>
+</div>
+
+<header class="sticky top-0 z-50 border-b border-border bg-[var(--color-surface)]/90 backdrop-blur supports-[backdrop-filter]:bg-[var(--color-surface)]/75">
+  <div class="container flex items-center justify-between gap-4 py-3.5">
+    <a href="/" class="flex items-center gap-3" aria-label="Rodgate Group — home">
+      <span class="grid h-9 w-9 place-items-center rounded-[5px] bg-[var(--color-primary)] text-[var(--on-primary)]">
+        <Icon name="shield-check" size={19} />
+      </span>
+      <span class="font-heading text-[19px] font-semibold tracking-tight text-fg">RODGATE<span class="text-muted-fg"> GROUP</span></span>
+    </a>
+
+    <nav class="hidden items-center gap-0.5 lg:flex" aria-label="Primary">
+      {nav.map((item) => (
+        <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}
+          class:list={[
+            'relative rounded-[5px] px-3.5 py-2 font-heading text-[15px] font-medium transition-colors',
+            isActive(item.href) ? 'text-primary' : 'text-muted-fg hover:text-fg',
+          ]}
+        >{item.label}</a>
+      ))}
+    </nav>
+
+    <div class="flex items-center gap-2">
+      <a href="/contact" class="btn btn-navy hidden !px-4 !py-2.5 !text-sm sm:inline-flex">
+        Capability Briefing <Icon name="arrow-right" size={15} />
+      </a>
+      <button id="theme-toggle" type="button" aria-label="Toggle dark mode"
+        class="grid h-9 w-9 place-items-center rounded-[5px] border border-border text-muted-fg transition-colors hover:text-fg">
+        <span class="dark:hidden"><Icon name="moon" size={17} /></span>
+        <span class="hidden dark:block"><Icon name="sun" size={17} /></span>
+      </button>
+      <button id="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-nav"
+        class="grid h-9 w-9 place-items-center rounded-[5px] border border-border text-muted-fg lg:hidden">
+        <Icon name="menu" size={19} />
+      </button>
+    </div>
+  </div>
+
+  <nav id="mobile-nav" hidden aria-label="Mobile" class="border-t border-border bg-[var(--color-surface)] lg:hidden">
+    <div class="container flex flex-col py-2">
+      {nav.map((item) => (
+        <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}
+          class:list={['rounded-[5px] px-2 py-2.5 font-heading text-base font-medium', isActive(item.href) ? 'text-primary' : 'text-fg']}>
+          {item.label}
+        </a>
+      ))}
+    </div>
+  </nav>
+</header>
+
+<script>
+  const root = document.documentElement;
+  document.getElementById('theme-toggle')?.addEventListener('click', () => {
+    const cur = root.getAttribute('data-theme');
+    const isDark = cur === 'dark' || (!cur && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const next = isDark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  });
+  const navToggle = document.getElementById('nav-toggle');
+  const mobileNav = document.getElementById('mobile-nav');
+  navToggle?.addEventListener('click', () => {
+    const open = mobileNav?.hasAttribute('hidden');
+    if (open) mobileNav?.removeAttribute('hidden'); else mobileNav?.setAttribute('hidden', '');
+    navToggle.setAttribute('aria-expanded', String(!!open));
+  });
+</script>

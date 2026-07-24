@@ -1,0 +1,77 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Icon from '../components/Icon.astro';
+import { company } from '../data/company.js';
+
+const values = [
+  { icon: 'shield-check', title: 'Accountability', body: 'Owner-managed means the person answering for the work is the person you talk to. No layers, no runaround.' },
+  { icon: 'handshake', title: 'In writing', body: 'Clear scope, clear expectations, before work begins. Honesty is how we earn the next contract.' },
+  { icon: 'badge-check', title: 'Boring excellence', body: 'Reliable delivery beats flash. We do the fundamentals consistently and let the record speak.' },
+];
+---
+<Base title="About" description="Rodgate Group is a family-driven, owner-managed small business built to serve federal, state, and local government with accountability and reliability.">
+  <PageHeader
+    num="—"
+    eyebrow="About"
+    title="A family-driven small business"
+    lead="Owner-managed accountability is not a slogan for us — it is the whole model."
+  />
+
+  <div class="container section-tight">
+    <div class="reveal grid gap-10 md:grid-cols-[1.4fr_1fr]">
+      <div class="prose-none">
+        <h2 class="font-heading text-2xl font-bold text-fg">Who we are</h2>
+        <div class="mt-4 space-y-4 text-[17px] leading-relaxed text-muted-fg">
+          <p>
+            {company.legalName} (DBA {company.dba}) is a {company.businessType.split('·')[0].trim()},
+            founded to serve federal, state, and local government with dependable facilities
+            services — custodial and janitorial, grounds and landscaping, trash and haul-away,
+            and broader facilities support.
+          </p>
+          <p>
+            We are a self-certified Small Disadvantaged, Minority-Owned (Hispanic American) small
+            business. We coordinate vetted regional crews across
+            {' '}{company.serviceArea.join(', ')} and stand behind the work as an owner-managed firm
+            — one point of contact, direct accountability, and everything agreed in writing.
+          </p>
+          <p>
+            We are early in our journey and honest about it. We are building our past performance
+            the right way: reliable delivery on real contracts, no borrowed credentials, no
+            overclaiming. When a prime or a contracting officer works with Rodgate, they get a
+            partner who treats every requirement like it matters — because to us, it does.
+          </p>
+        </div>
+      </div>
+
+      <aside class="card h-fit p-6">
+        <h2 class="font-heading text-sm font-bold uppercase tracking-wider text-muted-fg">Leadership</h2>
+        <div class="mt-4 flex items-center gap-4">
+          <span class="grid h-14 w-14 place-items-center rounded-[8px] bg-primary font-heading text-xl font-semibold text-[var(--on-primary)]">VR</span>
+          <div>
+            <p class="font-heading text-lg font-semibold text-fg">{company.poc}</p>
+            <p class="text-sm text-muted-fg">{company.pocTitle}</p>
+          </div>
+        </div>
+        <hr class="my-5 border-border" />
+        <ul class="space-y-3 text-sm">
+          <li class="flex items-center gap-2 text-muted-fg"><Icon name="mail" size={16} class="shrink-0" /><a href={`mailto:${company.email}`} class="hover:text-fg">{company.email}</a></li>
+          <li class="flex items-center gap-2 text-muted-fg"><Icon name="phone" size={16} class="shrink-0" /><a href={`tel:${company.phoneHref}`} class="hover:text-fg">{company.phone}</a></li>
+          <li class="flex items-start gap-2 text-muted-fg"><Icon name="map-pin" size={16} class="mt-0.5 shrink-0" /> {company.address}</li>
+        </ul>
+      </aside>
+    </div>
+
+    <div class="reveal mt-14 grid gap-6 md:grid-cols-3">
+      {values.map((v) => (
+        <div class="card p-6">
+          <span class="grid h-11 w-11 place-items-center rounded-[8px] bg-[var(--color-muted)] text-primary">
+            <Icon name={v.icon} size={22} />
+          </span>
+          <h3 class="mt-4 font-heading text-lg font-semibold text-fg">{v.title}</h3>
+          <p class="mt-2 text-[15px] text-muted-fg">{v.body}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</Base>

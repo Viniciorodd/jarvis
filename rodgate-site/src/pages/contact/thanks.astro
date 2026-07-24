@@ -1,0 +1,18 @@
+---
+import Base from '../../layouts/Base.astro';
+import Icon from '../../components/Icon.astro';
+---
+<Base title="Thank you" description="Your request has been received.">
+  <section class="mx-auto flex max-w-content flex-col items-center px-5 py-28 text-center">
+    <span class="grid h-16 w-16 place-items-center rounded-full bg-primary/10 text-primary">
+      <Icon name="check" size={32} />
+    </span>
+    <h1 class="mt-6 font-heading text-3xl font-bold text-fg md:text-4xl">Request received</h1>
+    <p class="mt-3 max-w-md text-muted-fg">
+      Thank you for reaching out to Rodgate Group. We've received your request and will respond
+      promptly. For anything urgent, call us directly at
+      <a href="tel:+12019208457" class="font-semibold text-primary hover:underline">201-920-8457</a>.
+    </p>
+    <a href="/" class="btn btn-gold mt-8">Back to home <Icon name="arrow-right" size={17} /></a>
+  </section>
+</Base>

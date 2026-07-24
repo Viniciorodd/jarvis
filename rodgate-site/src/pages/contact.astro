@@ -1,0 +1,67 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHeader from '../components/PageHeader.astro';
+import ContactForm from '../components/ContactForm.astro';
+import Icon from '../components/Icon.astro';
+import { company } from '../data/company.js';
+---
+<Base title="Contact" description="Request a capability briefing from Rodgate Group. Serving federal, state, and local government across PA, NJ, NY, and FL.">
+  <PageHeader
+    num="—"
+    eyebrow="Contact"
+    title="Request a capability briefing"
+    lead="Tell us about your requirement — location, scope, and timeline — and we'll respond promptly."
+  />
+
+  <div class="container section-tight">
+    <div class="grid gap-10 md:grid-cols-[1.4fr_1fr]">
+      <div class="reveal">
+        <ContactForm />
+      </div>
+
+      <aside class="reveal space-y-6">
+        <div class="card p-6">
+          <h2 class="font-heading text-lg font-semibold text-fg">Direct contact</h2>
+          <ul class="mt-4 space-y-4 text-[15px]">
+            <li class="flex items-start gap-3">
+              <Icon name="badge-check" size={18} class="mt-0.5 shrink-0 text-primary" />
+              <span><span class="font-semibold text-fg">{company.poc}</span><br /><span class="text-muted-fg">{company.pocTitle}</span></span>
+            </li>
+            <li class="flex items-center gap-3">
+              <Icon name="mail" size={18} class="shrink-0 text-primary" />
+              <a href={`mailto:${company.email}`} class="font-semibold text-primary hover:underline">{company.email}</a>
+            </li>
+            <li class="flex items-center gap-3">
+              <Icon name="phone" size={18} class="shrink-0 text-primary" />
+              <a href={`tel:${company.phoneHref}`} class="font-semibold text-primary hover:underline">{company.phone}</a>
+            </li>
+            <li class="flex items-start gap-3">
+              <Icon name="map-pin" size={18} class="mt-0.5 shrink-0 text-primary" />
+              <span class="text-muted-fg">{company.address}</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="rounded-[var(--r-lg)] border border-border bg-[var(--color-muted)] p-6">
+          <h2 class="flex items-center gap-2 font-heading text-sm font-bold uppercase tracking-wider text-muted-fg">
+            <Icon name="map-pin" size={16} /> Service area
+          </h2>
+          <div class="mt-3 flex flex-wrap gap-2">
+            {company.serviceArea.map((s) => (
+              <span class="tag">{s}</span>
+            ))}
+          </div>
+        </div>
+
+        <div class="card p-6">
+          <p class="text-xs font-bold uppercase tracking-wider text-muted-fg">Registrations</p>
+          <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-fg">
+            <span>UEI {company.uei}</span>
+            <span>CAGE {company.cage}</span>
+            <span>SAM.gov Active</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</Base>

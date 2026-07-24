@@ -1,0 +1,114 @@
+---
+import Base from '../layouts/Base.astro';
+import Hero from '../components/Hero.astro';
+import Icon from '../components/Icon.astro';
+import { services, differentiators, company } from '../data/company.js';
+
+const proof = [
+  ['3', 'NAICS codes', 'Facilities · Janitorial · Support'],
+  ['8', 'PSC / FSC codes', 'Registered service classes'],
+  ['4', 'States served', company.serviceAreaAbbr.join(' · ')],
+  ["Feb '27", 'SAM.gov active', 'Registered & current'],
+];
+const valueIcons = ['shield-check', 'badge-check', 'handshake', 'check'];
+---
+<Base>
+  <Hero />
+
+  <!-- Value strip (Prism-style) -->
+  <section class="section-tight border-b border-border">
+    <div class="container">
+      <p class="reveal kicker kicker--plain">Our value, your advantage</p>
+      <div class="reveal mt-10 grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+        {differentiators.map((d, i) => (
+          <div>
+            <span class="text-primary"><Icon name={valueIcons[i]} size={22} /></span>
+            <h3 class="mt-4 font-heading text-[17px] font-semibold text-fg">{d.title}</h3>
+            <p class="mt-2 text-[15px] leading-relaxed text-muted-fg">{d.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Services — numbered editorial rows -->
+  <section class="section">
+    <div class="container">
+      <div class="reveal max-w-3xl">
+        <p class="kicker" data-num="01">What we do</p>
+        <h2 class="h2 mt-4">Four service lines, one point of accountability.</h2>
+        <p class="lead mt-4">
+          Delivered through vetted regional crews across {company.serviceAreaAbbr.join(', ')} —
+          coordinated and stood behind by an owner-managed firm.
+        </p>
+      </div>
+
+      <div class="reveal mt-14 grid gap-x-12 gap-y-11 md:grid-cols-2">
+        {services.map((s, i) => (
+          <a href={`/services#${s.slug}`} class="group flex gap-5 border-t border-border pt-7 transition-colors hover:border-[var(--gold-line)]">
+            <span class="font-heading text-sm font-semibold tabular-nums text-accent">0{i + 1}</span>
+            <div class="flex-1">
+              <div class="flex items-start justify-between gap-4">
+                <h3 class="font-heading text-xl font-semibold text-fg">{s.name}</h3>
+                <span class="mt-1 shrink-0 text-muted-fg transition-transform group-hover:translate-x-1 group-hover:text-primary motion-reduce:transform-none">
+                  <Icon name="arrow-right" size={20} />
+                </span>
+              </div>
+              <p class="mt-2 text-[15.5px] text-muted-fg">{s.short}</p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Proof band -->
+  <section style="background:linear-gradient(160deg,var(--navy-900),var(--ink));color:#fff">
+    <div class="container grid grid-cols-2 md:grid-cols-4">
+      {proof.map(([n, label, sub], i) => (
+        <div class:list={['px-2 py-12 text-center md:border-l md:border-white/10', i === 0 && 'md:border-l-0']}>
+          <p class="font-heading text-4xl font-semibold tracking-tight text-white md:text-5xl">{n}</p>
+          <p class="mt-2 font-heading text-sm font-medium text-white/90">{label}</p>
+          <p class="mt-1 text-[13px] text-white/55">{sub}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Capability CTA -->
+  <section class="section">
+    <div class="container">
+      <div class="reveal grid items-center gap-10 rounded-[var(--r-lg)] border border-border bg-[var(--color-muted)] p-8 md:grid-cols-[1.25fr_1fr] md:p-14">
+        <div>
+          <p class="kicker kicker--plain">Capability statement</p>
+          <h2 class="h2 mt-4">Everything needed to qualify Rodgate — on one page.</h2>
+          <p class="lead mt-4">
+            UEI, CAGE, NAICS, PSC/FSC, socio-economic status, and SAM.gov registration, laid out
+            to print or screenshot — plus a downloadable capability statement.
+          </p>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <a href="/capabilities" class="btn btn-navy">View company data <Icon name="arrow-right" size={17} /></a>
+            <a href={company.capabilityPdf} download class="btn btn-outline"><Icon name="download" size={17} /> Capability statement (PDF)</a>
+          </div>
+        </div>
+        <dl class="card p-7">
+          <p class="kicker kicker--plain">At a glance</p>
+          <div class="mt-5 divide-hair">
+            {[
+              ['Legal name', company.legalName],
+              ['UEI', company.uei],
+              ['CAGE', company.cage],
+              ['Service area', company.serviceAreaAbbr.join(' · ')],
+              ['SAM.gov', 'Active'],
+            ].map(([k, v]) => (
+              <div class="flex items-center justify-between gap-6 py-3">
+                <dt class="text-sm text-muted-fg">{k}</dt>
+                <dd class="font-heading text-[15px] font-semibold text-fg">{v}</dd>
+              </div>
+            ))}
+          </div>
+        </dl>
+      </div>
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,56 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHeader from '../components/PageHeader.astro';
+import CapabilityTable from '../components/CapabilityTable.astro';
+import Icon from '../components/Icon.astro';
+import { company } from '../data/company.js';
+---
+<Base title="Capabilities & Company Data" description="Rodgate Group capability statement: UEI, CAGE, NAICS, PSC/FSC, socio-economic status, SAM.gov registration, and service area.">
+  <PageHeader
+    num="—"
+    eyebrow="Capability statement"
+    title="Company data & registrations"
+    lead="Everything a contracting officer or prime's procurement office needs to qualify Rodgate — on one page, ready to print or screenshot."
+  />
+
+  <div class="container section-tight">
+    <div class="reveal mb-8 flex flex-wrap items-center justify-between gap-4">
+      <p class="max-w-xl text-muted-fg">
+        {company.legalName} (DBA {company.dba}) is registered in SAM.gov and the Commonwealth of
+        Pennsylvania procurement system. All data below is current as of our active registration.
+      </p>
+      <a href={company.capabilityPdf} download class="btn btn-gold no-print">
+        <Icon name="download" size={17} /> Download capability statement (PDF)
+      </a>
+    </div>
+
+    <div class="reveal"><CapabilityTable /></div>
+
+    <div class="reveal mt-8 grid gap-6 md:grid-cols-2">
+      <div class="card p-6">
+        <h2 class="flex items-center gap-2 font-heading text-lg font-semibold text-fg">
+          <Icon name="badge-check" size={20} class="text-primary" /> Socio-economic status
+        </h2>
+        <div class="mt-4 flex flex-wrap gap-2">
+          {company.status.map((s) => (
+            <span class="tag tag--navy">{s}</span>
+          ))}
+        </div>
+        <p class="mt-4 text-sm text-muted-fg">
+          Self-certified only. Rodgate does not claim 8(a), HUBZone, SDVOSB, or WOSB status.
+        </p>
+      </div>
+      <div class="card p-6">
+        <h2 class="flex items-center gap-2 font-heading text-lg font-semibold text-fg">
+          <Icon name="map-pin" size={20} class="text-primary" /> Service area
+        </h2>
+        <div class="mt-4 flex flex-wrap gap-2">
+          {company.serviceArea.map((s) => (
+            <span class="tag">{s}</span>
+          ))}
+        </div>
+        <p class="mt-4 text-sm text-muted-fg">{company.bonding}</p>
+      </div>
+    </div>
+  </div>
+</Base>

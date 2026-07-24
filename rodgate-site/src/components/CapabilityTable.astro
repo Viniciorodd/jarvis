@@ -1,0 +1,49 @@
+---
+// Full capability statement — print/screenshot-ready reference.
+import { company } from '../data/company.js';
+
+const rows = [
+  ['Legal name', `${company.legalName} (DBA ${company.dba})`],
+  ['UEI', company.uei],
+  ['CAGE', company.cage],
+  ['NAICS', company.naics.map((n) => `${n.code} ${n.label}${n.primary ? ' (primary)' : ''}`).join(' · ')],
+  ['PSC / FSC', company.psc.join(', ')],
+  ['Socio-economic status', null], // rendered as pills below
+  ['SAM.gov', company.sam],
+  ['State pipeline', company.statePipeline],
+  ['Service area', company.serviceArea.join(' · ')],
+  ['Bonding', company.bonding],
+  ['Business type', company.businessType],
+  ['Point of contact', `${company.poc}, ${company.pocTitle}`],
+  ['Email', company.email],
+  ['Phone', company.phone],
+  ['Address', company.address],
+];
+---
+<div class="overflow-x-auto rounded-[var(--r-lg)] border border-border bg-surface shadow-[var(--shadow-1)]">
+  <table class="w-full border-collapse text-[15px]">
+    <caption class="sr-only">Rodgate Group capability statement and company data</caption>
+    <tbody>
+      {rows.map(([k, v]) => (
+        <tr class="border-b border-border last:border-0">
+          <th scope="row" class="w-56 whitespace-nowrap bg-muted/50 px-6 py-4 text-left align-top font-heading text-sm font-semibold text-primary">{k}</th>
+          <td class="px-6 py-4 align-top text-fg">
+            {k === 'Socio-economic status' ? (
+              <div class="flex flex-wrap gap-2">
+                {company.status.map((s) => (
+                  <span class="tag tag--navy">{s}</span>
+                ))}
+              </div>
+            ) : k === 'Email' ? (
+              <a href={`mailto:${company.email}`} class="font-semibold text-primary underline-offset-2 hover:underline">{v}</a>
+            ) : k === 'Phone' ? (
+              <a href={`tel:${company.phoneHref}`} class="font-semibold text-primary underline-offset-2 hover:underline">{v}</a>
+            ) : (
+              v
+            )}
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>

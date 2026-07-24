@@ -1,0 +1,82 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Icon from '../components/Icon.astro';
+import { company } from '../data/company.js';
+
+// Honest framing — no fabricated logos or metrics. Real case studies
+// drop into `caseStudies` cleanly once contracts close.
+const caseStudies = [];
+
+const pipeline = [
+  { label: 'Federal', body: 'Actively responding to facilities, janitorial, and grounds sources-sought and solicitations as a small-business subcontractor and prime.' },
+  { label: 'State & cooperative', body: 'Registered PA Commonwealth vendor and COSTARS cooperative — positioned for state and local facilities requirements.' },
+  { label: 'Teaming', body: 'Building relationships with prime contractors across PA, NJ, NY, and FL to deliver custodial and grounds scope under established past performance.' },
+];
+---
+<Base title="Past Performance" description="Rodgate Group is actively building past performance across PA/NJ/NY/FL federal, state, and local facilities contracts.">
+  <PageHeader
+    num="—"
+    eyebrow="Past performance"
+    title="Earning our record, one contract at a time"
+    lead="Rodgate is a young, focused firm building a facilities-services track record the honest way — through reliable delivery on real contracts, not borrowed credentials."
+  />
+
+  <div class="container section-tight">
+    {caseStudies.length === 0 ? (
+      <div class="reveal card p-8 md:p-10">
+        <h2 class="font-heading text-2xl font-bold text-fg">Actively building past performance</h2>
+        <p class="mt-3 max-w-2xl text-muted-fg">
+          {company.legalName} is actively building past performance across
+          {' '}{company.serviceAreaAbbr.join('/')} federal, state, and local facilities contracts.
+          Rather than present placeholder clients or invented metrics, this page reflects exactly
+          where we are — and will feature completed engagements as contracts close.
+        </p>
+
+        <div class="mt-8 grid gap-6 md:grid-cols-3">
+          {pipeline.map((p) => (
+            <div class="rounded-[var(--r-md)] border border-border bg-[var(--color-bg)] p-6">
+              <span class="grid h-10 w-10 place-items-center rounded-[7px] bg-primary/10 text-primary">
+                <Icon name="handshake" size={20} />
+              </span>
+              <h3 class="mt-4 font-heading text-base font-semibold text-fg">{p.label}</h3>
+              <p class="mt-2 text-sm text-muted-fg">{p.body}</p>
+            </div>
+          ))}
+        </div>
+
+        <div class="mt-8 rounded-[var(--r-md)] border border-primary/20 bg-primary/5 p-6">
+          <h3 class="flex items-center gap-2 font-heading text-base font-semibold text-primary">
+            <Icon name="shield-check" size={18} /> What primes and contracting officers can count on
+          </h3>
+          <ul class="mt-3 grid gap-2 sm:grid-cols-2">
+            {[
+              'Owner-managed accountability — one point of contact',
+              'Vetted regional crews sized to each requirement',
+              'SAM.gov registered and PA Commonwealth / COSTARS vendor',
+              'Everything in writing; clear scope before work begins',
+            ].map((item) => (
+              <li class="flex items-start gap-2 text-[15px] text-fg">
+                <Icon name="check" size={18} class="mt-0.5 shrink-0 text-accent" /> {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    ) : (
+      <div class="grid gap-6 md:grid-cols-2">
+        {caseStudies.map((c) => (
+          <article class="rounded-2xl border border-border bg-surface p-6 shadow-card">
+            <h3 class="font-heading text-lg font-semibold text-fg">{c.title}</h3>
+            <p class="mt-2 text-muted-fg">{c.summary}</p>
+          </article>
+        ))}
+      </div>
+    )}
+
+    <div class="reveal mt-10 flex flex-col items-start gap-4 rounded-[var(--r-lg)] border border-border bg-[var(--color-muted)] p-8 sm:flex-row sm:items-center sm:justify-between">
+      <p class="font-heading text-lg font-semibold text-fg">Considering Rodgate for a teaming opportunity?</p>
+      <a href="/contact" class="btn btn-gold shrink-0">Start a conversation <Icon name="arrow-right" size={17} /></a>
+    </div>
+  </div>
+</Base>

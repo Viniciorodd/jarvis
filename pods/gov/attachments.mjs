@@ -52,8 +52,8 @@ export function docxToText(buffer) {
 // Extract plain text from one downloaded buffer. PDF via unpdf's serverless pdf.js build (pure JS — runs on
 // win32 + alpine); DOCX via docxToText; txt/html direct. Any parser failure → '' (best-effort, never throws).
 export async function extractText(buffer, type) {
-  const b = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || '');
   try {
+    const b = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || '');
     if (type === 'pdf') {
       const { extractText: pdfExtract, getDocumentProxy } = await import('unpdf');
       const doc = await getDocumentProxy(new Uint8Array(b));

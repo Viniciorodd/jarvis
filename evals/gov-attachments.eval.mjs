@@ -46,5 +46,10 @@ export default {
       const { extractText } = await import('../pods/gov/attachments.mjs');
       return ok((await extractText(Buffer.from('??'), 'unknown')) === '');
     } },
+    { name: 'extractText never throws on a malformed buffer arg (returns "")', run: async () => {
+      const { extractText } = await import('../pods/gov/attachments.mjs');
+      const r = await extractText(12345, 'pdf');   // a number is not a Buffer/string
+      return ok(r === '', JSON.stringify(r));
+    } },
   ],
 };

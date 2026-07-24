@@ -44,7 +44,7 @@
   // HQ runs on the NAS — reachable via LAN when home, Tailscale when away.
   const WORLD_URL  = 'http://localhost:8095/';
   const LAN_HOST   = localStorage.getItem('jarvis-lan-host')  || '192.168.6.121';
-  const VPN_HOST   = localStorage.getItem('jarvis-vpn-host')  || '100.64.130.81';
+  const VPN_HOST   = localStorage.getItem('jarvis-vpn-host')  || 'jarvis-nas'; // NAS MagicDNS name (was wrongly the PC's IP); stable across tailscale IP changes
   const HQ_PORT    = 8099;
 
   const view    = document.getElementById('view');

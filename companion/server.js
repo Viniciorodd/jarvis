@@ -250,6 +250,11 @@ async function govBoardData() {
     const fromVault = VS.vaultSubmissions([...oppMap.keys()]);
     submissions = { ...fromVault, ...submissions }; // an explicit in-app record still wins on detail
   } catch { /* vault not on this machine → board falls back to its own records */ }
+  // attach the pre-built compliance-matrix summary (coverage % + gap count) so the board can badge it
+  try {
+    const D = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'deals.mjs')).href);
+    for (const o of oppMap.values()) { const deal = D.getDeal(o.noticeId); if (deal && deal.matrix) o.matrix = deal.matrix; }
+  } catch { /* ledger best-effort — board still renders without badges */ }
   return P.buildBoard({ opportunities: [...oppMap.values()], approvals, awards, dispositions, estimates: gs.estimates || {}, submissions });
 }
 // OpenAI key — used for Whisper voice transcription (Whisper API, ~$0.006/min)
@@ -3274,7 +3279,7 @@ const server = http.createServer(async (req, res) => {
       if (!r.ok || !r.matrix) return send(res, 404, JSON.stringify({ ok: false, error: r.error || 'could not build a matrix for this notice', noticeId }));
       if (!r.summary.total) return send(res, 404, JSON.stringify({ ok: false, error: 'no SOW requirements or draft found for this notice yet', noticeId, summary: r.summary }));
       const gaps = (r.matrix.rows || []).filter((row) => row.status === 'gap').map((row) => ({ id: row.id, requirement: row.requirement, category: row.category }));
-      return send(res, 200, JSON.stringify({ ok: true, summary: r.summary, gapCount: r.gapCount, gaps, markdown: M.renderMatrixMarkdown(r.matrix), file: r.file }));
+      return send(res, 200, JSON.stringify({ ok: true, summary: r.summary, bySection: r.summary.bySection || {}, attachments: r.attachments || 0, gapCount: r.gapCount, gaps, markdown: M.renderMatrixMarkdown(r.matrix), file: r.file }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
   // ── SUB TIER LADDER (pods/gov/sub-ladder.mjs): every open bid's sub bench — who's primary, who's the

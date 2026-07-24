@@ -223,6 +223,9 @@
 .gov-bidfit.review{ color:#e5b567; background:rgba(229,181,103,.12); border-color:rgba(229,181,103,.35); }
 .gov-bidfit.thin{ color:#e08a4a; background:rgba(224,138,74,.12); border-color:rgba(224,138,74,.32); }
 .gov-bidfit.no-bid{ color:var(--dim); background:rgba(255,255,255,.03); border-color:rgba(255,255,255,.08); }
+.gov-matrix{ font-weight:700; cursor:help; }
+.gov-matrix.gaps{ color:#e08a4a; background:rgba(224,138,74,.12); border:1px solid rgba(224,138,74,.32); }
+.gov-matrix.clean{ color:#3ecf8e; background:rgba(62,207,142,.12); border:1px solid rgba(62,207,142,.30); }
 .gov-na{ display:flex; gap:7px; align-items:baseline; margin-top:9px; padding-top:8px; border-top:0.5px solid rgba(255,255,255,.06); font-size:11.5px; }
 .gov-na-who{ font-size:10.5px; white-space:nowrap; color:var(--dim); }
 .gov-na.you .gov-na-who{ color:var(--teal); font-weight:600; }

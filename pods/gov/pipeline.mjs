@@ -180,6 +180,7 @@ export function buildBoard({ opportunities = [], approvals = [], awards = [], di
       score: Number(o.score) || 0,
       fit: fitScore(o.score),
       bidFit: { score: bf.score, band: bf.band, verdict: bf.verdict, note: bf.note, disqualified: bf.disqualified, reasons: bf.reasons.map((r) => r.reason), gates: bf.gates },
+      matrix: o.matrix || null,
       stage,
       next: nextAction(o, stage, ctx),
       url: o.url || '',

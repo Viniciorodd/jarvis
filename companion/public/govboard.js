@@ -32,6 +32,12 @@
       chip.title=tip.filter(Boolean).join(' — ');
       tags.appendChild(chip);
     }
+    if(card.matrix){
+      var mx=card.matrix, g=mx.gaps||0;
+      var chip=el('span','gov-matrix '+(g>0?'gaps':'clean'), g>0 ? ('⛔ '+g+' gap'+(g===1?'':'s')) : '✅ compliant');
+      chip.title = 'Compliance matrix: '+ (mx.coveragePct!=null?mx.coveragePct+'% coverage':'') + (mx.attachments?(' · '+mx.attachments+' attachment(s) read'):'');
+      tags.appendChild(chip);
+    }
     tags.appendChild(el('span','gov-tag' + (card.inLane?'':' bad'), card.setAside + (card.inLane?'':' ⛔')));
     if(card.naics) tags.appendChild(el('span','gov-tag', card.trade + ' · ' + card.naics));
     if(card.deadline) tags.appendChild(el('span','gov-tag due', 'due ' + card.deadline));

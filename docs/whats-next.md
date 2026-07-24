@@ -25,9 +25,24 @@ Frame: "reliability first; anything we left undone?" Cleared the two blockers, a
   incoming email treated as untrusted, capped 5/run, `STAGE_DRAFTS` (default on), digest/mirror/report show
   `draftsStaged`. **Never sends** — you open Gmail, review, edit, send. Verified live end-to-end against Gmail
   (append + full glue path; test drafts cleaned up). `replySubject` pinned. Evals 699→**718**.
-- **Still open (backlog, not tonight):** Watcher Health Contract not wired into live watchers; Bid Fit Index
-  not on board cards. **Your hands (🧑):** rotate OpenRouter + Bitwarden keys (overdue); top up Anthropic
-  credit (only the Claude chip needs it — voice/chat/drafts are free on Hermes).
+- **Bid Fit Index on board cards** — `pods/gov/bid-fit.mjs` now renders as a per-card badge on the Gov
+  Pipeline board (`buildBoard` in `pipeline.mjs` attaches it; `govboard.js` + `today.css` render band-colored
+  PURSUE/REVIEW/THIN/NO-BID + score, tooltip = reasons/gates). Safe NAICS guard (an inferred trade never
+  auto-disqualifies). Verified live: 87/87 cards carry it.
+- **Watcher Health Contract wired into live watchers** — new `lib.noteWatch()` (keeps `watcher-health.mjs`
+  pure): `gmail-triage` (runTriage) + `gov-scout` (runScan) self-update the health ledger each run, so an
+  empty feed from a broken connector reads BLIND not a false all-clear. Pushes **only** sensor-health problems
+  (BLIND/SUSPECT, transition-aware anti-spam) — never double-notifies over the digest/board.
+- **Telegram digest** already carries needs-reply + important + the drafts line; the draft cap is now
+  `STAGE_DRAFTS_MAX` (default 10, was a hard 5) and the digest says "N staged (M more need you — listed above)"
+  so nothing over the cap is hidden.
+- **NAS note:** the digest + draft-staging + watcher wiring run in the **control-plane** container
+  (`/maintenance/inbox-triage`), so they go live on the next NAS redeploy (add `STAGE_DRAFTS_MAX` to its
+  `environment:` block if you want a non-default cap). Evals **713 → 720**.
+- **Still open (backlog, not tonight):** fiverr-order-watch has no deterministic scanner to hang `recordRun`
+  on (it's an LLM-command job) — its seed already reports BLIND, correctly; wire it if/when a real fiverr pod
+  exists. **Your hands (🧑):** rotate OpenRouter + Bitwarden keys (overdue); top up Anthropic credit (only the
+  Claude chip needs it — voice/chat/drafts are free on Hermes).
 
 
 ### 🆕 2026-07-20 (latest) — Audit/PRD applied + the whole `#jarvis` backlog cleared + debrief wired + NAS redeploy

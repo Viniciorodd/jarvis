@@ -56,12 +56,15 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
   public** — FOIA request only, so not API-buildable. *(vault: [[Jarvis]] / [[Gov contracting]])*
 
 ## 🔨 Mine — buildable next without blocking on you (priority order)
-1. **Wire `recordRun()` into the live watchers** so the Watcher Health ledger self-updates on real runs.
-   The engine + ledger + endpoint exist; each watcher still needs the contract prepended + its control
-   probe added (the control-plane's `fiverr-order-poll` first, so it reports BLIND on its next live run).
-   *(NAS redeploy for the control-plane side.)*
-2. **Wire the Bid Fit Index into the flow** — a score on each Gov Pipeline Board card + a "score this bid"
-   panel in the opp drawer (operator inputs doc-takers / drive-hours / evaluation type → verdict). *(companion UI)*
+1. ✅ **Wire `recordRun()` into the live watchers** (2026-07-24) — new `lib.noteWatch()` (watcher-health.mjs
+   kept pure); `gmail-triage` (runTriage) + `gov-scout` (runScan) self-update the ledger each run and push
+   only sensor-health problems (BLIND/SUSPECT, transition-aware). *Still open:* `fiverr-order-poll` is an
+   LLM-command job with no deterministic scanner to hook — its seed already reports BLIND correctly; wire it
+   when a real fiverr pod exists. *(control-plane side goes live on next NAS redeploy.)*
+2. ✅ **Bid Fit Index on board cards** (2026-07-24) — `buildBoard` attaches a per-card `bidFit` badge
+   (PURSUE/REVIEW/THIN/NO-BID + score, band-colored, reasons/gates tooltip); verified 87/87 live cards.
+   *Later add:* the "score this bid" drawer panel (operator inputs doc-takers / drive-hours / evaluation
+   type → verdict) — the `/api/gov/bid-fit` endpoint already exists to power it.
 
 *(The 7/12-audit and vault-sweep 🔨 items are all shipped — see ✅.)*
 

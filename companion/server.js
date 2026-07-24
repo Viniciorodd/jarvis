@@ -3330,6 +3330,35 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, watchers, blindCount: blind.length, blind: blind.map((w) => w.name) }));
     } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // ── BROWSER AUTOMATION (pods/browser.mjs): read a page, or STAGE a sub-outreach form-fill. The form path
+  // fills our data + screenshots + STOPS — it never submits, never fills a credential field. The operator
+  // reviews the screenshot and sends it himself. Runs here (companion/PC) where Playwright is installed. ──
+  if (req.method === 'POST' && url.pathname === '/api/browser/read') {
+    try {
+      const B = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'browser.mjs')).href);
+      const body = await readBody(req);
+      return send(res, 200, JSON.stringify(await B.readPage(body.url)));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/browser/stage-form') {
+    try {
+      const B = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'browser.mjs')).href);
+      const body = await readBody(req);
+      if (!body.url) return send(res, 400, JSON.stringify({ ok: false, error: 'url required' }));
+      const fields = B.planOutreachFill(body.data || {});
+      const id = Date.now().toString(36);
+      const shotPath = path.join(__dirname, '..', 'browser-stage', id + '.png');
+      const r = await B.stageFormFill({ url: body.url, fields, screenshotPath: shotPath });
+      return send(res, 200, JSON.stringify({ ...r, screenshotUrl: r.screenshot ? '/api/browser/shot?id=' + id : null }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
+  if (req.method === 'GET' && url.pathname === '/api/browser/shot') {
+    try {
+      const id = String(url.searchParams.get('id') || '').replace(/[^a-z0-9]/gi, '');
+      const buf = fs.readFileSync(path.join(__dirname, '..', 'browser-stage', id + '.png'));
+      res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-store' }); res.end(buf); return;
+    } catch { return send(res, 404, JSON.stringify({ error: 'screenshot not found' })); }
+  }
   // Curated top-N opportunity BRIEFS (a few quality ones w/ what-they-want + fit + win-chance + strategy).
   if (req.method === 'GET' && url.pathname === '/api/gov/briefs') {
     try { const B = await import('../pods/gov/briefs.mjs'); return send(res, 200, JSON.stringify(await B.buildBriefs({ topN: Number(url.searchParams.get('n')) || 3, cpUrl: CP_URL }))); }

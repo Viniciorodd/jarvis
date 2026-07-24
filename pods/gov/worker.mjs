@@ -224,6 +224,22 @@ export async function runScan({ draftTopN = 1, source = 'manual' } = {}) {
     }
   }
 
+  // PRE-BUILD the compliance matrix (attachment-aware) for the bid-worthy so it's ready the moment the
+  // operator opens the opp. Reuses matrixForOp — reads the attachments we just pulled, runs the grounded AI
+  // reader on the free brain, writes the artifact. Analysis only; best-effort; a failure never fails the scan.
+  if (samKey) {
+    for (const { op } of scored.filter((s) => s.sc.recommendation === 'bid').slice(0, 5)) {
+      try {
+        const { matrixForOp } = await import('./matrix.mjs');
+        const mx = await matrixForOp(op, { key: samKey });
+        if (mx.ok && mx.summary.total) {
+          try { deals.upsertDeal(op.noticeId, { matrix: { coveragePct: mx.summary.coveragePct, gaps: mx.summary.gap, attachments: mx.attachments, file: mx.file } }); } catch { /* ledger best-effort */ }
+          await emit({ kind: 'action', actor: 'GOV-ANALYST', pod: 'gov', action: 'matrix.build', status: 'done', reversible: true, rationale: `Compliance matrix: ${mx.summary.coveragePct}% coverage, ${mx.summary.gap} gap(s) across ${mx.summary.total} req(s) (${mx.attachments} attachment(s) read)`, payload: { noticeId: op.noticeId, coveragePct: mx.summary.coveragePct, gaps: mx.summary.gap, attachments: mx.attachments, file: mx.file } });
+        }
+      } catch { /* matrix pre-build is best-effort */ }
+    }
+  }
+
   // Mirror the actionable pipeline (bid + watch) into the Notion company brain. Fire-and-forget, sequential
   // to respect Notion's rate limit, capped, and graceful (no key / page not shared → skips silently).
   import('../notion.mjs').then(async (N) => {

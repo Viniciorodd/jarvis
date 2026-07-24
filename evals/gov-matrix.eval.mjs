@@ -4,7 +4,7 @@
 // categories bucket correctly, coverage is deterministic keyword-overlap, and — the doctrine line — a GAP
 // carries an EMPTY citation (coverage is NEVER fabricated). No network: everything runs on fixture strings.
 
-import { extractRequirements, mapCoverage, buildMatrix, renderMatrixMarkdown, categorize, groundRows, detectForms, mergeRequirements } from '../pods/gov/matrix.mjs';
+import { extractRequirements, mapCoverage, buildMatrix, renderMatrixMarkdown, categorize, groundRows, detectForms, mergeRequirements, parseAIRows } from '../pods/gov/matrix.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -117,6 +117,19 @@ export default {
     { name: 'mergeRequirements caps at 80', run: () => {
       const many = Array.from({ length: 200 }, (_, i) => ({ section: 'C', text: `The contractor shall deliver item number ${i} on schedule`, category: 'general' }));
       return ok(mergeRequirements([], many, []).length === 80);
+    } },
+    { name: 'parseAIRows extracts a JSON array from fenced/noisy model output', run: () => {
+      const raw = 'Here you go:\n```json\n[{"section":"L","text":"submit 10 pages","quote":"not to exceed 10 pages"}]\n```\nHope that helps.';
+      const rows = parseAIRows(raw);
+      return ok(rows.length === 1 && rows[0].section === 'L', JSON.stringify(rows));
+    } },
+    { name: 'parseAIRows returns [] on non-JSON (never throws)', run: () =>
+      ok(parseAIRows('no json here').length === 0 && parseAIRows('').length === 0) },
+    { name: 'extractRequirementsAI uses the injected llm + parses its rows', run: async () => {
+      const { extractRequirementsAI } = await import('../pods/gov/matrix.mjs');
+      const llmImpl = async () => '[{"section":"M","text":"best value","quote":"award will be made on a best value basis"}]';
+      const rows = await extractRequirementsAI('award will be made on a best value basis', { llmImpl });
+      return ok(rows.length === 1 && rows[0].section === 'M', JSON.stringify(rows));
     } },
   ],
 };

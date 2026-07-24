@@ -408,6 +408,14 @@ const TOOLS = [
     input_schema: { type: 'object', properties: {} } },
   { name: 'triage_inbox', description: 'Triage unread Gmail (READ-ONLY): classify each as urgent / needs-reply / routine / junk and SUGGEST a one-line reply in his voice (draft only — never sends). Use for "triage my inbox", "what needs a reply".',
     input_schema: { type: 'object', properties: { max: { type: 'number', description: 'default 8' } } } },
+  { name: 'draft_gmail_reply', description: 'Write a REAL Gmail draft reply (appears in [Gmail]/Drafts, NEVER sent) to a specific email. Use when the operator says "draft a reply to X", "reply to that email saying Y", or similar — after read_email/triage_inbox has surfaced the message. Requires the original message\'s from-address and subject (and messageId if available, for correct threading). This DRAFTS ONLY — never tell the operator it was sent.',
+    input_schema: { type: 'object', properties: {
+      to: { type: 'string', description: 'recipient email address (the original sender)' },
+      subject: { type: 'string', description: 'original subject — will be prefixed Re: automatically' },
+      body: { type: 'string', description: "the reply text, written in the operator's voice" },
+      messageId: { type: 'string', description: 'optional — the original message-id for In-Reply-To/References threading' },
+      account: { type: 'string', enum: ['personal', 'rodgate'], description: 'which mailbox to draft into; default personal' },
+    }, required: ['to', 'subject', 'body'] } },
   { name: 'weekly_pl', description: "Victor's P&L: money collected (Stripe) vs AI spend vs the gov pipeline, with net. Use for \"weekly P&L\", \"how's the money\", \"what did we collect\", \"profit and loss\".",
     input_schema: { type: 'object', properties: {} } },
   { name: 'notion_search', description: 'Search the connected Notion workspace by keyword. Returns matching pages/databases with their IDs.',
@@ -1194,12 +1202,23 @@ async function runTool(name, input) {
     return t.triaged.map((m, i) => `${i + 1}. [${m.class}] ${m.from} — ${m.subject}${m.reply ? `\n   ↳ suggested reply: ${m.reply}` : ''}`).join('\n');
   }
   if (name === 'weekly_pl') { return plText(await weeklyPL()); }
+  if (name === 'draft_gmail_reply') {
+    const { appendGmailDraft } = await import('../pods/inbox/compose.mjs');
+    const r = await appendGmailDraft({ account: input.account || 'personal', to: input.to, subject: input.subject, body: input.body, inReplyTo: input.messageId });
+    if (!r.ok) {
+      if (r.error === 'inbox-not-connected') return "I can't reach that mailbox — its Gmail app password isn't set here, so I can't save a draft.";
+      if (r.error === 'missing to/body') return 'I need both a recipient and the reply text to draft it.';
+      return 'Could not save the draft: ' + (r.error || 'unknown error') + '. Nothing was sent.';
+    }
+    // Truth-contract (pods/narrate.mjs): a draft is NEVER narrated as sent.
+    return `✍️ Draft saved to [Gmail]/Drafts — to ${r.to}, subject "${r.subject}". Open Gmail to review and send it yourself. I never send.`;
+  }
   throw new Error('unknown tool: ' + name);
 }
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }

@@ -14,6 +14,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, env, emit, mirror, hqApproval, notifyTelegram, claudeBatch, noteWatch } from '../lib.mjs';
+import { appendGmailDraft, replySubject } from './compose.mjs';
+export { replySubject }; // re-exported (moved to compose.mjs) — keeps its eval + any importers green
 
 const REPORT = path.join(ROOT, 'control-plane', 'data', 'inbox-triage-latest.json');
 
@@ -39,13 +41,6 @@ export function foldClassification(msgs, rows) {
 }
 
 // ── PURE: the digest text (calm, glanceable, phone-sized). Eval-pinned. ─────────────────────────────
-// PURE: the reply subject — keep an existing "Re:" (case/space-insensitive), else prepend one. Eval-pinned.
-export function replySubject(subject) {
-  const s = String(subject || '').trim();
-  if (!s) return 'Re: (no subject)';
-  return /^re:/i.test(s) ? s : 'Re: ' + s;
-}
-
 export function digestText(account, triaged) {
   const by = (c) => triaged.filter((m) => m.category === c);
   const need = by('needs_reply').sort((a, b) => (b.urgency || 0) - (a.urgency || 0));
@@ -112,25 +107,16 @@ export async function stageDrafts(account, needsReply, userAddr, { max = 5 } = {
   let results = [];
   try { results = await claudeBatch(targets.map((m) => ({ system: sys, user: `INCOMING EMAIL\nFROM: ${m.fromName} <${m.from}>\nSUBJECT: ${m.subject}\nBODY: ${m.snippet}` })), { tier: 'draft', maxTokens: 400, agent: 'MAILROOM-01', timeoutMs: 8 * 60000 }); }
   catch { return { staged: 0 }; }
-  let MailComposer, ImapFlow;
-  try { MailComposer = (await import('nodemailer/lib/mail-composer/index.js')).default; ({ ImapFlow } = await import('imapflow')); } catch { return { staged: 0, note: 'draft deps unavailable' }; }
-  const PASS = (account === 'rodgate' ? env('RODGATE_GMAIL_APP_PASSWORD') : env('PERSONAL_GMAIL_APP_PASSWORD') || '').replace(/\s+/g, '');
-  const client = new ImapFlow({ host: 'imap.gmail.com', port: 993, secure: true, auth: { user: userAddr, pass: PASS }, logger: false });
+  // Write each reply via the shared appendGmailDraft (compose.mjs) — same mechanics the on-demand chat tool
+  // uses, so the "\Draft-into-[Gmail]/Drafts, never send" logic lives in exactly one place.
   let staged = 0;
-  try {
-    await client.connect();
-    for (let i = 0; i < targets.length; i++) {
-      const m = targets[i];
-      const body = String((results[i] && results[i].text) || '').trim();
-      if (!body) continue;
-      const subject = replySubject(m.subject);
-      const mail = new MailComposer({ from: userAddr, to: m.from, subject, inReplyTo: m.messageId || undefined, references: m.messageId || undefined, text: body });
-      const raw = await new Promise((res, rej) => mail.compile().build((err, msg) => (err ? rej(err) : res(msg))));
-      await client.append('[Gmail]/Drafts', raw, ['\\Draft']); // \Draft flag + Gmail Drafts mailbox — appears in Gmail, never sent
-      staged++;
-    }
-  } catch (e) { return { staged, note: 'append failed: ' + e.message }; }
-  finally { try { await client.logout(); } catch { /* */ } }
+  for (let i = 0; i < targets.length; i++) {
+    const m = targets[i];
+    const body = String((results[i] && results[i].text) || '').trim();
+    if (!body) continue;
+    const r = await appendGmailDraft({ account, userAddr, to: m.from, subject: m.subject, body, inReplyTo: m.messageId });
+    if (r.ok) staged++;
+  }
   return { staged };
 }
 

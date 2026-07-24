@@ -1,8 +1,10 @@
 // Draft-staging (MAILROOM-01): the morning triage stages review-ready REPLY drafts into Gmail Drafts for
-// the emails that need one — draft-only, never sends (doctrine §2). This pins the pure reply-subject rule
-// (the rest — LLM reply gen + IMAP append — is I/O, verified live against Gmail on 2026-07-24).
+// the emails that need one — draft-only, never sends (doctrine §2). This pins the pure reply-subject rule +
+// appendGmailDraft's input guard (the rest — LLM reply gen + IMAP append — is I/O, verified live vs Gmail).
+// replySubject is imported via triage.mjs to confirm its re-export from compose.mjs stays intact.
 
 import { replySubject } from '../pods/inbox/triage.mjs';
+import { appendGmailDraft } from '../pods/inbox/compose.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -19,5 +21,11 @@ export default {
       run: () => ok(replySubject('') === 'Re: (no subject)' && replySubject('   ') === 'Re: (no subject)' && replySubject(null) === 'Re: (no subject)') },
     { name: 'trims surrounding whitespace before deciding',
       run: () => { const s = replySubject('  Payment terms  '); return ok(s === 'Re: Payment terms', s); } },
+    { name: 'appendGmailDraft refuses (never touches IMAP) with no recipient or no body',
+      run: async () => {
+        const a = await appendGmailDraft({ to: '', body: 'hi' });
+        const b = await appendGmailDraft({ account: 'personal', to: 'a@b.com', body: '' });
+        return ok(a.ok === false && a.error === 'missing to/body' && b.ok === false && b.error === 'missing to/body', JSON.stringify({ a, b }));
+      } },
   ],
 };

@@ -58,7 +58,16 @@ iPhone/iPad — nothing is exposed to the public internet.
   - Gov Pipeline board logic (derives stage / fit / whose-move from live data): `pods/gov/pipeline.mjs` →
     `/api/gov-board` (+ `/disposition`). `govBoardData()` in the server is the ONE source for "your next gov
     move" — shared with the cockpit one-thing so Home and the board never disagree. Manual dispositions:
-    `pods/gov/pipeline-state.json`.
+    `pods/gov/pipeline-state.json`. Cards carry a deterministic **Bid Fit Index** (`pods/gov/bid-fit.mjs`)
+    and a **compliance-matrix** gap badge (from the deal ledger's `matrix` summary).
+  - RFP Shredder → Compliance Matrix (Phase 1, 2026-07-24): `pods/gov/attachments.mjs` downloads +
+    text-extracts a solicitation's attached PDFs (via `unpdf`) / DOCX (`adm-zip`) into `gov-drafts/att/<slug>/`
+    (cached + manifest — the substrate for Phase 2 amendment-diffing + Phase 6 wage determinations).
+    `pods/gov/matrix.mjs` then builds a **section-aware** requirements matrix (Section L/M/C + a deterministic
+    required-forms checklist): a grounded free-brain AI reader proposes rows, but `groundRows` DROPS any whose
+    verbatim `quote` isn't in the source (no hallucinated requirements), and coverage (`mapCoverage`) stays
+    100% deterministic. `matrixForOp()` → `GET /api/gov/matrix`; pre-built for bid-worthy opps in `runScan`.
+    Analysis+artifact only (never sends). Spec: `docs/superpowers/specs/2026-07-24-gov-rfp-shredder-phase1-design.md`.
   - Front-end: `companion/public/index.html` (Home + Today tab + Gov overlay), `today.js`/`today.css`
     (Home glance + Today + gov-board styles), `govboard.js`. Theme follows `data-theme` via shared CSS vars.
 - HQ API contract: documented at the top of `hq/server.js` (POST /api/event, /api/approval, GET /api/state).

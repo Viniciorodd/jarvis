@@ -9,6 +9,24 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
 
 ---
 
+## 🏛 GovCon capability build — 6-phase plan (2026-07-24)
+From a review of GovDash / GovGPT / the GovCon AI-tool landscape vs. what Jarvis already has. We build the
+gaps ourselves (no $500/yr HigherGov). Order = win-rate leverage first, then dependency. Each phase = its own
+spec → plan → build cycle.
+- ✅ **Phase 1 — RFP Shredder → Compliance Matrix** (done 2026-07-24). `pods/gov/attachments.mjs` (PDF via
+  `unpdf` / DOCX via `adm-zip`, cached to `gov-drafts/att/`) + section-aware `pods/gov/matrix.mjs` (Section
+  L/M/C + required-forms checklist; grounded AI reader that can't hallucinate a requirement; deterministic
+  coverage). Live-proven: 4 attachment PDFs read → 63-gap matrix on a real notice. +20 evals (725→745).
+  Spec `docs/superpowers/specs/2026-07-24-gov-rfp-shredder-phase1-design.md`, plan `…/plans/2026-07-24-gov-rfp-shredder-phase1.md`.
+- 🔨 **Phase 2 — Amendment & Deadline Radar** — diff the attachment cache/manifest across scans → alert on
+  amendments + shifted deadlines. Extends the deadline radar + Watcher-Health.
+- 🔨 **Phase 3 — Past-Performance & Snippet Library** — reusable records + boilerplate that auto-insert into drafts.
+- 🔨 **Phase 4 — Matrix-Grounded Drafting** — draft each section to answer the Phase-1 matrix rows, grounded
+  in the Phase-3 library; existing `checkCompliance` verifies coverage. (Also lifts the AI reader's L/M recall.)
+- 🔨 **Phase 5 — Incumbent & Extended Discovery** — who holds this / recompete timing / SLED beyond SAM (the
+  build-it-ourselves HigherGov replacement).
+- 🔨 **Phase 6 — SCA-Wage Bid-Price Builder** — parse the cached SCLS wage determination → labor-loaded bid price.
+
 ## ✅ Done (2026-07-20)
 - ✅ **Bid Fit Index** (PRD L-013) — `pods/gov/bid-fit.mjs` + `POST /api/gov/bid-fit`: disqualifier-aware
   weighted 0–100 bid scorer with bands, portal-gate/bond flags, no-shame output. All 6 PRD backtests pass.

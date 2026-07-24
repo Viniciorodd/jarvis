@@ -10,12 +10,15 @@ import { CP_URL, emit, mirror, notify } from '../lib.mjs';
 // small, stable, order-free hash (djb2 → base36) — local so this module doesn't pull in attachments.mjs's deps.
 function djb2(s) { let h = 5381; s = String(s || ''); for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); }
 
-// PURE: a deterministic, ORDER-INDEPENDENT signature of an attachment set. Includes each file's byte size so a
-// same-URL content swap (SAM replacing a file in place) changes the signature. Empty set → ''. Eval-pinned.
+// PURE: a deterministic, ORDER-INDEPENDENT signature of an attachment SET (which files are attached). Keyed on
+// the stable per-file hash ONLY — NOT byte size, which the manifest reports as 0 on a cache hit and real on a
+// fresh download, so a size-based sig would flip every scan and fire false "changed" alerts. A file added or
+// removed changes the hash set → the sig changes; a same-URL in-place swap keeps the same hash (that amendment
+// is caught by the deadline / Amendment-N signals instead, which also trigger a cache refresh). Empty set → ''.
 export function attSignature(files = []) {
   const parts = (Array.isArray(files) ? files : [])
     .filter((f) => f && (f.hash || f.url))
-    .map((f) => `${f.hash || djb2(f.url)}:${Number(f.bytes) || 0}`)
+    .map((f) => String(f.hash || djb2(f.url)))
     .sort();
   return parts.length ? djb2(parts.join('|')) : '';
 }
@@ -70,7 +73,9 @@ export function detectAmendments(events = [], { pursued, pendingSubmitNotices = 
     const latest = arr[arr.length - 1], prev = arr[arr.length - 2];
     const changes = [];
     if (prev.deadline && latest.deadline && prev.deadline !== latest.deadline) changes.push('deadline');
-    if (latest.attSig && prev.attSig !== latest.attSig) changes.push('attachments');
+    // require BOTH signatures non-empty: '' → X just means we finally ingested attachments (top-5 cap /
+    // first matrix build), not that the set CHANGED. Only compare two real, populated signatures.
+    if (prev.attSig && latest.attSig && prev.attSig !== latest.attSig) changes.push('attachments');
     if ((Number(latest.amendmentN) || 0) > (Number(prev.amendmentN) || 0)) changes.push('amendment');
     if (!changes.length) continue;
     if (flagged.has(sigOf(noticeId, latest))) continue;   // already alerted for this exact change
@@ -108,10 +113,9 @@ export async function runAmendmentRadar({ pendingSubmitNotices = [] } = {}) {
       verb: 'Re-check bid', xp: 25,
     });
     await emit({ kind: 'action', actor: 'SAM-SCOUT', pod: 'gov', action: 'gov.amendment.flagged', status: 'done', rationale: `Amendment on ${String(c.title || '').slice(0, 80)}: ${c.changes.join('/')}`, payload: { noticeId: c.noticeId, deadline: c.latest.deadline, attSig: c.latest.attSig, amendmentN: c.latest.amendmentN, changes: c.changes } });
-    if (c.changes.includes('attachments')) {
-      // stale-matrix guard: drop the cached attachment dir so the next scan re-downloads the revised files.
-      try { const { attDir } = await import('./attachments.mjs'); fs.rmSync(attDir({ noticeId: c.noticeId }), { recursive: true, force: true }); } catch { /* best-effort */ }
-    }
+    // stale-matrix guard: on ANY flagged change (a same-URL PWS swap shows up as a deadline/amendment bump,
+    // not a new hash), drop the cached attachment dir so the next scan re-downloads fresh + the matrix rebuilds.
+    try { const { attDir } = await import('./attachments.mjs'); fs.rmSync(attDir({ noticeId: c.noticeId }), { recursive: true, force: true }); } catch { /* best-effort */ }
   }
   await mirror('SAM-SCOUT', changes.length ? 'need' : 'idle', changes.length ? `${changes.length} solicitation amendment(s) — re-check your bids` : 'No new amendments on your bids');
   return { ok: true, flagged: changes.length, changes };

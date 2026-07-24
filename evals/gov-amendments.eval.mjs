@@ -15,11 +15,14 @@ const flag = (noticeId, s) => ({ action: 'gov.amendment.flagged', payload: { not
 export default {
   agent: 'gov-amendments',
   cases: [
-    { name: 'attSignature is order-independent + size-sensitive; empty → ""', run: () => {
-      const a = attSignature([{ hash: 'x', bytes: 10 }, { hash: 'y', bytes: 20 }]);
-      const b = attSignature([{ hash: 'y', bytes: 20 }, { hash: 'x', bytes: 10 }]); // reordered → same
-      const c = attSignature([{ hash: 'x', bytes: 10 }, { hash: 'y', bytes: 21 }]); // one byte diff → different
-      return ok(a === b && a !== c && attSignature([]) === '', JSON.stringify({ a, b, c }));
+    { name: 'attSignature is order-independent + add/remove-sensitive; empty → ""; stable vs byte noise', run: () => {
+      const a = attSignature([{ hash: 'x' }, { hash: 'y' }]);
+      const b = attSignature([{ hash: 'y' }, { hash: 'x' }]);                  // reordered → same
+      const c = attSignature([{ hash: 'x' }, { hash: 'z' }]);                  // a different file → different
+      const d = attSignature([{ hash: 'x' }, { hash: 'y' }, { hash: 'w' }]);   // added file → different
+      // bytes must NOT affect the sig (cache hits report bytes:0, fresh downloads report real bytes)
+      const noise = attSignature([{ hash: 'x', bytes: 0 }, { hash: 'y', bytes: 9999 }]);
+      return ok(a === b && a !== c && a !== d && a === noise && attSignature([]) === '', JSON.stringify({ a, b, c, d, noise }));
     } },
 
     { name: 'amendmentLevel returns the highest Amendment N (0 if none)', run: () =>
@@ -72,6 +75,13 @@ export default {
     { name: 'detectAmendments needs ≥2 snapshots (a first-ever snapshot is never a change)', run: () => {
       const ev = [score('A', 'bid'), snap('A', { deadline: '2026-07-24', attSig: 's1', amendmentN: 1 })];
       return ok(detectAmendments(ev).length === 0);
+    } },
+
+    { name: 'detectAmendments: attSig "" → X (attachments finally ingested) is NOT flagged as a change', run: () => {
+      const ev = [score('A', 'bid'),
+        snap('A', { deadline: '2026-07-24', attSig: '', amendmentN: 0 }),   // no manifest yet (outside top-5)
+        snap('A', { deadline: '2026-07-24', attSig: 's1', amendmentN: 0 })]; // matrix built → real sig appears
+      return ok(detectAmendments(ev).length === 0, 'first-ingest "" -> X wrongly flagged');
     } },
   ],
 };

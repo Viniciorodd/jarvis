@@ -96,6 +96,11 @@ services:
       GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY}
       RODGATE_GMAIL_USER: ${RODGATE_GMAIL_USER}
       RODGATE_GMAIL_APP_PASSWORD: ${RODGATE_GMAIL_APP_PASSWORD}
+      # PERSONAL (viniciorodd) inbox — the scheduled inbox-triage defaults to this account. These were in
+      # .env but NOT listed here, so the container never saw them and triage reported "inbox not connected"
+      # even though the password was set (the GOV_AUTO_SEND lesson again, 2026-07-24).
+      PERSONAL_GMAIL_USER: ${PERSONAL_GMAIL_USER}
+      PERSONAL_GMAIL_APP_PASSWORD: ${PERSONAL_GMAIL_APP_PASSWORD}
       # Approve-to-send (operator granted 2026-07-12): with this ON, approving a gov SEND gate really
       # sends the email via RODGATE_GMAIL SMTP. Without it here, .env's flag never reaches the container
       # and every approval dry-runs. The gate stays the control — nothing sends without a human tap.

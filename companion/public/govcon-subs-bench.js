@@ -141,8 +141,22 @@
           '<button class="gc-btn" data-px="' + esc(id) + '">Save pricing</button>' +
         '</div><div class="gc-sub-meta" id="gcPxOut" style="margin-top:7px"></div></div>';
       h += '<button class="gc-btn primary" data-act="reach" data-id="' + esc(id) + '">Reach out to ' + esc(sub.name || 'them') + '</button>';
+      if (sub.website) h += '<button class="gc-btn" data-act="formfill" data-id="' + esc(id) + '" style="margin-left:8px" title="Hector fills their contact form + screenshots it for your review (never submits)">🌐 Fill their contact form</button>';
       el.innerHTML = h;
       el.querySelector('[data-act="reach"]').onclick = function () { m.close(); reach(id); };
+      var ffBtn = el.querySelector('[data-act="formfill"]');
+      if (ffBtn) ffBtn.onclick = function () {
+        el.innerHTML = '<div class="gc-empty">🌐 Hector is opening ' + esc(sub.website) + ' and filling their contact form…<br><span style="opacity:.7">~30–60s · nothing is submitted</span></div>';
+        fetch('/api/gov/sub-form-fill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
+          .then(function (r) { return r.json(); }).then(function (d) {
+            if (!d.ok) { el.innerHTML = '<div class="gc-empty">Couldn’t do it: ' + esc(d.error || 'unknown') + '</div>'; return; }
+            var h2 = '<div class="gc-sub-block"><div class="k">Contact form — ' + (d.filledCount ? d.filledCount + ' field(s) filled ✓' : 'no fields filled') + '</div>'
+              + '<div class="gc-sub-meta">' + esc(d.note || '') + '</div>'
+              + '<div class="gc-sub-meta" style="margin-top:5px"><a href="' + esc(d.url || sub.website) + '" target="_blank" rel="noopener">Open the form ▸</a> — review the screenshot below, then submit it on their site yourself.</div></div>';
+            if (d.screenshotUrl) h2 += '<img src="' + esc(d.screenshotUrl) + '" alt="staged contact form" style="width:100%;border:1px solid var(--line);border-radius:10px;margin-top:8px">';
+            el.innerHTML = h2;
+          }).catch(function () { el.innerHTML = '<div class="gc-empty">The browser run failed.</div>'; });
+      };
       var pxBtn = el.querySelector('[data-px]');
       if (pxBtn) pxBtn.onclick = function () {
         var body = { id: id, perSqft: el.querySelector('#gcPxSqft').value, hourly: el.querySelector('#gcPxHr').value, minimum: el.querySelector('#gcPxMin').value };

@@ -2175,6 +2175,40 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(await r.json().catch(() => ({ ok: false }))));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
+  // ── SUB CONTACT-FORM (Hector via the browser): for a sub with a WEBSITE but no email, fill their contact
+  // form with our teaming outreach + SCREENSHOT it for review. Never submits — you review + send. Runs here
+  // (companion/PC, Playwright). Tries the site, then /contact, to find the form. ──
+  if (req.method === 'POST' && url.pathname === '/api/gov/sub-form-fill') {
+    try {
+      const { id } = await readBody(req);
+      if (!id) return send(res, 400, JSON.stringify({ ok: false, error: 'id required' }));
+      const crm = await fetch(`${CP_URL}/crm`, { signal: AbortSignal.timeout(5000) }).then((r) => r.json()).catch(() => ({ subs: [] }));
+      let localSubs = []; try { localSubs = (JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'pods', 'gov', 'subs.json'), 'utf8')).subs) || []; } catch { /* */ }
+      const sub = [...((crm && crm.subs) || []), ...localSubs].find((s) => String(s.id) === String(id));
+      if (!sub) return send(res, 404, JSON.stringify({ ok: false, error: 'sub not found' }));
+      if (!sub.website) return send(res, 400, JSON.stringify({ ok: false, error: `${sub.name} has no website on file — nowhere to find a contact form.` }));
+      const B = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'browser.mjs')).href);
+      const data = {
+        name: 'Vinicio Rodriguez',
+        email: process.env.RODGATE_GMAIL_USER || 'rodgategroup@gmail.com',
+        company: 'Rodgate LLC',
+        phone: process.env.RODGATE_PHONE || '',
+        message: `Hi — I'm Vinicio Rodriguez with Rodgate LLC, a PA-based SDB/minority-owned janitorial & facilities GovCon prime. We're building our subcontractor bench for upcoming federal ${sub.trade || 'facilities'} work. Could you reply with your services, coverage area, relevant past performance, and typical pricing? Thank you.`,
+      };
+      const fields = B.planOutreachFill(data);
+      const base = String(sub.website).replace(/\/+$/, '');
+      const tries = [base + '/contact', base]; // the contact page first (most likely to have the form), then the homepage
+      let result = null, usedUrl = null;
+      for (const u of tries) {
+        const id2 = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+        const shotPath = path.join(__dirname, '..', 'browser-stage', id2 + '.png');
+        const r = await B.stageFormFill({ url: u, fields, screenshotPath: shotPath });
+        if (r.ok && r.filled && r.filled.length) { result = { ...r, screenshotUrl: r.screenshot ? '/api/browser/shot?id=' + id2 : null }; usedUrl = u; break; }
+        if (!result && r.ok) { result = { ...r, screenshotUrl: r.screenshot ? '/api/browser/shot?id=' + id2 : null }; usedUrl = u; } // keep the last opened page as a fallback
+      }
+      return send(res, 200, JSON.stringify({ ok: true, sub: sub.name, url: usedUrl, filledCount: (result && result.filled || []).length, ...result, note: (result && result.filled && result.filled.length) ? 'Filled + staged. Review the screenshot, then open the URL and submit it yourself.' : 'No matching form fields found on the site — open the URL and check for a contact page.' }));
+    } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
+  }
 
   // ── BOOK → OPS REVIEW (pods/vault/book-to-ops.mjs): turn saved book highlights into system-targeted
   // "make a concrete change" cards. READ-ONLY on the vault. GET returns the top un-reviewed cards; POST

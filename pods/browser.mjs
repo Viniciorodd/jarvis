@@ -80,11 +80,13 @@ async function findFieldSelector(page, keywords) {
 
 // STAGE a form fill → open the page, fill the planned fields, SCREENSHOT, and STOP. Never submits, never
 // clicks. Returns the filled state + screenshot path so the operator can review and send it himself.
-export async function stageFormFill({ url, fields = [], screenshotPath } = {}) {
+export async function stageFormFill({ url, fields = [], screenshotPath, timeoutMs = 18000 } = {}) {
   if (!/^https?:\/\//i.test(String(url || ''))) return { ok: false, error: 'a full http(s) URL is required' };
   try {
     return await withBrowser(async (page) => {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+      // best-effort: dismiss a cookie/consent banner that often blocks form fields (never a submit/pay button)
+      try { const btn = await page.$('button:has-text("Accept"), button:has-text("Agree"), button:has-text("Got it"), #onetrust-accept-btn-handler'); if (btn) { const label = (await btn.innerText().catch(() => '')) || ''; if (/accept|agree|got it|ok/i.test(label) && !/pay|buy|order|submit/i.test(label)) await btn.click({ timeout: 2500 }).catch(() => {}); } } catch { /* no banner */ }
       const filled = [], unmatched = [];
       for (const f of fields) {
         if (!isFieldFillable(f.intent)) { unmatched.push({ intent: f.intent, reason: 'sensitive field — never filled' }); continue; }

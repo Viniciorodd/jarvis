@@ -284,30 +284,43 @@ async function readDraft(op) {
 // deals.mjs pulls in pricing.mjs on import; keep it lazy + guarded so matrix stays usable if it ever throws.
 async function importDeals() { try { return await import('./deals.mjs'); } catch { return {}; } }
 
-// ── best-effort orchestrator: resolve SOW + draft, build the matrix, WRITE the artifact, return summary. ──
-// Never throws. Args override disk (used by tests + callers that already hold the text).
-export async function matrixForOp(op = {}, { draftText, sowText, key } = {}) {
+// ── best-effort orchestrator: resolve SOW + ATTACHMENTS + draft, run the regex floor + grounded AI reader +
+// forms detector, fuse them, build the matrix, WRITE the artifact, return the summary. Never throws. Args
+// override disk/network (tests inject sowText/fullText/llmImpl/fetchImpl). useAI defaults to SHRED_AI. ──
+export async function matrixForOp(op = {}, { draftText, sowText, fullText, key, useAI = (process.env.SHRED_AI !== '0'), llmImpl, fetchImpl } = {}) {
   try {
     op = typeof op === 'string' ? { noticeId: op } : (op || {});
-    // 1) SOW text: explicit arg → the persisted SOW file → best-effort live pull (only if a key is given)
+    // 1) SOW notice text
     let sow = sowText || '';
     if (!sow) sow = readSowDescription(op);
     if (!sow && key) { try { const r = await pullScopeOfWork(op, key); sow = (r && r.text) || ''; } catch { /* offline */ } }
-    // 2) draft text: explicit arg → the deal's proposalFile → gov-drafts/<slug>.md
+    // 2) attachment text (skip when caller supplied fullText, or when there's no key)
+    let attCount = 0, attText = '';
+    if (fullText == null && key) {
+      try { const { ingestAttachments } = await import('./attachments.mjs'); const ing = await ingestAttachments(op, key, fetchImpl ? { fetchImpl } : {}); attText = ing.combinedText || ''; attCount = (ing.files || []).filter((f) => f.ok).length; } catch { /* attachments best-effort */ }
+    }
+    const full = fullText != null ? fullText : [sow, attText].filter(Boolean).join('\n\n');
+    // 3) draft text
     let draft = draftText || '';
     if (!draft) draft = await readDraft(op);
-    const meta = { noticeId: op.noticeId || null, title: op.title || null, generatedAt: new Date().toISOString() };
-    const matrix = buildMatrix({ sowText: sow, draft, meta });
+    // 4) requirements: regex floor (SOW→C) + forms + grounded AI, fused
+    const regexRows = extractRequirements(full).map((r) => ({ ...r, section: 'C' }));
+    const formRows = detectForms(full);
+    let groundedRows = [];
+    if (useAI && full.trim()) { try { groundedRows = groundRows(await extractRequirementsAI(full, { llmImpl }), full); } catch { /* AI best-effort */ } }
+    const requirements = mergeRequirements(regexRows, groundedRows, formRows);
+    const meta = { noticeId: op.noticeId || null, title: op.title || null, generatedAt: new Date().toISOString(), attachments: attCount };
+    const matrix = buildMatrix({ sowText: sow, fullText: full, draft, meta, requirements });
     let file = null;
     try {
       fs.mkdirSync(MATRIX_DIR, { recursive: true });
       const p = matrixPath(op);
       fs.writeFileSync(p, renderMatrixMarkdown(matrix));
       file = path.relative(ROOT, p);
-    } catch { /* artifact write best-effort; the matrix object is still returned */ }
-    return { ok: true, file, summary: matrix.summary, gapCount: matrix.summary.gap, matrix };
+    } catch { /* artifact write best-effort */ }
+    return { ok: true, file, summary: matrix.summary, gapCount: matrix.summary.gap, matrix, attachments: attCount };
   } catch (e) {
-    return { ok: false, error: e.message, file: null, summary: { total: 0, addressed: 0, partial: 0, gap: 0, coveragePct: 100 }, gapCount: 0, matrix: null };
+    return { ok: false, error: e.message, file: null, summary: { total: 0, addressed: 0, partial: 0, gap: 0, coveragePct: 100, bySection: {} }, gapCount: 0, matrix: null, attachments: 0 };
   }
 }
 

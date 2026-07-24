@@ -145,5 +145,20 @@ export default {
       const rows = await extractRequirementsAI('award will be made on a best value basis', { llmImpl });
       return ok(rows.length === 1 && rows[0].section === 'M', JSON.stringify(rows));
     } },
+    { name: 'matrixForOp fuses regex + grounded AI + forms (no network, injected deps)', run: async () => {
+      const { matrixForOp } = await import('../pods/gov/matrix.mjs');
+      const sow = 'The contractor shall provide daily janitorial services. Offerors shall submit a technical volume not to exceed 10 pages. Complete SF1449.';
+      // AI proposes an L row grounded in the text + one hallucinated row (dropped)
+      const llmImpl = async () => JSON.stringify([
+        { section: 'L', text: 'Submit a technical volume max 10 pages', quote: 'shall submit a technical volume not to exceed 10 pages' },
+        { section: 'M', text: 'made up', quote: 'this exact phrase is not in the source text at all' },
+      ]);
+      const r = await matrixForOp({ noticeId: 'MFO-TEST' }, { sowText: sow, fullText: sow, draft: 'Rodgate provides daily janitorial services.', useAI: true, llmImpl });
+      const sections = r.matrix.rows.map((x) => x.section);
+      const hasForm = r.matrix.rows.some((x) => x.section === 'form');
+      const hasL = r.matrix.rows.some((x) => x.section === 'L');
+      const noHallucination = !r.matrix.rows.some((x) => /made up/i.test(x.requirement));
+      return ok(r.ok && hasForm && hasL && noHallucination, JSON.stringify({ sections, hasForm, hasL, noHallucination }));
+    } },
   ],
 };

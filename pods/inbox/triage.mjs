@@ -56,7 +56,13 @@ export function digestText(account, triaged) {
 async function readInbox(account, { days = 3, max = 40 } = {}) {
   const USER = account === 'rodgate' ? env('RODGATE_GMAIL_USER') : env('PERSONAL_GMAIL_USER');
   const PASS = (account === 'rodgate' ? env('RODGATE_GMAIL_APP_PASSWORD') : env('PERSONAL_GMAIL_APP_PASSWORD') || '').replace(/\s+/g, '');
-  if (!USER || !PASS) return { error: `Inbox not connected — set ${account === 'rodgate' ? 'RODGATE' : 'PERSONAL'}_GMAIL_USER + _GMAIL_APP_PASSWORD in .env.` };
+  if (!USER || !PASS) {
+    const P = account === 'rodgate' ? 'RODGATE' : 'PERSONAL';
+    const missing = !USER ? `${P}_GMAIL_USER` : `${P}_GMAIL_APP_PASSWORD`;
+    // The 2026-07-24 footgun: the value can be in .env yet absent HERE because compose injects only the
+    // vars named in its environment: block. Say that plainly so nobody hunts for hours.
+    return { error: `Inbox not connected: ${missing} is not set in this container. If it IS in your .env, it also must be listed under the control-plane service's environment: block in docker-compose.yml (compose injects only the vars it names) — add \`${missing}: \${${missing}}\`, then \`docker compose up -d --force-recreate control-plane\`.` };
+  }
   let ImapFlow;
   try { ({ ImapFlow } = await import('imapflow')); } catch { return { error: 'imapflow not available in this runtime.' }; }
   const client = new ImapFlow({ host: 'imap.gmail.com', port: 993, secure: true, auth: { user: USER, pass: PASS }, logger: false });

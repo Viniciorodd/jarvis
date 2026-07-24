@@ -49,6 +49,8 @@ const server = http.createServer(async (req, res) => {
   const p = url.pathname;
   try {
     if (req.method === 'GET' && p === '/health') return send(res, 200, { ok: true, caps: { action: ACTION_CAP, daily: DAILY_CAP } });
+    // Which integration credentials actually reached this container (catches the .env-but-not-in-compose footgun).
+    if (req.method === 'GET' && p === '/env-health') { const { envHealth } = await import('./env-health.mjs'); return send(res, 200, envHealth()); }
 
     if (req.method === 'POST' && p === '/events') {
       const b = await readBody(req);
@@ -394,4 +396,13 @@ load().then(() => server.listen(PORT, () => {
   console.log(`JARVIS control-plane on http://localhost:${PORT}`);
   console.log(`  spend caps: $${ACTION_CAP}/action, $${DAILY_CAP}/day (override via SPEND_ACTION_CAP_USD / SPEND_DAILY_CAP_USD)`);
   console.log('  event store: control-plane/data/events.jsonl (append-only, system of record)');
+  // Surface any integration credential that a .env has but this container never received (compose injects
+  // only what its environment: block names). Loud at boot so it's never a silent "not connected" again.
+  import('./env-health.mjs').then(({ envHealth }) => {
+    const h = envHealth();
+    if (h.warnCount) {
+      console.warn(`  ⚠ ${h.warnCount} required credential(s) NOT injected into this container — features will fail:`);
+      for (const m of h.missing.filter((x) => !x.optional)) console.warn(`    · ${m.name} (${m.feature}) — if it's in .env, add it to docker-compose.yml environment: for the control-plane service`);
+    } else { console.log('  credentials: all required integration vars injected ✓'); }
+  }).catch(() => {});
 })).catch((e) => { console.error('control-plane failed to start:', e); process.exit(1); });

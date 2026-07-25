@@ -1229,10 +1229,17 @@ function loadMemory() { try { return JSON.parse(fs.readFileSync(MEMORY_FILE, 'ut
 function saveMemory(m) { try { fs.writeFileSync(MEMORY_FILE, JSON.stringify(m, null, 2)); } catch { /* */ } }
 
 // Re-read profile + memory on every call so updates take effect immediately without restart.
+// L-014 truthfulness rule, appended to the chat system prompt on both brains (belt-and-suspenders for the
+// deterministic free-brain guard in pods/chat-truth.mjs). Inlined (buildSystem is sync) — keep in sync with TRUTH_RULE there.
+const TRUTH_RULE = '\n\n## TRUTHFULNESS (non-negotiable — Lessons Ledger L-014)\n'
+  + 'You may claim an action happened ONLY if you called its tool and received a SUCCESS result in THIS turn. '
+  + 'No tool call → no claim. Never invent or guess a file path, filename, result, number, or name. NEVER output a '
+  + 'placeholder path like /Users/YourName/. If a tool returned an error, or you have no tool for what is asked, say '
+  + 'so plainly ("I can\'t do that yet" / "that failed — <reason>") and STOP — never narrate a success you did not verify.';
 function buildSystem() {
   let op = '';
   try { op = fs.readFileSync(OPERATOR_PROFILE_FILE, 'utf8'); } catch { /* not yet */ }
-  const base = (op ? `# WHO YOU WORK FOR\n${op}\n\n---\n\n` : '') + SYSTEM;
+  const base = (op ? `# WHO YOU WORK FOR\n${op}\n\n---\n\n` : '') + SYSTEM + TRUTH_RULE;
   const mem = loadMemory();
   const rem = loadReminders();
   const extras = [];
@@ -1283,11 +1290,32 @@ async function freeBackupReply(messages, model) {
   const userText = Array.isArray(last?.content)
     ? last.content.map((c) => (typeof c === 'string' ? c : (c.text || (c.type === 'tool_result' ? String(c.content) : '')))).join('\n')
     : (last?.content || '');
+  // L-014 GUARD (anti-confabulation): the free brain has NO tools; if this is a real ACTION request, refuse
+  // HONESTLY in code rather than let a local model narrate a fake success with an invented path. Structural.
+  try {
+    const { looksLikeAction, FREE_BRAIN_REFUSAL } = await import('../pods/chat-truth.mjs');
+    if (looksLikeAction(userText)) return { content: [{ type: 'text', text: FREE_BRAIN_REFUSAL }], stop_reason: 'end_turn', usage: null, _provider: 'truth-guard' };
+  } catch { /* guard best-effort */ }
   const tier = /opus|sonnet/i.test(model) ? 'draft' : 'cheap';
   const sys = buildSystem() + '\n\n[You are on the free everyday brain (local Hermes / OpenRouter) — the DEFAULT for conversation, and it costs nothing. You have NO tools and you CANNOT see the operator\'s live data (calendar, tasks, email, gov pipeline, numbers). CRITICAL: never invent or guess that data — do not make up meetings, tasks, times, dollar amounts, or names. If asked about anything real/live, say plainly: "I can\'t see your live data on the free brain — flip the brain chip to Claude and I\'ll pull it." For a real ACTION (send, draft, submit, edit files, image, web) say the same. For general questions, thinking-through, or brainstorming, just help normally and briefly. Do not apologize for being the free brain; it is the intended default.]';
   const out = await R.llm({ system: sys, user: String(userText || 'Hello'), tier, maxTokens: 1000 });
   const text = out.text || "I'm on the free everyday brain (the default — $0). I can chat and answer, but for a real action like sending or drafting, flip the brain chip to Claude and ask again.";
   return { content: [{ type: 'text', text }], stop_reason: 'end_turn', usage: out.usage || null, _provider: out.provider };
+}
+
+// Chat transcript logging (PRD §5): every turn appended to the vault, one file per day, so history survives
+// the UI (which hides earlier messages) AND doubles as the audit trail — tool ACTIONS are logged from their
+// real results, not the model's prose. Best-effort; never blocks a reply.
+function logChatTurn(userText, out) {
+  try {
+    const vault = VAULT_DIR || path.join(require('node:os').homedir(), 'Documents', 'Second Brain'); // same fallback the pods use
+    const dir = path.join(vault, '00 - System', 'Jarvis', 'Chat Logs');
+    fs.mkdirSync(dir, { recursive: true });
+    const now = new Date();
+    const acts = (out.actions || []).map((a) => `  - ${a.ok === false ? '❌' : '✅'} ${String(a.label || a.tool || '').trim()}`).join('\n');
+    const block = `\n### ${now.toISOString().slice(11, 19)}\n**You:** ${String(userText || '').trim()}\n\n**Jarvis:** ${String(out.text || '').trim()}\n${acts ? '\n_actions (from real tool results):_\n' + acts + '\n' : ''}`;
+    fs.appendFileSync(path.join(dir, `${now.toISOString().slice(0, 10)}.md`), block);
+  } catch { /* logging best-effort */ }
 }
 
 // agent loop: run tools until Claude is done; collect actions for the UI
@@ -1548,6 +1576,7 @@ const server = http.createServer(async (req, res) => {
         }
       } catch { /* not an expense / parser error → normal chat */ }
       const out = await converse(messages.slice(-20));
+      try { const lastU = [...messages].reverse().find((m) => m.role === 'user'); logChatTurn(typeof lastU?.content === 'string' ? lastU.content : '', out); } catch { /* logging best-effort */ }
       return send(res, 200, JSON.stringify(out));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }

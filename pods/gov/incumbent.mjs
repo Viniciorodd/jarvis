@@ -44,6 +44,9 @@ export async function incumbentFor(opp = {}, { now = new Date() } = {}) {
   let comp;
   try { const P = await import('./price-to-win.mjs'); comp = await P.fetchComparableAwards({ naics, state }); }
   catch (e) { return { ok: false, error: e.message }; }
+  // fetchComparableAwards swallows network errors into a `source: 'error: …'` string rather than throwing —
+  // surface that as an honest ok:false so a caller can't mistake a network failure for a real empty lane.
+  if (comp && typeof comp.source === 'string' && comp.source.startsWith('error:')) return { ok: false, error: comp.source, sampleSize: 0 };
   const awards = (comp && comp.awards) || [];
   const incumbent = pickIncumbent(awards);
   const recompete = recompeteTiming(incumbent && incumbent.endDate, now);

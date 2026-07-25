@@ -53,5 +53,14 @@ export default {
 
     { name: 'recompeteTiming: no/invalid POP end → "unknown" (never a guessed date)', run: () =>
       ok(recompeteTiming('', NOW).status === 'unknown' && recompeteTiming('not-a-date', NOW).status === 'unknown') },
+
+    { name: 'mixed endDate/date-only (USASpending omits End Date for some IDIQ awards): ranks by best date, unknown recompete when the winner has no POP end', run: () => {
+      const inc = pickIncumbent([
+        { recipient: 'HasEnd', amount: 500000, date: '2022-01-01', endDate: '2025-06-30' },
+        { recipient: 'DateOnly', amount: 100000, date: '2026-01-01', endDate: '' }, // no POP end; its start date is the latest
+      ]);
+      const r = recompeteTiming(inc.endDate, NOW);
+      return ok(inc.recipient === 'DateOnly' && r.status === 'unknown', JSON.stringify({ inc: inc.recipient, status: r.status }));
+    } },
   ],
 };

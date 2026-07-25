@@ -3443,6 +3443,17 @@ const server = http.createServer(async (req, res) => {
     try { const rec = await readBody(req); const L = await import('../pods/gov/library.mjs'); const stored = L.addPastPerformance(rec || {}); return send(res, 200, JSON.stringify({ ok: !stored.error, record: stored })); }
     catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // Incumbent intelligence & recompete timing (pods/gov/incumbent.mjs): who holds this lane now + when it
+  // recompetes + lane concentration, from the cached USASpending sample. Read-only; no gate, nothing sent.
+  if (req.method === 'GET' && url.pathname === '/api/gov/incumbent') {
+    try {
+      const noticeId = url.searchParams.get('noticeId');
+      const I = await import('../pods/gov/incumbent.mjs');
+      let op = { noticeId };
+      try { const D = await import('../pods/gov/deals.mjs'); const deal = D.getDeal(noticeId); if (deal) op = { ...deal, noticeId }; } catch { /* ledger best-effort */ }
+      return send(res, 200, JSON.stringify(await I.incumbentFor(op)));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   if (req.method === 'POST' && url.pathname === '/api/gov-board/disposition') {
     try {
       const { noticeId, stage, title: bodyTitle, agency: bodyAgency } = await readBody(req);

@@ -3399,7 +3399,7 @@ const server = http.createServer(async (req, res) => {
       const BF = await import(require('node:url').pathToFileURL(path.join(__dirname, '..', 'pods', 'gov', 'bid-fit.mjs')).href);
       let opp = await readBody(req) || {};
       if (opp.noticeId && !opp.naics) { try { const D = await import('../pods/gov/deals.mjs'); const deal = D.getDeal(opp.noticeId); if (deal) opp = { ...deal, ...opp, naics: opp.naics || deal.naics }; } catch { /* */ } }
-      return send(res, 200, JSON.stringify({ ok: true, ...BF.bidFit(opp) }));
+      return send(res, 200, JSON.stringify({ ok: true, ...BF.bidFit(opp), coach: BF.bidCoach(opp).coach }));
     } catch (e) { return send(res, 500, JSON.stringify({ ok: false, error: e.message })); }
   }
   // ── WATCHER HEALTH (control-plane/watcher-health.mjs, L-013): the three-state contract — which sensors

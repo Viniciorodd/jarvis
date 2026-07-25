@@ -81,3 +81,51 @@ export function bidFit(opp = {}) {
     + `\nNext action: ${b.band === 'PURSUE' ? 'pull the RFP + start Step 0 scoping' : b.band === 'REVIEW' ? 'pursue if capacity allows' : b.band === 'THIN' ? 'hold unless the pipeline is empty' : 'release it — numbers say pass'}`;
   return { score, ...b, disqualified: false, reasons: [], signals, strongest, weakest, gates, line };
 }
+
+// ── BID COACH (REDOS Port #1) — turn Bid Fit's single "next action" into a RANKED, severity-tagged set of
+// ACTIONABLE moves (a move, not an observation), derived deterministically from the same signals. Ranked
+// dealbreaker → fix → tip → strength. PURE + eval-pinned. No LLM. ────────────────────────────────────────
+const cap1 = (s) => { const t = String(s || '').trim(); return t ? t[0].toUpperCase() + t.slice(1) : t; };
+// A concrete MOVE for a weak signal (what to DO about it), keyed by signal name.
+const WEAK_MOVE = {
+  competitionDepth: { sev: 'fix', text: 'Crowded field (many doc-takers) — submit 2 sharp questions to the CO to reshape scope in your favor before you commit.' },
+  geographySub: { sev: 'fix', text: 'No sub on the bench nearby — line up a local crew now (Jarvis can source one) so labor is locked before you bid.' },
+  pastPerfDemand: { sev: 'fix', text: 'Past performance is demanded — lead with the sub\'s past performance + your PA/SAM registrations; never claim experience you don\'t hold.' },
+  setAsideFit: { sev: 'tip', text: 'Set-aside fit is thin — confirm you can PRIME this before investing in a full response.' },
+  recurringValue: { sev: 'tip', text: 'One-time / low recurring value — keep the LOE proportional; don\'t over-invest a full-team response.' },
+  awardSize: { sev: 'tip', text: 'Small award — keep the proposal effort lean so the win is worth the hours.' },
+  portalGate: { sev: 'fix', text: 'Login-walled portal — register + download early so the submission mechanics don\'t sink the bid.' },
+  evaluationType: { sev: 'tip', text: 'Lowest-price/LPTA lean — this is won on PRICE; sharpen the number and trim optional LOE.' },
+  naicsCore: { sev: 'tip', text: 'NAICS is off your core lane — double-check it\'s genuinely yours before bidding.' },
+};
+// A STRENGTH to lean on, keyed by signal name.
+const STRONG_MOVE = {
+  geographySub: 'Sub on the bench within reach — lean on it in the technical approach as proof of immediate capability.',
+  competitionDepth: 'Thin competition — a strong, compliant response has a real shot; pursue it.',
+  naicsCore: 'Dead-center in your NAICS lane — make that the opening line of the win theme.',
+  setAsideFit: 'Set-aside fits you — lead with the SDB / Minority / Hispanic-owned status as the win theme.',
+  recurringValue: 'Multi-year / BPA value — a win here compounds; worth a strong response.',
+  evaluationType: 'Best-value / tradeoff — lead the narrative on approach + past performance, not just price.',
+};
+const ICON = { dealbreaker: '🚨', fix: '⚠️', tip: '💡', price: '💡', strength: '✅' };
+const SEV_ORDER = { dealbreaker: 0, fix: 1, tip: 2, price: 3, strength: 4 };
+
+// PURE: the ranked, actionable coach for an opportunity. Returns { score, band, verdict, disqualified, coach:[{severity,icon,text}] }.
+export function bidCoach(opp = {}) {
+  const fit = bidFit(opp);
+  const coach = [];
+  for (const dq of fit.reasons) coach.push({ severity: 'dealbreaker', text: `${cap1(dq.reason)} — team with a qualified prime or release it; do not bid as prime.` });
+  for (const g of fit.gates) coach.push({ severity: 'fix', text: cap1(g) + '.' });
+  if (!fit.disqualified) {
+    const ratio = (k) => fit.signals[k] / MAX[k];
+    const ranked = Object.keys(fit.signals).sort((a, b) => ratio(a) - ratio(b));
+    // up to 2 genuinely-WEAK signals (ratio < 0.7) that have an actionable move — lowest first
+    let w = 0; for (const k of ranked) { if (w >= 2) break; if (WEAK_MOVE[k] && ratio(k) < 0.7) { coach.push({ severity: WEAK_MOVE[k].sev, text: WEAK_MOVE[k].text }); w++; } }
+    // up to 2 genuinely-STRONG signals (ratio ≥ 0.7) that have a move — highest first
+    let s = 0; for (const k of [...ranked].reverse()) { if (s >= 2) break; if (STRONG_MOVE[k] && ratio(k) >= 0.7) { coach.push({ severity: 'strength', text: STRONG_MOVE[k] }); s++; } }
+  }
+  coach.sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
+  const seen = new Set();
+  const deduped = coach.filter((c) => { if (seen.has(c.text)) return false; seen.add(c.text); return true; }).map((c) => ({ ...c, icon: ICON[c.severity] }));
+  return { score: fit.score, band: fit.band, verdict: fit.verdict, disqualified: fit.disqualified, coach: deduped };
+}

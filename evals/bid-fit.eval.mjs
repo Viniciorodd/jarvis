@@ -3,7 +3,7 @@
 // what we already learned the hard way. If a backtest disagrees with reality, the weights are wrong — the
 // fixtures here use the facts the PRD documents for each opportunity.
 
-import { bidFit, disqualifiers, band, CORE_NAICS, VALUE_CAP } from '../pods/gov/bid-fit.mjs';
+import { bidFit, bidCoach, disqualifiers, band, CORE_NAICS, VALUE_CAP } from '../pods/gov/bid-fit.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -46,5 +46,19 @@ export default {
 
     { name: 'a NO-BID never uses shaming language (L-010) — line reads "released, next one"',
       run: () => { const r = bidFit(DELCO); return ok(!/failed|missed|should have|overdue/i.test(r.line) && /release/i.test(r.line), r.line); } },
+
+    // ── REDOS Port #1: Bid Coach (ranked, actionable mitigations) ──
+    { name: 'bidCoach on a strong janitorial opp → ranked moves led by a ✅ strength, no dealbreaker',
+      run: () => { const r = bidCoach(SCTA); const sevs = r.coach.map((c) => c.severity); return ok(r.coach.length > 0 && !sevs.includes('dealbreaker') && sevs.includes('strength'), JSON.stringify(sevs)); } },
+    { name: 'bidCoach on a disqualified opp → leads with a 🚨 dealbreaker (team or release)',
+      run: () => { const r = bidCoach({ title: 'Grounds Z', naics: '561720', setAside: 'SDVOSB Set-Aside' }); const first = r.coach[0]; return ok(r.disqualified && first && first.severity === 'dealbreaker' && first.icon === '🚨' && /team|release/i.test(first.text), JSON.stringify(first)); } },
+    { name: 'bidCoach is ranked dealbreaker→fix→tip→strength and every line is a MOVE (has a verb), deduped',
+      run: () => {
+        const r = bidCoach(ERIE); // bond + pennbid gates + crowded field → fixes present
+        const order = { dealbreaker: 0, fix: 1, tip: 2, price: 3, strength: 4 };
+        const sorted = r.coach.every((c, i) => i === 0 || order[r.coach[i - 1].severity] <= order[c.severity]);
+        const texts = r.coach.map((c) => c.text);
+        return ok(sorted && new Set(texts).size === texts.length && r.coach.some((c) => c.severity === 'fix'), JSON.stringify(r.coach.map((c) => c.severity)));
+      } },
   ],
 };

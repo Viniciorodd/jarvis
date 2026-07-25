@@ -237,7 +237,7 @@ export async function countPopulation({ naics, state, years = 3 } = {}) {
   } catch { return null; }
 }
 
-const mapAward = (x) => ({ awardId: x['Award ID'] || '', recipient: x['Recipient Name'] || '', amount: Number(x['Award Amount']), date: x['Start Date'] || '' });
+const mapAward = (x) => ({ awardId: x['Award ID'] || '', recipient: x['Recipient Name'] || '', amount: Number(x['Award Amount']), date: x['Start Date'] || '', endDate: x['End Date'] || '' });
 const usableAward = (a) => Number.isFinite(a.amount) && a.amount > 0;
 
 // ── best-effort network: REAL comparable awards from USASpending. NEVER throws — any failure returns an
@@ -259,7 +259,7 @@ export async function fetchComparableAwards({ naics, state, years = 3, limit = P
   const win = fyWindow(years);
   const filters = buildFilters(code, st, win);
   const where = st ? ' · ' + st : ' · nationwide';
-  const pageBody = (page, lim) => ({ filters, fields: ['Award ID', 'Recipient Name', 'Award Amount', 'Start Date'], page, limit: lim, sort: 'Award Amount', order: 'desc' });
+  const pageBody = (page, lim) => ({ filters, fields: ['Award ID', 'Recipient Name', 'Award Amount', 'Start Date', 'End Date'], page, limit: lim, sort: 'Award Amount', order: 'desc' });
 
   // 1) How big is this lane, really? Best-effort — null means "couldn't tell", not "empty".
   const population = await countPopulation({ naics: code, state: st, years });

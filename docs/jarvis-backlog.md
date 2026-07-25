@@ -48,7 +48,12 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
   `/api/gov/incumbent`. Live-verified: janitorial/PA → 275 awards, incumbent Penn-York (POP 2029, locked 30mo).
   9 evals (774→783). **SLED-beyond-SAM discovery DEFERRED** (per-portal scrapers = own effort) — future add.
   Spec `docs/superpowers/specs/2026-07-24-gov-incumbent-phase5-design.md`.
-- 🔨 **Phase 6 — SCA-Wage Bid-Price Builder** — parse the cached SCLS wage determination → labor-loaded bid price.
+- ✅ **Phase 6 — SCA-Wage Bid-Price Builder** (done 2026-07-24 — completes the gov pipeline). `pods/gov/wage-det.mjs`:
+  `parseWageDetermination` (rates + Health & Welfare from the cached SCLS attachment; garbage→empty, no fabricated
+  wage), `janitorialRates` (title-matched), `laborLoadedPrice` (self-perform SCA-compliant bid; clamped
+  burden/overhead/profit knobs; **never below the wage floor — structural invariant, not a check**),
+  `readCachedWd`. `/api/gov/wage-price?noticeId=&hours=`. Sample: Janitor $22.21/hr × 2080 → $68,192.81. 8 evals
+  (783→790). Final review: Ready to merge, no fixes. Spec `docs/superpowers/specs/2026-07-24-gov-sca-wage-price-phase6-design.md`.
 - 🔨 **Phase 7 — REDOS → Rodgate transferable patterns** (vault `🔁 REDOS → Rodgate — Transferable Patterns.md`).
   Three ports onto the existing bid engine — all code, eval-pinnable, PC-doable, independent of Phases 2–6:
   - **① Bid Coach** — extend `pods/gov/bid-fit.mjs` output from one "next action" to a ranked, severity-tagged

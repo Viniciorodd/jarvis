@@ -41,8 +41,13 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
   nothing auto-sends; existing facts-guard + compliance self-heal still run. 7 evals (767→774). Verified live
   (real notice → grounding block w/ requirements + 5 sections + no-fab). **Deferred:** coverage-% on the submit
   gate (viewable via `/api/gov/matrix`). Spec `docs/superpowers/specs/2026-07-24-gov-grounded-drafting-phase4-design.md`.
-- 🔨 **Phase 5 — Incumbent & Extended Discovery** — who holds this / recompete timing / SLED beyond SAM (the
-  build-it-ourselves HigherGov replacement).
+- ✅ **Phase 5 — Incumbent Intelligence & Recompete Timing** (done 2026-07-24). `pods/gov/incumbent.mjs`:
+  `pickIncumbent` (latest-POP-end award, best-signal, empty→null no fabrication) + `recompeteTiming`
+  (unknown/stale/recompeting-now/window/locked) + `incumbentFor` (reuses the cached USASpending sample — no new
+  API load — + lane concentration from bid-winners). `price-to-win` award query now pulls `End Date`.
+  `/api/gov/incumbent`. Live-verified: janitorial/PA → 275 awards, incumbent Penn-York (POP 2029, locked 30mo).
+  9 evals (774→783). **SLED-beyond-SAM discovery DEFERRED** (per-portal scrapers = own effort) — future add.
+  Spec `docs/superpowers/specs/2026-07-24-gov-incumbent-phase5-design.md`.
 - 🔨 **Phase 6 — SCA-Wage Bid-Price Builder** — parse the cached SCLS wage determination → labor-loaded bid price.
 - 🔨 **Phase 7 — REDOS → Rodgate transferable patterns** (vault `🔁 REDOS → Rodgate — Transferable Patterns.md`).
   Three ports onto the existing bid engine — all code, eval-pinnable, PC-doable, independent of Phases 2–6:

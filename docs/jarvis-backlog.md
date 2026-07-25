@@ -56,9 +56,9 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
   (783→790). Final review: Ready to merge, no fixes. Spec `docs/superpowers/specs/2026-07-24-gov-sca-wage-price-phase6-design.md`.
 - 🔨 **Phase 7 — REDOS → Rodgate transferable patterns** (vault `🔁 REDOS → Rodgate — Transferable Patterns.md`).
   Three ports onto the existing bid engine — all code, eval-pinnable, PC-doable, independent of Phases 2–6:
-  - **① Bid Coach** — extend `pods/gov/bid-fit.mjs` output from one "next action" to a ranked, severity-tagged
-    mitigation set (🚨 Dealbreaker → ⚠️ Fix → 💡 Tip → 💡 Price move → ✅ Strength); every line a *move*, not an
-    observation. Deterministic (from the same signals + disqualifiers + gates + price). Surfaces on the board card + brief.
+  - ✅ **① Bid Coach** (done 2026-07-25) — `bidCoach(opp)` in `pods/gov/bid-fit.mjs`: ranked, severity-tagged
+    MOVES (🚨 dealbreaker → ⚠️ fix → 💡 tip → ✅ strength), deterministic from the same signals/gates/disqualifiers.
+    On `/api/gov/bid-fit`. 3 evals (795→798). _Surfacing on the board card/drawer UI still TODO._
   - **② Projected-vs-Actual win-rate engine** (the doc's "real gem", highest value) — a per-bid ledger row
     (Bid Fit score/verdict, win-prob, price-to-win, LOE, margin) captured at bid, filled at award; grade forecast
     accuracy (were PURSUEs winning? price-to-win biased? LOE under-estimated?) → a recalibration signal for the Bid

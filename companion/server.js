@@ -3454,6 +3454,22 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(await I.incumbentFor(op)));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // SCA wage-determination price (pods/gov/wage-det.mjs): parse the cached SCLS wage determination → janitorial
+  // rates + a self-perform labor-loaded bid price (never below the SCA floor). Read-only; no gate, nothing sent.
+  if (req.method === 'GET' && url.pathname === '/api/gov/wage-price') {
+    try {
+      const noticeId = url.searchParams.get('noticeId');
+      const hours = Number(url.searchParams.get('hours')) || 2080;
+      const W = await import('../pods/gov/wage-det.mjs');
+      let op = { noticeId };
+      try { const D = await import('../pods/gov/deals.mjs'); const deal = D.getDeal(noticeId); if (deal) op = { ...deal, noticeId }; } catch { /* ledger best-effort */ }
+      const wd = await W.readCachedWd(op);
+      const jan = W.janitorialRates(wd);
+      const rate = jan[0] || wd.rates[0] || null;
+      const sample = rate ? W.laborLoadedPrice({ baseHourly: rate.hourly, hwHourly: wd.healthWelfare, hours }) : null;
+      return send(res, 200, JSON.stringify({ ok: true, wd: { wdNumber: wd.wdNumber, revision: wd.revision, healthWelfare: wd.healthWelfare, rateCount: (wd.rates || []).length, source: wd.source }, janitorialRates: jan, sample, sampleLine: W.priceLine(sample), pricedCategory: rate ? { code: rate.code, title: rate.title, hourly: rate.hourly } : null }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   if (req.method === 'POST' && url.pathname === '/api/gov-board/disposition') {
     try {
       const { noticeId, stage, title: bodyTitle, agency: bodyAgency } = await readBody(req);

@@ -9,7 +9,7 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
 
 ---
 
-## 🏛 GovCon capability build — 8-phase plan (2026-07-24)
+## 🏛 GovCon capability build — 9-phase plan (2026-07-24, +Phase 9 2026-07-27)
 From a review of GovDash / GovGPT / the GovCon AI-tool landscape vs. what Jarvis already has. We build the
 gaps ourselves (no $500/yr HigherGov). Order = win-rate leverage first, then dependency. Each phase = its own
 spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator request: 7 = REDOS bid-engine ports,
@@ -78,6 +78,19 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
   - **Item 3 — converge the two Jarvises**: execute `docs/one-source-of-truth.md`'s migration (point Morning Brief /
     Gov Inbox Watch at `/api/gov-board`, emit events not vault-note status guesses). Touches Mac-worker job prompts +
     n8n on the NAS — the PRD says this is its OWN session, run from the Mac (Tailscale access). I can't reach it from the PC.
+- 🔨 **Phase 9 (LAST) — GovCon Autonomous Outreach** (`00 - System/Jarvis/PRD — GovCon Autonomous Outreach…md`, added
+  2026-07-27 at operator request). ⚠️ **CHANGES A STANDING HARD RULE**: agents may AUTO-SEND a defined class of
+  low-stakes outreach (sub-quote requests, follow-ups → Tier 1; prime intros → Tier 2; sources-sought → Tier 3),
+  while **proposals/bids/pricing/commitments/CO submissions stay human-sent forever** (§2 hard line). Guardrails are
+  CODE not prompts (§4): approved templates only · Canonical-Facts injection (L-005) · **verified-recipient allowlist**
+  (`verified:true` per CRM contact, L-009) · rate limits/caps · three-place logging (L-003) · verified-send (L-014) ·
+  inbound-is-untrusted injection defense · **scoped least-privilege send credential** · kill switch · daily digest.
+  Autonomy ladder (§5): Tier 0→1→2→3, promote on a clean record, one bad send = demote. Also 5 vault rule changes (§6:
+  CLAUDE.md permissions, Architecture directive #2, board `🤖 auto`/`👤 sent` marker, Lessons Ledger, CRM `verified` field).
+  🧑 **HARD PREREQUISITES before ANY auto-send (operator's hands):** (1) resolve the **2026-07-21 credential flag**
+  (unexplained app-password + passkey on rodgategroup) — cannot run autonomous email on a credential of unknown origin;
+  (2) confirm the approved templates; (3) seed the verified-contact allowlist; (4) confirm the scoped sending account.
+  Runs on the Mac worker + gov pod. This is the autonomy-ladder the architecture always said was "missing."
 
 ## ✅ Done (2026-07-20)
 - ✅ **Bid Fit Index** (PRD L-013) — `pods/gov/bid-fit.mjs` + `POST /api/gov/bid-fit`: disqualifier-aware

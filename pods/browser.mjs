@@ -56,6 +56,18 @@ export async function readPage(url, { timeoutMs = 25000, maxChars = 8000 } = {})
   } catch (e) { return { ok: false, url, error: String(e.message || e).slice(0, 160) }; }
 }
 
+// Render a JS-heavy page and return its full HTML — used by web-eyes.mjs when a plain fetch yields no
+// server-rendered content. Read-only: navigates + reads, never clicks/submits. Returns '' on failure.
+export async function renderHtml(url, { timeoutMs = 25000 } = {}) {
+  if (!/^https?:\/\//i.test(String(url || ''))) return '';
+  try {
+    return await withBrowser(async (page) => {
+      await page.goto(url, { waitUntil: 'networkidle', timeout: timeoutMs });
+      return await page.content();
+    });
+  } catch { return ''; }
+}
+
 // Find one fillable field by matching keywords against name/id/placeholder/aria-label/associated <label>.
 async function findFieldSelector(page, keywords) {
   return page.evaluate((kws) => {

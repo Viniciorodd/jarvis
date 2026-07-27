@@ -903,11 +903,12 @@ async function runTool(name, input) {
     return items.map((n, i) => `${i + 1}. ${n.title}${n.src ? ' — ' + n.src : ''}${n.date ? ' (' + n.date + ')' : ''}`).join('\n');
   }
   if (name === 'web_read') {
-    const u = String(input.url || '').trim(); if (!/^https?:\/\//.test(u)) throw new Error('a full http(s) URL is required');
-    let html = await (await fetch(u, { headers: { 'user-agent': 'Mozilla/5.0' }, redirect: 'follow', signal: AbortSignal.timeout(15000) })).text();
-    html = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<nav[\s\S]*?<\/nav>/gi, ' ').replace(/<footer[\s\S]*?<\/footer>/gi, ' ');
-    const text = stripTags(html).replace(/\s+/g, ' ').trim();
-    return text.slice(0, 8000) || '(no readable text found)';
+    // Clean web → Markdown via web-eyes (Readability + Turndown, JS-render fallback) — real article extraction,
+    // not a regex tag-strip. Returns honest content or an honest failure (never a fabricated read).
+    const W = await import('../pods/web-eyes.mjs');
+    const r = await W.readWeb(input.url);
+    if (!r.ok) return `I couldn't read that page — ${r.error}.`;
+    return `# ${r.title || r.url}\n\n${r.markdown}`;
   }
   if (name === 'discover_tvs') {
     const tvs = await discoverTVs(3500);

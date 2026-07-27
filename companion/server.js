@@ -261,6 +261,8 @@ async function govBoardData() {
 // OpenAI key — used for Whisper voice transcription (Whisper API, ~$0.006/min)
 let OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 if (!OPENAI_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^OPENAI_API_KEY=(.+)$/m); if (m) OPENAI_KEY = m[1].trim(); } catch { /* */ } }
+let OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
+if (!OPENROUTER_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^OPENROUTER_API_KEY=(.+)$/m); if (m) OPENROUTER_KEY = m[1].trim(); } catch { /* */ } }
 // Focus mode: normal | gaming | work | dnd
 let focusMode = 'normal';
 // Stripe money-in (READ-ONLY): available + pending balance and recently collected. Test or live by the key.
@@ -370,6 +372,12 @@ const TOOLS = [
     input_schema: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } },
   { name: 'write_file', description: 'Create or overwrite a text file inside the workspace. Creates parent folders as needed.',
     input_schema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } },
+  { name: 'create_note', description: 'Create a REAL Markdown note in the operator\'s Obsidian vault (Second Brain). Use for "create a note", "save a note", "make a note in my vault", "jot this down". It writes the file, READS IT BACK to verify, and returns the real path. Never claim a note exists without calling this and getting its success result.',
+    input_schema: { type: 'object', properties: {
+      title: { type: 'string', description: 'the note title (becomes the .md filename)' },
+      content: { type: 'string', description: 'the markdown body of the note' },
+      folder: { type: 'string', description: 'optional vault subfolder, e.g. "04 - Personal"; defaults to "00 - System/Jarvis/Notes"' },
+    }, required: ['title'] } },
   { name: 'edit_file', description: 'Replace the first occurrence of old_text with new_text in an existing file.',
     input_schema: { type: 'object', properties: { path: { type: 'string' }, old_text: { type: 'string' }, new_text: { type: 'string' } }, required: ['path', 'old_text', 'new_text'] } },
   { name: 'scan', description: 'Recursively list files and folders under a path (bounded) to understand structure before organizing.',
@@ -1035,6 +1043,21 @@ async function runTool(name, input) {
     await fsp.writeFile(p, String(input.content ?? ''), 'utf8');
     return `${existed ? 'overwrote' : 'wrote'} file: ${rel}`;
   }
+  if (name === 'create_note') {
+    // Scoped vault-note write (PRD): straight into the Obsidian vault, sanitized (no traversal), then READ BACK
+    // to VERIFY the content before reporting success — a failed/partial write can never render as "created".
+    const vault = VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
+    const folder = String(input.folder || '00 - System/Jarvis/Notes').replace(/[<>:"|?*]/g, '').replace(/\.{2,}/g, '').replace(/^[/\\]+/, '');
+    const nameSafe = (String(input.title || 'Untitled').replace(/[<>:"/\\|?*\n\r]/g, '').trim().slice(0, 120)) || 'Untitled';
+    const dir = path.join(vault, folder);
+    await fsp.mkdir(dir, { recursive: true });
+    const fp = path.join(dir, nameSafe + '.md');
+    const wanted = String(input.content ?? '');
+    await fsp.writeFile(fp, wanted, 'utf8');
+    const readback = await fsp.readFile(fp, 'utf8'); // verify
+    if (readback !== wanted) throw new Error('verification failed — the note did not save correctly');
+    return `✅ Created note "${nameSafe}.md" at ${path.relative(vault, fp)} (${readback.length} chars, read-back verified) in your vault.`;
+  }
   if (name === 'edit_file') {
     const p = safe(rel);
     const cur = await fsp.readFile(p, 'utf8');
@@ -1218,7 +1241,7 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
@@ -1262,7 +1285,61 @@ function brainPrefer() {
   return String(process.env.LLM_PREFER || 'auto').toLowerCase();
 }
 
-async function callClaude(messages) {
+// ── THE ACTION BRAIN (operator, 2026-07-27): when the operator asks for a REAL action (create/draft/do) but
+// the paid Claude brain has no credit, route to a cheap, reliable TOOL-CALLING model (gpt-4o-mini) that
+// actually RUNS the tools — so the free-default chat can create/draft/do (not just honestly refuse). Chat +
+// greetings still stay on the free brain ($0); only a real action spends the ~fraction-of-a-cent. It returns
+// an ANTHROPIC-shaped response so converse()'s existing agent loop works unchanged. Null on any failure →
+// caller falls back to the honest refusal (never a fabricated success). ─────────────────────────────────
+const OPENAI_TOOLS = () => TOOLS.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema || { type: 'object', properties: {} } } }));
+// Anthropic message array (with tool_use / tool_result blocks) → OpenAI chat format.
+function toOpenAIMessages(msgs) {
+  const out = [];
+  for (const m of msgs) {
+    if (typeof m.content === 'string') { out.push({ role: m.role, content: m.content }); continue; }
+    if (m.role === 'assistant') {
+      const text = m.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+      const calls = m.content.filter((b) => b.type === 'tool_use').map((b) => ({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input || {}) } }));
+      const msg = { role: 'assistant', content: text || null };
+      if (calls.length) msg.tool_calls = calls;
+      out.push(msg);
+    } else { // user turn: strings, text blocks, and tool_result blocks
+      for (const b of m.content) {
+        if (b.type === 'tool_result') out.push({ role: 'tool', tool_call_id: b.tool_use_id, content: String(b.content) });
+        else if (b.type === 'text') out.push({ role: 'user', content: b.text });
+      }
+    }
+  }
+  return out;
+}
+async function callActionBrain(messages) {
+  // Provider preference: OpenAI gpt-4o-mini (cheap + most reliable tool-caller, when funded) → a FREE OpenRouter
+  // tool-capable model ($0, so it still works with no paid credit) → null (caller gives the honest refusal).
+  const oaMsgs = [{ role: 'system', content: buildSystem() }, ...toOpenAIMessages(messages)];
+  const tools = OPENAI_TOOLS();
+  const providers = [];
+  if (OPENAI_KEY) providers.push({ url: 'https://api.openai.com/v1/chat/completions', key: OPENAI_KEY, model: 'gpt-4o-mini', label: 'openai:gpt-4o-mini' });
+  if (OPENROUTER_KEY) providers.push({ url: 'https://openrouter.ai/api/v1/chat/completions', key: OPENROUTER_KEY, model: process.env.ACTION_BRAIN_OR_MODEL || 'openai/gpt-oss-20b:free', label: 'openrouter:gpt-oss-20b(free)' });
+  for (const p of providers) {
+    try {
+      const r = await fetch(p.url, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + p.key, 'content-type': 'application/json' },
+        body: JSON.stringify({ model: p.model, max_tokens: 1200, tools, tool_choice: 'auto', messages: oaMsgs }),
+      });
+      if (!r.ok) continue; // out of credit / model unavailable → try the next provider
+      const data = await r.json();
+      const msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
+      const content = [];
+      if (msg.content) content.push({ type: 'text', text: msg.content });
+      for (const tc of (msg.tool_calls || [])) { let input = {}; try { input = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch { /* bad args */ } content.push({ type: 'tool_use', id: tc.id || ('call_' + Math.round(performance.now()) + content.length), name: tc.function.name, input }); }
+      if (content.length) return { content, stop_reason: (msg.tool_calls && msg.tool_calls.length) ? 'tool_use' : 'end_turn', usage: data.usage || null, _provider: p.label };
+    } catch { /* try the next provider */ }
+  }
+  return null;
+}
+
+async function callClaude(messages, wantsAction = false) {
   const model = pickModel(messages);
   // COST RULE (operator, 2026-07-20): voice/chat is CONVERSATIONAL and runs on the FREE brain by default —
   // paid Claude credit is reserved for big business ACTIONS with a real return, not a greeting or simple
@@ -1276,9 +1353,12 @@ async function callClaude(messages) {
         body: JSON.stringify({ model, max_tokens: 1200, system: buildSystem(), tools: TOOLS, messages }),
       });
       if (r.ok) return r.json();
-      // credit/rate error (400 low-balance / 429 / 5xx) → fall through to the free brain rather than die
+      // credit/rate error (400 low-balance / 429 / 5xx) → fall through rather than die
     } catch { /* network error → fall through */ }
   }
+  // ACTION path: a real do-it request routes to the tool-capable action brain (gpt-4o-mini) so it ACTUALLY
+  // runs the tools. Null (no key / API error) → the honest free-brain refusal below, never a faked success.
+  if (wantsAction) { const a = await callActionBrain(messages); if (a) return a; }
   // FREE brain (the default): a plain (tool-less) reply via local Ollama / OpenRouter — $0.
   return freeBackupReply(messages, model);
 }
@@ -1323,8 +1403,17 @@ async function converse(history) {
   const messages = history.map((m) => ({ role: m.role, content: m.content })); // strings ok
   const actions = [];
   const visuals = [];
+  // Does this turn ask for a real ACTION? If so, callClaude routes to the tool-capable action brain so it
+  // actually does it (rather than the free brain refusing). Computed once from the latest user message.
+  let wantsAction = false;
+  try {
+    const lu = [...messages].reverse().find((m) => m.role === 'user');
+    const t = typeof lu?.content === 'string' ? lu.content : '';
+    const { looksLikeAction } = await import('../pods/chat-truth.mjs');
+    wantsAction = looksLikeAction(t);
+  } catch { /* detection best-effort */ }
   for (let i = 0; i < 8; i++) {
-    const resp = await callClaude(messages);
+    const resp = await callClaude(messages, wantsAction);
     addUsage(resp.usage);
     const toolUses = (resp.content || []).filter((b) => b.type === 'tool_use');
     if (resp.stop_reason !== 'tool_use' || toolUses.length === 0) {

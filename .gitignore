@@ -128,3 +128,6 @@ browser-stage/
 # Gov library — seed is tracked; the operator's real past-performance + snippet edits are private
 gov-library/*.json
 !gov-library/snippets.seed.json
+
+# Win-rate ledger — real bid outcomes are business data
+gov-winrate/

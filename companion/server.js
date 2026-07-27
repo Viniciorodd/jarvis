@@ -3573,6 +3573,12 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(await I.incumbentFor(op)));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // WIN-RATE engine (pods/gov/win-rate.mjs, REDOS Port #2): Projected-vs-Actual — win-rate by Bid Fit band,
+  // price-to-win + LOE bias, and recalibration hints. Read-only analysis. The hints are recommendations only.
+  if (req.method === 'GET' && url.pathname === '/api/gov/win-rate') {
+    try { const W = await import('../pods/gov/win-rate.mjs'); return send(res, 200, JSON.stringify({ ok: true, ...W.winRateReport() })); }
+    catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // SCA wage-determination price (pods/gov/wage-det.mjs): parse the cached SCLS wage determination → janitorial
   // rates + a self-perform labor-loaded bid price (never below the SCA floor). Read-only; no gate, nothing sent.
   if (req.method === 'GET' && url.pathname === '/api/gov/wage-price') {
@@ -3611,6 +3617,15 @@ const server = http.createServer(async (req, res) => {
           CAP.recordOutcome({ noticeId, title: dTitle, agency: dAgency, result: stage, lessons: [], debriefRequested: false });
           debrief = CAP.debriefRequestEmail({ opp: { title: dTitle, noticeId, agency: dAgency }, result: stage }); // text shown in the UI right away
         } catch { debrief = null; }
+        // WIN-RATE loop (REDOS Port #2): record the projection (Bid Fit band) + the actual outcome, so the
+        // machine grades whether its own forecasts came true. Best-effort — never blocks the disposition.
+        try {
+          const [WR, BF, D] = await Promise.all([import('../pods/gov/win-rate.mjs'), import('../pods/gov/bid-fit.mjs'), import('../pods/gov/deals.mjs')]);
+          const deal = (D.getDeal && D.getDeal(noticeId)) || {};
+          const fit = BF.bidFit({ ...deal, title: dTitle || deal.title, noticeId });
+          WR.recordBid(noticeId, { title: dTitle || deal.title || '', band: fit.band, score: fit.score });
+          WR.recordAward(noticeId, { result: stage });
+        } catch { /* win-rate best-effort */ }
       }
       // Grow the past-performance library from a real WIN (Phase 3): a won bid becomes a citable record the
       // operator fleshes out later. Best-effort, only on the transition INTO won (not a re-mark); never blocks.

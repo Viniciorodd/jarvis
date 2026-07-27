@@ -1,9 +1,11 @@
 {
   "name": "jarvis-control-plane",
   "private": true,
-  "description": "Optional runtime deps for the pods the control-plane runs (Gov email read/send). The spine itself is dependency-free; these only power Hector's IMAP reply-reading + SMTP send.",
+  "description": "Optional runtime deps for the pods the control-plane runs (Gov email read/send + RFP attachment shredding). The spine itself is dependency-free; these power Hector's IMAP reply-reading + SMTP send, and the RFP shredder's attachment text-extraction (PDF via unpdf, DOCX via adm-zip).",
   "dependencies": {
     "imapflow": "^1.0.164",
-    "nodemailer": "^6.9.14"
+    "nodemailer": "^6.9.14",
+    "unpdf": "^1.6.2",
+    "adm-zip": "^0.5.17"
   }
 }

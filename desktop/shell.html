@@ -123,6 +123,15 @@
     setTimeout(check, 600); // slight head-start for the companion server
   }
 
+  // ESCAPE HATCH for a blacked-out webview (recurring blank Home/Today/Jarvis): Ctrl/Cmd+R or F5 force-reloads
+  // the inner view IGNORING cache — a one-key recovery so a stale cache never leaves the app stuck.
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'))) {
+      e.preventDefault();
+      try { view.reloadIgnoringCache(); } catch { view.src = view.src; }
+    }
+  });
+
   goWorld();
   probe();
   setInterval(probe, 30_000);

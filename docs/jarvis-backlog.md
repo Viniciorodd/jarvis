@@ -88,9 +88,13 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
   inbound-is-untrusted injection defense · **scoped least-privilege send credential** · kill switch · daily digest.
   Autonomy ladder (§5): Tier 0→1→2→3, promote on a clean record, one bad send = demote. Also 5 vault rule changes (§6:
   CLAUDE.md permissions, Architecture directive #2, board `🤖 auto`/`👤 sent` marker, Lessons Ledger, CRM `verified` field).
-  🧑 **HARD PREREQUISITES before ANY auto-send (operator's hands):** (1) resolve the **2026-07-21 credential flag**
-  (unexplained app-password + passkey on rodgategroup) — cannot run autonomous email on a credential of unknown origin;
-  (2) confirm the approved templates; (3) seed the verified-contact allowlist; (4) confirm the scoped sending account.
+  🧑 **HARD PREREQUISITES before ANY auto-send (operator's hands):** (1) ✅ **RESOLVED 2026-07-27** — the 2026-07-21
+  credential flag is CLOSED: the operator confirmed **he created** the app-password + passkey himself, setting up the
+  `vinicio@rodgategroup.com` domain Send-As (send/receive on Gmail). Known origin → the blocker is cleared. _(Vault
+  docs still carry the ⚠️ open-flag wording — `Jarvis - Architecture.md` #3 and the 7/21 `Connections` entry — update
+  them to "resolved, operator-created" so it stops resurfacing as an open risk.)_ (2) confirm the approved templates;
+  (3) seed the verified-contact allowlist; (4) confirm the sending identity — **decision pending: send outreach from
+  `rodgategroup@gmail.com` or the new `vinicio@rodgategroup.com` alias?** (the alias reads more professional to primes).
   Runs on the Mac worker + gov pod. This is the autonomy-ladder the architecture always said was "missing."
 
 ## ✅ Done (2026-07-20)

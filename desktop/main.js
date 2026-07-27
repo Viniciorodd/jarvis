@@ -70,6 +70,15 @@ if (!app.requestSingleInstanceLock()) {
     else createWindow();
   });
 
+  // THE REAL blank-Home fix: a <webview> uses its OWN session, NOT session.defaultSession — so the launch-time
+  // clear below never touched the webview's cache, and a stale cached bundle kept blacking out Home/Today/Jarvis.
+  // Clear the actual webview session's cache + service workers the moment the webview's web-contents is created.
+  app.on('web-contents-created', (_e, contents) => {
+    if (contents.getType && contents.getType() === 'webview') {
+      try { contents.session.clearCache(); contents.session.clearStorageData({ storages: ['serviceworkers', 'cachestorage', 'shadercache'] }); } catch { /* best-effort */ }
+    }
+  });
+
   app.whenReady().then(async () => {
     // This app is served from localhost (always online) — a stale cache buys nothing and causes blank/half-
     // rendered screens when shipped UI changes only partly land. Clear the webview's HTTP cache + service

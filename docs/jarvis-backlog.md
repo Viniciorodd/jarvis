@@ -73,9 +73,14 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
     owns the ONE draft mechanism (`replySubject` + `appendGmailDraft` → IMAP append to `[Gmail]/Drafts`, `\Draft`,
     NEVER sends); `stageDrafts` refactored onto it (dedup); new `draft_gmail_reply` tool + handler in `/api/chat`
     with a truthful "drafted, never sent" reply. Verified live end-to-end vs Gmail. 747 evals green.
-  - **Item 2 — Telegram per-agent topics**: verify + fix the Cowork-built `companion/telegram-topics.mjs` +
-    `telegram-bridge.mjs` (currently UNCOMMITTED in the tree) — needs a real phone + a forum group + the NAS bridge
-    running; check the `createForumTopic` flat-chat fallback + that `narrate-rollup`/`narrate-truth` evals stay green.
+  - ✅ **Item 2 — Telegram per-agent topics** (LIVE 2026-07-27). Code reviewed + committed; two blockers found and
+    fixed: (a) the **Dockerfile never COPY'd `telegram-topics.mjs`** so the bridge would crash on boot (hard import);
+    (b) the setup doc missed that a bot's **Group Privacy is ON by default**, so it can't see normal messages —
+    must be disabled in BotFather + the bot re-added. Deployed to the NAS forum supergroup
+    (`TELEGRAM_CHAT_ID=-1004340729966`, old id saved in `.env.bak`); bot promoted to admin w/ Manage Topics.
+    **Verified live: the `🗣 Talk to Jarvis` topic auto-created in the group.** The flat-chat fallback also proved
+    itself en route (logged once, fell back, no crash). Per-agent threads populate as agents post.
+    ⚠️ ALL Jarvis Telegram traffic now routes to the new group, not the old 1:1 chat.
   - **Item 3 — converge the two Jarvises**: execute `docs/one-source-of-truth.md`'s migration (point Morning Brief /
     Gov Inbox Watch at `/api/gov-board`, emit events not vault-note status guesses). Touches Mac-worker job prompts +
     n8n on the NAS — the PRD says this is its OWN session, run from the Mac (Tailscale access). I can't reach it from the PC.

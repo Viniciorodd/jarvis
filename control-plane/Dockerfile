@@ -16,6 +16,8 @@ COPY pods ./pods
 # the Telegram bridge shares this image (compose runs it as its own service). Dependency-free; imports
 # only from pods/ (already copied), so just the one file is needed — keeps the image small.
 COPY companion/telegram-bridge.mjs ./companion/telegram-bridge.mjs
+# telegram-bridge.mjs hard-imports this at load — without it the bridge crashes on boot (fixed 2026-07-27).
+COPY companion/telegram-topics.mjs ./companion/telegram-topics.mjs
 # what the pod workers need at runtime: the image engine (Fiverr) + entity/operator profiles (Gov).
 # The scheduler shares this image (its compose service just overrides the command).
 COPY scripts ./scripts

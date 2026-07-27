@@ -12,6 +12,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rollupNarrations } from '../pods/narrate.mjs';
 import { wantsPending } from '../pods/pending-intent.mjs'; // shared with the Chief-of-Staff router (one source)
+import { findPerson } from '../pods/org.mjs';
+import { ensureTopic, threadIdFor, TALK_TOPIC, isUnsupported } from './telegram-topics.mjs';
 export { wantsPending }; // re-exported so evals importing it from here keep working
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -29,8 +31,25 @@ const API = 'https://api.telegram.org/bot' + TOKEN;
 
 const history = []; // light conversation memory
 async function tg(method, body) { try { return await (await fetch(API + '/' + method, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(); } catch (e) { return { ok: false, error: e.message }; } }
-async function send(chat, text) { for (let i = 0; i < text.length; i += 3900) await tg('sendMessage', { chat_id: chat, text: text.slice(i, i + 3900) }); }
+// threadId is OPTIONAL and additive — omitted (or when topics aren't enabled on this chat), messages land
+// in the plain chat exactly as before. This is what lets "one topic per agent" degrade to today's single
+// flat feed with zero behavior change until the operator does the one-time forum setup.
+async function send(chat, text, threadId) {
+  for (let i = 0; i < text.length; i += 3900) {
+    const body = { chat_id: chat, text: text.slice(i, i + 3900) };
+    if (threadId) body.message_thread_id = threadId;
+    await tg('sendMessage', body);
+  }
+}
 async function get(p) { try { return await (await fetch(COMPANION + p)).json(); } catch (e) { return { error: e.message }; } }
+// Resolve (and lazily create) the Telegram topic for whoever triggered an event/gate. Falls back to null
+// (plain chat) for an unknown actor or a chat where topics aren't enabled — never blocks the send.
+async function topicFor(actor) {
+  if (!ALLOWED || isUnsupported()) return null;
+  const person = findPerson(actor);
+  if (!person) return null;
+  return threadIdFor(person.codename) || await ensureTopic(tg, ALLOWED, { codename: person.codename, nickname: person.nickname, title: person.title });
+}
 
 // ── Approve-from-phone ────────────────────────────────────────────────────────────────────────────
 // Push each NEW gated action as inline ✅/⏭ buttons; a tap fires the SAME control-plane executor the app
@@ -91,14 +110,19 @@ async function seedApprovals() { const list = await cp('/approvals/pending'); if
 // new task; (B) after a bridge restart, seedApprovals() marks all pending gates as already-pushed so their
 // buttons are never re-sent — this brings them back on demand. Leads with the SEND gates (the outreach), caps
 // the burst so 20 pending items don't flood the phone.
-async function showPending(chat) {
+async function showPending(chat, replyThread) {
   const list = await cp('/approvals/pending');
-  if (!Array.isArray(list) || !list.length) { await send(chat, '✓ Nothing is waiting on you right now — no pending drafts or approvals.'); return; }
+  if (!Array.isArray(list) || !list.length) { await send(chat, '✓ Nothing is waiting on you right now — no pending drafts or approvals.', replyThread); return; }
   const sorted = list.slice().sort((a, b) => (isSendGate(b) ? 1 : 0) - (isSendGate(a) ? 1 : 0) || String(b.ts || '').localeCompare(String(a.ts || '')));
   const CAP = 8;
-  await send(chat, `🟡 ${list.length} waiting on you. Here ${list.length === 1 ? 'it is' : 'they are'} — tap to decide${list.length > CAP ? ` (showing the first ${CAP})` : ''}:`);
+  await send(chat, `🟡 ${list.length} waiting on you. Here ${list.length === 1 ? 'it is' : 'they are'} — tap to decide${list.length > CAP ? ` (showing the first ${CAP})` : ''}:`, replyThread);
   for (const a of sorted.slice(0, CAP)) {
-    await tg('sendMessage', { chat_id: chat, text: approvalText(a), reply_markup: { inline_keyboard: [[{ text: '✅ Approve & send', callback_data: 'ap:' + a.id }, { text: '⏭ Skip', callback_data: 'sk:' + a.id }]] } });
+    // Each card goes to ITS agent's own topic (same routing as the live push below) so "show my pending"
+    // doesn't dump a mixed pile into whatever topic the operator happened to ask from.
+    const thread = await topicFor(a.actor);
+    const body = { chat_id: chat, text: approvalText(a), reply_markup: { inline_keyboard: [[{ text: '✅ Approve & send', callback_data: 'ap:' + a.id }, { text: '⏭ Skip', callback_data: 'sk:' + a.id }]] } };
+    if (thread) body.message_thread_id = thread;
+    await tg('sendMessage', body);
     pushedApprovals.add(a.id); // mark seen so the 15s auto-pusher doesn't double-send
   }
 }
@@ -109,7 +133,10 @@ async function pushApprovals() {
   for (const a of list) {
     if (pushedApprovals.has(a.id)) continue;
     pushedApprovals.add(a.id);
-    await tg('sendMessage', { chat_id: ALLOWED, text: approvalText(a), reply_markup: { inline_keyboard: [[{ text: '✅ Approve & send', callback_data: 'ap:' + a.id }, { text: '⏭ Skip', callback_data: 'sk:' + a.id }]] } });
+    const thread = await topicFor(a.actor); // e.g. Hector's own topic for a sub-outreach send gate
+    const body = { chat_id: ALLOWED, text: approvalText(a), reply_markup: { inline_keyboard: [[{ text: '✅ Approve & send', callback_data: 'ap:' + a.id }, { text: '⏭ Skip', callback_data: 'sk:' + a.id }]] } };
+    if (thread) body.message_thread_id = thread;
+    await tg('sendMessage', body);
   }
 }
 // ── Agent activity feed (BATCHED) ──────────────────────────────────────────────────────────────────
@@ -132,8 +159,18 @@ async function pushNarration() {
     fresh.push(ev);
   }
   if (!fresh.length) return;
-  const msg = rollupNarrations(fresh);        // one truthful message per cycle, or null if all noise
-  if (msg) await send(ALLOWED, msg);          // send() chunks >3900 chars, so a big batch still delivers
+  // ONE TOPIC PER AGENT: group this cycle's events by actor FIRST, then run each group through the same
+  // rollupNarrations the old single-message version used — that function is the truth-contract guard
+  // (evals/narrate*.eval.mjs), untouched; we're only changing WHERE each actor's rollup is delivered, not
+  // how it's worded. An event with no resolvable actor keeps the old behavior (main chat, no thread).
+  const byActor = new Map();
+  for (const ev of fresh) { const k = ev.actor || ''; if (!byActor.has(k)) byActor.set(k, []); byActor.get(k).push(ev); }
+  for (const [actor, evs] of byActor) {
+    const msg = rollupNarrations(evs);
+    if (!msg) continue;
+    const thread = actor ? await topicFor(actor) : null;
+    await send(ALLOWED, msg, thread);        // send() chunks >3900 chars, so a big batch still delivers
+  }
 }
 
 // Per-opportunity Pursue/Pass taps must be idempotent: two taps on the SAME button arrive as two
@@ -226,29 +263,36 @@ async function askJarvis(text) {
   return '⚠ Brain unreachable right now — try again in a moment.';
 }
 
-async function handle(chat, text) {
+// `thread` = the topic the INCOMING message arrived in (undefined in a plain chat, or when topics
+// aren't set up). Every reply here answers IN THAT SAME TOPIC — Telegram never silently moves a
+// conversation to a different thread, so neither do we. Per-agent topics (Gideon's, Hector's, ...) are
+// only ever the DESTINATION for agent-initiated pushes (pushApprovals/pushNarration above), never
+// something a reply jumps to on its own.
+async function handle(chat, text, thread) {
   text = (text || '').trim();
-  if (/^\/start/.test(text)) return send(chat, `Jarvis here. Text me anything — ask, draft, decide. Commands: /opps (top gov opportunities) · /brief · /capture <thought> · /money.\n\nYour chat id is ${chat} — put it in .env as TELEGRAM_CHAT_ID to lock the bot to this phone.`);
-  if (/^\/brief/.test(text)) { const b = await get('/api/brief'); return send(chat, b.text || b.error || 'no brief yet'); }
+  if (/^\/start/.test(text)) return send(chat, `Jarvis here. Text me anything — ask, draft, decide. Commands: /opps (top gov opportunities) · /brief · /capture <thought> · /money.\n\nYour chat id is ${chat} — put it in .env as TELEGRAM_CHAT_ID to lock the bot to this phone.${isUnsupported() ? '' : '\n\nTip: each agent (Gideon, Hector, Elle, Victor…) now gets its own topic thread for updates/approvals — this thread is just for talking to me directly.'}`, thread);
+  if (/^\/brief/.test(text)) { const b = await get('/api/brief'); return send(chat, b.text || b.error || 'no brief yet', thread); }
   // The curated few — "send me the opportunities with detail." /opps or "opportunities"/"opps".
   if (/^\/opps/.test(text) || /^(opps|opportunities|what.?s good|any (good )?opportunities)\b/i.test(text)) {
-    const b = await get('/api/gov/briefs?n=3'); return send(chat, (b && b.text) || b.error || 'No opportunities to show yet.');
+    const b = await get('/api/gov/briefs?n=3'); return send(chat, (b && b.text) || b.error || 'No opportunities to show yet.', thread);
   }
   // "pursue 1" (or 2/3) from the last /opps list → draft that proposal.
   const pur = text.match(/^pursue\s+([1-3])\b/i);
   if (pur) {
     const b = await get('/api/gov/briefs?n=3'); const pick = (b && b.briefs || [])[Number(pur[1]) - 1];
-    if (!pick) return send(chat, 'I don\'t have that one on the current list — send /opps first.');
+    if (!pick) return send(chat, 'I don\'t have that one on the current list — send /opps first.', thread);
     await fetch(COMPANION + '/api/pursue', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ noticeId: pick.noticeId, op: pick }) }).catch(() => {});
-    return send(chat, `On it — drafting the proposal for "${pick.title}". Open the Submit Wizard in the app to review, sign & submit.`);
+    return send(chat, `On it — drafting the proposal for "${pick.title}". Open the Submit Wizard in the app to review, sign & submit.`, thread);
   }
-  if (/^\/money/.test(text)) { const b = await get('/api/business?id=finance'); const m = b.money || {}; return send(chat, `Income ${m.month || 'this month'}: $${(m.mtd || 0).toLocaleString()} / $${(m.goal || 10000).toLocaleString()} (${m.pct || 0}%) · $${(m.remaining || 0).toLocaleString()} to go.`); }
+  if (/^\/money/.test(text)) { const b = await get('/api/business?id=finance'); const m = b.money || {}; return send(chat, `Income ${m.month || 'this month'}: $${(m.mtd || 0).toLocaleString()} / $${(m.goal || 10000).toLocaleString()} (${m.pct || 0}%) · $${(m.remaining || 0).toLocaleString()} to go.`, thread); }
   const cap = text.match(/^\/capture\s+([\s\S]+)/i);
-  if (cap) { await fetch(COMPANION + '/api/cockpit/capture', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: cap[1] }) }).catch(() => {}); return send(chat, '✓ captured to your vault'); }
+  if (cap) { await fetch(COMPANION + '/api/cockpit/capture', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: cap[1] }) }).catch(() => {}); return send(chat, '✓ captured to your vault', thread); }
   // "pull me the drafts / show my pending / the 2 sub outreach" → the REAL store, with buttons (see wantsPending).
-  if (wantsPending(text)) return showPending(chat);
-  await tg('sendChatAction', { chat_id: chat, action: 'typing' });
-  return send(chat, await askJarvis(text));
+  // Each card still routes to ITS agent's own topic (showPending does this internally) — only the summary
+  // line above the list answers in the thread the operator asked from.
+  if (wantsPending(text)) return showPending(chat, thread);
+  await tg('sendChatAction', { chat_id: chat, action: 'typing', ...(thread ? { message_thread_id: thread } : {}) });
+  return send(chat, await askJarvis(text), thread);
 }
 
 let offset = 0;
@@ -259,8 +303,9 @@ async function poll() {
     if (u.callback_query) { try { await handleCallback(u.callback_query); } catch { /* */ } continue; }
     const msg = u.message; if (!msg || !msg.text) continue;
     const chat = String(msg.chat.id);
-    if (ALLOWED && chat !== ALLOWED) { await send(chat, `Not authorized. (To allow this phone, set TELEGRAM_CHAT_ID=${chat} in .env.)`); continue; }
-    try { await handle(chat, msg.text); } catch (e) { await send(chat, '⚠ ' + e.message); }
+    const thread = msg.message_thread_id || undefined; // which topic this came from, if any
+    if (ALLOWED && chat !== ALLOWED) { await send(chat, `Not authorized. (To allow this phone, set TELEGRAM_CHAT_ID=${chat} in .env.)`, thread); continue; }
+    try { await handle(chat, msg.text, thread); } catch (e) { await send(chat, '⚠ ' + e.message, thread); }
   }
   setTimeout(poll, d && d.ok === false ? 3000 : 400); // back off on network errors
 }
@@ -273,7 +318,16 @@ async function main() {
   await seedEvents();                   // same for the activity feed
   setInterval(pushApprovals, 15000);   // push NEW gated actions as tap-to-approve buttons
   setInterval(pushNarration, 90000);   // narrate meaningful agent actions, signed by the agent
-  if (ALLOWED) tg('sendMessage', { chat_id: ALLOWED, text: '👥 Jarvis team is online — I\'ll tell you what each agent does, and send you approvals to tap. Say "show my pending" any time to pull up what\'s waiting. Let\'s make money.' }).catch(() => {});
+  if (ALLOWED) {
+    // One-time-per-boot: try to stand up the "Talk to Jarvis" home topic + confirm whether this chat
+    // supports topics at all (requires a forum-enabled supergroup — see companion/telegram-topics.mjs).
+    // Never blocks boot — a plain 1:1 chat just keeps working exactly as it does today.
+    const talkThread = await ensureTopic(tg, ALLOWED, TALK_TOPIC);
+    const note = talkThread
+      ? '👥 Jarvis team is online. Each agent (Gideon, Hector, Elle, Victor…) posts updates + approvals in their own topic; talk to me directly in 🗣 Talk to Jarvis. Say "show my pending" any time to pull up what\'s waiting.'
+      : '👥 Jarvis team is online — I\'ll tell you what each agent does, and send you approvals to tap. Say "show my pending" any time to pull up what\'s waiting. (Tip: enable Topics on this chat + make me a Manage-Topics admin for one thread per agent instead of one flat feed — docs/telegram-topics-setup.md.)';
+    tg('sendMessage', { chat_id: ALLOWED, text: note, ...(talkThread ? { message_thread_id: talkThread } : {}) }).catch(() => {});
+  }
   poll();
 }
 

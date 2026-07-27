@@ -59,13 +59,14 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
   - ✅ **① Bid Coach** (done 2026-07-25) — `bidCoach(opp)` in `pods/gov/bid-fit.mjs`: ranked, severity-tagged
     MOVES (🚨 dealbreaker → ⚠️ fix → 💡 tip → ✅ strength), deterministic from the same signals/gates/disqualifiers.
     On `/api/gov/bid-fit`. 3 evals (795→798). _Surfacing on the board card/drawer UI still TODO._
-  - **② Projected-vs-Actual win-rate engine** (the doc's "real gem", highest value) — a per-bid ledger row
-    (Bid Fit score/verdict, win-prob, price-to-win, LOE, margin) captured at bid, filled at award; grade forecast
-    accuracy (were PURSUEs winning? price-to-win biased? LOE under-estimated?) → a recalibration signal for the Bid
-    Fit weights. Ties into `pods/gov/capture.mjs` (win/loss) + the [[🧠 Lessons Ledger]]. Fully independent — could
-    be pulled earlier if the operator wants the win-rate loop sooner.
-  - **③ Bid Brief one-pager** — branded capture/bid brief (opportunity + Bid Fit + verdict + price-to-win +
-    teaming + top risks/mitigations), reusing `pods/gov/pdf.mjs`. Markets Rodgate as bigger than a solo shop to teaming partners.
+  - ✅ **② Projected-vs-Actual win-rate engine** (done 2026-07-27 — the "real gem"). `pods/gov/win-rate.mjs`:
+    records projection (Bid Fit band/score) at bid + actual (won/lost) at disposition; `forecastAccuracy` grades
+    win-rate by band + price-to-win/LOE bias; `recalibrationHints` → concrete moves (PURE, eval-pinned; NEVER
+    auto-rewrites the eval-pinned weights — operator applies). Wired into won/lost disposition + `/api/gov/win-rate`. 7 evals.
+  - ✅ **③ Bid Brief one-pager** (done 2026-07-27). `pods/gov/bid-brief.mjs`: composes opp + Bid Fit + Coach +
+    incumbent + matrix gaps + capability/past-perf → Markdown (or printable HTML via `pdf.mjs`). Honest (empty
+    past-perf → "newer prime, do NOT claim"; needsReview never cited). `/api/gov/bid-brief(?format=html)`. 6 evals.
+  - **PHASE 7 COMPLETE 2026-07-27** — all 3 REDOS ports shipped.
 - 🔨 **Phase 8 (LAST) — Tonight PRD follow-ups** (`docs/prd-2026-07-24-followups.md`). Cross-cutting infra/UX,
   NOT gov-pod — different domain, gated on live infra for 2 of 3 items:
   - ✅ **Item 1 — on-demand Gmail drafting** (done 2026-07-24, pulled forward per operator). `pods/inbox/compose.mjs`

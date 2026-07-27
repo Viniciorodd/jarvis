@@ -3573,6 +3573,19 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(await I.incumbentFor(op)));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // BID BRIEF one-pager (pods/gov/bid-brief.mjs, REDOS Port #3): opportunity + Bid Fit + Coach + incumbent +
+  // matrix gaps + capability, as Markdown (JSON) or a printable page (?format=html). Read-only; nothing sent.
+  if (req.method === 'GET' && url.pathname === '/api/gov/bid-brief') {
+    try {
+      const noticeId = url.searchParams.get('noticeId');
+      const B = await import('../pods/gov/bid-brief.mjs');
+      let op = { noticeId };
+      try { const D = await import('../pods/gov/deals.mjs'); const deal = D.getDeal(noticeId); if (deal) op = { ...deal, noticeId }; } catch { /* ledger best-effort */ }
+      const r = await B.bidBriefFor(op, { key: SAM_KEY });
+      if (url.searchParams.get('format') === 'html' && r.html) { res.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' }); res.end(r.html); return; }
+      return send(res, 200, JSON.stringify({ ok: true, markdown: r.markdown }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // WIN-RATE engine (pods/gov/win-rate.mjs, REDOS Port #2): Projected-vs-Actual — win-rate by Bid Fit band,
   // price-to-win + LOE bias, and recalibration hints. Read-only analysis. The hints are recommendations only.
   if (req.method === 'GET' && url.pathname === '/api/gov/win-rate') {

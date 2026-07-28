@@ -30,7 +30,10 @@ export function policy(env = process.env) {
 // Any hit here means a human sends it, full stop. Deliberately broad: a false block costs one approval tap;
 // a false ALLOW could send a price or a false certification to the government in Rodgate's name.
 const BLOCKED = [
-  ['pricing', /\$\s?\d|\b\d+(?:,\d{3})+(?:\.\d{2})?\s*(?:dollars|usd)\b|\b(?:our|the)\s+(?:price|quote|rate|bid)\b|\bprice\s*(?:is|of|:)|\bwe\s+(?:can\s+)?(?:do|offer)\s+(?:it\s+)?for\b|\bper\s+(?:sq\.?\s?ft|square\s+foot|hour)\b.*\d/i],
+  // NOTE: "our price/quote/rate/bid" = WE are giving a number → blocked. Deliberately NOT "the quote", because
+  // "following up on the quote request" is us ASKING for one — an approved Tier-1 template that must be able to
+  // send. A real number still trips the $-figure patterns regardless of wording. (Caught by template check 2026-07-27.)
+  ['pricing', /\$\s?\d|\b\d+(?:,\d{3})+(?:\.\d{2})?\s*(?:dollars|usd)\b|\bour\s+(?:price|quote|rate|bid)\b|\bprice\s*(?:is|of|:)|\bwe\s+(?:can\s+)?(?:do|offer)\s+(?:it\s+)?for\b|\bper\s+(?:sq\.?\s?ft|square\s+foot|hour)\b.*\d/i],
   ['commitment', /\bwe\s+(?:agree|commit|guarantee|accept|will\s+perform)\b|\bteaming\s+agreement\b|\bsubcontract\s+agreement\b|\bsigned?\s+(?:by|below)\b|\bbinding\b/i],
   // NOTE: wom[ae]n covers BOTH "woman-owned" and "women-owned" — the singular is the more common phrasing
   // and slipped this filter until an eval caught it (2026-07-27).
@@ -68,10 +71,17 @@ export function classifyOutreach({ templateKey, kind } = {}) {
   return hit ? { kind: hit, tier: KIND_TIER[hit] } : { kind: 'unknown', tier: Infinity };
 }
 
+// PURE: the contact's email — the live CRM (pods/gov/subs.json) uses `contact_email`; accept `email` too.
+export function contactEmail(contact) {
+  const e = contact && (contact.contact_email || contact.email);
+  return typeof e === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.trim()) ? e.trim() : '';
+}
+
 // PURE: is this recipient on the operator-maintained allowlist? Explicit true ONLY (L-009) — a missing,
-// undefined, or truthy-ish value is NOT verified.
+// undefined, or truthy-ish value is NOT verified. The operator marks `verified: true` per contact himself;
+// nothing in the system may set it (that would defeat the allowlist).
 export function verifiedRecipient(contact) {
-  return !!(contact && contact.verified === true && typeof contact.email === 'string' && /@/.test(contact.email));
+  return !!(contact && contact.verified === true && contactEmail(contact));
 }
 
 const DAY = 86400000;

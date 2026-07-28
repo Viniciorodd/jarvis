@@ -65,6 +65,10 @@ export async function sourceSubsForOpp(opp = {}, { min = 5, force = false, enric
   // Fill in missing contact emails by scraping the firms' own sites (Hector's enrichment).
   let enriched = null;
   if (enrich) { try { const E = await import('./enrich.mjs'); enriched = await E.enrichSubs({ all: true, limit: 10 }); } catch (e) { enriched = { error: e.message }; } }
+  // AUTO-VERIFY the bench (operator: 'i dont want to come and check and then approve'). Objective checks
+  // only — domain match, SAM UEI, ratings, prior work. Manual trust is never downgraded.
+  try { const V = await import('./sub-verify.mjs'); const C0 = await import('./connector.mjs'); const all = C0.loadSubs(); const av = V.autoVerifyAll(all); if (av.verified) C0.saveSubs(all); }
+  catch { /* auto-verify best-effort */ }
   let subs = [];
   try { const C = await import('./connector.mjs'); subs = C.loadSubs() || []; }
   catch { /* fall through to empty */ }

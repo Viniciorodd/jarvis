@@ -3611,6 +3611,14 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ...sourced, outreach }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // AUTO-SEND TIER proxy — lets the Gov OS set the autonomy level without touching the NAS .env.
+  if (url.pathname === '/api/gov/auto-send-tier' && (req.method === 'GET' || req.method === 'POST')) {
+    try {
+      const body = req.method === 'POST' ? JSON.stringify(await readBody(req)) : undefined;
+      const r = await fetch(CP_URL + '/maintenance/auto-send-tier', { method: req.method, headers: body ? { 'content-type': 'application/json' } : undefined, body, signal: AbortSignal.timeout(8000) });
+      return send(res, 200, JSON.stringify(await r.json()));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // 🛑 KILL SWITCH proxy (Phase 9) — the Gov OS button talks to the control-plane, which owns auto-send.json.
   // GET = current state; POST {kill} = set it. Kept dead simple: this must never fail to stop.
   if (url.pathname === '/api/gov/auto-send-kill' && (req.method === 'GET' || req.method === 'POST')) {

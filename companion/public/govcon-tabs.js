@@ -36,6 +36,32 @@
   try { var saved = localStorage.getItem(KEY); if (saved && buttons.some(function (b) { return b.getAttribute('data-go') === saved; })) start = saved; } catch (e) { /* */ }
   show(start);
 
+  /* AUTONOMY TIER — this is what "flip Tier 1" actually means: pick it from this dropdown. No .env edit, no
+     NAS, no redeploy. 0 = nothing sends. Turning a tier ON asks for confirmation and states plainly what it
+     does and does not grant; the Kill button still stops everything instantly. */
+  var tierSel = document.getElementById('gcTier');
+  if (tierSel) {
+    var syncTier = function () {
+      fetch('/api/gov/auto-send-tier').then(function (r) { return r.json(); })
+        .then(function (d) { if (d && d.ok) tierSel.value = String(d.tier || 0); })
+        .catch(function () { /* leave at OFF — the safe default */ });
+    };
+    syncTier();
+    tierSel.addEventListener('change', function () {
+      var t = Number(tierSel.value) || 0;
+      if (t > 0 && !confirm('Turn ON Tier ' + t + '?\n\nJarvis will send that class of outreach to AUTO-VERIFIED contacts without asking you first.\n\nProposals, pricing and commitments still NEVER auto-send. You can stop everything instantly with the Kill button.')) {
+        syncTier();
+        return;
+      }
+      tierSel.disabled = true;
+      fetch('/api/gov/auto-send-tier', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tier: t }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (!d || d.ok === false) { alert('Could not reach the control-plane — the tier did NOT change.'); syncTier(); } })
+        .catch(function () { alert('Could not reach the control-plane — the tier did NOT change.'); syncTier(); })
+        .then(function () { tierSel.disabled = false; });
+    });
+  }
+
   /* 🛑 KILL SWITCH — halts ALL autonomous agent sending instantly (Phase 9). One tap to kill; releasing asks
      for confirmation. If the control-plane can't be reached we say so plainly rather than implying safety. */
   var kb = document.getElementById('gcKill');

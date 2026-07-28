@@ -20,6 +20,11 @@ const KILL_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 
 export function killSwitchOn() {
   try { return JSON.parse(fs.readFileSync(KILL_FILE, 'utf8')).kill === true; } catch { return false; }
 }
+// The tier the operator set from the UI (same file). Returns null when unset, so env/default still applies —
+// this is what makes 'flip Tier 1' a BUTTON instead of an .env edit on the NAS.
+export function tierFromFile() {
+  try { const t = JSON.parse(fs.readFileSync(KILL_FILE, 'utf8')).tier; return Number.isFinite(Number(t)) ? Number(t) : null; } catch { return null; }
+}
 
 export const TIERS = { 0: 'off', 1: 'sub-quote requests + follow-ups', 2: '+ prime introductions', 3: '+ sources-sought responses' };
 const KIND_TIER = { 'sub-quote': 1, 'follow-up': 1, 'prime-intro': 2, 'sources-sought': 3 };
@@ -30,7 +35,7 @@ const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 // PURE: the operator's current settings (env, clamped). Default tier 0 = OFF — the shipped state.
 export function policy(env = process.env) {
   return {
-    tier: clamp(num(env.AUTO_SEND_TIER, 0), 0, 3),
+    tier: clamp(tierFromFile() != null ? tierFromFile() : num(env.AUTO_SEND_TIER, 0), 0, 3),
     dailyMax: clamp(num(env.AUTO_SEND_DAILY_MAX, 10), 0, 100),
     cooldownDays: clamp(num(env.AUTO_SEND_COOLDOWN_DAYS, 3), 0, 60),
     kill: String(env.AUTO_SEND_KILL || '') === '1',

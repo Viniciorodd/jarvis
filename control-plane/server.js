@@ -239,6 +239,19 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: true, kill, note: kill ? 'ALL autonomous sending is HALTED' : 'kill switch released — tier setting again governs' });
       }
     }
+    // AUTO-SEND TIER — the operator sets his autonomy level from the UI (no .env edit, no redeploy).
+    // 0 = off (nothing sends) · 1 = sub-quotes + follow-ups · 2 = + prime intros · 3 = + sources-sought.
+    if (p === '/maintenance/auto-send-tier') {
+      const f = path.join(__dirname, 'auto-send.json');
+      let cur = {}; try { cur = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { /* none yet */ }
+      if (req.method === 'GET') return send(res, 200, { ok: true, tier: Number(cur.tier) || 0, kill: !!cur.kill });
+      if (req.method === 'POST') {
+        const b = await readBody(req);
+        const tier = Math.max(0, Math.min(3, Number(b.tier) || 0));
+        try { fs.writeFileSync(f, JSON.stringify({ ...cur, tier, tierSetAt: new Date().toISOString() }, null, 2)); } catch (e) { return send(res, 200, { ok: false, error: e.message }); }
+        return send(res, 200, { ok: true, tier, note: tier === 0 ? 'Auto-send OFF — everything goes to your approval queue' : 'Tier ' + tier + ' ON' });
+      }
+    }
     // Auto-outreach run. DRY RUN unless {dryRun:false} is passed explicitly — and even then every candidate
     // must clear the full policy gauntlet. Returns the honest per-candidate outcome.
     if (req.method === 'POST' && p === '/maintenance/auto-outreach') {

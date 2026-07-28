@@ -3590,6 +3590,27 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, markdown: r.markdown }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // SOURCE SUBS FOR ONE OPPORTUNITY (pods/gov/sub-sourcing.mjs) — "find me ≥5 subs for this job and get quotes".
+  // Discovers (Places + SAM, bench-first) → scrapes contact emails → ranks by reachability/rating/proximity/
+  // expertise → optionally queues sub-quote requests. Newly-sourced firms are unverified, so the Phase 9 policy
+  // QUEUES them for approval rather than emailing them (L-009). ?send=1 runs the outreach step (still gated).
+  if (req.method === 'GET' && url.pathname === '/api/gov/source-subs') {
+    try {
+      const noticeId = url.searchParams.get('noticeId');
+      const min = Number(url.searchParams.get('min')) || 5;
+      const S = await import('../pods/gov/sub-sourcing.mjs');
+      let op = { noticeId };
+      try { const D = await import('../pods/gov/deals.mjs'); const deal = D.getDeal(noticeId); if (deal) op = { ...deal, noticeId }; } catch { /* ledger best-effort */ }
+      const sourced = await S.sourceSubsForOpp(op, { min, force: url.searchParams.get('force') === '1' });
+      let outreach = null;
+      if (url.searchParams.get('send') === '1') {
+        const [C, A] = await Promise.all([import('../pods/gov/connector.mjs'), import('../pods/gov/auto-outreach.mjs')]);
+        const cands = S.toOutreachCandidates(sourced, C.loadSubs());
+        outreach = await A.runAutoOutreach({ candidates: cands, dryRun: url.searchParams.get('live') !== '1' });
+      }
+      return send(res, 200, JSON.stringify({ ...sourced, outreach }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // 🛑 KILL SWITCH proxy (Phase 9) — the Gov OS button talks to the control-plane, which owns auto-send.json.
   // GET = current state; POST {kill} = set it. Kept dead simple: this must never fail to stop.
   if (url.pathname === '/api/gov/auto-send-kill' && (req.method === 'GET' || req.method === 'POST')) {

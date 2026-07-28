@@ -13,6 +13,8 @@
   var sections = [].slice.call(document.querySelectorAll('[data-tab]'));
   var cols = [].slice.call(document.querySelectorAll('.gc-col'));
 
+  var grid = document.querySelector('.gc-grid');
+
   function show(tab) {
     sections.forEach(function (s) { s.hidden = (s.getAttribute('data-tab') !== tab); });
     // hide a column that has no visible section, so the grid doesn't leave an empty track
@@ -20,6 +22,9 @@
       var any = [].slice.call(c.querySelectorAll('[data-tab]')).some(function (s) { return !s.hidden; });
       c.style.display = any ? '' : 'none';
     });
+    // Home keeps the 3-column cockpit; every focused tab goes FULL WIDTH. Without this the surviving
+    // column stayed pinned at its 340px/420px track and the page rendered as a strip beside a dead zone.
+    if (grid) grid.classList.toggle('gc-grid--full', tab !== 'home');
     buttons.forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-go') === tab); });
     try { localStorage.setItem(KEY, tab); } catch (e) { /* private mode */ }
     window.scrollTo({ top: 0, behavior: 'smooth' });

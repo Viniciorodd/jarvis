@@ -131,3 +131,7 @@ gov-library/*.json
 
 # Win-rate ledger — real bid outcomes are business data
 gov-winrate/
+
+# Auto-outreach ledger + generated outreach files (real business sends)
+gov-outreach/
+gov-drafts/auto/

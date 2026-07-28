@@ -8,7 +8,18 @@
 //
 // Guardrails are CODE, not prompts (PRD §4). Auto-send ships OFF (AUTO_SEND_TIER=0) — the operator turns on a
 // tier himself, after review, and can kill everything instantly with AUTO_SEND_KILL=1.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { COMPANY } from './company.mjs';
+
+// The phone-reachable kill switch (control-plane/auto-send.json, written by /maintenance/auto-send-kill).
+// Checked on EVERY decision so one tap halts autonomous sending everywhere, without a redeploy. Best-effort
+// read: no file = not killed (the switch is opt-in); a file that says kill:true always wins.
+const KILL_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'control-plane', 'auto-send.json');
+export function killSwitchOn() {
+  try { return JSON.parse(fs.readFileSync(KILL_FILE, 'utf8')).kill === true; } catch { return false; }
+}
 
 export const TIERS = { 0: 'off', 1: 'sub-quote requests + follow-ups', 2: '+ prime introductions', 3: '+ sources-sought responses' };
 const KIND_TIER = { 'sub-quote': 1, 'follow-up': 1, 'prime-intro': 2, 'sources-sought': 3 };
@@ -91,7 +102,7 @@ const DAY = 86400000;
 // operator's approval queue with a plain-English reason. Eval-pinned; fails closed on bad input.
 export function canAutoSend({ templateKey, kind, body, recipient, sentToday = 0, lastToRecipientAt = null, now = new Date(), env = process.env } = {}) {
   const p = policy(env);
-  if (p.kill) return { allow: false, reason: 'kill switch is ON — all autonomous sending halted' };
+  if (p.kill || killSwitchOn()) return { allow: false, reason: 'kill switch is ON — all autonomous sending halted' };
   if (p.tier <= 0) return { allow: false, reason: 'auto-send is OFF (AUTO_SEND_TIER=0) — everything goes to your approval queue' };
 
   const cls = classifyOutreach({ templateKey, kind });

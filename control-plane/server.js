@@ -222,6 +222,45 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { result = { ok: false, note: e.message }; }
       return send(res, 200, result);
     }
+    // ── PHASE 9 AUTONOMOUS OUTREACH ────────────────────────────────────────────────────────────────────
+    // KILL SWITCH — one call from the phone halts ALL autonomous sending immediately. Reading it is also how
+    // the operator checks the current tier. POST {kill:true|false} writes control-plane/auto-send.json, which
+    // outreach-policy.mjs honors on every decision. Deliberately dead simple: this must never fail to stop.
+    if (p === '/maintenance/auto-send-kill') {
+      const f = path.join(__dirname, 'auto-send.json');
+      if (req.method === 'GET') {
+        let cur = {}; try { cur = JSON.parse(fs.readFileSync(f, 'utf8')); } catch { /* none yet */ }
+        return send(res, 200, { ok: true, kill: !!cur.kill, tier: Number(process.env.AUTO_SEND_TIER) || 0 });
+      }
+      if (req.method === 'POST') {
+        const b = await readBody(req);
+        const kill = b.kill !== false; // default to KILLING — the safe direction
+        try { fs.writeFileSync(f, JSON.stringify({ kill, at: new Date().toISOString() }, null, 2)); } catch (e) { return send(res, 200, { ok: false, error: e.message }); }
+        return send(res, 200, { ok: true, kill, note: kill ? 'ALL autonomous sending is HALTED' : 'kill switch released — tier setting again governs' });
+      }
+    }
+    // Auto-outreach run. DRY RUN unless {dryRun:false} is passed explicitly — and even then every candidate
+    // must clear the full policy gauntlet. Returns the honest per-candidate outcome.
+    if (req.method === 'POST' && p === '/maintenance/auto-outreach') {
+      const b = await readBody(req);
+      let result;
+      try {
+        const A = await import('../pods/gov/auto-outreach.mjs');
+        result = await A.runAutoOutreach({ dryRun: b.dryRun !== false, candidates: b.candidates || [] });
+      } catch (e) { result = { ok: false, error: e.message }; }
+      return send(res, 200, result);
+    }
+    // The morning digest of what auto-sent yesterday (plain list; says so when nothing went out).
+    if (req.method === 'POST' && p === '/maintenance/auto-outreach-digest') {
+      await readBody(req);
+      try {
+        const A = await import('../pods/gov/auto-outreach.mjs');
+        const text = A.digestText(A.loadLog(), new Date(Date.now() - 86400000));
+        const { notifyTelegram } = await import('../pods/lib.mjs');
+        notifyTelegram(text);
+        return send(res, 200, { ok: true, text });
+      } catch (e) { return send(res, 200, { ok: false, error: e.message }); }
+    }
     // Amendment radar → detect when a PURSUED solicitation CHANGED (moved deadline / revised attachment / new
     // Amendment 000N) across scans, alert once, and invalidate the stale attachment cache (deterministic, no LLM).
     if (req.method === 'POST' && p === '/maintenance/amendment-check') {

@@ -1320,7 +1320,11 @@ async function callActionBrain(messages) {
   const tools = OPENAI_TOOLS();
   const providers = [];
   if (OPENAI_KEY) providers.push({ url: 'https://api.openai.com/v1/chat/completions', key: OPENAI_KEY, model: 'gpt-4o-mini', label: 'openai:gpt-4o-mini' });
-  if (OPENROUTER_KEY) providers.push({ url: 'https://openrouter.ai/api/v1/chat/completions', key: OPENROUTER_KEY, model: process.env.ACTION_BRAIN_OR_MODEL || 'openai/gpt-oss-20b:free', label: 'openrouter:gpt-oss-20b(free)' });
+  // FREE tool-capable fallbacks, fastest first (benchmarked 2026-07-27 on a real tool call: nemotron-30b 2.7s ·
+  // nemotron-9b 3.3s · gpt-oss-20b 4.3s · ling-flash 4.5s). Several, not one, so a rate-limited or briefly-down
+  // free model rolls to the next instead of dropping the operator back to "I can't do that."
+  const OR_FREE = (process.env.ACTION_BRAIN_OR_MODELS || 'nvidia/nemotron-3-nano-30b-a3b:free,openai/gpt-oss-20b:free,nvidia/nemotron-nano-9b-v2:free,inclusionai/ling-3.0-flash:free').split(',').map((s) => s.trim()).filter(Boolean);
+  if (OPENROUTER_KEY) for (const m of OR_FREE) providers.push({ url: 'https://openrouter.ai/api/v1/chat/completions', key: OPENROUTER_KEY, model: m, label: 'openrouter:' + m });
   for (const p of providers) {
     try {
       const r = await fetch(p.url, {

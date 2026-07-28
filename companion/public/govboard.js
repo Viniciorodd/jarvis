@@ -120,5 +120,25 @@
   var btn=$id('govBtn'); if(btn) btn.addEventListener('click', open);
   var x=$id('govX'); if(x) x.addEventListener('click', close);
   var rf=$id('govRefresh'); if(rf) rf.addEventListener('click', load);
+  // 🛑 KILL SWITCH — halts ALL autonomous agent sending instantly (Phase 9). Reflects live state on open,
+  // and toggles. Confirm only on RELEASE (turning protection off); killing is always one tap, no friction.
+  var kb=$id('govKill');
+  if(kb){
+    function paintKill(on){
+      kb.textContent = on ? '🛑 Auto-send HALTED — tap to release' : '🛑 Kill auto-send';
+      kb.classList.toggle('on', !!on);
+    }
+    fetch('/api/gov/auto-send-kill').then(function(r){return r.json();}).then(function(d){ paintKill(d && d.kill); }).catch(function(){});
+    kb.addEventListener('click', function(){
+      var turningOff = kb.classList.contains('on');
+      if(turningOff && !confirm('Release the kill switch? Agents will be able to auto-send again (subject to your tier setting).')) return;
+      kb.disabled = true;
+      fetch('/api/gov/auto-send-kill', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ kill: !turningOff }) })
+        .then(function(r){return r.json();})
+        .then(function(d){ paintKill(d && d.kill); if(!d || d.ok===false) alert('Could not reach the control-plane — assume sending is NOT halted and check the NAS.'); })
+        .catch(function(){ alert('Could not reach the control-plane — assume sending is NOT halted and check the NAS.'); })
+        .then(function(){ kb.disabled = false; });
+    });
+  }
   var hop=$id('jHomeGovOpen'); if(hop) hop.addEventListener('click', function(e){ e.preventDefault(); open(); });
 })();

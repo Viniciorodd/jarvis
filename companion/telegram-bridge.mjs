@@ -270,8 +270,23 @@ async function askJarvis(text) {
 // something a reply jumps to on its own.
 async function handle(chat, text, thread) {
   text = (text || '').trim();
-  if (/^\/start/.test(text)) return send(chat, `Jarvis here. Text me anything — ask, draft, decide. Commands: /opps (top gov opportunities) · /brief · /capture <thought> · /money.\n\nYour chat id is ${chat} — put it in .env as TELEGRAM_CHAT_ID to lock the bot to this phone.${isUnsupported() ? '' : '\n\nTip: each agent (Gideon, Hector, Elle, Victor…) now gets its own topic thread for updates/approvals — this thread is just for talking to me directly.'}`, thread);
+  if (/^\/start/.test(text)) return send(chat, `Jarvis here. Text me anything — ask, draft, decide. Commands: /opps · /brief · /capture <thought> · /money · 🛑 /kill (halt all autonomous sending) · /resume · /killstatus.\n\nYour chat id is ${chat} — put it in .env as TELEGRAM_CHAT_ID to lock the bot to this phone.${isUnsupported() ? '' : '\n\nTip: each agent (Gideon, Hector, Elle, Victor…) now gets its own topic thread for updates/approvals — this thread is just for talking to me directly.'}`, thread);
   if (/^\/brief/.test(text)) { const b = await get('/api/brief'); return send(chat, b.text || b.error || 'no brief yet', thread); }
+  // ── AUTONOMOUS-OUTREACH KILL SWITCH from the phone (Phase 9). /kill halts ALL agent sending instantly;
+  // /resume releases it; /killstatus reports. Deliberately simple + always available — this must never fail
+  // to stop. Anything unclear defaults to HALTING (the safe direction).
+  if (/^\/(kill|stop|halt)\b/i.test(text)) {
+    const r = await fetch(CP + '/maintenance/auto-send-kill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kill: true }) }).then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+    return send(chat, r.ok ? '🛑 KILL SWITCH ON — all autonomous sending is halted. Nothing goes out until you /resume. (Your own approvals still work.)' : `⚠️ Could not reach the control-plane to set the kill switch — ${r.error || 'unknown'}. Assume sending is NOT halted and check the NAS.`, thread);
+  }
+  if (/^\/resume\b/i.test(text)) {
+    const r = await fetch(CP + '/maintenance/auto-send-kill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kill: false }) }).then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+    return send(chat, r.ok ? '▶️ Kill switch released. Your AUTO_SEND_TIER setting governs again (Tier 0 = still nothing sends).' : `⚠️ Could not release it — ${r.error || 'unknown'}.`, thread);
+  }
+  if (/^\/killstatus\b/i.test(text)) {
+    const r = await fetch(CP + '/maintenance/auto-send-kill').then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+    return send(chat, r.ok ? `Kill switch: ${r.kill ? '🛑 ON (nothing autonomous sends)' : '▶️ off'} · auto-send tier: ${r.tier}${r.tier === 0 ? ' (OFF — nothing sends anyway)' : ''}` : `⚠️ ${r.error || 'could not read status'}`, thread);
+  }
   // The curated few — "send me the opportunities with detail." /opps or "opportunities"/"opps".
   if (/^\/opps/.test(text) || /^(opps|opportunities|what.?s good|any (good )?opportunities)\b/i.test(text)) {
     const b = await get('/api/gov/briefs?n=3'); return send(chat, (b && b.text) || b.error || 'No opportunities to show yet.', thread);

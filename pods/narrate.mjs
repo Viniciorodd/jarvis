@@ -58,6 +58,12 @@ const short = (s, n = 90) => {
 // PURE: event → a one-line TRUTHFUL narration, or null to skip (scores, scan-starts, spend checks,
 // traces). Eval-pinned. Order matters: gate and dry-run checks run BEFORE any action-name matching so
 // an intended/gated/previewed act can never borrow completed-act wording.
+// PURE: is this "rationale" just the gate's own doctrine boilerplate rather than a description of the thing
+// being gated? Those must never become the narration's subject (they say nothing and read as a duplicate).
+export function isGateBoilerplate(s = '') {
+  return /treated as irreversible|gated for your approval|doctrine\s*§|requires (?:your )?approval|awaiting approval/i.test(String(s || ''));
+}
+
 export function narrationFor(ev = {}) {
   if (ev.kind === 'trace') return null;                                     // traces are never milestones
   const a = String(ev.action || '').toLowerCase();
@@ -65,9 +71,14 @@ export function narrationFor(ev = {}) {
   const t = p.title ? ` — ${p.title}` : '';
   const what = short(p.title || ev.rationale || '');
 
-  // Rule 1 — a GATE narrates the wait, never the act.
+  // Rule 1 — a GATE narrates the wait, never the act. The SUBJECT must say what was drafted, not restate the
+  // doctrine: a rationale like "Treated as irreversible — gated for your approval (doctrine §9 rule 2)" is the
+  // gate's REASON, and using it produced "Drafted: gated for your approval — waiting on YOUR approval", which
+  // said the same thing twice and named nothing (operator flagged the repeats, 2026-07-27). Prefer a real
+  // subject; fall back to a plain "an action" rather than echoing boilerplate.
   if (ev.kind === 'approval.request') {
-    return `✏️ Drafted${what ? ': ' + what : ' an action'} — waiting on YOUR approval (nothing sent)`;
+    const subject = short(p.title || p.subject || p.to || p.file || (isGateBoilerplate(ev.rationale) ? '' : ev.rationale) || '');
+    return `✏️ Drafted${subject ? ': ' + subject : ' an action'} — waiting on YOUR approval (nothing sent)`;
   }
   // Rule 2 — a dry-run PREPARED something; auto-send is off, nothing left the building.
   if (isDryRun(ev)) {

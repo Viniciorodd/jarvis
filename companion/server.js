@@ -3590,6 +3590,15 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, markdown: r.markdown }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // 🛑 KILL SWITCH proxy (Phase 9) — the Gov OS button talks to the control-plane, which owns auto-send.json.
+  // GET = current state; POST {kill} = set it. Kept dead simple: this must never fail to stop.
+  if (url.pathname === '/api/gov/auto-send-kill' && (req.method === 'GET' || req.method === 'POST')) {
+    try {
+      const body = req.method === 'POST' ? JSON.stringify(await readBody(req)) : undefined;
+      const r = await fetch(CP_URL + '/maintenance/auto-send-kill', { method: req.method, headers: body ? { 'content-type': 'application/json' } : undefined, body, signal: AbortSignal.timeout(8000) });
+      return send(res, 200, JSON.stringify(await r.json()));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, note: 'control-plane unreachable — assume sending is NOT halted' })); }
+  }
   // WIN-RATE engine (pods/gov/win-rate.mjs, REDOS Port #2): Projected-vs-Actual — win-rate by Bid Fit band,
   // price-to-win + LOE bias, and recalibration hints. Read-only analysis. The hints are recommendations only.
   if (req.method === 'GET' && url.pathname === '/api/gov/win-rate') {

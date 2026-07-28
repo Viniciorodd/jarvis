@@ -18,7 +18,9 @@
       "uei": "",
       "place_id": "",
       "notes": "no email found on jan-pro.com — add one manually or set HUNTER_API_KEY",
-      "last_contacted": null
+      "last_contacted": null,
+      "exclusionStatus": "clear",
+      "exclusionCheckedAt": "2026-07-17T12:31:35.230Z"
     },
     {
       "id": "SUB-ameristar-facility-sol-jyqi",
@@ -36,7 +38,7 @@
       "source": "google-places",
       "uei": "",
       "place_id": "",
-      "notes": "email via website (2026-07-01)",
+      "notes": "email via website (2026-07-17)",
       "last_contacted": null
     },
     {
@@ -380,6 +382,102 @@
       "place_id": "",
       "notes": "auto-discovered — add a contact email to reach out",
       "last_contacted": null
+    },
+    {
+      "id": "TEST-SUB-1",
+      "name": "TEST Sub 1 (Janitorial)",
+      "trade": "Janitorial",
+      "location": "Wilkes-Barre, PA",
+      "contact_name": "Test Contact 1",
+      "contact_email": "scvntm9323@minitts.net",
+      "phone": "",
+      "website": "",
+      "capabilities": "Janitorial",
+      "status": "test",
+      "source": "operator temp email — Phase 9 allowlist testing (2026-07-27)",
+      "verified": true,
+      "isTest": true,
+      "notes": "TEMPORARY TEST CONTACT — safe to delete. verified:true so Phase 9 auto-send can be exercised end-to-end without emailing a real sub."
+    },
+    {
+      "id": "TEST-SUB-2",
+      "name": "TEST Sub 2 (Floor care)",
+      "trade": "Floor care",
+      "location": "Wilkes-Barre, PA",
+      "contact_name": "Test Contact 2",
+      "contact_email": "gudrutetri@necub.com",
+      "phone": "",
+      "website": "",
+      "capabilities": "Floor care",
+      "status": "test",
+      "source": "operator temp email — Phase 9 allowlist testing (2026-07-27)",
+      "verified": true,
+      "isTest": true,
+      "notes": "TEMPORARY TEST CONTACT — safe to delete. verified:true so Phase 9 auto-send can be exercised end-to-end without emailing a real sub."
+    },
+    {
+      "id": "TEST-SUB-3",
+      "name": "TEST Sub 3 (Grounds)",
+      "trade": "Grounds",
+      "location": "Wilkes-Barre, PA",
+      "contact_name": "Test Contact 3",
+      "contact_email": "grfhil177@pdf-cutter.com",
+      "phone": "",
+      "website": "",
+      "capabilities": "Grounds",
+      "status": "test",
+      "source": "operator temp email — Phase 9 allowlist testing (2026-07-27)",
+      "verified": true,
+      "isTest": true,
+      "notes": "TEMPORARY TEST CONTACT — safe to delete. verified:true so Phase 9 auto-send can be exercised end-to-end without emailing a real sub."
+    },
+    {
+      "id": "TEST-SUB-4",
+      "name": "TEST Sub 4 (Custodial)",
+      "trade": "Custodial",
+      "location": "Wilkes-Barre, PA",
+      "contact_name": "Test Contact 4",
+      "contact_email": "davelyn.204@fashond.com",
+      "phone": "",
+      "website": "",
+      "capabilities": "Custodial",
+      "status": "test",
+      "source": "operator temp email — Phase 9 allowlist testing (2026-07-27)",
+      "verified": true,
+      "isTest": true,
+      "notes": "TEMPORARY TEST CONTACT — safe to delete. verified:true so Phase 9 auto-send can be exercised end-to-end without emailing a real sub."
+    },
+    {
+      "id": "TEST-SUB-5",
+      "name": "TEST Sub 5 (Window cleaning)",
+      "trade": "Window cleaning",
+      "location": "Wilkes-Barre, PA",
+      "contact_name": "Test Contact 5",
+      "contact_email": "lurzizim@fosil.pro",
+      "phone": "",
+      "website": "",
+      "capabilities": "Window cleaning",
+      "status": "test",
+      "source": "operator temp email — Phase 9 allowlist testing (2026-07-27)",
+      "verified": true,
+      "isTest": true,
+      "notes": "TEMPORARY TEST CONTACT — safe to delete. verified:true so Phase 9 auto-send can be exercised end-to-end without emailing a real sub."
+    },
+    {
+      "id": "TEST-SUB-6",
+      "name": "TEST Sub 6 (Drywall)",
+      "trade": "Drywall",
+      "location": "Wilkes-Barre, PA",
+      "contact_name": "Test Contact 6",
+      "contact_email": "drywall@horizonspost.com",
+      "phone": "",
+      "website": "",
+      "capabilities": "Drywall",
+      "status": "test",
+      "source": "operator temp email — Phase 9 allowlist testing (2026-07-27)",
+      "verified": true,
+      "isTest": true,
+      "notes": "TEMPORARY TEST CONTACT — safe to delete. verified:true so Phase 9 auto-send can be exercised end-to-end without emailing a real sub."
     }
   ]
 }

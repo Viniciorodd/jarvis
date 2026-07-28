@@ -359,3 +359,18 @@ body {
 .gc-team-letter { margin: 8px 0 2px; }
 .gc-team-note { font-size: 11px; color: var(--warn); margin-bottom: 6px; }
 .gc-team-text { font: inherit; font-size: 12.5px; white-space: pre-wrap; line-height: 1.5; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0 0 8px; max-height: 260px; overflow-y: auto; }
+
+/* ── TABS (2026-07-27) — the GovCon OS was one long overcrowded page; each section now lives on a tab. ── */
+.gc-tabs{ display:flex; gap:6px; flex-wrap:wrap; padding:0 14px 12px; }
+.gc-tab{ font-family:inherit; font-size:12.5px; padding:7px 13px; border-radius:999px; cursor:pointer;
+  background:transparent; border:1px solid var(--line, rgba(255,255,255,.12)); color:var(--faint, #8b93a7); transition:.14s; }
+.gc-tab:hover{ border-color:var(--accent); color:var(--ink-text, #e9edf5); }
+.gc-tab.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent, #04070f); font-weight:600; }
+@media (max-width:720px){ .gc-tabs{ overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch; } .gc-tab{ white-space:nowrap; } }
+
+/* 🛑 kill switch — calm when quiet, unmistakable when sending is halted */
+.gc-kill{ font-family:inherit; font-size:11.5px; padding:6px 12px; border-radius:999px; cursor:pointer; margin-right:4px;
+  background:transparent; border:1px solid rgba(240,138,122,.4); color:#f08a7a; transition:.14s; }
+.gc-kill:hover{ background:rgba(240,138,122,.12); border-color:#f08a7a; }
+.gc-kill.on{ background:rgba(240,138,122,.2); border-color:#f08a7a; color:var(--ink-text, #e9edf5); font-weight:700; }
+.gc-kill:disabled{ opacity:.5; cursor:wait; }

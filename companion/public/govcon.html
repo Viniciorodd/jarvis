@@ -20,9 +20,9 @@
     <div class="gc-brand">
       <span class="gc-logo">▣</span>
       <span class="gc-brand-text">RODGATE <em>· GovCon OS</em></span>
-      <span class="gc-preview-tag" title="A preview surface — your normal cockpit is untouched.">PREVIEW</span>
     </div>
     <div class="gc-top-right">
+      <button class="gc-kill" id="gcKill" title="Halt ALL autonomous agent sending immediately">🛑 Kill auto-send</button>
       <span class="gc-live"><span class="gc-dot"></span> Live</span>
       <span class="gc-date" id="gcDate">—</span>
       <button class="gc-toggle" id="gcTheme" title="Toggle light / dark (applies across Jarvis)" aria-label="Toggle theme">☾</button>
@@ -31,15 +31,30 @@
   </header>
 
   <main class="gc-main">
-    <!-- KPI strip — full width across the top -->
+    <!-- KPI strip — full width across the top (stays visible on every tab: it's the at-a-glance line) -->
     <section class="gc-kpis" id="gcKpis"></section>
+
+    <!-- TABS (operator 2026-07-27: "everything is in one single page and it's a bit overcrowded").
+         Each section carries data-tab; the JS shows only the active tab's sections and hides any column
+         that ends up empty, so the 3-column grid never leaves a hole. -->
+    <nav class="gc-tabs" id="gcTabs" role="tablist">
+      <button class="gc-tab on" data-go="home" role="tab">🏠 Home</button>
+      <button class="gc-tab" data-go="pipeline" role="tab">📊 Pipeline</button>
+      <button class="gc-tab" data-go="dealroom" role="tab">💼 Deal Room</button>
+      <button class="gc-tab" data-go="bench" role="tab">🧰 Sub Bench</button>
+      <button class="gc-tab" data-go="quickwins" role="tab">⚡ Quick Wins</button>
+      <button class="gc-tab" data-go="teaming" role="tab">🤝 Teaming</button>
+      <button class="gc-tab" data-go="journal" role="tab">📓 Journal</button>
+      <button class="gc-tab" data-go="team" role="tab">👥 Gov Team</button>
+      <button class="gc-tab" data-go="simulator" role="tab">🎚 Simulator</button>
+    </nav>
 
     <!-- 3 columns: LEFT (you + missions) · MID (pipeline + board) · RIGHT (map + genome) -->
     <div class="gc-grid">
 
       <!-- ── LEFT ── -->
       <div class="gc-col">
-        <section class="gc-briefing card" id="gcBriefing">
+        <section class="gc-briefing card" data-tab="home" id="gcBriefing">
           <div class="gc-briefing-head">
             <div>
               <h1 id="gcGreeting">Good morning.</h1>
@@ -58,23 +73,23 @@
           <ul class="gc-priorities" id="gcPriorities"></ul>
         </section>
 
-        <section class="card gc-coach">
+        <section class="card gc-coach" data-tab="home">
           <h2 class="gc-h2">AI coach <span class="gc-h2-hint">what to notice</span></h2>
           <div id="gcCoach" class="gc-coach-list"></div>
         </section>
 
-        <section class="card gc-mission">
+        <section class="card gc-mission" data-tab="home">
           <h2 class="gc-h2">Mission today <span class="gc-h2-hint">clear the board</span></h2>
           <div class="gc-mission-list" id="gcMission"></div>
           <div class="gc-mission-progress"><i id="gcMissionBar" style="width:0%"></i></div>
         </section>
 
-        <section class="card gc-agents">
+        <section class="card gc-agents" data-tab="team">
           <h2 class="gc-h2">Your gov team <span class="gc-h2-hint">who's on it</span></h2>
           <div class="gc-agents-row" id="gcAgents"></div>
         </section>
 
-        <section class="card gc-simu">
+        <section class="card gc-simu" data-tab="simulator">
           <h2 class="gc-h2">Bid simulator <span class="gc-h2-hint">watch your margin</span></h2>
           <div class="gc-sl"><label>Bid value <b id="slVal">$400,000</b></label><input type="range" id="slValR" min="25000" max="1500000" step="5000" value="400000"></div>
           <div class="gc-sl"><label>Labor / subcontractor cost <b id="slLab">65%</b></label><input type="range" id="slLabR" min="30" max="92" step="1" value="65"></div>
@@ -88,17 +103,17 @@
 
       <!-- ── MID ── -->
       <div class="gc-col">
-        <section class="card gc-funnel">
+        <section class="card gc-funnel" data-tab="pipeline">
           <h2 class="gc-h2">Pipeline</h2>
           <div class="gc-funnel-bars" id="gcFunnel"></div>
         </section>
 
-        <section class="card gc-board-wrap">
+        <section class="card gc-board-wrap" data-tab="pipeline">
           <h2 class="gc-h2">Board <span class="gc-h2-hint">your move first</span></h2>
           <div class="gc-board" id="gcBoard"></div>
         </section>
 
-        <section class="card gc-quickwins">
+        <section class="card gc-quickwins" data-tab="quickwins">
           <h2 class="gc-h2">⚡ Quick wins <span class="gc-h2-hint">fast-close leads · <a href="/quickwins">all →</a></span></h2>
           <div class="gc-qw-list" id="gcQuickwins"></div>
         </section>
@@ -106,7 +121,7 @@
 
       <!-- ── RIGHT ── -->
       <div class="gc-col">
-        <section class="card gc-mapwrap">
+        <section class="card gc-mapwrap" data-tab="home">
           <!-- Map + relationship graph share ONE spot — toggle between them (operator request 2026-07-20). -->
           <div class="gc-mapnet-head">
             <div class="gc-seg" id="gcMapNetSeg">
@@ -137,7 +152,7 @@
           </div>
         </section>
 
-        <section class="card gc-genome">
+        <section class="card gc-genome" data-tab="home">
           <h2 class="gc-h2">Opportunity Genome</h2>
           <p class="gc-genome-title" id="gcGenomeTitle">—</p>
           <div class="gc-winprob">
@@ -155,12 +170,12 @@
           <p class="gc-genome-foot">Derived from the scout's fit score + set-aside lane + trade. An estimate to prioritize — not a guarantee.</p>
         </section>
 
-        <section class="card gc-journal">
+        <section class="card gc-journal" data-tab="journal">
           <h2 class="gc-h2">Decision journal <span class="gc-h2-hint">every gov move, logged</span></h2>
           <div id="gcJournal" class="gc-journal-list"></div>
         </section>
 
-        <section class="card gc-teaming">
+        <section class="card gc-teaming" data-tab="teaming">
           <h2 class="gc-h2">🤝 Teaming radar <span class="gc-h2-hint">primes to reach · <a href="/teaming">all →</a></span></h2>
           <div class="gc-team-list" id="gcTeaming"></div>
         </section>
@@ -172,7 +187,7 @@
 
     <!-- Subcontractor bench — salvaged from the retired /govcon-os (2026-07-20): Google-review vetting, the
          always-visible SAM exclusion status, the reach-out PREVIEW, and the honest approval-effect modal. -->
-    <section class="card gc-subs">
+    <section class="card gc-subs" data-tab="bench">
       <h2 class="gc-h2">🧰 Subcontractor bench <span class="gc-h2-hint" id="gcSubsStat">your vetted crew</span></h2>
       <div id="gcSubs"><div class="gc-empty">Loading the bench…</div></div>
     </section>
@@ -214,7 +229,7 @@
 <!-- ── PIPELINE — the live board, merged INTO GovCon OS (was: More→Gov Pipeline + Ops→Gov Pipeline;
      one gov surface since 2026-07-05). Reads /api/gov-board (vault-synced) + the deal ledger;
      the Deal Room is the money drill-down. ── -->
-<section class="card" id="gcBoardCard" style="margin:14px;padding:16px 18px;">
+<section class="card" id="gcBoardCard" data-tab="dealroom" style="margin:14px;padding:16px 18px;">
   <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;">
     <h2 style="margin:0;font-size:16px;">Pipeline — live board</h2>
     <span style="display:flex;gap:10px;align-items:baseline;">
@@ -254,5 +269,6 @@
 <script src="submit-wizard.js"></script>
 <script src="govcon.js"></script>
 <script src="govcon-subs-bench.js"></script>
+<script src="govcon-tabs.js"></script>
 </body>
 </html>

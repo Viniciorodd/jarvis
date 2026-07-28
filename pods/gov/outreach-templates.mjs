@@ -21,6 +21,7 @@ const SIGNATURE = () => [
 // tier 3 = makes capability claims to the government.
 export const TEMPLATES = {
   'sub-quote': {
+    fromAlias: 'subcontracts',
     tier: 1,
     requiredSlots: ['contactName', 'trade', 'place'],
     subject: (s) => `Quote request — ${s.trade} support in ${s.place}`,
@@ -37,6 +38,7 @@ export const TEMPLATES = {
     ].join('\n'),
   },
   'follow-up': {
+    fromAlias: 'subcontracts',
     tier: 1,
     requiredSlots: ['contactName'],
     subject: (s) => `Following up${s.subjectRef ? ` — ${s.subjectRef}` : ''}`,
@@ -51,6 +53,7 @@ export const TEMPLATES = {
     ].join('\n'),
   },
   'prime-intro': {
+    fromAlias: 'ops',
     tier: 2,
     requiredSlots: ['contactName', 'company'],
     subject: () => `Introduction — ${COMPANY.legalName} (janitorial / facilities support)`,
@@ -68,6 +71,7 @@ export const TEMPLATES = {
     ].join('\n'),
   },
   'sources-sought': {
+    fromAlias: 'bids',
     tier: 3,
     requiredSlots: ['contactName', 'solicitation'],
     subject: (s) => `Response to Sources Sought — ${s.solicitation}`,
@@ -93,7 +97,18 @@ export function renderTemplate(key, slots = {}) {
   if (!t) throw new Error(`unknown outreach template "${key}" — only approved templates can be sent`);
   const missing = t.requiredSlots.filter((s) => !String(slots[s] || '').trim());
   if (missing.length) throw new Error(`template "${key}" is missing required slot(s): ${missing.join(', ')}`);
-  return { key, tier: t.tier, subject: t.subject(slots), body: t.body(slots) };
+  return { key, tier: t.tier, subject: t.subject(slots), body: t.body(slots), from: fromAddress(t.fromAlias) };
+}
+
+// PURE: the sending identity for a class of outreach (operator's aliases, 2026-07-27):
+//   subcontracts@ — sub-quote requests + follow-ups (the sub conversation)
+//   ops@          — prime introductions (how the company introduces itself)
+//   bids@         — sources-sought responses (anything aimed at the government)
+// ⚠️ Each alias must be verified in Gmail → Settings → Accounts → "Send mail as" or Gmail rewrites/rejects it.
+// Falls back to the main mailbox when the domain isn't configured, so a missing alias never blocks a send.
+export function fromAddress(alias) {
+  const domain = process.env.RODGATE_MAIL_DOMAIN || 'rodgategroup.com';
+  return alias ? `${alias}@${domain}` : '';
 }
 
 export function templateKeys() { return Object.keys(TEMPLATES); }

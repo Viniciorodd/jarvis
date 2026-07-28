@@ -67,7 +67,7 @@ async function slackPreview(label, to, subject, body) {
 }
 
 // Send (or dry-run) a gov email file via the Rodgate mailbox. Returns a structured result; never throws.
-export async function sendGovEmail({ file, toSelf = false, dryRun = false, slack = true } = {}) {
+export async function sendGovEmail({ file, toSelf = false, dryRun = false, slack = true, fromAddr = '' } = {}) {
   let raw;
   try { raw = fs.readFileSync(resolveFile(file), 'utf8'); }
   catch { return { ok: false, sent: false, status: 'error', reason: `cannot read ${file}` }; }
@@ -94,7 +94,10 @@ export async function sendGovEmail({ file, toSelf = false, dryRun = false, slack
   try {
     const transport = nodemailer.createTransport({ service: 'gmail', auth: { user: USER, pass: PASS } });
     await transport.verify();
-    const info = await transport.sendMail({ from: `"Rodgate, LLC" <${USER}>`, to, cc: ccAddr || undefined, replyTo: REPLY_TO, subject, text: body });
+    // fromAddr lets an outreach class send from its own alias (subcontracts@/ops@/bids@). It must be a
+    // VERIFIED Gmail "Send mail as" address or Gmail rewrites it — so fall back to the mailbox itself.
+    const sendFrom = fromAddr && /@/.test(fromAddr) ? `"Rodgate, LLC" <${fromAddr}>` : `"Rodgate, LLC" <${USER}>`;
+    const info = await transport.sendMail({ from: sendFrom, to, cc: ccAddr || undefined, replyTo: fromAddr || REPLY_TO, subject, text: body });
     if (slack) await slackPreview('✅ SENT', to, subject, body);
     // Deal ledger: a REAL send just happened — if this was a sub outreach, advance its deal to
     // outreach_sent so the Deal Room stops showing it as hanging (matched by file basename).

@@ -87,7 +87,7 @@ export async function runAutoOutreach({ dryRun = true, candidates = [], now = ne
     const slug = `${c.templateKey}-${(to || 'x').replace(/[^\w]+/g, '-')}-${Date.now().toString(36)}`;
     const file = writeOutreachFile(slug, to, rendered.subject, rendered.body);
     let r = { ok: false, sent: false, reason: 'sender unavailable' };
-    try { const S = await import('./sender.mjs'); r = await S.sendGovEmail({ file, dryRun: false }); } catch (e) { r = { ok: false, sent: false, reason: e.message }; }
+    try { const S = await import('./sender.mjs'); r = await S.sendGovEmail({ file, dryRun: false, fromAddr: rendered.from || '' }); } catch (e) { r = { ok: false, sent: false, reason: e.message }; }
     const reallySent = !!(r && r.sent);
     if (reallySent) {
       sent++;

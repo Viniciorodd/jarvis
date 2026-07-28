@@ -135,3 +135,6 @@ gov-winrate/
 # Auto-outreach ledger + generated outreach files (real business sends)
 gov-outreach/
 gov-drafts/auto/
+
+# Gateway usage ledger (local free-tier accounting)
+control-plane/data/gateway-usage.json

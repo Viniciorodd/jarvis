@@ -9,7 +9,11 @@ Legend: ✅ done · 🔨 **mine** (I can build without you) · 🧑 **needs you*
 
 ---
 
-## 🏛 GovCon capability build — 9-phase plan (2026-07-24, +Phase 9 2026-07-27)
+## 🏛 GovCon capability build — 9 phases, ALL BUILT (2026-07-24 → 2026-07-28)
+> **Status 2026-07-28: every phase is code-complete, 860 evals green, all pushed.** What remains is operator
+> action, not engineering: verify the aliases in Gmail, mark trusted subs `verified: true`, apply the 5 vault
+> rule changes, set `AUTO_SEND_TIER=1`, and redeploy the NAS. Optional/parked: OmniRoute (audited ⚠️ SUSPICIOUS —
+> sandbox-only path documented in docs/repo-audits.md), Voicebox (operator installs), Phase 8 Item 3 (Mac session).
 From a review of GovDash / GovGPT / the GovCon AI-tool landscape vs. what Jarvis already has. We build the
 gaps ourselves (no $500/yr HigherGov). Order = win-rate leverage first, then dependency. Each phase = its own
 spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator request: 7 = REDOS bid-engine ports,

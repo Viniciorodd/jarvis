@@ -84,7 +84,25 @@ spec → plan → build cycle. (Phases 7–8 added 2026-07-24 at operator reques
   - **Item 3 — converge the two Jarvises**: execute `docs/one-source-of-truth.md`'s migration (point Morning Brief /
     Gov Inbox Watch at `/api/gov-board`, emit events not vault-note status guesses). Touches Mac-worker job prompts +
     n8n on the NAS — the PRD says this is its OWN session, run from the Mac (Tailscale access). I can't reach it from the PC.
-- 🔨 **Phase 9 (LAST) — GovCon Autonomous Outreach** (`00 - System/Jarvis/PRD — GovCon Autonomous Outreach…md`, added
+- 🟡 **Phase 9 — GovCon Autonomous Outreach — MACHINERY BUILT 2026-07-27, AUTO-SEND STILL OFF.**
+  Shipped: `pods/gov/outreach-policy.mjs` (the safety core — the only code that can authorize an unattended send:
+  tier gate w/ **default `AUTO_SEND_TIER=0` = OFF** · verified-recipient allowlist (L-009, `verified===true` only,
+  reads the live CRM `contact_email`) · hard-line block (pricing/commitment/false-cert/CO-submission) ·
+  canonical-facts gate (L-005) · daily cap · per-recipient cooldown · kill switch — **fails closed everywhere**);
+  `outreach-templates.mjs` (4 approved slot-fill templates, facts copied from COMPANY, missing slot THROWS);
+  `auto-outreach.mjs` (**dry-run by default**; denied → approval queue; a send is only called sent on a real SMTP
+  receipt, L-014; three-place logging); control-plane `/maintenance/auto-send-kill` (GET status / POST halt,
+  defaults to killing) · `/auto-outreach` · `/auto-outreach-digest`. **34 evals** mirroring the PRD's acceptance
+  tests. Live-verified: the kill file flips an `allow:true` send to blocked instantly.
+  **Bugs the evals caught before they shipped:** "woman-owned" (singular — the common spelling) slipped the
+  false-cert filter; `UEI is <wrong>` slipped the facts gate; the allowlist read `email` while the CRM uses
+  `contact_email` (would never have matched a real contact); the pricing guard blocked "the quote request"
+  (us ASKING), permanently disabling an approved template.
+  🧑 **REMAINING — ALL OPERATOR ACTIONS (nothing sends until these):** (1) seed the allowlist — add
+  `"verified": true` to trusted contacts in `pods/gov/subs.json` (20 subs, none verified today); (2) apply the 5
+  vault rule changes (PRD §6 — wording supplied); (3) set `AUTO_SEND_TIER=1` in the NAS `.env` when ready;
+  (4) confirm the sending identity (`rodgategroup@gmail.com` vs the new `vinicio@rodgategroup.com` alias).
+- 🗒 _original scope:_ **GovCon Autonomous Outreach** (`00 - System/Jarvis/PRD — GovCon Autonomous Outreach…md`, added
   2026-07-27 at operator request). ⚠️ **CHANGES A STANDING HARD RULE**: agents may AUTO-SEND a defined class of
   low-stakes outreach (sub-quote requests, follow-ups → Tier 1; prime intros → Tier 2; sources-sought → Tier 3),
   while **proposals/bids/pricing/commitments/CO submissions stay human-sent forever** (§2 hard line). Guardrails are

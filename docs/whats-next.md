@@ -2,7 +2,58 @@
 
 _Updated 2026-07-24. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-29 (latest, pt.3) — THE SECOND BRAIN IS NOW JARVIS'S MEMORY (read + write + search)
+### 🆕 2026-07-29 (latest, pt.4) — SAM.gov quota is being burned by automated jobs before Vinicio's own manual runs
+Operator ran `node scripts/sam-scout.mjs --naics 561210,561720,561990 --days 14` himself this morning (fresh
+PowerShell, key set correctly this time) and got HTTP 429 "quota exceeded" on the FIRST call of the day —
+`nextAccessTime` said the quota wouldn't reset until 2026-Jul-30 00:00 UTC (8PM Eastern tonight). The key itself
+is fine (a 429 is proof of a valid key — a bad key 401s/403s); something else already spent today's ~10-call
+free-tier budget before he touched it.
+
+**Root cause, found by direct code read:**
+- A manual `sam-scout.mjs` run is cheap — 3 NAICS codes = 3 HTTP calls, no retries (`scripts/sam-scout.mjs`
+  lines 33-44). Can't exhaust the quota alone.
+- `pods/gov/worker.mjs`'s `scout()` (lines 93-123) makes 4 NAICS calls, then calls `fetchDescription()`
+  (`pods/gov/sow.mjs` line 36) **once per opportunity lacking inline text** — a run returning 50+ opportunities
+  (this repo's own `events.jsonl` shows runs returning 50-193) burns 50+ calls by itself.
+- `pods/gov/quickwins.mjs`'s `scanQuickWins()` (lines 70-92) loops **14 NAICS codes** = 14 calls per run; a
+  7/17 log entry recorded 84 quick wins returned that day.
+- Both are wired into `control-plane/schedule.json` (`gov-daily-scan` + `gov-growth-digest`, ~8:00am daily).
+  `control-plane/data/scheduler-state.json` / `events.jsonl` show no activity logged since 7/19-20, so this
+  scheduler likely did NOT fire today — can't fully rule out someone hitting the maintenance endpoint directly.
+- `n8n/workflows/01-sam-scout.json` has a `scheduleTrigger` for **06:10 daily** (3 NAICS calls) and the exported
+  JSON says `"active": false` — but per this repo's own convention note, that file can drift from whatever is
+  actually toggled on live in the n8n UI (n8n runs as its own always-on Docker service). This is the most likely
+  live culprit given the timing (6:10am, well before Vinicio's morning test).
+
+**Fix needed (not yet done):** either (a) confirm in the n8n UI directly whether `01-sam-scout` is actually
+active and pause it, and/or throttle `gov-daily-scan`/`gov-growth-digest` to not call `fetchDescription()` per
+opportunity (batch or cache instead), or (b) get a paid/higher-tier SAM.gov key so the daily cap stops being a
+scarce resource multiple jobs compete for. Until fixed, Vinicio's own manual pulls will keep losing the race to
+whichever automated job fires first each day. Quota resets nightly at 8PM Eastern — a manual run any time
+between 8PM ET and the next morning's ~6am job is currently the only reliable window.
+
+### 🆕 2026-07-29 (latest, pt.4) — OLD OPS MERGED INTO NEW OPS (23 tools, one front door)
+Operator: *"merge the old ops with the new ops, add the missing things from the old ops to the new one."*
+The old `#ops` overlay held **23 working tool views** the new Businesses hub had no route to — reachable only
+via a generic **"old Ops ↗"** button, which is exactly why it felt like two half-apps.
+- **Linked, not rewritten.** `window.JarvisOps.openTab(biz, tab)` opens old Ops at a specific business+tool;
+  the hub renders a per-business **TOOLS** strip that calls it. Porting 1,380 lines of working renderers into
+  the hub would have risked breaking tools for zero user-visible gain.
+- **Mapping** (from `pods/businesses.mjs`, not guessed): gov→gov · realestate→realestate · **finance→trading**
+  (Finance had NO board at all — the market tools ARE the money desk) · web→webstudio · zerotick→saas ·
+  fiverr/music unchanged. `agents` is org-wide, so it replaced the "old Ops ↗" button as **"🤖 Agents ↗"**.
+- **The catch that mattered:** gov / finance / realestate route to their OWN full desks (`/govcon`,
+  `/finances`, `/real-estate`) — separate pages that never render the hub's strip. Those are the three with the
+  most tools, so the merge would have silently missed them. They now deep-link back via **`/#ops=<biz>:<tool>`**
+  (handler in `ops.js`, fires on hashchange + DOMContentLoaded + load, since the shell reaches them by
+  different paths). `/real-estate` gained Units/Flips/Builds/Rentals; `/finances` gained the 4 market tools.
+- **Bug found while verifying:** the deep link cleared the URL hash inside the same `try` as the open, and the
+  Jarvis shell has **no working `history.replaceState`** — so a perfectly good open was logged as a failure and
+  re-armed, firing twice. Tidying the URL is cosmetic and can never be allowed to fail the real action.
+- Verified live in all three paths: `/finances` → Watchlist (live NVDA $191.89) · `/real-estate` → Flips ·
+  hub → Music → Identity/Studio/Releases. The "old Ops ↗" button is gone.
+
+### 2026-07-29 (pt.3) — THE SECOND BRAIN IS NOW JARVIS'S MEMORY (read + write + search)
 Operator: *"if we have our second brain in an obsidian vault, why cant jarvis not use that as a memory with the
 capability to write and read, create, move, organize, open, show and so on… i want to fill like tony stark."*
 The answer was NOT missing capability — `read_file`/`write_file`/`edit_file`/`move_path`/`scan`/`open_path` all

@@ -136,6 +136,26 @@
     $('finRoot').innerHTML = h;
   }
 
+  // The market tools (old Ops "Trading": Watchlist / Positions / Predictions / Paper P&L) had NO home in the
+  // new hub — Finance carried no board at all. They belong to the money desk, so they surface here and link
+  // into the Ops overlay on the shell page rather than being rebuilt (2026-07-29 merge).
+  (function opsTools() {
+    var TOOLS = [['watchlist', '📊 Watchlist'], ['positions', '📋 Positions'], ['predictions', '🔮 Predictions'], ['paper', '🧪 Paper P&L']];
+    var host = document.getElementById('finRoot');
+    if (!host || !host.parentNode) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'biz-tools';
+    wrap.innerHTML = '<div class="biz-tools-h">MARKET TOOLS</div>';
+    var row = document.createElement('div'); row.className = 'biz-tools-row';
+    TOOLS.forEach(function (t) {
+      var b = document.createElement('button'); b.className = 'biz-tool'; b.textContent = t[1];
+      b.addEventListener('click', function () { window.location.href = '/#ops=trading:' + t[0]; });
+      row.appendChild(b);
+    });
+    wrap.appendChild(row);
+    host.parentNode.insertBefore(wrap, host);
+  })();
+
   function j(u) { return fetch(u).then(function (r) { return r.json(); }).catch(function () { return null; }); }
   Promise.all([j('/api/pl'), j('/api/tax/status'), j('/api/finance/credit'), j('/api/finance/debts')])
     .then(function (r) { render(r[0], r[1], r[2], r[3]); })

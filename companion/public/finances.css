@@ -99,3 +99,15 @@
   text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all .15s;
 }
 .fin-cta:hover { background: var(--teal); color: var(--ink-on-accent); }
+
+/* ── TOOLS strip (2026-07-29 Ops merge) ────────────────────────────────────────────────────────────
+   The Real Estate + Finances desks are SEPARATE pages, so the old-Ops tools they own (Units/Flips/
+   Rentals, Watchlist/Paper P&L) are reached by deep-linking back to the shell's Ops overlay. Mirrors
+   .biz-tools in today.css, which this page does not load. */
+.biz-tools{ margin:0 0 16px; }
+.biz-tools-h{ font-size:10px; letter-spacing:.16em; color:var(--dim,#8a9); margin-bottom:7px; }
+.biz-tools-row{ display:flex; flex-wrap:wrap; gap:7px; }
+.biz-tool{ background:rgba(var(--teal-rgb,90,180,170),.06); border:1px solid rgba(var(--teal-rgb,90,180,170),.2);
+  color:var(--cream,#e8e6e1); border-radius:9px; padding:7px 11px; font-size:12.5px; font-family:inherit;
+  cursor:pointer; white-space:nowrap; transition:background .15s, border-color .15s; }
+.biz-tool:hover{ background:rgba(var(--teal-rgb,90,180,170),.14); border-color:rgba(var(--teal-rgb,90,180,170),.42); }

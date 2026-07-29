@@ -324,7 +324,10 @@
   <div class="ops-head">
     <span class="px ops-brand">Operations</span>
     <span class="map-stat" id="bizStat">your businesses — whose move is next</span>
-    <button class="btn ghost" id="bizOldOps" style="font-size:11px; padding:5px 11px;">old Ops ↗</button>
+    <!-- was "old Ops ↗" — a generic escape hatch to a second, parallel Ops screen. Every one of those tools is
+         now reachable from the business it belongs to (see TOOLS in businesses.js). What's left here is the
+         org-wide agent desk, which is genuinely not one business's tool. -->
+    <button class="btn ghost" id="bizAgents" style="font-size:11px; padding:5px 11px;">🤖 Agents ↗</button>
     <button class="ops-refresh" id="bizRefresh" title="Refresh">⟳</button>
     <button class="ops-x" id="bizX" title="Close">✕</button>
   </div>

@@ -208,6 +208,26 @@
     run(); // show the default deal immediately
   }
 
+  // The old-Ops property tools. This desk is the Deal Analyzer; Units / Flips / New Builds / Rentals live in
+  // the Ops overlay on the shell page, and this desk being a SEPARATE page left them unreachable once the hub
+  // started routing here (2026-07-29 merge). Link back rather than duplicate four working views.
+  (function opsTools() {
+    var TOOLS = [['units', '🏠 Units'], ['flips', '🔨 Flips'], ['builds', '🏗 New Builds'], ['rentals', '🔑 Rentals']];
+    var host = document.getElementById('reRoot');
+    if (!host || !host.parentNode) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'biz-tools';
+    wrap.innerHTML = '<div class="biz-tools-h">MORE PROPERTY TOOLS</div>';
+    var row = document.createElement('div'); row.className = 'biz-tools-row';
+    TOOLS.forEach(function (t) {
+      var b = document.createElement('button'); b.className = 'biz-tool'; b.textContent = t[1];
+      b.addEventListener('click', function () { window.location.href = '/#ops=realestate:' + t[0]; });
+      row.appendChild(b);
+    });
+    wrap.appendChild(row);
+    host.parentNode.insertBefore(wrap, host);
+  })();
+
   fetch('/api/real-estate').then(function (r) { return r.json(); }).then(render)
     .catch(function () { render(null); });
 })();

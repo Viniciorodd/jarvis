@@ -1352,6 +1352,23 @@
   function close() { ops.hidden = true; }
   // Exposed so the Map view can drill straight into an opportunity's full detail (RFP docs + actions).
   window.JarvisOps = {
+    // Open a specific business + tool directly. This is what MERGES old Ops into the new Businesses hub
+    // (operator, 2026-07-29: "merge the old ops with the new ops, add the missing things from the old ops to
+    // the new one"). The 23 tool renderers below are working code — rewriting them into the hub would risk
+    // breaking them for no gain, so the hub links INTO them instead and the generic "old Ops ↗" escape hatch
+    // goes away. One front door, nothing lost.
+    async openTab(bizId, tabId) {
+      const mv = el('mapView'); if (mv) mv.hidden = true;
+      const bv = el('bizView'); if (bv) bv.hidden = true;
+      ops.hidden = false;
+      if (!Object.keys(oppByNotice).length) { try { await load(); } catch { /* render what we have */ } }
+      const target = BUSINESSES.find((b) => b.id === bizId);
+      if (target) {
+        biz = target.id;
+        tab = target.tabs.includes(tabId) ? tabId : target.tabs[0];
+      }
+      renderBizBar(); renderTabs(); render();
+    },
     async openOpportunity(noticeId) {
       if (!noticeId) return;
       const mv = el('mapView'); if (mv) mv.hidden = true;
@@ -1361,6 +1378,31 @@
       openOppDetail(noticeId);
     },
   };
+  // Deep link: /#ops=<business>:<tool>. Gov / Finance / Real Estate open their OWN full desks (separate
+  // pages), so their old-Ops tools — Units, Flips, Rentals, Watchlist, Paper P&L — had no route at all once
+  // the hub stopped being the only door. Those desks link back here instead of us duplicating the tools.
+  let lastHashOpen = '';
+  async function openFromHash() {
+    const m = /^#ops=([a-z]+):([a-z]+)$/i.exec(location.hash || '');
+    if (!m) return;
+    const want = m[1].toLowerCase() + ':' + m[2].toLowerCase();
+    if (want === lastHashOpen) return;                    // already showing it
+    lastHashOpen = want;
+    try {
+      await window.JarvisOps.openTab(m[1].toLowerCase(), m[2].toLowerCase());
+    } catch (e) { console.warn('[ops] deep link failed:', e && e.message); lastHashOpen = ''; return; }
+    // Tidying the URL is cosmetic and must NEVER be able to fail the open. The Jarvis shell has no working
+    // history.replaceState, so doing this inside the same try reported a perfectly good open as a failure
+    // (and re-armed it, firing twice). `lastHashOpen` is what actually prevents a repeat.
+    try { history.replaceState(null, '', location.pathname + location.search); } catch { /* shell has no history API */ }
+  }
+  window.addEventListener('hashchange', openFromHash);
+  // The shell scripts load at different times depending on how the page was reached (fresh load vs a
+  // same-document hash change from another desk), so listen on every ready signal — a deep link that only
+  // works on one of those paths is a link he'd find broken at random.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', openFromHash);
+  window.addEventListener('load', openFromHash);
+  setTimeout(openFromHash, 0);
   el('opsBtn').addEventListener('click', open);
   el('opsX').addEventListener('click', close);
   el('opsRefresh').addEventListener('click', load);

@@ -138,6 +138,45 @@
     return wrap;
   }
 
+  /* ── the OLD Ops tools, merged in per business ──────────────────────────────
+     Operator, 2026-07-29: "merge the old ops with the new ops, add the missing things from the old ops to the
+     new one." The old #ops overlay held 23 working tool views (Deal Analyzer, Units, Flips, Watchlist, Paper
+     P&L, Live Sites…) that the new hub had no route to — reachable only via a generic "old Ops ↗" button,
+     which is why it felt like two half-apps. These map each hub business onto its old-Ops id + tools, so every
+     one is reachable from the business it belongs to. Nothing was rewritten (that would risk breaking working
+     tools); the hub links into them, and the generic escape hatch is gone.
+     Note: `trading`'s tools land on FINANCE, which until now had no board at all — the market tools are the
+     finance desk. `agents` is org-wide, not a business, so it sits on the hub header instead. */
+  var TOOL_LABELS = { leads:'⚑ Leads', opps:'◎ Opportunities', props:'▤ Proposals', crm:'⚇ CRM', studio:'🎨 Studio',
+    activity:'⟁ Activity', analyzer:'📊 Deal Analyzer', units:'🏠 Units', flips:'🔨 Flips', builds:'🏗 New Builds',
+    rentals:'🔑 Rentals', watchlist:'📊 Watchlist', positions:'📋 Positions', predictions:'🔮 Predictions',
+    paper:'🧪 Paper P&L', projects:'🔨 Projects', sites:'🌐 Live Sites', clients:'👥 Clients', pipeline:'💰 Pipeline',
+    assistant:'🧠 Assistant', busops:'⚙ Business Ops', queue:'✋ Review queue', identity:'🪪 Identity',
+    tracks:'🎙 Studio', releases:'🚀 Releases' };
+  var TOOLS = {
+    gov:        { ops:'gov',        tabs:['leads','opps','props','crm'] },
+    realestate: { ops:'realestate', tabs:['analyzer','units','flips','builds','rentals'] },
+    finance:    { ops:'trading',    tabs:['watchlist','positions','predictions','paper'] },
+    web:        { ops:'webstudio',  tabs:['projects','sites','clients','pipeline'] },
+    fiverr:     { ops:'fiverr',     tabs:['studio','activity','leads'] },
+    zerotick:   { ops:'saas',       tabs:['activity','leads'] },
+    music:      { ops:'music',      tabs:['identity','tracks','releases'] },
+  };
+  function toolStrip(bizId){
+    var t = TOOLS[bizId];
+    if(!t || !window.JarvisOps || !window.JarvisOps.openTab) return null;
+    var wrap = el('div','biz-tools');
+    wrap.appendChild(el('div','biz-tools-h','TOOLS'));
+    var row = el('div','biz-tools-row');
+    t.tabs.forEach(function(tab){
+      var b = el('button','biz-tool', TOOL_LABELS[tab] || tab);
+      b.addEventListener('click', function(){ window.JarvisOps.openTab(t.ops, tab); });
+      row.appendChild(b);
+    });
+    wrap.appendChild(row);
+    return wrap;
+  }
+
   function renderDetail(b){
     var body = $id('bizDetailBody'); body.innerHTML = '';
     if(b && b.error){ body.appendChild(el('div','ops-empty','Could not load: ' + b.error)); return; }
@@ -146,6 +185,9 @@
     nx.appendChild(el('div','gov-next-text', b.next.text));
     nx.appendChild(el('div','gov-next-sub', b.status || ''));
     body.appendChild(nx);
+    // BEFORE the board/setup early-returns below — otherwise the businesses with no board (Finance, ZeroTick,
+    // Lifeline) would return early and never show their tools, which is exactly who needed them most.
+    var tools = toolStrip(b.id); if(tools) body.appendChild(tools);
 
     if(b.money){ body.appendChild(moneySection(b)); body.appendChild(el('div','biz-act-div')); }
 
@@ -203,5 +245,12 @@
   var x=$id('bizX'); if(x) x.addEventListener('click', close);
   var rf=$id('bizRefresh'); if(rf) rf.addEventListener('click', load);
   var dx=$id('bizDetailX'); if(dx) dx.addEventListener('click', function(){ $id('bizDetail').hidden = true; });
-  var oldops=$id('bizOldOps'); if(oldops) oldops.addEventListener('click', function(){ close(); var o=$id('opsBtn'); if(o) o.click(); });
+  // The agent desk (Assistant / Business Ops / Review queue) is org-wide, not one business's tool, so it keeps
+  // a header button — but it now lands ON the agents tools rather than dumping him into a generic second Ops.
+  var agentsBtn=$id('bizAgents');
+  if(agentsBtn) agentsBtn.addEventListener('click', function(){
+    close();
+    if(window.JarvisOps && window.JarvisOps.openTab) window.JarvisOps.openTab('agents','assistant');
+    else { var o=$id('opsBtn'); if(o) o.click(); }
+  });
 })();

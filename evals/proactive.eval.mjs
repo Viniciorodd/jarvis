@@ -14,6 +14,27 @@ const ts = (min) => new Date(NOW - min * 60000).toISOString();
 export default {
   agent: 'proactive-rails',
   cases: [
+    // ── the operator's Home screen, 2026-07-29: "6 things" that were 3 things said twice, half of them
+    // the gate's own doctrine text. A catch-up that pads itself is worse than no catch-up.
+    { name: 'CATCH-UP: doctrine boilerplate never becomes the headline', run: () => {
+      const items = catchupItems([{ ts: '2026-07-29T10:00:00Z', kind: 'approval.request', actor: 'MAILROOM-01', action: 'submit', rationale: 'Treated as irreversible — gated for your approval (doctrine §9 rule 2).', payload: { assignee: { nickname: 'Elle' }, summary: 'Read the Gov Pipeline Board before reporting status.' } }], null, { cap: 10 });
+      return { pass: !/gated for your approval|doctrine/i.test(items[0].text), detail: items[0].text };
+    } },
+
+    { name: 'CATCH-UP: the same line three times collapses to one, counted', run: () => {
+      const ev = [1, 2, 3].map((n) => ({ ts: '2026-07-2' + n + 'T10:00:00Z', action: 'inbox.triage', rationale: 'Inbox triaged (personal): 40 msgs — 0 need you, 40 noise' }));
+      const items = catchupItems(ev, null, { cap: 10 });
+      return { pass: items.length === 1 && items[0].count === 3, detail: JSON.stringify(items.map((i) => ({ n: i.count, t: i.text.slice(0, 40) }))) };
+    } },
+
+    { name: 'CATCH-UP: genuinely different news is still all shown', run: () => {
+      const items = catchupItems([
+        { ts: '2026-07-29T10:00:00Z', action: 'inbox.triage', rationale: 'Inbox triaged: 40 msgs' },
+        { ts: '2026-07-29T11:00:00Z', action: 'proposal.draft', rationale: 'Drafted a proposal for B100' },
+      ], null, { cap: 10 });
+      return { pass: items.length === 2, detail: JSON.stringify(items.map((i) => i.text)) };
+    } },
+
     // ── kill switch ───────────────────────────────────────────────────────────────────────────────
     { name: 'pause: off by default; on = everything holds',
       run: () => {

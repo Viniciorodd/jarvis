@@ -3220,6 +3220,21 @@ const server = http.createServer(async (req, res) => {
     let tasks = { dueToday: [], active: [] };
     try { const T = await tasksEngine(); tasks = T.cockpitTasks(vaultOpt()); }
     catch (e) { tasks = { dueToday: [], active: [], error: e.message }; }
+    // The vault stores Markdown; a glance screen needs prose. pods/today-view.mjs cleans the text, drops
+    // duplicates, ranks dates above priorities and caps the list — 140 undifferentiated rows was the single
+    // biggest reason the operator called this screen useless (2026-07-29). `hidden` is reported, never silent.
+    try {
+      const TV = await import('../pods/today-view.mjs');
+      // Clean EVERY list, not just the ranked one. Several panels render these arrays directly, so cleaning
+      // only `focus` left raw `**bold**` and broken emoji on the Today tab — fix it at the boundary instead.
+      const scrub = (list) => (list || []).map((t) => ({ ...t, text: TV.cleanTaskText(t.text) })).filter((t) => t.text);
+      tasks.dueToday = scrub(tasks.dueToday);
+      tasks.active = scrub(tasks.active);
+      const ranked = TV.rankToday([...tasks.dueToday, ...tasks.active], { today: todayStr, limit: 7 });
+      tasks.focus = ranked.items;
+      tasks.focusTotal = ranked.total;
+      tasks.focusHidden = ranked.hidden;
+    } catch { /* ranking is a view concern — the raw lists still render if it fails */ }
     // calendar (Google, read-only): next 7 days, plus today's slice
     let week = [], calError = null;
     try { week = await google.calendarUpcoming({ days: 7, max: 30 }); }

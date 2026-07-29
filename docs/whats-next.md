@@ -2,7 +2,29 @@
 
 _Updated 2026-07-24. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-29 (latest) — our gateway is now the action brain's front door, and it routes by SIZE
+### 🆕 2026-07-29 (latest, pt.2) — Home + Today were useless; the cause was ONE bug wearing three hats
+Operator: *"my today and home are still useless on my pc."* Measured, not guessed. Three separate surfaces
+were each re-deriving a human label from the gate's own doctrine string:
+- **Approval queue** — `subj()` mined `" for (.+)"` out of *"gated **for your approval** (doctrine §9 rule 2)"*,
+  so 12 of 25 rows were titled **"your approval"**. Plus the scheduler re-gates the same morning-brief step
+  every run, so the queue grew daily without new information. → `pods/approvals-view.mjs`
+  (`approvalSubject`/`collapseApprovals`). **25 rows → 13, zero unnamed.** Collapsing is DISPLAY-only and
+  carries every id, so acting on a row still resolves the group — nothing silently leaves the queue.
+- **Catch-up feed** — `line()` returned the rationale verbatim → the same doctrine sentence as "news", 3×.
+  Now falls back to the real subject and de-dupes. **"6 things" → "2 things"** (with an honest ×N count).
+- **Today list** — 140 undifferentiated rows, raw `**bold**` / `[[wikilinks]]` and one broken surrogate glyph
+  rendering as ◆. → `pods/today-view.mjs` (`cleanTaskText`/`rankToday`): cleaned, de-duped, dates ranked above
+  priorities, capped at 7 **with `hidden` reported** (a silently truncated list reads as "this is everything").
+  Cleaning is applied at the API boundary so every panel benefits, not just the ranked one.
+- **Deliberately NOT done:** auto-hiding tasks that *look* finished. The backlog register marks work done in
+  prose; fuzzy-matching it against vault text would eventually hide a REAL task, which is worse than showing
+  a stale one. Nothing is dropped.
+- **The real ceiling (operator's data, not code):** **0 of 140 tasks carry any date** (14 highest / 19 medium /
+  107 no priority). Ranking can only surface the 14 highest-priority — no software can compute "due today"
+  from undated tasks. Dating them, or letting Jarvis propose dates, is the next real win.
+- Evals **921 → 940**.
+
+### 2026-07-29 — our gateway is now the action brain's front door, and it routes by SIZE
 Frame: finish the free-token gateway the operator asked us to rebuild ("we need those 1billion tokens").
 - **Action brain runs on OUR gateway** — `callActionBrain` (companion) tries `pods/gateway/router.mjs` first,
   falling back to the old inline list. `envAll()` merges `process.env` + `.env` so the companion actually sees

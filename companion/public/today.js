@@ -95,9 +95,12 @@
     var wrap = $id('jTodayTasks'), cnt = $id('jTodayCount');
     if(!wrap) return;
     var due = (tasks && tasks.dueToday) || [], active = (tasks && tasks.active) || [];
-    if(cnt) cnt.textContent = (due.length ? due.length+' due · ' : '') + active.length + ' active';
+    // tasks.focus is the server-ranked, text-cleaned shortlist (pods/today-view.mjs). Prefer it; the raw
+    // concat is only the fallback for an older server. Home showed 140 raw Markdown rows before this.
+    var list = (tasks && tasks.focus && tasks.focus.length) ? tasks.focus.slice(0,5) : due.concat(active).slice(0,5);
+    var total = (tasks && tasks.focusTotal != null) ? tasks.focusTotal : (due.length + active.length);
+    if(cnt) cnt.textContent = (due.length ? due.length+' due · ' : '') + total + ' active';
     wrap.innerHTML = '';
-    var list = due.concat(active).slice(0,5);
     if(!list.length){ wrap.appendChild(el('div','j-pipe-empty','Nothing queued — add one in Today.')); return; }
     list.forEach(function(t){ wrap.appendChild(taskRow(t, true)); });
   }
@@ -115,8 +118,14 @@
     var aList = $id('tdActiveList');
     if(aList){
       aList.innerHTML = '';
-      if(!active.length) aList.appendChild(el('div','j-pipe-empty','Nothing active. Add a task above.'));
-      else active.slice(0,40).forEach(function(t){ aList.appendChild(taskRow(t, false)); });
+      // Ranked + cleaned first, then the rest of the backlog — so the top of the list is what matters today
+      // instead of whatever the vault happened to list first.
+      var focus = (d.tasks && d.tasks.focus) || [];
+      var rows = focus.length ? focus.concat(active.filter(function(t){
+        return !focus.some(function(f){ return f.id === t.id; });
+      })) : active;
+      if(!rows.length) aList.appendChild(el('div','j-pipe-empty','Nothing active. Add a task above.'));
+      else rows.slice(0,40).forEach(function(t){ aList.appendChild(taskRow(t, false)); });
     }
     // the calendar (day/week/month) is rendered by calendar.js into #calWidget
   }

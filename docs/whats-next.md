@@ -2,7 +2,29 @@
 
 _Updated 2026-07-24. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-24 (latest) — reliability restored + browser automation + inbox now produces drafts
+### 🆕 2026-07-29 (latest) — our gateway is now the action brain's front door, and it routes by SIZE
+Frame: finish the free-token gateway the operator asked us to rebuild ("we need those 1billion tokens").
+- **Action brain runs on OUR gateway** — `callActionBrain` (companion) tries `pods/gateway/router.mjs` first,
+  falling back to the old inline list. `envAll()` merges `process.env` + `.env` so the companion actually sees
+  `GROQ_API_KEY` etc. Chat action latency **44.4s → 4.0s**. Usage lands in `control-plane/data/gateway-usage.json`.
+- **Size-aware routing (the real find)** — Groq's free tier hard-rejects (413) any request over 12k TPM, and it
+  counts the RESERVED `max_tokens` too. The action brain's prompt is ~13.8k by Groq's count, so the router was
+  burning **two doomed round-trips every turn** and silently failing over. Providers now carry
+  `maxRequestTokens`; `estimateTokens` (3.5 chars/tok **+ maxTokens**, errs high on purpose) skips a provider
+  that provably can't hold the payload. A size skip is a **skip, not a failure** — it must not burn that
+  provider's error budget. Verified live: small call → **groq 0.42s**; action-brain call → groq absent from the
+  ledger entirely, openrouter serves in 4.0s.
+- **Providers ordered by measured latency** (groq 0.2s → openrouter 0.7s → …), which is only safe *because* of
+  the size guard — fastest-first for what fits, deterministic skip for what doesn't.
+- **Honest failover logging** — the router keeps the provider's own error body (`detail`), and the companion
+  prints every skipped hop **before** the success return. Silent fallthrough is how a dead free tier hides for
+  weeks while we quietly burn the next one down the list. This is how the 413 was found at all.
+- Evals **905 → 910**.
+- ⏳ Still needs the operator: **NAS redeploy** (`docker compose up -d --build control-plane scheduler
+  telegram-bridge`) — until then `/maintenance/auto-send-tier` 404s and the tier dropdown + kill switch can't
+  reach the control-plane.
+
+### 2026-07-24 — reliability restored + browser automation + inbox now produces drafts
 Frame: "reliability first; anything we left undone?" Cleared the two blockers, added the browser, closed two gaps.
 - **Tailscale back up** — expired auth key; operator generated a fresh reusable `TS_AUTHKEY`, `force-recreate
   tailscale`. `jarvis-nas` MagicDNS name back on the mesh (desktop Away mode now targets `jarvis-nas`, not a
@@ -44,6 +66,61 @@ Frame: "reliability first; anything we left undone?" Cleared the two blockers, a
   exists. **Your hands (🧑):** rotate OpenRouter + Bitwarden keys (overdue); top up Anthropic credit (only the
   Claude chip needs it — voice/chat/drafts are free on Hermes).
 
+
+### 🆕 2026-07-24 (Cowork session, later same day) — confirmed the "two Jarvises" problem is still live, not fixed
+A Cowork/Claude session (vault-only access, no code repo) spent tonight manually hand-editing the vault's
+🏛 Gov Pipeline Board and Log.md — exactly the Cowork-Jarvis anti-pattern `docs/one-source-of-truth.md`
+diagnosed on 2026-07-12. Operator asked why SAM_API_KEY wasn't being used; investigation found:
+- **The key is real and correctly wired** (`.env` → `scripts/sam-scout.mjs`, `n8n/workflows/01-sam-scout.json`).
+  Never flagged or revoked — simply never reachable from the Cowork session (it only had the Second Brain
+  vault mounted, not this repo, until the operator connected it mid-conversation tonight).
+- **The "board-first" migration from one-source-of-truth.md's "Now" section does not appear to have been
+  executed.** Tonight's Cowork-side scheduled jobs (Gideon/gov-scout, Gov Inbox Watch, Morning Brief) are
+  still reconstructing status from Gmail/web search and writing directly to vault markdown — the same
+  finding-#8 failure class the 7/12 doc named, still happening 12 days later.
+- **Confirmed hard limit, not a permission issue:** this Cowork sandbox's egress is allowlist-proxied
+  (`blocked-by-allowlist` on api.sam.gov and sam.gov generally) and has no network path to the NAS's Tailscale
+  mesh at all. So neither the live SAM scout nor a control-plane event POST can run from inside a Cowork
+  session — the convergence in one-source-of-truth.md can only be executed from a machine already on the
+  Tailscale mesh (the Mac worker, per the architecture doc) or the operator's own PC terminal.
+- **Built tonight, in response to "I want one chat per AI agent" + "let me open Jarvis and talk to her and
+  have her do everything":** investigated first — `companion/server.js`'s `/api/chat` already IS a real
+  tool-calling chat (Claude + a 40-tool `TOOLS` array: file ops, `read_email`/`triage_inbox` (Gmail,
+  read-only), `command_org` (routes an instruction to the right agent — e.g. Hector for sub-sourcing),
+  real estate, trading, web studio, morning brief, etc.) — talking to Jarvis and having her do most of
+  tonight's Cowork work is **already built**, not missing. The one thing genuinely missing, now built:
+  **one Telegram topic per agent.** New `companion/telegram-topics.mjs` + edits to
+  `companion/telegram-bridge.mjs` — agent-initiated pushes (new approvals, narrated activity) now route to
+  that agent's own forum topic instead of one flat chat; the operator's own messages always reply in
+  whichever topic they were sent from (never jumps threads); a stable "🗣 Talk to Jarvis" topic is created
+  at boot for direct conversation. Fully backward-compatible (falls back to today's flat chat if the
+  one-time Telegram forum setup isn't done). `node --check` passes on both files — **that's the only
+  verification possible from this session** (no live Telegram/NAS network access); setup + done-when
+  checklist: `docs/telegram-topics-setup.md`. Real test is the operator's, next time he's at a terminal.
+- **Smaller gap noted, not built tonight (scope control):** the live chat's `triage_inbox` tool only
+  *suggests* a reply back in conversation — it does not write an actual Gmail draft the way the scheduled
+  `pods/inbox/triage.mjs` job's `stageDrafts` does. Worth a `draft_gmail_reply` tool wired to the same
+  `stageDrafts` logic so "draft a reply to X" works the same live in chat as it does on the morning
+  schedule. Logged, not built — this session was already deep in the Telegram-topics build.
+- **Immediate, no-code win available to the operator right now:** from a real terminal on the PC (not Cowork),
+  `cd C:\Users\vinic\Documents\Projects\jarvis && node scripts/sam-scout.mjs --naics 561210,561720,561990 --days 3`
+  hits the real API with the real key and prints live janitorial/grounds leads — bypasses the SAM.gov
+  JS-rendering wall that's been blocking Cowork's browser-based scouting all month.
+- **Next real fix, scoped and ready:** run a Claude Code session on the Mac worker (it has Tailscale access)
+  against `docs/one-source-of-truth.md`'s "Now" migration list — point Morning Brief/Gov Inbox Watch at
+  `/api/gov-board` for status and have them emit events instead of writing vault notes directly. Not done
+  in this session (no network path to attempt it from here).
+- **RESOLVED, confirmed live by the operator:** ran `node scripts/sam-scout.mjs --naics 561210,561720,561990
+  --days 3` from a real PowerShell terminal (`$env:SAM_API_KEY=...` — the docs' inline `VAR=cmd` syntax is
+  bash-only, doesn't work in PowerShell, that was the first failure). Result: **HTTP 429 "Message throttled
+  out... exceeded your quota"** on all 3 NAICS calls — not an auth error. This is the single piece of proof
+  that ends the whole investigation: the key is 100% valid and correctly wired; a bad/revoked key returns
+  401/403, not a quota message. SAM.gov's free public tier caps at ~10 requests/day; this script burns 1
+  request per NAICS code (3 for the default set), so a handful of manual test runs today used it up. Quota
+  resets **2026-07-25 00:00 UTC = 2026-07-24 20:00 EDT (8 PM tonight)**. `schedule.json`'s `gov-daily-scan`
+  job (once/day, 3 NAICS codes) sits well inside the 10/day cap by design — this was a testing artifact, not
+  a structural problem. Every earlier doc/vault note saying "SAM_API_KEY isn't configured" was wrong; correct
+  the record: it's configured, valid, and just needs the daily quota to reset.
 
 ### 🆕 2026-07-20 (latest) — Audit/PRD applied + the whole `#jarvis` backlog cleared + debrief wired + NAS redeploy
 Big session. Operator's frame: "we log tasks and never resurface them." The fix + the work:

@@ -5,7 +5,7 @@
 // No network: a fake fetch drives every path.
 
 import { availableProviders, routePlan, PROVIDERS } from '../pods/gateway/providers.mjs';
-import { complete, noteUsage, isCooling, usageReport } from '../pods/gateway/router.mjs';
+import { complete, noteUsage, isCooling, usageReport, estimateTokens } from '../pods/gateway/router.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 const NOW = new Date('2026-07-28T12:00:00Z');
@@ -94,6 +94,38 @@ export default {
       const cooling = { groq: { day: '2026-07-28', cooldownUntil: new Date(NOW.getTime() + 60000).toISOString() } };
       const expired = { groq: { day: '2026-07-28', cooldownUntil: new Date(NOW.getTime() - 60000).toISOString() } };
       return ok(isCooling(cooling, 'groq', NOW) === true && isCooling(expired, 'groq', NOW) === false && isCooling({}, 'groq', NOW) === false);
+    } },
+
+    // ── request-size routing (the live 413 from Groq on 2026-07-29) ──
+    { name: 'estimateTokens grows with the payload and counts the tool schema too', run: () => {
+      const small = estimateTokens([{ role: 'user', content: 'hi' }]);
+      const big = estimateTokens([{ role: 'user', content: 'x'.repeat(40000) }]);
+      const withTools = estimateTokens([{ role: 'user', content: 'hi' }], [{ type: 'function', function: { name: 'f'.repeat(400) } }]);
+      return ok(big > 9000 && small < 50 && withTools > small, JSON.stringify({ small, big, withTools }));
+    } },
+
+    { name: 'the RESERVED completion budget counts toward the ceiling (the real Groq 413)', run: () => {
+      // Groq rejected a payload we had estimated at ~12,000 because it also charges max_tokens against TPM.
+      const bare = estimateTokens([{ role: 'user', content: 'hi' }]);
+      return ok(estimateTokens([{ role: 'user', content: 'hi' }], null, 1200) === bare + 1200, 'maxTokens is not counted');
+    } },
+
+    { name: 'a payload over a provider\'s published ceiling SKIPS it — no doomed round-trip', run: async () => {
+      let hitGroq = false;
+      const fetchImpl = async (url) => { if (/groq/.test(url)) hitGroq = true; return reply('from the big-context provider'); };
+      const r = await complete({ usageStore: {}, persist: false, messages: [{ role: 'user', content: 'x'.repeat(80000) }], tools: [], env: ENV, fetchImpl, now: NOW });
+      return ok(r.ok && !hitGroq && r.provider !== 'groq', JSON.stringify({ provider: r.provider, hitGroq }));
+    } },
+
+    { name: 'a size SKIP is not a failure — it must not burn the provider\'s error budget', run: async () => {
+      const store = {};
+      await complete({ usageStore: store, persist: false, messages: [{ role: 'user', content: 'x'.repeat(80000) }], tools: [], env: ENV, fetchImpl: async () => reply('ok'), now: NOW });
+      return ok(!store.groq, 'groq was charged a failure for a payload it never saw: ' + JSON.stringify(store.groq));
+    } },
+
+    { name: 'a SMALL payload still goes to the fastest provider first (groq is not demoted)', run: async () => {
+      const r = await complete({ usageStore: {}, persist: false, messages: [{ role: 'user', content: 'hi' }], tools: [], env: ENV, fetchImpl: async () => reply('fast'), now: NOW });
+      return ok(r.ok && r.provider === 'groq', JSON.stringify({ provider: r.provider }));
     } },
 
     { name: 'usageReport shows today\'s spend per provider (the free budget, visible)', run: () => {

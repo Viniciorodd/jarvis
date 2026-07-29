@@ -261,6 +261,21 @@ async function govBoardData() {
 // OpenAI key — used for Whisper voice transcription (Whisper API, ~$0.006/min)
 let OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 if (!OPENAI_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^OPENAI_API_KEY=(.+)$/m); if (m) OPENAI_KEY = m[1].trim(); } catch { /* */ } }
+// Every key from process.env AND ../.env, merged — the gateway needs the whole set (GROQ/CEREBRAS/
+// GEMINI...), and this server has always read .env manually rather than loading it into process.env.
+let _envAll = null;
+function envAll() {
+  if (_envAll) return _envAll;
+  const out = { ...process.env };
+  try {
+    for (const line of fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^([A-Za-z0-9_]+)=(.*)$/);
+      if (m && !out[m[1]]) out[m[1]] = m[2].trim();
+    }
+  } catch { /* no .env — process.env only */ }
+  _envAll = out;
+  return out;
+}
 let OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
 if (!OPENROUTER_KEY) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.env'), 'utf8').match(/^OPENROUTER_API_KEY=(.+)$/m); if (m) OPENROUTER_KEY = m[1].trim(); } catch { /* */ } }
 // Focus mode: normal | gaming | work | dnd
@@ -1318,6 +1333,21 @@ async function callActionBrain(messages) {
   // tool-capable model ($0, so it still works with no paid credit) → null (caller gives the honest refusal).
   const oaMsgs = [{ role: 'system', content: buildSystem() }, ...toOpenAIMessages(messages)];
   const tools = OPENAI_TOOLS();
+  // Prefer OUR gateway (pods/gateway) — it knows every free provider, tracks the daily budget, and cools
+  // down a rate-limited one instead of hammering it. Falls through to the inline list if it can't answer.
+  try {
+    const G = await import('../pods/gateway/router.mjs');
+    const g = await G.complete({ messages: oaMsgs, tools, needTools: true, allowPaid: !!OPENAI_KEY, maxTokens: 1200, env: envAll() });
+    // Log the skipped providers BEFORE the success return — a dead free tier is invisible precisely when the
+    // NEXT one covers for it, which is the case we most need to see (we're silently burning the wrong budget).
+    for (const t of (g.tried || [])) if (t.status || t.error || t.note) console.warn('[gateway] ' + t.provider + '/' + t.model + ' → ' + (t.status || t.note || t.error) + (t.detail ? ' :: ' + t.detail : ''));
+    if (g.ok && g.message) {
+      const c = [];
+      if (g.message.content) c.push({ type: 'text', text: g.message.content });
+      for (const tc of (g.message.tool_calls || [])) { let input = {}; try { input = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch { /* bad args */ } c.push({ type: 'tool_use', id: tc.id || ('call_' + c.length), name: tc.function.name, input }); }
+      if (c.length) return { content: c, stop_reason: (g.message.tool_calls && g.message.tool_calls.length) ? 'tool_use' : 'end_turn', usage: g.usage || null, _provider: 'gateway:' + g.provider + '/' + g.model };
+    }
+  } catch (e) { console.warn('[gateway] unavailable: ' + (e && e.message)); }
   const providers = [];
   if (OPENAI_KEY) providers.push({ url: 'https://api.openai.com/v1/chat/completions', key: OPENAI_KEY, model: 'gpt-4o-mini', label: 'openai:gpt-4o-mini' });
   // FREE tool-capable fallbacks, fastest first (benchmarked 2026-07-27 on a real tool call: nemotron-30b 2.7s ·

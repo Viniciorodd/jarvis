@@ -53,6 +53,17 @@ export function usageReport(usage = {}, now = new Date()) {
 
 const COOLDOWN_MS = 15 * 60000; // a 429 rests that provider for 15 minutes
 
+// PURE: a deliberately rough token estimate for the OUTBOUND request. It only has to tell "comfortably under a
+// provider's ceiling" from "over it", so a crude ratio beats a tokenizer dependency. Two corrections learned
+// from a live Groq 413 on 2026-07-29, where it counted 13,810 against a payload we had estimated at ~12,000:
+//   • 3.5 chars/token, not 4 — JSON escaping and prompt boilerplate tokenize denser than prose.
+//   • `maxTokens` counts. Providers RESERVE the completion budget against the same per-minute ceiling.
+// It errs high on purpose: over-estimating costs one skipped hop, under-estimating costs a guaranteed 413.
+export function estimateTokens(messages = [], tools = null, maxTokens = 0) {
+  const chars = JSON.stringify(messages || []).length + (tools ? JSON.stringify(tools).length : 0);
+  return Math.ceil(chars / 3.5) + (Number(maxTokens) || 0);
+}
+
 // The one call every app/agent makes. OpenAI-shaped in, OpenAI-shaped out.
 //   complete({ messages, tools, needTools, allowPaid, privacy, maxTokens })
 // Returns { ok, provider, model, message, usage, tried } — or { ok:false, error, tried } when every provider
@@ -63,9 +74,13 @@ export async function complete({ messages = [], tools = null, needTools = false,
   // usageStore lets a caller (and the evals) supply an isolated ledger — otherwise we use the real one.
   let usage = usageStore || loadUsage();
   const tried = [];
+  const estTokens = estimateTokens(messages, tools, maxTokens);
 
   for (const hop of plan) {
     if (isCooling(usage, hop.providerId, now)) { tried.push({ provider: hop.providerId, model: hop.model, skipped: 'cooling down' }); continue; }
+    // Don't spend a round-trip discovering a published limit we already know. This is a SKIP, not a failure:
+    // the provider is healthy, the payload just doesn't fit it, so it must not count against its error budget.
+    if (hop.maxRequestTokens && estTokens > hop.maxRequestTokens) { tried.push({ provider: hop.providerId, model: hop.model, skipped: 'payload ~' + estTokens + ' tok exceeds its ' + hop.maxRequestTokens + ' limit' }); continue; }
     const key = hop.keyEnv ? env[hop.keyEnv] : '';
     const body = { model: hop.model, messages, max_tokens: maxTokens };
     if (tools) { body.tools = tools; body.tool_choice = 'auto'; }
@@ -81,7 +96,15 @@ export async function complete({ messages = [], tools = null, needTools = false,
         tried.push({ provider: hop.providerId, model: hop.model, status: r.status, note: 'rate-limited — cooling down' });
         continue;
       }
-      if (!r.ok) { usage = noteUsage(usage, hop.providerId, { ok: false, now }); tried.push({ provider: hop.providerId, model: hop.model, status: r.status }); continue; }
+      if (!r.ok) {
+        // Keep the provider's own words. A 400 that says "tool schema invalid" is a bug WE can fix; without
+        // the body it looks identical to a dead endpoint and we'd keep failing over forever instead.
+        let detail = '';
+        try { detail = typeof r.text === 'function' ? (await r.text()).slice(0, 200) : ''; } catch { /* body already consumed or absent */ }
+        usage = noteUsage(usage, hop.providerId, { ok: false, now });
+        tried.push({ provider: hop.providerId, model: hop.model, status: r.status, detail });
+        continue;
+      }
       const data = await r.json();
       const msg = data.choices && data.choices[0] && data.choices[0].message;
       if (!msg) { usage = noteUsage(usage, hop.providerId, { ok: false, now }); tried.push({ provider: hop.providerId, model: hop.model, note: 'empty response' }); continue; }

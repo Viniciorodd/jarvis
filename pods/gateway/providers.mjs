@@ -13,7 +13,25 @@
 // Adding a provider = one entry here. Keys come from env; a provider with no key is simply skipped.
 // `limits` are the provider's PUBLISHED free-tier ceilings — used to budget locally, never to evade.
 
+// ORDER = measured latency on a real tool call (2026-07-28): groq 0.2s -> openrouter 0.7s -> the rest.
+// Fastest-first matters: every agent action pays this latency, so the order is data, not preference.
+//
+// `maxRequestTokens` is the provider's published per-request/per-minute ceiling. It is NOT a preference — Groq's
+// free tier hard-rejects (413) anything over 12k, and the action brain's system prompt is ~13k, so without this
+// the router burned two doomed round-trips on every single turn before failing over. With it, Groq stays FIRST
+// for the small calls it wins at (scanning, classification) and is skipped deterministically for the big ones.
 export const PROVIDERS = [
+  {
+    id: 'groq',
+    label: 'Groq (free tier)',
+    keyEnv: 'GROQ_API_KEY',
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+    tools: true,
+    maxRequestTokens: 12000,            // free-tier TPM ceiling, confirmed live by a 413 on 2026-07-29
+    limits: { requestsPerDay: 14400, tokensPerDay: 500000 },
+    notes: 'Fastest free tier by far (0.2s), but a hard 12k-token request ceiling — big prompts route past it.',
+  },
   {
     id: 'openrouter-free',
     label: 'OpenRouter (free pool)',
@@ -26,21 +44,12 @@ export const PROVIDERS = [
     notes: 'Aggregates many vendors\' free tiers behind one key. Free models rotate — the router probes and skips dead ones.',
   },
   {
-    id: 'groq',
-    label: 'Groq (free tier)',
-    keyEnv: 'GROQ_API_KEY',
-    url: 'https://api.groq.com/openai/v1/chat/completions',
-    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
-    tools: true,
-    limits: { requestsPerDay: 14400, tokensPerDay: 500000 },
-    notes: 'Very fast inference. Generous published free tier.',
-  },
-  {
     id: 'cerebras',
     label: 'Cerebras (free tier)',
     keyEnv: 'CEREBRAS_API_KEY',
     url: 'https://api.cerebras.ai/v1/chat/completions',
-    models: ['llama-3.3-70b', 'llama3.1-8b'],
+    // verified live against GET /v1/models on 2026-07-28 — guessed names 404'd, these are the real ones
+    models: ['gpt-oss-120b', 'zai-glm-4.7', 'gemma-4-31b'],
     tools: true,
     limits: { tokensPerDay: 1000000 },
     notes: '~1M tokens/day published free. Excellent for bulk agent work.',
@@ -98,6 +107,6 @@ export function availableProviders({ env = process.env, needTools = false, allow
 // so a single rate-limited model rolls to its sibling before we abandon a provider entirely.
 export function routePlan(opts = {}) {
   const out = [];
-  for (const p of availableProviders(opts)) for (const model of p.models) out.push({ providerId: p.id, label: p.label, url: p.url, keyEnv: p.keyEnv, model, tools: p.tools });
+  for (const p of availableProviders(opts)) for (const model of p.models) out.push({ providerId: p.id, label: p.label, url: p.url, keyEnv: p.keyEnv, model, tools: p.tools, maxRequestTokens: p.maxRequestTokens || null });
   return out;
 }

@@ -3229,13 +3229,12 @@ const server = http.createServer(async (req, res) => {
     let approvals = [];
     try {
       const pending = await fetch(CP_URL + '/approvals/pending', { signal: AbortSignal.timeout(4000) }).then((r) => r.json()).catch(() => []);
-      const subj = (a) => {
-        if (a.payload && a.payload.title) return a.payload.title;
-        const r = (a.rationale || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ');
-        const m = r.match(/drafted for (.+?)\s*(?:\.|$)/i) || r.match(/ for (.+?)\s*(?:\.|$)/i);
-        return (m ? m[1] : r.split(/[.—]/)[0]).trim() || a.action;
-      };
-      approvals = (Array.isArray(pending) ? pending : []).map((a) => ({ id: a.id, pod: a.pod, action: a.action, rationale: a.rationale, title: subj(a), ts: a.ts }));
+      // Titles + de-duplication live in pods/approvals-view.mjs (pure, eval-pinned). The old inline version
+      // mined the subject out of the rationale, so the gate's own boilerplate — "gated FOR YOUR APPROVAL
+      // (doctrine §9 rule 2)" — became the title of 12 rows, and the same morning-brief step was listed once
+      // per run. A queue that says "your approval" twelve times is worse than an empty one.
+      const AV = await import('../pods/approvals-view.mjs');
+      approvals = AV.collapseApprovals(Array.isArray(pending) ? pending : []);
     } catch { /* control-plane offline — cockpit still renders */ }
     // Your next gov move comes from the SAME pipeline the Gov board uses, so Home + board never disagree.
     let govNextAction = null;

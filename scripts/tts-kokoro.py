@@ -18,6 +18,13 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL = os.environ.get('KOKORO_MODEL', os.path.join(HERE, 'kokoro-v1.0.onnx'))
 VOICES = os.environ.get('KOKORO_VOICES', os.path.join(HERE, 'voices-v1.0.bin'))
 DEFAULT_VOICE = os.environ.get('KOKORO_VOICE', 'af_heart')
+# Operator, 2026-07-29: "jarvis speaks too slow". Kokoro shipped at 1.0, which reads like an audiobook rather
+# than an assistant. 1.15 is brisk and still clear; KOKORO_SPEED tunes it without touching this file.
+try:
+    SPEED = float(os.environ.get('KOKORO_SPEED', '1.15'))
+except ValueError:
+    SPEED = 1.15
+SPEED = min(2.0, max(0.6, SPEED))
 
 try:
     import soundfile as sf
@@ -35,7 +42,7 @@ class H(BaseHTTPRequestHandler):
         pass
 
     def _audio(self, text, voice):
-        samples, sr = kok.create(text, voice=voice, speed=1.0, lang='en-us')
+        samples, sr = kok.create(text, voice=voice, speed=SPEED, lang='en-us')
         buf = io.BytesIO(); sf.write(buf, samples, sr, format='WAV')
         data = buf.getvalue()
         self.send_response(200)

@@ -116,12 +116,37 @@ function stopSpeaking() {
 }
 
 function afterSpeak() { if (!busy) setState(wakeOn ? 'listening' : 'idle', wakeOn ? 'listening' : 'standby'); }
+// Markdown → speech, for the BROWSER fallback only (the server strips it for Kokoro/ElevenLabs in /api/tts).
+// Mirrors pods/speech.mjs; kept small and dependency-free because this file ships to the browser as-is.
+function speakableText(s) {
+  return String(s == null ? '' : s)
+    .replace(/```[\s\S]*?```/g, ' . ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2').replace(/\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/(\*\*\*|___)(\S[\s\S]*?\S|\S)\1/g, '$2')
+    .replace(/(\*\*|__)(\S[\s\S]*?\S|\S)\1/g, '$2')
+    .replace(/(?<![\w*])\*(?!\s)([^*\n]+?)(?<!\s)\*(?![\w*])/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '').replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '').replace(/^\s*\d+[.)]\s+/gm, '')
+    .replace(/<[^>]+>/g, ' ').replace(/[•▪●✓✔→]/g, ' ')
+    .replace(/—|–/g, ', ').replace(/…/g, '. ')
+    .replace(/\n{2,}/g, '. ').replace(/\n/g, '. ')
+    .replace(/\.{2,}/g, '.').replace(/\s+([,.!?;:])/g, '$1')
+    .replace(/\s+/g, ' ').trim();
+}
+// Operator, 2026-07-29: "jarvis speaks too slow". 1.04 was barely above default; 1.18 reads brisk but still
+// clear. Tunable live from the console (window.JARVIS_SPEECH_RATE) so he can dial it without a rebuild.
+function speechRate() {
+  const r = Number(window.JARVIS_SPEECH_RATE || localStorage.getItem('jarvisSpeechRate') || 1.18);
+  return Math.min(2, Math.max(0.6, isFinite(r) ? r : 1.18));
+}
 function browserSpeak(text) {
   if (!('speechSynthesis' in window)) { afterSpeak(); return; }
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
+  const u = new SpeechSynthesisUtterance(speakableText(text));
   if (preferredVoice) u.voice = preferredVoice;
-  u.rate = 1.04; u.pitch = 1.0;
+  u.rate = speechRate(); u.pitch = 1.0;
   // browser TTS exposes no audio node — drive a gentle speaking pulse so the orb still reacts
   if (window.Orb) Orb.setVoice('jarvis');
   const osc = setInterval(() => { if (window.Orb) Orb.setLevel(0.28 + Math.random() * 0.4); }, 95);

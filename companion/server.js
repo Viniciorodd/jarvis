@@ -1482,7 +1482,9 @@ async function converse(history) {
   // until the loop guard fired, then answered nothing (live, 2026-07-29 — 8 calls, 75s, no answer). Repeating
   // a search cannot produce new information, so a repeat is served from cache with a nudge to ANSWER instead.
   const toolCache = new Map();
-  const callKey = (n, inp) => n + '|' + JSON.stringify(inp || {}).toLowerCase().replace(/[^a-z0-9|]/g, '');
+  // Word-order-blind, because the free models reorder a failed query and re-run it: the operator's live test
+  // burned "Brick Ave operating agreement" AND "operating agreement Brick Ave" — 2.5s each for one answer.
+  const callKey = (n, inp) => n + '|' + JSON.stringify(inp || {}).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
   for (let i = 0; i < 8; i++) {
     const resp = await callClaude(messages, wantsAction);
     addUsage(resp.usage);
@@ -1624,8 +1626,13 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
   if (req.method === 'POST' && url.pathname === '/api/tts') {
-    const { text } = await readBody(req);
-    if (!text) return send(res, 400, JSON.stringify({ error: 'text required' }));
+    const { text: rawText } = await readBody(req);
+    if (!rawText) return send(res, 400, JSON.stringify({ error: 'text required' }));
+    // Strip Markdown HERE, at the one boundary every voice path crosses — the operator heard her pronounce
+    // the asterisks in "**does exist**" (2026-07-29). Doing it per-caller would just wait for the next caller
+    // to forget. The on-screen transcript keeps its emphasis; only the audio is cleaned.
+    let text = rawText;
+    try { const S = await import('../pods/speech.mjs'); text = S.speakable(rawText) || rawText; } catch { /* speak it raw rather than not at all */ }
     const provider = TTS_PROVIDER; // auto | local | eleven
     // 1) FREE local Kokoro voice first (no key, offline, no monthly fee).
     if (provider !== 'eleven') {
@@ -1643,12 +1650,20 @@ const server = http.createServer(async (req, res) => {
     }
     // 2) ElevenLabs (only if configured + not forced local) — optional premium.
     if (provider !== 'local' && ELEVEN_KEY) {
+      // Operator, 2026-07-29: "jarvis speaks too slow". ElevenLabs takes `speed` in voice_settings (~0.7–1.2)
+      // but only on some models/plans, and an unsupported field is a 4xx — which would cost him his voice
+      // entirely. So: ask for the faster read, and on ANY rejection retry the plain body. Never trade the
+      // voice for the tempo. ELEVEN_SPEED tunes it without a code change.
+      const eleven = async (body) => fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE}`, {
+        method: 'POST',
+        headers: { 'xi-api-key': ELEVEN_KEY, 'content-type': 'application/json', accept: 'audio/mpeg' },
+        body: JSON.stringify(body),
+      });
+      const base = { text: String(text).slice(0, 1500), model_id: 'eleven_turbo_v2_5' };
+      const speed = Math.min(1.2, Math.max(0.7, Number(process.env.ELEVEN_SPEED) || 1.12));
       try {
-        const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE}`, {
-          method: 'POST',
-          headers: { 'xi-api-key': ELEVEN_KEY, 'content-type': 'application/json', accept: 'audio/mpeg' },
-          body: JSON.stringify({ text: String(text).slice(0, 1500), model_id: 'eleven_turbo_v2_5' }),
-        });
+        let r = await eleven({ ...base, voice_settings: { speed } });
+        if (!r.ok) r = await eleven(base);                       // speed unsupported here → plain request
         if (r.ok) { const buf = Buffer.from(await r.arrayBuffer()); res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' }); return res.end(buf); }
       } catch { /* fall through */ }
     }

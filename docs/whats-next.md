@@ -2,7 +2,35 @@
 
 _Updated 2026-07-24. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
-### 🆕 2026-07-29 (latest, pt.2) — Home + Today were useless; the cause was ONE bug wearing three hats
+### 🆕 2026-07-29 (latest, pt.3) — THE SECOND BRAIN IS NOW JARVIS'S MEMORY (read + write + search)
+Operator: *"if we have our second brain in an obsidian vault, why cant jarvis not use that as a memory with the
+capability to write and read, create, move, organize, open, show and so on… i want to fill like tony stark."*
+The answer was NOT missing capability — `read_file`/`write_file`/`edit_file`/`move_path`/`scan`/`open_path` all
+already existed. Four real defects were in the way:
+1. **The vault was not in `JARVIS_ROOTS`.** Every file tool sandboxes to those roots, and `C:\Users\vinic\
+   Documents\Second Brain` was not one of them — so every tool refused it as outside the sandbox. Only
+   `create_note` worked (it hardcodes `VAULT_DIR`). **One config line.** Vault is now the PRIMARY root, and
+   `.obsidian` / `.trash` / `.smart-env` were added to `OFF_LIMITS` first so a "tidy up" can't wreck Obsidian.
+2. **There was NO content search at all** — `scan`/`list_dir` show structure, `read_file` needs an exact path.
+   Jarvis could WRITE notes and never find them again: a filing cabinet, not a memory. → `pods/vault-search.mjs`
+   + the `search_vault` tool (title hits outrank passing mentions; returns REAL quoted excerpts so the model
+   quotes the vault instead of paraphrasing from air). Measured: **6,086 notes, ~2.5s** for a full scan; the
+   first draft's 4,000-file cap silently skipped 2,086 notes, so the default is 20k and `capped` is reported.
+3. **L-014 part two — questions were never given tools.** The guard only caught ACTIONS, so *"What do I know
+   about Ana's NIH evaluation?"* fell to the tool-less brain, which invented a filename, a folder path, a
+   surname Ana does not have, and an NIH *grant* review with h-index metrics — for a transplant patient, with
+   **zero tool calls**. The system prompt literally said "never invent… names". A prompt is not a guard.
+   → `needsRealData()` routes recall/live-data questions to the tool brain (free + ~4s via our gateway, so the
+   old "no tools to save money" tradeoff that created this gap is gone), and the tool-less path now refuses.
+4. **`String(out)` on an object tool result = `"[object Object]"`** — `search_vault` returns an object, so the
+   model got literally nothing and reasoned about the placeholder. Plus the free models re-ran identical
+   searches until the loop guard fired and answered nothing; repeats are now served from cache with a nudge to
+   answer, and the loop ends with a forced tools-withheld synthesis pass instead of "I stopped to avoid looping".
+
+**Before:** an invented PDF, an invented surname, an invented grant review. **After:** the real note names, the
+real coordinator, the real `ccopr@nih.gov` thread — one search, 24s, nothing fabricated. Evals **940 → 956**.
+
+### 2026-07-29 (pt.2) — Home + Today were useless; the cause was ONE bug wearing three hats
 Operator: *"my today and home are still useless on my pc."* Measured, not guessed. Three separate surfaces
 were each re-deriving a human label from the gate's own doctrine string:
 - **Approval queue** — `subj()` mined `" for (.+)"` out of *"gated **for your approval** (doctrine §9 rule 2)"*,

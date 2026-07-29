@@ -20,6 +20,38 @@ const ACTION_RE = new RegExp([
 
 export function looksLikeAction(text = '') { return ACTION_RE.test(String(text || '')); }
 
+// PURE: does answering this REQUIRE reading the operator's real world (vault, calendar, inbox, pipeline,
+// money, people)? This is the second half of L-014, found live on 2026-07-29.
+//
+// The original guard only caught ACTIONS, so a QUESTION — "What do I know about Ana's NIH evaluation? Check my
+// vault." — fell through to the tool-less brain, which invented an entire document: a filename
+// ("Ana's NIH Grant Evaluation - FINAL.pdf"), a folder path, a surname Ana does not have, and an NIH *grant*
+// review with h-index and publication metrics. Ana is a transplant patient, not a researcher. Zero tools were
+// called. The system prompt told it "never invent or guess... names" and it invented all of it — which is the
+// whole doctrine in one example: a prompt is not a guard, only CODE is.
+//
+// Questions are exactly WHEN memory matters most, so they must reach the tool brain (now free + ~4s via our
+// own gateway, so the old "no tools to save money" tradeoff no longer exists).
+const REAL_DATA_RE = new RegExp([
+  // his own things, by name
+  '\\b(vault|second brain|obsidian|my notes?|the notes?)\\b',
+  '\\bmy\\b[^.?!\\n]{0,30}\\b(calendar|schedule|inbox|email|tasks?|pipeline|deals?|bids?|proposals?|invoices?|budget|expenses?|clients?|subs?|contracts?|numbers?|money|profit|revenue|goals?)\\b',
+  // recall questions — "what do I know / what did we decide / have I written"
+  '\\bwhat (do|did) (i|we|you)\\b',
+  '\\b(do|did) (i|we) (have|know|decide|say|write|note|record|plan)\\b',
+  '\\bhave (i|we)\\b[^.?!\\n]{0,40}\\b(written|noted|decided|saved|recorded|said|planned)\\b',
+  '\\bwhat.{0,25}\\b(we|i)\\s+(decide|decided|agree|agreed|discuss|discussed)\\b',
+  // explicit lookups
+  '\\b(check|search|look (in|up|through)|pull (up|from)|remind me (of|about)|what.s in)\\b',
+  // his live status
+  '\\b(how much|how many|when is|when did|what.s (next|due|left|the status))\\b',
+].join('|'), 'i');
+
+export function needsRealData(text = '') { return REAL_DATA_RE.test(String(text || '')); }
+
+// The honest refusal when a REAL-DATA question reaches a brain with no tools. Never an invented answer.
+export const FREE_BRAIN_NO_DATA = "I can't see your real data from here, so I won't guess at it — no invented notes, files, names, or numbers. Ask me again and I'll search your Second Brain properly.";
+
 // The honest refusal the tool-less brain returns instead of a confabulated success.
 export const FREE_BRAIN_REFUSAL = "I can't actually do that on the free everyday brain — I have no tools here, so I won't pretend I did (no made-up files, paths, or results). Flip the brain chip to Claude (top bar) and ask again, and I'll really do it and show you the verified result.";
 

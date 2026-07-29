@@ -77,8 +77,12 @@ const isInside = (root, abs) => { const rel = path.relative(root, abs); return r
 const rootOf = (abs) => ROOTS.find((r) => isInside(r, abs)) || PRIMARY;
 // Folders Jarvis must never traverse or reorganize — app-sync dirs (would fight Google Drive /
 // OneDrive / iCloud) and system dirs. She leaves these strictly alone.
+// `.obsidian` / `.trash` / `.smart-env` are Obsidian's OWN state — plugins, hotkeys, graph layout, workspace.
+// The Second Brain is now an allowed root (2026-07-29) so Jarvis can genuinely read+organize it, and the very
+// first thing an eager reorganizer would "tidy" is the dotfolder that makes Obsidian work. It stays untouched.
 const OFF_LIMITS = new Set(['.jarvis-trash', 'node_modules', '.git', '#recycle', '#snapshot', '@eaDir',
-  '.cloud', '.storage', 'Google Drive Sync Folder', 'OneDrive Sync Folder', 'iCloud', 'Dropbox']);
+  '.cloud', '.storage', 'Google Drive Sync Folder', 'OneDrive Sync Folder', 'iCloud', 'Dropbox',
+  '.obsidian', '.trash', '.smart-env']);
 const HQ_URL = (process.env.JARVIS_HQ_URL || 'http://192.168.6.121:8099').replace(/\/$/, '');
 const CP_URL = (process.env.JARVIS_CP_URL || 'http://192.168.6.121:8787').replace(/\/$/, '');
 // local store for reminders / important dates / birthdays (so "her" never forgets)
@@ -393,6 +397,11 @@ const TOOLS = [
       content: { type: 'string', description: 'the markdown body of the note' },
       folder: { type: 'string', description: 'optional vault subfolder, e.g. "04 - Personal"; defaults to "00 - System/Jarvis/Notes"' },
     }, required: ['title'] } },
+  { name: 'search_vault', description: 'SEARCH the operator\'s Obsidian Second Brain by meaning/keywords and get back the matching notes with REAL quoted excerpts. This is your MEMORY — use it before answering anything about his life, businesses, Ana, health, deals, decisions, prices, people, or past plans ("what do I know about X", "what did we decide about Y", "pull up my notes on Z", "have I written about…"). Always search before saying you do not know. Quote what you find and name the note; never paraphrase a note you did not read.',
+    input_schema: { type: 'object', properties: {
+      query: { type: 'string', description: 'what to look for — keywords or a short phrase, e.g. "Ana NIH transplant" or "Brick Ave operating agreement"' },
+      limit: { type: 'number', description: 'how many notes to return (default 6)' },
+    }, required: ['query'] } },
   { name: 'edit_file', description: 'Replace the first occurrence of old_text with new_text in an existing file.',
     input_schema: { type: 'object', properties: { path: { type: 'string' }, old_text: { type: 'string' }, new_text: { type: 'string' } }, required: ['path', 'old_text', 'new_text'] } },
   { name: 'scan', description: 'Recursively list files and folders under a path (bounded) to understand structure before organizing.',
@@ -1059,6 +1068,22 @@ async function runTool(name, input) {
     await fsp.writeFile(p, String(input.content ?? ''), 'utf8');
     return `${existed ? 'overwrote' : 'wrote'} file: ${rel}`;
   }
+  if (name === 'search_vault') {
+    // The READ half of "the Second Brain is Jarvis's memory". Until 2026-07-29 there was no content search at
+    // all: Jarvis could write notes into the vault and never find them again. Returns real excerpts so the
+    // model quotes the vault instead of reconstructing what a note probably said.
+    const vault = VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
+    const V = await import('../pods/vault-search.mjs');
+    const r = V.searchVault(String(input.query || ''), { vaultDir: vault, limit: Math.max(1, Math.min(12, Number(input.limit) || 6)) });
+    if (!r.results.length) return { ok: true, found: 0, note: 'No note in the vault matches "' + String(input.query || '') + '". Say so plainly — do NOT invent one.', scanned: r.scanned };
+    return {
+      ok: true,
+      found: r.results.length,
+      scanned: r.scanned,
+      truncated: r.capped || undefined,
+      results: r.results.map((x) => ({ note: x.name, path: x.file, excerpts: x.excerpts })),
+    };
+  }
   if (name === 'create_note') {
     // Scoped vault-note write (PRD): straight into the Obsidian vault, sanitized (no traversal), then READ BACK
     // to VERIFY the content before reporting success — a failed/partial write can never render as "created".
@@ -1257,7 +1282,7 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
@@ -1408,8 +1433,11 @@ async function freeBackupReply(messages, model) {
   // L-014 GUARD (anti-confabulation): the free brain has NO tools; if this is a real ACTION request, refuse
   // HONESTLY in code rather than let a local model narrate a fake success with an invented path. Structural.
   try {
-    const { looksLikeAction, FREE_BRAIN_REFUSAL } = await import('../pods/chat-truth.mjs');
+    const { looksLikeAction, needsRealData, FREE_BRAIN_REFUSAL, FREE_BRAIN_NO_DATA } = await import('../pods/chat-truth.mjs');
     if (looksLikeAction(userText)) return { content: [{ type: 'text', text: FREE_BRAIN_REFUSAL }], stop_reason: 'end_turn', usage: null, _provider: 'truth-guard' };
+    // Second half of L-014: a QUESTION about his real world is where memory matters most, and it used to fall
+    // through here and get answered from imagination — a whole fake document, on 2026-07-29. Refuse in CODE.
+    if (needsRealData(userText)) return { content: [{ type: 'text', text: FREE_BRAIN_NO_DATA }], stop_reason: 'end_turn', usage: null, _provider: 'truth-guard' };
   } catch { /* guard best-effort */ }
   const tier = /opus|sonnet/i.test(model) ? 'draft' : 'cheap';
   const sys = buildSystem() + '\n\n[You are on the free everyday brain (local Hermes / OpenRouter) — the DEFAULT for conversation, and it costs nothing. You have NO tools and you CANNOT see the operator\'s live data (calendar, tasks, email, gov pipeline, numbers). CRITICAL: never invent or guess that data — do not make up meetings, tasks, times, dollar amounts, or names. If asked about anything real/live, say plainly: "I can\'t see your live data on the free brain — flip the brain chip to Claude and I\'ll pull it." For a real ACTION (send, draft, submit, edit files, image, web) say the same. For general questions, thinking-through, or brainstorming, just help normally and briefly. Do not apologize for being the free brain; it is the intended default.]';
@@ -1444,9 +1472,17 @@ async function converse(history) {
   try {
     const lu = [...messages].reverse().find((m) => m.role === 'user');
     const t = typeof lu?.content === 'string' ? lu.content : '';
-    const { looksLikeAction } = await import('../pods/chat-truth.mjs');
-    wantsAction = looksLikeAction(t);
+    const { looksLikeAction, needsRealData } = await import('../pods/chat-truth.mjs');
+    // Questions about his own world need TOOLS just as much as actions do — that is what "the Second Brain is
+    // Jarvis's memory" means in practice. Our own gateway made the tool brain free and ~4s, so the old
+    // "no tools on the free brain, to save money" tradeoff that created this gap no longer exists.
+    wantsAction = looksLikeAction(t) || needsRealData(t);
   } catch { /* detection best-effort */ }
+  // The free models are weak multi-step agents: asked to search the vault they re-ran near-identical searches
+  // until the loop guard fired, then answered nothing (live, 2026-07-29 — 8 calls, 75s, no answer). Repeating
+  // a search cannot produce new information, so a repeat is served from cache with a nudge to ANSWER instead.
+  const toolCache = new Map();
+  const callKey = (n, inp) => n + '|' + JSON.stringify(inp || {}).toLowerCase().replace(/[^a-z0-9|]/g, '');
   for (let i = 0; i < 8; i++) {
     const resp = await callClaude(messages, wantsAction);
     addUsage(resp.usage);
@@ -1459,19 +1495,36 @@ async function converse(history) {
     const results = [];
     for (const tu of toolUses) {
       let out, ok = true;
-      try { out = await runTool(tu.name, tu.input || {}); }
-      catch (e) { out = 'ERROR: ' + e.message; ok = false; }
+      const key = callKey(tu.name, tu.input);
+      if (toolCache.has(key)) {
+        out = toolCache.get(key) + '\n\n[You already ran this exact call. Re-running it cannot return anything new — ANSWER THE OPERATOR NOW using what you have above, quoting the notes by name. If it genuinely found nothing, say so plainly.]';
+      } else {
+        try { out = await runTool(tu.name, tu.input || {}); }
+        catch (e) { out = 'ERROR: ' + e.message; ok = false; }
+        if (ok) toolCache.set(key, typeof out === 'string' ? out : JSON.stringify(out));
+      }
       // a show_visual result is a directive for the UI, not text for the model
       if (ok && typeof out === 'string' && out.startsWith('__VISUAL__')) {
         try { visuals.push(JSON.parse(out.slice('__VISUAL__'.length))); } catch { /* skip */ }
         out = 'Displayed it on his screen.';
       }
       actions.push(actionLabel(tu.name, tu.input || {}, out, ok));
-      results.push({ type: 'tool_result', tool_use_id: tu.id, content: String(out), is_error: !ok });
+      // String(obj) yields "[object Object]" — an object-returning tool would hand the model literally nothing
+      // and it would then reason about the placeholder instead of the data (live, 2026-07-29: search_vault).
+      results.push({ type: 'tool_result', tool_use_id: tu.id, content: typeof out === 'string' ? out : JSON.stringify(out), is_error: !ok });
     }
     messages.push({ role: 'user', content: results });
   }
-  return { text: "I worked through several steps but stopped to avoid looping — tell me if you want me to continue.", actions, visuals };
+  // Out of tool turns. Never hand back "I stopped to avoid looping" — by now real evidence has been gathered
+  // and thrown away. Force ONE final pass with tools withheld, so the model must ANSWER from what it found.
+  try {
+    messages.push({ role: 'user', content: [{ type: 'text', text: 'Stop searching. Using ONLY the tool results above, answer the original question now — quote the notes by name. If they genuinely do not contain the answer, say exactly that. Do not invent anything.' }] });
+    const final = await callClaude(messages, false);
+    addUsage(final.usage);
+    const text = (final.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    if (text) return { text, actions, visuals, usage: final.usage };
+  } catch { /* fall through to the honest stop message */ }
+  return { text: "I searched but couldn't pull it together into an answer — the tool results are above. Ask me again and I'll narrow it down.", actions, visuals };
 }
 
 function send(res, code, body, type = 'application/json') {

@@ -32,7 +32,30 @@ scarce resource multiple jobs compete for. Until fixed, Vinicio's own manual pul
 whichever automated job fires first each day. Quota resets nightly at 8PM Eastern — a manual run any time
 between 8PM ET and the next morning's ~6am job is currently the only reliable window.
 
-### 🆕 2026-07-29 (latest, pt.4) — OLD OPS MERGED INTO NEW OPS (23 tools, one front door)
+### 🆕 2026-07-29 (latest, pt.5) — ONE RECORD ("log everything") + conversations that start WARM
+Operator: *"can we log everything?"* and *"i want to fill like tony stark… having jarvis pull information for
+me, data, do work with me."*
+- **Capture was never the gap — QUERY was.** Chat turns lived in the vault, agent runs/approvals in the
+  control-plane log, spend and failures in their own files. Answering *"what did Jarvis do Tuesday, and why?"*
+  meant four files in three formats. `pods/timeline.mjs` normalizes and merges them (pure, eval-pinned, 13
+  cases): `fromEvent` · `fromChatLog` (parses BOTH sides of every turn + the verified-actions block) ·
+  `mergeTimeline` · `searchTimeline` · `renderTimeline`. A row with no timestamp is DROPPED, never given a
+  fake one — an invented time in an audit trail is worse than a missing row.
+- **`GET /api/timeline?q=&kind=&days=&limit=`** plus a **`timeline` chat tool**, both through ONE
+  `buildTimeline()` so the endpoint and the tool can never answer the same question differently.
+  Live: 108 rows merged; *"What did we talk about yesterday?"* → grounded answer, one tool call, 11.4s.
+- **Conversations now start warm.** The system prompt carried WHO he is (profile / memory / reminders) but
+  nothing about RIGHT NOW, so every chat began cold and he had to ask for context Jarvis already had. A cached
+  **RIGHT NOW** block (today's date, his ONE thing, pending sign-offs, top tasks, today's calendar) refreshes
+  every 2 min. Cached deliberately: `buildSystem()` is sync and on the hot path of every turn — a live fetch
+  there would put network latency in front of every reply.
+- **Honest limitation:** with warm context the free models get the FACTS right but still add unverified colour
+  ("they didn't respond yet", "it's been revised"). Prompt wording was tightened and it improved, but this is
+  a model-quality limit, not a fixable-by-prompt one — the same lesson as L-014. The structural guards still
+  hold (no fake actions, no invented files); flip the brain chip to Claude for tight prose.
+- Evals **967 → 980**.
+
+### 2026-07-29 (pt.4) — OLD OPS MERGED INTO NEW OPS (23 tools, one front door)
 Operator: *"merge the old ops with the new ops, add the missing things from the old ops to the new one."*
 The old `#ops` overlay held **23 working tool views** the new Businesses hub had no route to — reachable only
 via a generic **"old Ops ↗"** button, which is exactly why it felt like two half-apps.

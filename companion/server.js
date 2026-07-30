@@ -397,6 +397,13 @@ const TOOLS = [
       content: { type: 'string', description: 'the markdown body of the note' },
       folder: { type: 'string', description: 'optional vault subfolder, e.g. "04 - Personal"; defaults to "00 - System/Jarvis/Notes"' },
     }, required: ['title'] } },
+  { name: 'timeline', description: 'Search the UNIFIED RECORD of everything that happened — every chat turn (both sides), every agent run, every approval, every error, newest first. This is the audit trail: use it for "what did you do yesterday/today", "what did we talk about", "when did we decide X", "what happened with Y", "did you already do Z", "what went wrong". Quote the timestamped lines it returns; never guess at history.',
+    input_schema: { type: 'object', properties: {
+      query: { type: 'string', description: 'optional keywords to filter by, e.g. "Brick Ave" or "outreach"' },
+      kind: { type: 'string', description: 'optional filter: chat | agent | approval | error' },
+      days: { type: 'number', description: 'how many days back to look (default 3)' },
+      limit: { type: 'number', description: 'max rows (default 40)' },
+    }, required: [] } },
   { name: 'search_vault', description: 'SEARCH the operator\'s Obsidian Second Brain by meaning/keywords and get back the matching notes with REAL quoted excerpts. This is your MEMORY — use it before answering anything about his life, businesses, Ana, health, deals, decisions, prices, people, or past plans ("what do I know about X", "what did we decide about Y", "pull up my notes on Z", "have I written about…"). Always search before saying you do not know. Quote what you find and name the note; never paraphrase a note you did not read.',
     input_schema: { type: 'object', properties: {
       query: { type: 'string', description: 'what to look for — keywords or a short phrase, e.g. "Ana NIH transplant" or "Brick Ave operating agreement"' },
@@ -1068,6 +1075,19 @@ async function runTool(name, input) {
     await fsp.writeFile(p, String(input.content ?? ''), 'utf8');
     return `${existed ? 'overwrote' : 'wrote'} file: ${rel}`;
   }
+  if (name === 'timeline') {
+    // The unified record: control-plane events + both sides of every chat turn, merged and searchable.
+    // Operator: "can we log everything?" — capture was already there; being able to ASK is the missing half.
+    const T = await import('../pods/timeline.mjs');
+    const rows = await buildTimeline(T, Math.max(1, Math.min(30, Number(input.days) || 3)));
+    const hits = T.searchTimeline(rows, {
+      q: String(input.query || ''),
+      kind: String(input.kind || ''),
+      limit: Math.max(1, Math.min(120, Number(input.limit) || 40)),
+    });
+    if (!hits.length) return { ok: true, found: 0, note: 'Nothing in the record matches that. Say so plainly — do NOT guess at what happened.' };
+    return { ok: true, found: hits.length, searched: rows.length, record: T.renderTimeline(hits) };
+  }
   if (name === 'search_vault') {
     // The READ half of "the Second Brain is Jarvis's memory". Until 2026-07-29 there was no content search at
     // all: Jarvis could write notes into the vault and never find them again. Returns real excerpts so the
@@ -1282,7 +1302,7 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
@@ -1300,6 +1320,31 @@ const TRUTH_RULE = '\n\n## TRUTHFULNESS (non-negotiable — Lessons Ledger L-014
   + 'No tool call → no claim. Never invent or guess a file path, filename, result, number, or name. NEVER output a '
   + 'placeholder path like /Users/YourName/. If a tool returned an error, or you have no tool for what is asked, say '
   + 'so plainly ("I can\'t do that yet" / "that failed — <reason>") and STOP — never narrate a success you did not verify.';
+// ── LIVE STATE (operator, 2026-07-29: "i want to fill like tony stark… having jarvis pull information for me")
+// The prompt carried WHO he is (profile, remembered facts, reminders) but nothing about RIGHT NOW, so every
+// conversation started cold and he had to ask for context that Jarvis already had. This is the difference
+// between a chatbot and an assistant who has been paying attention while you were away.
+//
+// Refreshed on a timer and CACHED, because buildSystem() is synchronous and on the hot path of every turn —
+// a live fetch there would put network latency in front of every single reply. Stale-but-instant beats
+// fresh-but-slow for context; anything that must be exact gets read through a tool instead.
+let liveState = '';
+async function refreshLiveState() {
+  try {
+    const d = await fetch('http://127.0.0.1:' + PORT + '/api/cockpit', { signal: AbortSignal.timeout(8000) }).then((r) => r.json());
+    const bits = [];
+    bits.push(`Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.`);
+    if (d.oneThing && d.oneThing.text) bits.push(`His ONE THING right now: ${d.oneThing.text}`);
+    const aps = d.approvals || [];
+    if (aps.length) bits.push(`${aps.length} decision${aps.length === 1 ? '' : 's'} waiting on his sign-off, top: ${aps.slice(0, 3).map((a) => a.title).join(' · ')}`);
+    const focus = (d.tasks && d.tasks.focus) || [];
+    if (focus.length) bits.push(`Top tasks: ${focus.slice(0, 4).map((t) => t.text.slice(0, 70)).join(' · ')}`);
+    const cal = d.todayCalendar || [];
+    if (cal.length) bits.push(`On his calendar today: ${cal.map((c) => (c.summary || c.title || '')).filter(Boolean).join(' · ')}`);
+    liveState = bits.join('\n');
+  } catch { /* keep the last good snapshot rather than blanking his context */ }
+}
+
 function buildSystem() {
   let op = '';
   try { op = fs.readFileSync(OPERATOR_PROFILE_FILE, 'utf8'); } catch { /* not yet */ }
@@ -1307,6 +1352,13 @@ function buildSystem() {
   const mem = loadMemory();
   const rem = loadReminders();
   const extras = [];
+  // Live state first — it is the thing most likely to matter to whatever he just said.
+  if (liveState) extras.push(`## RIGHT NOW (live — already true, no need to look it up)\n${liveState}\n`
+    + 'Use this naturally, the way someone who has been watching his day would. Do NOT recite it back at him '
+    + 'unprompted. If he asks for anything more specific or exact than this, use a tool and quote the result.\n'
+    + 'STATE ONLY WHAT IS ABOVE. Do not embellish it with history, progress, or detail that is not written '
+    + 'here — no "we discussed this before", no "it has been revised", no invented counts or dates. If you '
+    + 'want that kind of detail, call the `timeline` tool and quote what it returns.');
   if (mem.length) extras.push(`## MEMORY — things you have been told to remember\n${mem.map((m, i) => `${i + 1}. ${m}`).join('\n')}`);
   if (rem.length) extras.push(`## REMINDERS & DATES\n${rem.map((r) => `- ${r.text}${r.when ? ` (${r.when})` : ''}`).join('\n')}`);
   return extras.length ? base + '\n\n' + extras.join('\n\n') : base;
@@ -1444,6 +1496,24 @@ async function freeBackupReply(messages, model) {
   const out = await R.llm({ system: sys, user: String(userText || 'Hello'), tier, maxTokens: 1000 });
   const text = out.text || "I'm on the free everyday brain (the default — $0). I can chat and answer, but for a real action like sending or drafting, flip the brain chip to Claude and ask again.";
   return { content: [{ type: 'text', text }], stop_reason: 'end_turn', usage: out.usage || null, _provider: out.provider };
+}
+
+// Read every log source and merge it. ONE function so the /api/timeline endpoint and the `timeline` chat tool
+// can never drift apart and answer the same question differently — the audit trail disagreeing with itself is
+// worse than having none. Each source is best-effort: a dead control-plane still leaves the chat history.
+async function buildTimeline(T, days = 3) {
+  let events = [];
+  try {
+    const ev = await fetch(CP_URL + '/events', { signal: AbortSignal.timeout(5000) }).then((r) => r.json()).catch(() => []);
+    events = (Array.isArray(ev) ? ev : []).filter((e) => e && e.kind !== 'trace').map(T.fromEvent);
+  } catch { /* control-plane offline — the chat log still tells the story */ }
+  const chatDir = path.join(VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain'), '00 - System', 'Jarvis', 'Chat Logs');
+  const chats = [];
+  for (const day of T.recentDays(days)) {
+    try { chats.push(...T.fromChatLog(fs.readFileSync(path.join(chatDir, day + '.md'), 'utf8'), day)); }
+    catch { /* no chat that day */ }
+  }
+  return T.mergeTimeline(events, chats);
 }
 
 // Chat transcript logging (PRD §5): every turn appended to the vault, one file per day, so history survives
@@ -3281,6 +3351,21 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // The unified record, for the UI and for anything else that wants it: /api/timeline?q=&kind=&days=&limit=
+  if (req.method === 'GET' && url.pathname === '/api/timeline') {
+    try {
+      const T = await import('../pods/timeline.mjs');
+      const days = Math.max(1, Math.min(30, Number(url.searchParams.get('days')) || 3));
+      const rows = await buildTimeline(T, days);
+      const hits = T.searchTimeline(rows, {
+        q: url.searchParams.get('q') || '',
+        kind: url.searchParams.get('kind') || '',
+        since: url.searchParams.get('since') || '',
+        limit: Math.max(1, Math.min(500, Number(url.searchParams.get('limit')) || 100)),
+      });
+      return send(res, 200, JSON.stringify({ ok: true, days, total: rows.length, count: hits.length, rows: hits }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, rows: [] })); }
+  }
   // ── COCKPIT: the one calm screen (🎯 Today · ✅ Tasks · 📅 Week · ⚡ Capture · approvals strip) ────
   if (req.method === 'GET' && url.pathname === '/api/cockpit') {
     const todayStr = new Date().toLocaleDateString('en-CA'); // local YYYY-MM-DD
@@ -3933,4 +4018,8 @@ server.listen(PORT, () => {
   if (!API_KEY) console.log('  (no API key — chat disabled until ANTHROPIC_API_KEY is set)');
   ensureKokoro();      // bring up the free local natural voice if it isn't already running
   scheduleActionSync(); // keep the vault Action Log current on a calm interval
+  // Warm the live-state snapshot so the FIRST conversation of the session already knows his day, then keep
+  // it current. 2 minutes is well inside how fast his day actually changes, and it costs one local request.
+  setTimeout(refreshLiveState, 2500);
+  setInterval(refreshLiveState, 120000).unref?.();
 });

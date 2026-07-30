@@ -105,8 +105,51 @@
     list.forEach(function(t){ wrap.appendChild(taskRow(t, true)); });
   }
 
+  /* ── Proposed dates ───────────────────────────────────────────────────────────
+     None of his live tasks carried a date, so nothing could ever be "due today". Jarvis proposes one
+     deterministically (priority + capacity, weekdays only, 2/day) and he confirms individually — a bulk
+     "accept all" would eventually stamp dates on a backlog he never read, and dates he doesn't believe are
+     worse than no dates: the first one he blows through teaches him to ignore the rest. */
+  function renderProposals(){
+    var wrap = $id('tdPropWrap'), list = $id('tdPropList'), sub = $id('tdPropSub');
+    if(!wrap || !list) return;
+    fetch('/api/cockpit/date-proposals?limit=6').then(function(r){ return r.json(); }).then(function(d){
+      var rows = (d && d.proposals) || [];
+      if(!rows.length){ wrap.hidden = true; return; }
+      wrap.hidden = false;
+      if(sub) sub.textContent = d.undated ? (d.undated + ' with no date') : '';
+      list.innerHTML = '';
+      rows.forEach(function(p){
+        var row = el('div','td-prop');
+        var txt = el('div','td-prop-txt', p.text);
+        txt.title = p.reason || '';
+        row.appendChild(txt);
+        var why = el('div','td-prop-why', p.stated ? 'your date' : (p.reason || ''));
+        row.appendChild(why);
+        var ok = el('button','td-prop-ok', '📅 ' + p.due);
+        ok.title = 'Write ' + p.due + ' onto this task in your vault';
+        ok.addEventListener('click', function(){
+          ok.disabled = true; ok.textContent = 'saving…';
+          fetch('/api/cockpit/task/schedule', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ id:p.id, file:p.file, raw:p.raw, due:p.due }) })
+            .then(function(r){ return r.json(); })
+            .then(function(res){
+              // Report what actually happened. A row that silently vanishes reads as "saved" even when the
+              // vault moved underneath us and nothing was written.
+              if(res && res.changed){ row.classList.add('done'); ok.textContent = '✓ ' + p.due; }
+              else { ok.disabled = false; ok.textContent = '⚠ retry'; ok.title = (res && res.reason) || 'not written'; }
+            })
+            .catch(function(){ ok.disabled = false; ok.textContent = '⚠ retry'; });
+        });
+        row.appendChild(ok);
+        list.appendChild(row);
+      });
+    }).catch(function(){ wrap.hidden = true; });
+  }
+
   /* ── TODAY tab: tasks + week + capture ────────────────────────────────────── */
   function renderTodayTab(d){
+    renderProposals();
     var due = (d.tasks && d.tasks.dueToday) || [], active = (d.tasks && d.tasks.active) || [];
     var cnt = $id('tdTaskCount'); if(cnt) cnt.textContent = (due.length ? due.length+' due · ' : '') + active.length + ' active';
     var dueWrap = $id('tdDueWrap'), dueList = $id('tdDueList');

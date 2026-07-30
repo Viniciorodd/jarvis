@@ -32,7 +32,28 @@ scarce resource multiple jobs compete for. Until fixed, Vinicio's own manual pul
 whichever automated job fires first each day. Quota resets nightly at 8PM Eastern — a manual run any time
 between 8PM ET and the next morning's ~6am job is currently the only reliable window.
 
-### 🆕 2026-07-29 (latest, pt.5) — ONE RECORD ("log everything") + conversations that start WARM
+### 🆕 2026-07-29 (latest, pt.6) — DATES: "Today" can finally mean today
+The gap found in pt.2: **0 of ~142 live tasks carried any date**, so no ranking could ever compute "due
+today". Jarvis now proposes; the operator confirms one at a time. `pods/task-dates.mjs` (pure, 19 evals).
+- **Deterministic on purpose** (doctrine rule 1 — code disposes). Dates are arithmetic over priority and
+  capacity. The ONLY thing read from the task text is a date **he already wrote** (`statedDate`: ISO,
+  "Aug 12", "8/12"). Vague language — "next week", "soon" — is NEVER converted; an inferred deadline that
+  turns out wrong is worse than none, because he'd trust it.
+- **Capacity is the whole point.** First cut used a fixed 3-day horizon for "highest" — with 14 of them every
+  in-window day overflowed and six landed on one date, i.e. the undated pile with a date stamped on it. The
+  horizon now STRETCHES to fit (`bandNeed`), so it says 14 top-priority tasks take three weeks instead of
+  pretending otherwise. Weekdays only: a date he blows through teaches him to ignore all of them.
+- **Two bugs caught in live verification:** the endpoint first used `scanTasks()` (**3,716** rows — archives,
+  templates, old journals) instead of the curated ~142 he actually sees; and proposals rendered raw Markdown
+  again, so `cleanTaskText` is applied here too.
+- **The write** (`setTaskDue` in `control-plane/tasks.mjs`) only replaces a **byte-for-byte matched line**, so
+  a vault edited since the proposal is a no-op, not a wrong edit. Existing `📅` is replaced, never duplicated;
+  completed tasks and non-task lines are refused. One task per call — no bulk "accept all", which would
+  eventually stamp dates on a backlog he never read. The UI reports failures instead of silently vanishing.
+- Round-trip verified on a scratch file: written → parsed back as `due` → second write replaced, not doubled.
+- Evals **980 → 999**.
+
+### 2026-07-29 (pt.5) — ONE RECORD ("log everything") + conversations that start WARM
 Operator: *"can we log everything?"* and *"i want to fill like tony stark… having jarvis pull information for
 me, data, do work with me."*
 - **Capture was never the gap — QUERY was.** Chat turns lived in the vault, agent runs/approvals in the

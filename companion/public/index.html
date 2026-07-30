@@ -131,6 +131,12 @@
           <div class="td-label">🔥 Today &amp; overdue</div>
           <div id="tdDueList"></div>
         </div>
+        <!-- Proposed dates. 0 of his ~140 live tasks carried a date, so "Today" could never mean today.
+             Jarvis proposes deterministically; he confirms one at a time. Nothing is written until he taps. -->
+        <div class="td-sub" id="tdPropWrap" hidden>
+          <div class="td-label">📅 Give these a date <span class="td-prop-sub" id="tdPropSub"></span></div>
+          <div id="tdPropList"></div>
+        </div>
         <div class="td-sub">
           <div class="td-label">⚡ Active</div>
           <div id="tdActiveList"></div>

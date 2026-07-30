@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
+import { setDueOnLine } from '../pods/task-dates.mjs';
 
 // ── where the vault lives (override with VAULT_DIR) ───────────────────────────────────────────────
 export const VAULT_DIR = process.env.VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
@@ -189,6 +190,34 @@ export function completeTask({ file, raw, id, vaultDir = VAULT_DIR, doneDate = t
   }
   if (changed) fs.writeFileSync(abs, lines.join(eol));
   return { changed, file };
+}
+
+// Write a CONFIRMED due date onto one task line. Same locate-by-exact-line discipline as completeTask: we
+// only ever replace a line we matched byte-for-byte, so a vault edited since the proposal was shown is a
+// no-op rather than a wrong edit. One task per call — he confirms them individually, and a bulk writer would
+// eventually be pointed at the whole backlog by accident.
+export function setTaskDue({ file, raw, id, due, vaultDir = VAULT_DIR } = {}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(due || ''))) return { changed: false, file: file || null, reason: 'bad date' };
+  let abs = file ? path.join(vaultDir, file) : null;
+  if (!raw && id) {
+    const hit = scanTasks({ vaultDir }).find((t) => t.id === id);
+    if (!hit) return { changed: false, file: file || null, reason: 'id not found' };
+    abs = path.join(vaultDir, hit.file); raw = hit.raw; file = hit.file;
+  }
+  if (!abs || raw == null) return { changed: false, file: file || null, reason: 'need file+raw or id' };
+  let content;
+  try { content = fs.readFileSync(abs, 'utf8'); } catch { return { changed: false, file, reason: 'file unreadable' }; }
+  const eol = eolOf(content);
+  const lines = content.split(/\r?\n/);
+  let changed = false, line = null;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] !== raw) continue;
+    const next = setDueOnLine(lines[i], due);
+    if (next !== lines[i]) { lines[i] = next; changed = true; line = next; }
+    break;
+  }
+  if (changed) fs.writeFileSync(abs, lines.join(eol));
+  return { changed, file, line, reason: changed ? undefined : 'line not found (vault changed since the proposal?)' };
 }
 
 // Find a file anywhere in the vault by its basename (reorg-proof — the vault moves files between

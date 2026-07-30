@@ -3351,6 +3351,37 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // DATE PROPOSALS — 0 of his 140 open tasks carried a date, so "Today" could never mean today. Jarvis
+  // proposes; he confirms one at a time. Deterministic (pods/task-dates.mjs), never written until confirmed.
+  if (req.method === 'GET' && url.pathname === '/api/cockpit/date-proposals') {
+    try {
+      const T = await tasksEngine();
+      const D = await import('../pods/task-dates.mjs');
+      const TV = await import('../pods/today-view.mjs');
+      // The CURATED set — the same tasks the Today screen shows him. scanTasks() walks the whole vault
+      // (3,716 rows: archives, templates, old journals), and proposing dates on those would bury the ~140
+      // that are actually his live work.
+      const all = T.cockpitTasks(vaultOpt());
+      const live = [...(all.dueToday || []), ...(all.active || [])];
+      const rows = D.proposeDates(live, {
+        today: new Date().toLocaleDateString('en-CA'),
+        perDay: Math.max(1, Math.min(8, Number(url.searchParams.get('perDay')) || 2)),
+        limit: Math.max(1, Math.min(60, Number(url.searchParams.get('limit')) || 10)),
+      // Markdown is a storage format; he is reading these to decide. Same cleanup as the Today list.
+      }).map((p) => ({ ...p, text: TV.cleanTaskText(p.text) }));
+      const undated = live.filter((t) => !t.done && !t.due && !t.scheduled).length;
+      return send(res, 200, JSON.stringify({ ok: true, undated, count: rows.length, proposals: rows }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, proposals: [] })); }
+  }
+  // Confirming ONE proposal. This WRITES to his vault, so it only ever replaces a byte-for-byte matched line.
+  if (req.method === 'POST' && url.pathname === '/api/cockpit/task/schedule') {
+    try {
+      const b = await readBody(req);
+      const T = await tasksEngine();
+      const r = T.setTaskDue({ file: b.file, raw: b.raw, id: b.id, due: b.due, ...vaultOpt() });
+      return send(res, 200, JSON.stringify(r));
+    } catch (e) { return send(res, 200, JSON.stringify({ changed: false, error: e.message })); }
+  }
   // The unified record, for the UI and for anything else that wants it: /api/timeline?q=&kind=&days=&limit=
   if (req.method === 'GET' && url.pathname === '/api/timeline') {
     try {

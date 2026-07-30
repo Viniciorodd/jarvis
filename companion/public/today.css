@@ -147,6 +147,19 @@
 .crm-add input:focus{ border-color:rgba(var(--teal-rgb),.4); }
 .crm-openboard{ margin:10px 16px 0; background:rgba(var(--teal-rgb),.1); border:1px solid rgba(var(--teal-rgb),.3); color:var(--teal); border-radius:10px; padding:9px 14px; font-size:13px; cursor:pointer; font-family:inherit; }
 .crm-openboard:hover{ background:rgba(var(--teal-rgb),.16); }
+/* Proposed dates (2026-07-29) — one row per task: what it is, why that date, and a single tap to accept. */
+.td-prop{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px;
+  border:1px solid rgba(var(--teal-rgb),.14); background:rgba(var(--teal-rgb),.03); margin-bottom:6px; }
+.td-prop.done{ opacity:.5; }
+.td-prop-txt{ flex:1; min-width:0; font-size:13px; color:var(--cream); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.td-prop-why{ font-size:11px; color:var(--dim); white-space:nowrap; }
+.td-prop-sub{ font-size:11px; color:var(--dim); font-weight:400; }
+.td-prop-ok{ background:rgba(var(--teal-rgb),.12); border:1px solid rgba(var(--teal-rgb),.32); color:var(--teal);
+  border-radius:8px; padding:6px 10px; font-size:12px; font-family:inherit; cursor:pointer; white-space:nowrap; }
+.td-prop-ok:hover:not(:disabled){ background:rgba(var(--teal-rgb),.2); }
+.td-prop-ok:disabled{ cursor:default; opacity:.7; }
+@media (max-width:560px){ .td-prop-why{ display:none; } }
+
 /* TOOLS strip — the old-Ops tool views, merged onto the business they belong to (2026-07-29). Wraps rather
    than scrolls: with 5 tools on Real Estate a hidden overflow row is a tool he never finds. */
 .biz-tools{ margin:12px 16px 2px; }

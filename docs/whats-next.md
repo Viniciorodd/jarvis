@@ -32,7 +32,31 @@ scarce resource multiple jobs compete for. Until fixed, Vinicio's own manual pul
 whichever automated job fires first each day. Quota resets nightly at 8PM Eastern — a manual run any time
 between 8PM ET and the next morning's ~6am job is currently the only reliable window.
 
-### 🆕 2026-08-01 (latest) — DESKTOP PRESENCE: the ask-overlay + the end of the tool-less brain
+### 🆕 2026-08-01 (latest, pt.2) — THE CONTROL CENTER: a switch that is code, not a label
+From `PRD — Jarvis Control Center`. Part B shipped; the panel lives at **`/control`**.
+- **`pods/control-center.mjs`** (pure, 16 evals) — per-agent `state` (active/paused/off) + `tier` (0/1/2) and
+  the global kill switch. Everything **fails closed**: a corrupt file, an unknown agent, a garbage tier, or no
+  state at all all resolve to draft-only. A brand-new agent can never be born with autonomy it wasn't granted.
+- **Enforced where it matters.** The PRD's guardrail is *"a Tier-0 agent must be UNABLE to act, not merely
+  told not to"*, so the gate is called by **`canAutoSend`** itself — the same fail-closed function that already
+  owns every other send guard. Not a prompt, not the UI that draws the toggle. A Tier-2 agent still passes
+  every other guard (pricing / commitments / cert claims / unverified recipients are blocked at any tier).
+- **PRD acceptance tests run live against the real gate:** Off → `"CONNECT-01 is switched OFF"` · Tier 0 →
+  `"Tier 0 (draft-only)"` · kill switch → halts a Tier-2 agent · invalid tier 99 → **refused, not coerced** ·
+  UI click → disk → gate all agree. Turning the kill switch back off does **not** resurrect individually-off
+  agents (it's a blanket, not an undo).
+- **`/control` panel** — 17 agents grouped by pod, each showing what it can ACTUALLY do right now
+  ("stopped" / "needs your yes" / "acts alone"), computed server-side by the same gate, so the panel can never
+  show "off" while an agent keeps working.
+- **Bug caught:** wiring the gate made two auto-outreach evals read the REAL on-disk switch state, so flipping
+  a toggle in the UI would have silently changed what the suite asserts. `control` is now injectable — same
+  lesson as the gateway usage ledger.
+- **NOT done:** Part A (agent→required-reading map, adding Vera as the 18th), Part C (Telegram approve/edit/
+  skip round-trip — the bridge exists, the reply handler doesn't), Part D (posting connectors). NAS-side
+  agents pick up the gate on the next control-plane redeploy; the companion-side path is live now.
+- Evals **1004 → 1024**.
+
+### 2026-08-01 — DESKTOP PRESENCE: the ask-overlay + the end of the tool-less brain
 From `PRD — Jarvis Desktop Presence & Computer Control` (vault). Build order #1–#3 shipped.
 - **The overlay** (`desktop/overlay.html` + `desktop/main.js`): frameless, always-on-top, `Ctrl+Shift+Space`,
   Escape or click-away dismisses, floats over full-screen apps. `Ctrl+Shift+J` already existed but toggles the

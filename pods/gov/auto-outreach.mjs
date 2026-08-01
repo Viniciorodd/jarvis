@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, emit } from './lib.mjs';
 import { canAutoSend, contactEmail, policy } from './outreach-policy.mjs';
+import { loadControl } from '../control-center.mjs';
 import { renderTemplate } from './outreach-templates.mjs';
 
 const DIR = path.join(ROOT, 'gov-outreach');
@@ -52,9 +53,13 @@ function writeOutreachFile(slug, to, subject, body) {
 
 // The send path. `candidates` = [{ contact, templateKey, slots }]. DRY RUN BY DEFAULT.
 // Returns { dryRun, tier, considered, sent, queued, results } — results carry the honest per-item outcome.
-export async function runAutoOutreach({ dryRun = true, candidates = [], now = new Date() } = {}) {
+// `control` is injectable so the evals never depend on the real on-disk switch state — otherwise flipping a
+// toggle in the UI would change what the test suite asserts, which is how a suite quietly stops meaning
+// anything. Same lesson as the gateway usage ledger.
+export async function runAutoOutreach({ dryRun = true, candidates = [], now = new Date(), control = null } = {}) {
   const p = policy();
   const log = loadLog();
+  const ctl = control || loadControl();
   const results = [];
   let sent = 0, queued = 0;
 
@@ -69,6 +74,9 @@ export async function runAutoOutreach({ dryRun = true, candidates = [], now = ne
     const decision = canAutoSend({
       templateKey: c.templateKey, body: rendered.body, recipient: contact,
       sentToday: sentToday(log, now), lastToRecipientAt: lastToRecipient(log, to), now,
+      // Outreach is Hector's (CONNECT-01). Passing the Control Center state makes his on/off/tier switch a
+      // real gate rather than a label — if the operator switched him off, this send cannot happen.
+      agent: 'CONNECT-01', control: ctl,
     });
 
     if (!decision.allow) {

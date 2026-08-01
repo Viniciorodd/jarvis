@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPANY } from './company.mjs';
+import { canAgentAct } from '../control-center.mjs';
 
 // The phone-reachable kill switch (control-plane/auto-send.json, written by /maintenance/auto-send-kill).
 // Checked on EVERY decision so one tap halts autonomous sending everywhere, without a redeploy. Best-effort
@@ -105,9 +106,17 @@ const DAY = 86400000;
 // ── THE ONE DECISION ─────────────────────────────────────────────────────────────────────────────────
 // Returns { allow, reason }. allow:true ONLY when every guard passes. Everything else routes to the
 // operator's approval queue with a plain-English reason. Eval-pinned; fails closed on bad input.
-export function canAutoSend({ templateKey, kind, body, recipient, sentToday = 0, lastToRecipientAt = null, now = new Date(), env = process.env } = {}) {
+export function canAutoSend({ templateKey, kind, body, recipient, sentToday = 0, lastToRecipientAt = null, now = new Date(), env = process.env, agent = '', control = null } = {}) {
   const p = policy(env);
   if (p.kill || killSwitchOn()) return { allow: false, reason: 'kill switch is ON — all autonomous sending halted' };
+  // CONTROL CENTER (PRD guardrail: "a Tier-0 agent must be UNABLE to act, not merely told not to"). The
+  // per-agent switch is enforced HERE, in the same fail-closed function that already owns every other send
+  // guard — not in a prompt, and not in the UI that renders the toggle. If the operator switched this agent
+  // off, paused it, or left it below Tier 2, the send simply cannot happen.
+  if (agent && control) {
+    const gate = canAgentAct({ state: control, codename: agent, kind: 'act' });
+    if (!gate.allow) return { allow: false, reason: gate.reason };
+  }
   if (p.tier <= 0) return { allow: false, reason: 'auto-send is OFF (AUTO_SEND_TIER=0) — everything goes to your approval queue' };
 
   const cls = classifyOutreach({ templateKey, kind });

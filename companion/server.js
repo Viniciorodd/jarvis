@@ -3388,6 +3388,33 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // ── CONTROL CENTER (PRD Part B): the roster, each agent's switch + tier, and the global kill switch.
+  // GET returns what each agent can ACTUALLY do right now (computed by the same gate the send path obeys,
+  // so the panel can never show "off" while the agent keeps working).
+  if (req.method === 'GET' && url.pathname === '/api/control-center') {
+    try {
+      const CC = await import('../pods/control-center.mjs');
+      const O = await import('../pods/org.mjs');
+      const people = (O.ROSTER || []).filter((p) => p && p.codename);
+      const state = CC.loadControl();
+      return send(res, 200, JSON.stringify({ ok: true, killAll: !!state.killAll, agents: CC.rosterView(state, people) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, agents: [] })); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/control-center') {
+    try {
+      const b = await readBody(req);
+      const CC = await import('../pods/control-center.mjs');
+      let state = CC.loadControl();
+      if (b.kill !== undefined) state = CC.setKill(state, !!b.kill);
+      else if (b.codename) state = CC.setAgent(state, String(b.codename), { state: b.state, tier: b.tier });
+      else return send(res, 200, JSON.stringify({ ok: false, error: 'need codename, or kill' }));
+      CC.saveControl(state);
+      // Echo back the RESOLVED policy, not what he asked for — an invalid tier is refused, and he should see
+      // what actually took effect rather than assume his request landed.
+      const applied = b.codename ? CC.agentPolicy(state, String(b.codename)) : null;
+      return send(res, 200, JSON.stringify({ ok: true, killAll: !!state.killAll, applied }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // DATE PROPOSALS — 0 of his 140 open tasks carried a date, so "Today" could never mean today. Jarvis
   // proposes; he confirms one at a time. Deterministic (pods/task-dates.mjs), never written until confirmed.
   if (req.method === 'GET' && url.pathname === '/api/cockpit/date-proposals') {
@@ -4059,7 +4086,7 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
-  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname === '/govcon-os' ? 'govcon-os.html' : url.pathname === '/finances' ? 'finances.html' : url.pathname === '/real-estate' ? 'real-estate.html' : url.pathname.replace(/^\/+/, '');
+  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname === '/control' ? 'control.html' : url.pathname === '/govcon-os' ? 'govcon-os.html' : url.pathname === '/finances' ? 'finances.html' : url.pathname === '/real-estate' ? 'real-estate.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));

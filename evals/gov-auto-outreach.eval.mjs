@@ -9,6 +9,10 @@ const ok = (pass, detail = '') => ({ pass, detail });
 const VERIFIED = { contact_name: 'Jane', contact_email: 'jane@subco.com', verified: true };
 const UNVERIFIED = { contact_name: 'Bob', contact_email: 'bob@unknown.com' };
 const CAND = (contact) => ({ contact, templateKey: 'sub-quote', slots: { trade: 'floor care', place: 'Erie, PA' } });
+// Hector (CONNECT-01) switched on at Tier 2 in the Control Center — so these cases exercise the OUTREACH
+// guards, not the per-agent switch. Injected rather than read from disk: a suite that depends on the real
+// toggle state would change meaning every time the operator flips something in the UI.
+const CTL2 = { killAll: false, agents: { 'CONNECT-01': { state: 'active', tier: 2 } } };
 
 export default {
   agent: 'gov-auto-outreach',
@@ -18,8 +22,11 @@ export default {
       return ok(r.dryRun === true && r.sent === 0, JSON.stringify({ dryRun: r.dryRun, sent: r.sent }));
     } },
 
+    // `CTL2` = Hector switched on at Tier 2 in the Control Center, so these cases test the OUTREACH guards
+    // rather than the per-agent switch (which has its own suite). Injected, never read from disk — otherwise
+    // toggling a switch in the UI would silently change what this suite asserts.
     { name: 'with auto-send OFF (default env), a verified contact is QUEUED, never sent', run: async () => {
-      const r = await runAutoOutreach({ candidates: [CAND(VERIFIED)] });
+      const r = await runAutoOutreach({ candidates: [CAND(VERIFIED)], control: CTL2 });
       const res = r.results[0];
       return ok(r.sent === 0 && r.queued === 1 && res.allowed === false && /OFF/.test(res.reason), JSON.stringify(res));
     } },
@@ -27,7 +34,7 @@ export default {
     { name: 'even with Tier 1 ON, an UNVERIFIED contact is queued — never sent (the L-009 allowlist holds)', run: async () => {
       const prev = process.env.AUTO_SEND_TIER;
       process.env.AUTO_SEND_TIER = '1'; // turn auto-send ON so we test the ALLOWLIST, not the off-switch
-      const r = await runAutoOutreach({ candidates: [CAND(UNVERIFIED), CAND(VERIFIED)] });
+      const r = await runAutoOutreach({ candidates: [CAND(UNVERIFIED), CAND(VERIFIED)], control: CTL2 });
       process.env.AUTO_SEND_TIER = prev;
       const bad = r.results.find((x) => x.to === 'bob@unknown.com');
       const good = r.results.find((x) => x.to === 'jane@subco.com');

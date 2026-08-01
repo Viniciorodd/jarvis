@@ -21,6 +21,34 @@ export default {
       return ok(r.allow === false && /OFF/.test(r.reason), JSON.stringify(r));
     } },
 
+    // ── CONTROL CENTER enforcement: the per-agent switch is a CODE gate here, not a prompt or a UI state.
+    // PRD: "a Tier-0 agent must be UNABLE to act, not merely told not to." These use the otherwise-happy
+    // path, so the ONLY thing stopping the send is the operator's switch.
+    { name: 'CONTROL CENTER: an agent switched OFF cannot send, even when every other guard passes', run: () => {
+      const ctl = { killAll: false, agents: { 'CONNECT-01': { state: 'off', tier: 2 } } };
+      const r = canAutoSend({ templateKey: 'sub-quote', body: CLEAN, recipient: VERIFIED, env: T1, agent: 'CONNECT-01', control: ctl });
+      return ok(r.allow === false && /OFF/i.test(r.reason), JSON.stringify(r));
+    } },
+
+    { name: 'CONTROL CENTER: a Tier-0 agent is BLOCKED at the send gate (not merely declined)', run: () => {
+      const ctl = { killAll: false, agents: { 'CONNECT-01': { state: 'active', tier: 0 } } };
+      const r = canAutoSend({ templateKey: 'sub-quote', body: CLEAN, recipient: VERIFIED, env: T1, agent: 'CONNECT-01', control: ctl });
+      return ok(r.allow === false && /Tier 0|approval/i.test(r.reason), JSON.stringify(r));
+    } },
+
+    { name: 'CONTROL CENTER: the global kill switch overrides a Tier-2 agent', run: () => {
+      const ctl = { killAll: true, agents: { 'CONNECT-01': { state: 'active', tier: 2 } } };
+      const r = canAutoSend({ templateKey: 'sub-quote', body: CLEAN, recipient: VERIFIED, env: T1, agent: 'CONNECT-01', control: ctl });
+      return ok(r.allow === false && /KILL/i.test(r.reason), JSON.stringify(r));
+    } },
+
+    { name: 'CONTROL CENTER: a Tier-2 agent still passes every OTHER guard (no bypass)', run: () => {
+      const ctl = { killAll: false, agents: { 'CONNECT-01': { state: 'active', tier: 2 } } };
+      const priced = canAutoSend({ templateKey: 'sub-quote', body: CLEAN + ' our price is $4,000.', recipient: VERIFIED, env: T1, agent: 'CONNECT-01', control: ctl });
+      const unverified = canAutoSend({ templateKey: 'sub-quote', body: CLEAN, recipient: { email: 'x@y.com' }, env: T1, agent: 'CONNECT-01', control: ctl });
+      return ok(priced.allow === false && unverified.allow === false, JSON.stringify({ priced: priced.reason, unverified: unverified.reason }));
+    } },
+
     { name: 'happy path: verified sub + Tier 1 + clean template → ALLOW', run: () => {
       const r = canAutoSend({ templateKey: 'sub-quote', body: CLEAN, recipient: VERIFIED, env: T1 });
       return ok(r.allow === true, JSON.stringify(r));

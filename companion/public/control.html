@@ -1,0 +1,144 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Control Center — Jarvis</title>
+<link rel="stylesheet" href="style.css" />
+<!--
+  control.html — PRD "Jarvis Control Center", Part B.
+  *"If tomorrow I want to stop an agent, or give one autonomy, or turn that autonomy off, I need that switch."*
+
+  This page only RENDERS state. The enforcement lives in pods/control-center.mjs and is called by the send
+  gate itself, so a switch shown here is the same switch the code obeys — the panel cannot drift from reality
+  and show "off" while an agent keeps sending.
+-->
+<style>
+  :root { --teal-rgb: 90,190,180; --teal: #5abeb4; --cream: #e8e6e1; --dim: #7d8b96; }
+  body { margin: 0; background: #04070f; color: var(--cream); font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 26px 20px 70px; }
+  h1 { font-size: 21px; margin: 0 0 4px; font-weight: 600; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 20px; }
+  .kill { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 12px; margin-bottom: 22px;
+    border: 1px solid rgba(226,133,122,.3); background: rgba(226,133,122,.06); }
+  .kill.on { border-color: #e2857a; background: rgba(226,133,122,.16); }
+  .kill-t { flex: 1; }
+  .kill-h { font-size: 14px; font-weight: 600; }
+  .kill-p { font-size: 12px; color: var(--dim); margin-top: 3px; }
+  button { font-family: inherit; cursor: pointer; }
+  .kill-b { background: rgba(226,133,122,.14); border: 1px solid rgba(226,133,122,.45); color: #e2857a;
+    border-radius: 9px; padding: 9px 16px; font-size: 13px; }
+  .kill-b:hover { background: rgba(226,133,122,.26); }
+  .pod { font-size: 10.5px; letter-spacing: .16em; color: var(--dim); margin: 20px 0 8px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 11px; margin-bottom: 7px;
+    border: 1px solid rgba(var(--teal-rgb),.14); background: rgba(var(--teal-rgb),.03); }
+  .row.off { opacity: .5; }
+  .who { flex: 1; min-width: 0; }
+  .nm { font-size: 14px; }
+  .ttl { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+  .can { font-size: 11px; color: var(--dim); white-space: nowrap; }
+  .can.auto { color: var(--teal); }
+  .seg { display: flex; gap: 0; border: 1px solid rgba(var(--teal-rgb),.22); border-radius: 8px; overflow: hidden; }
+  .seg button { background: transparent; border: 0; color: var(--dim); padding: 6px 10px; font-size: 11.5px; }
+  .seg button.on { background: rgba(var(--teal-rgb),.2); color: var(--cream); }
+  .seg button.on.danger { background: rgba(226,133,122,.24); color: #e2857a; }
+  select { background: #0a1220; color: var(--cream); border: 1px solid rgba(var(--teal-rgb),.22); border-radius: 8px;
+    padding: 6px 8px; font-size: 11.5px; font-family: inherit; }
+  .note { margin-top: 26px; padding: 13px 15px; border-radius: 11px; font-size: 12px; color: var(--dim); line-height: 1.6;
+    border: 1px solid rgba(var(--teal-rgb),.14); background: rgba(var(--teal-rgb),.03); }
+  @media (max-width: 620px) { .can { display: none; } .ttl { display: none; } }
+</style>
+
+<div class="wrap">
+  <h1>Control Center</h1>
+  <div class="sub">Every agent, its switch, and how much it may do on its own. Changes take effect immediately.</div>
+
+  <div class="kill" id="killBox">
+    <div class="kill-t">
+      <div class="kill-h" id="killH">Kill switch — OFF</div>
+      <div class="kill-p" id="killP">Halts every autonomous agent action instantly. Approvals you've already given still stand.</div>
+    </div>
+    <button class="kill-b" id="killBtn">🛑 Halt everything</button>
+  </div>
+
+  <div id="roster"></div>
+
+  <div class="note">
+    <b>Tier 0 — draft-only:</b> proposes, never acts. &nbsp;·&nbsp;
+    <b>Tier 1 — approve-to-act:</b> acts only after your yes. &nbsp;·&nbsp;
+    <b>Tier 2 — auto:</b> acts alone, inside its coded guardrails.<br />
+    These are enforced in code at the point of action — a Tier-0 agent is <b>unable</b> to send, not merely told not to.
+    Every other guard still applies on top: pricing, commitments, cert claims and unverified recipients never auto-send at any tier.
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let data = { killAll: false, agents: [] };
+
+  async function load() {
+    const r = await fetch('/api/control-center');
+    data = await r.json();
+    render();
+  }
+  async function post(body) {
+    await fetch('/api/control-center', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    await load();                       // re-read, never assume — the server may refuse an invalid value
+  }
+
+  function render() {
+    const box = $('killBox');
+    box.className = 'kill' + (data.killAll ? ' on' : '');
+    $('killH').textContent = 'Kill switch — ' + (data.killAll ? 'ON · everything is halted' : 'OFF');
+    $('killBtn').textContent = data.killAll ? '↩ Resume' : '🛑 Halt everything';
+
+    const root = $('roster');
+    root.innerHTML = '';
+    const pods = [...new Set(data.agents.map((a) => a.pod || 'other'))];
+    for (const pod of pods) {
+      const h = document.createElement('div');
+      h.className = 'pod'; h.textContent = String(pod).toUpperCase();
+      root.appendChild(h);
+      for (const a of data.agents.filter((x) => (x.pod || 'other') === pod)) root.appendChild(rowFor(a));
+    }
+  }
+
+  function rowFor(a) {
+    const row = document.createElement('div');
+    row.className = 'row' + (a.state === 'off' ? ' off' : '');
+
+    const who = document.createElement('div');
+    who.className = 'who';
+    who.innerHTML = '<div class="nm">' + a.nickname + '</div><div class="ttl">' + (a.title || '') + ' · ' + a.codename + '</div>';
+    row.appendChild(who);
+
+    // What it can ACTUALLY do right now — computed server-side by the same gate the send path obeys.
+    const can = document.createElement('div');
+    can.className = 'can' + (a.canActAlone ? ' auto' : '');
+    can.textContent = !a.canRun ? 'stopped' : (a.canActAlone ? 'acts alone' : 'needs your yes');
+    row.appendChild(can);
+
+    const seg = document.createElement('div');
+    seg.className = 'seg';
+    for (const s of ['active', 'paused', 'off']) {
+      const b = document.createElement('button');
+      b.textContent = s === 'active' ? 'On' : s === 'paused' ? 'Pause' : 'Off';
+      if (a.state === s) b.className = 'on' + (s === 'off' ? ' danger' : '');
+      b.addEventListener('click', () => post({ codename: a.codename, state: s }));
+      seg.appendChild(b);
+    }
+    row.appendChild(seg);
+
+    const sel = document.createElement('select');
+    for (const t of [0, 1, 2]) {
+      const o = document.createElement('option');
+      o.value = t; o.textContent = 'Tier ' + t + (t === 0 ? ' · draft' : t === 1 ? ' · approve' : ' · auto');
+      if (a.tier === t) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => post({ codename: a.codename, tier: Number(sel.value) }));
+    row.appendChild(sel);
+    return row;
+  }
+
+  $('killBtn').addEventListener('click', () => post({ kill: !data.killAll }));
+  load();
+</script>

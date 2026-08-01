@@ -172,6 +172,64 @@ async function speak(text) {
   browserSpeak(text);
 }
 
+// A Jarvis bubble is "<span class=who>JARVIS</span>" + a text node, so setting textContent would delete the
+// label. Replace only the trailing text.
+function setMsgText(el, text) {
+  if (!el) return;
+  const last = el.lastChild;
+  if (last && last.nodeType === 3) last.nodeValue = text;
+  else el.append(document.createTextNode(text));
+  if (window.JDock) window.JDock.mirror('j', text);
+}
+
+// ── LOOKING, inside the conversation ──────────────────────────────────────
+// The server cannot reach a webcam, so it returns a directive and this does the capture. One frame, then the
+// track is stopped immediately — the camera light going out is the proof that nothing is still watching.
+// The same server-side gates apply as anywhere else (a reason is required, `continuous` is refused, and a
+// rapid loop of looks is refused), so this convenience cannot become a standing watch.
+let lookStream = null;
+async function doLook(req) {
+  const kind = (req && req.kind) || 'object';
+  const reason = (req && req.reason) || 'he asked me to look';
+  const badge = addMsg('j', '👁 looking…');
+  try {
+    lookStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false });
+    const vid = document.createElement('video');
+    vid.srcObject = lookStream; vid.muted = true; vid.playsInline = true;
+    await vid.play();
+    // Give the sensor a moment to expose — the first frame off a cold camera is usually black, and a model
+    // handed a black frame will confidently describe darkness.
+    await new Promise((r) => setTimeout(r, 350));
+    const c = document.createElement('canvas');
+    c.width = vid.videoWidth || 1280; c.height = vid.videoHeight || 720;
+    c.getContext('2d').drawImage(vid, 0, 0, c.width, c.height);
+    const image = c.toDataURL('image/jpeg', 0.82);
+    stopLook(vid);
+    const r = await fetch('/api/vision/look', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ image, kind, reason }),
+    });
+    const d = await r.json();
+    const said = d.refused ? ('I won\'t do that — ' + d.reason)
+      : !d.ok ? ('I couldn\'t see just now — ' + (d.error || 'no vision provider answered.'))
+      : d.text;
+    setMsgText(badge, said);
+    history.push({ role: 'assistant', content: said });
+    speak(said);
+  } catch (e) {
+    // Never soften this into "I couldn't see anything" — that reads as an empty room rather than no camera.
+    badge.textContent = e && /denied|NotAllowed/i.test(String(e.name || e.message))
+      ? 'I need camera permission to look — allow it and ask me again.'
+      : 'I couldn\'t open the camera — ' + (e.message || e);
+    stopLook();
+  }
+}
+function stopLook(vid) {
+  try { if (vid) { vid.pause(); vid.srcObject = null; } } catch { /* */ }
+  try { if (lookStream) lookStream.getTracks().forEach((t) => t.stop()); } catch { /* */ }
+  lookStream = null;
+}
+
 // ── the brain ────────────────────────────────────────────────────────────
 async function sendToJarvis(text) {
   if (busy || !text.trim()) return;
@@ -188,6 +246,10 @@ async function sendToJarvis(text) {
     setState('speaking', 'speaking'); addMsg('j', data.text);
     history.push({ role: 'assistant', content: data.text });
     speak(data.text);
+    // A LOOK happens right here, in the conversation. Operator, 2026-08-01: "it's just so many different
+    // tabs… it should be less tabs, more focused work, more power." A camera you have to navigate to is a
+    // feature; a camera that answers where you're already talking is a sense.
+    if (data.camera) doLook(data.camera);
     loadDash(); // a turn may have changed spend/tokens/HQ
     if (!speakOn) setTimeout(() => setState(wakeOn ? 'listening' : 'idle', wakeOn ? 'listening' : 'standby'), Math.min(5000, 1000 + data.text.length * 16));
   } catch (e) { typing.remove(); addMsg('err', e.message); setState('idle', 'standby'); }

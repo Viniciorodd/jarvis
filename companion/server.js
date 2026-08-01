@@ -397,8 +397,11 @@ const TOOLS = [
       content: { type: 'string', description: 'the markdown body of the note' },
       folder: { type: 'string', description: 'optional vault subfolder, e.g. "04 - Personal"; defaults to "00 - System/Jarvis/Notes"' },
     }, required: ['title'] } },
-  { name: 'open_eyes', description: 'Open the CAMERA page so the operator can show you something ("what am I holding", "look at this", "can you see this", "read this label"). You CANNOT see through the camera on your own — this opens the page where HE presses the button and one frame is sent. Never claim to see anything until he has actually shown you.',
-    input_schema: { type: 'object', properties: {} } },
+  { name: 'look', description: 'LOOK through his camera, right here in the conversation. Use whenever he shows you something or asks what he is holding: "what am I holding", "look at this", "can you see this", "what is this", "read this label", "what does this say". It captures ONE frame and comes back with what is actually there — you do NOT need to open anything or send him to another screen. Never describe what you have not been shown.',
+    input_schema: { type: 'object', properties: {
+      kind: { type: 'string', description: 'object = what he is holding (default) · read = read text/labels · scene = the workspace' },
+      reason: { type: 'string', description: 'why you are looking, in his words — it goes in the record' },
+    }, required: [] } },
   { name: 'open_note', description: 'OPEN one of the operator\'s Obsidian notes BY NAME on his PC (it opens in Obsidian). Use for "open my Ana care note", "pull up the Brick Ave note", "open the gov pipeline note". Resolves the name to the real file and reports the path it actually opened — if no note matches, it says so and opens nothing. Use search_vault instead when he wants the CONTENTS rather than the note on screen.',
     input_schema: { type: 'object', properties: {
       name: { type: 'string', description: 'the note title or a close approximation, e.g. "Ana\'s Care"' },
@@ -1173,11 +1176,17 @@ async function runTool(name, input) {
   if (name === 'open_path') {
     return openTarget(input.target);
   }
-  if (name === 'open_eyes') {
-    // Jarvis cannot open the camera herself — HE presses the button. That asymmetry is the privacy promise,
-    // so the tool opens the page and says plainly that she has not seen anything yet.
-    await openTarget('http://localhost:' + PORT + '/eyes');
-    return { ok: true, opened: 'the camera page', note: 'You have NOT seen anything yet — he has to turn the camera on and press a button. Say so; do not describe anything until a look actually comes back.' };
+  if (name === 'look') {
+    // Operator, 2026-08-01: "Jarvis was just ONE AI that could do everything… right now we have Jarvis, we're
+    // talking, and now we have eyes, and it's just so many different tabs. It should be LESS tabs, more
+    // focused work, more power." He is right — a camera you have to navigate to is a feature, not a sense.
+    //
+    // So looking happens INSIDE the conversation. The server cannot reach a webcam; only the page can. This
+    // returns a directive the chat UI acts on: it captures ONE frame, posts it to /api/vision/look (same
+    // gates as ever — reason required, no continuous, no loop) and speaks the answer in the same thread.
+    // Nothing is opened, nothing is switched to.
+    const kind = ['object', 'read', 'scene'].includes(input.kind) ? input.kind : 'object';
+    return '__CAMERA__' + JSON.stringify({ kind, reason: String(input.reason || 'he asked me to look').slice(0, 120) });
   }
   if (name === 'open_note') {
     // PRD "Desktop Presence" acceptance #2: open a NAMED Obsidian note. open_path needs an exact path, which
@@ -1337,7 +1346,7 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', open_note: 'opened a vault note', open_eyes: 'opened the camera', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', open_note: 'opened a vault note', look: 'looked through your camera', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
@@ -1574,6 +1583,7 @@ async function converse(history) {
   const messages = history.map((m) => ({ role: m.role, content: m.content })); // strings ok
   const actions = [];
   const visuals = [];
+  let camera = null;                 // a pending look, handed to the page (the server cannot reach a webcam)
   // Does this turn ask for a real ACTION? If so, callClaude routes to the tool-capable action brain so it
   // actually does it (rather than the free brain refusing). Computed once from the latest user message.
   let wantsAction = false;
@@ -1609,7 +1619,7 @@ async function converse(history) {
     const toolUses = (resp.content || []).filter((b) => b.type === 'tool_use');
     if (resp.stop_reason !== 'tool_use' || toolUses.length === 0) {
       const text = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-      return { text, actions, visuals, usage: resp.usage };
+      return { text, actions, visuals, camera, usage: resp.usage };
     }
     messages.push({ role: 'assistant', content: resp.content });
     const results = [];
@@ -1628,6 +1638,13 @@ async function converse(history) {
         try { visuals.push(JSON.parse(out.slice('__VISUAL__'.length))); } catch { /* skip */ }
         out = 'Displayed it on his screen.';
       }
+      // A LOOK is a directive for the page (only the browser can reach a webcam). The model must be told
+      // plainly that it has NOT seen anything yet, or it will narrate the contents of an image that does not
+      // exist — the exact confabulation this whole system is built to prevent, with a camera attached.
+      if (ok && typeof out === 'string' && out.startsWith('__CAMERA__')) {
+        try { camera = JSON.parse(out.slice('__CAMERA__'.length)); } catch { /* skip */ }
+        out = 'The camera is capturing a frame now. You have NOT seen it yet — do not describe anything. Reply with one short line telling him you are looking; the result will reach him on its own.';
+      }
       actions.push(actionLabel(tu.name, tu.input || {}, out, ok));
       // String(obj) yields "[object Object]" — an object-returning tool would hand the model literally nothing
       // and it would then reason about the placeholder instead of the data (live, 2026-07-29: search_vault).
@@ -1642,9 +1659,9 @@ async function converse(history) {
     const final = await callClaude(messages, false);
     addUsage(final.usage);
     const text = (final.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-    if (text) return { text, actions, visuals, usage: final.usage };
+    if (text) return { text, actions, visuals, camera, usage: final.usage };
   } catch { /* fall through to the honest stop message */ }
-  return { text: "I searched but couldn't pull it together into an answer — the tool results are above. Ask me again and I'll narrow it down.", actions, visuals };
+  return { text: "I searched but couldn't pull it together into an answer — the tool results are above. Ask me again and I'll narrow it down.", actions, visuals, camera };
 }
 
 function send(res, code, body, type = 'application/json') {

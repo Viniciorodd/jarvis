@@ -59,6 +59,9 @@
     <button class="kill-b" id="killBtn">🛑 Halt everything</button>
   </div>
 
+  <div id="readWarn" style="display:none; padding:11px 14px; border-radius:10px; margin-bottom:16px; font-size:12.5px;
+    color:#e2857a; border:1px solid rgba(226,133,122,.35); background:rgba(226,133,122,.07);"></div>
+
   <div id="roster"></div>
 
   <div class="note">
@@ -90,6 +93,13 @@
     $('killH').textContent = 'Kill switch — ' + (data.killAll ? 'ON · everything is halted' : 'OFF');
     $('killBtn').textContent = data.killAll ? '↩ Resume' : '🛑 Halt everything';
 
+    // A renamed or deleted required-reading note is a SILENT failure — the agent keeps working and just stops
+    // sounding like him. So it gets a visible warning, not a log line nobody reads.
+    const warn = $('readWarn');
+    const missing = (data.reading && data.reading.missing) || [];
+    warn.style.display = missing.length ? '' : 'none';
+    if (missing.length) warn.textContent = '⚠ ' + missing.length + ' required-reading note(s) missing from the vault — agents are writing without them: ' + missing.join(' · ');
+
     const root = $('roster');
     root.innerHTML = '';
     const pods = [...new Set(data.agents.map((a) => a.pod || 'other'))];
@@ -108,6 +118,9 @@
     const who = document.createElement('div');
     who.className = 'who';
     who.innerHTML = '<div class="nm">' + a.nickname + '</div><div class="ttl">' + (a.title || '') + ' · ' + a.codename + '</div>';
+    // Part A: what this agent is required to read before writing in his name. On the title so it is available
+    // without adding a row of noise to every agent.
+    if (a.reading && a.reading.length) who.title = 'Required reading:\n· ' + a.reading.join('\n· ');
     row.appendChild(who);
 
     // What it can ACTUALLY do right now — computed server-side by the same gate the send path obeys.

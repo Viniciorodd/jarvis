@@ -28,17 +28,33 @@ export const CONTROL_FILE = path.join(HERE, '..', 'control-plane', 'agent-contro
 // different state, the switch would show "off" while the agent kept sending — the worst possible failure for
 // a control surface. An unreadable or corrupt file returns empty state, which `agentPolicy` resolves to the
 // safe default: everything drafts, nothing acts alone.
+// ONE KILL SWITCH, two files. The gov auto-send halt (`auto-send.json`) predates this and is what Telegram's
+// /kill and the GovCon OS button write; the Control Center owns `agent-control.json`. Both are obeyed at the
+// send gate, so nothing could ever slip through — but they could DISAGREE on screen: halt everything from
+// your phone, open the panel, and it would cheerfully say "Kill switch — OFF". A control surface that
+// misreports the safety state is worse than not having one, so they are read and written as a single switch.
+export const AUTOSEND_FILE = path.join(HERE, '..', 'control-plane', 'auto-send.json');
+function readJson(p) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } }
+
 export function loadControl() {
-  try {
-    const d = JSON.parse(fs.readFileSync(CONTROL_FILE, 'utf8'));
-    return d && typeof d === 'object' ? { killAll: !!d.killAll, agents: d.agents || {} } : { killAll: false, agents: {} };
-  } catch { return { killAll: false, agents: {} }; }
+  const d = readJson(CONTROL_FILE) || {};
+  const gov = readJson(AUTOSEND_FILE) || {};
+  // OR, not override: either switch being on means halted. Safe direction wins on disagreement.
+  return { killAll: !!d.killAll || gov.kill === true, agents: (d && d.agents) || {} };
 }
 
 export function saveControl(state = {}) {
   const clean = { killAll: !!state.killAll, agents: state.agents || {} };
   fs.mkdirSync(path.dirname(CONTROL_FILE), { recursive: true });
   fs.writeFileSync(CONTROL_FILE, JSON.stringify(clean, null, 2));
+  // Mirror the halt to the gov switch so Telegram /killstatus, the GovCon OS button and this panel always
+  // agree. Preserve `tier` — it lives in the same file and is not ours to reset.
+  try {
+    const gov = readJson(AUTOSEND_FILE) || {};
+    if (gov.kill !== clean.killAll) {
+      fs.writeFileSync(AUTOSEND_FILE, JSON.stringify({ ...gov, kill: clean.killAll }, null, 2));
+    }
+  } catch { /* best-effort: the panel's own state is already saved and the gate already obeys it */ }
   return clean;
 }
 

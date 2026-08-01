@@ -35,6 +35,12 @@ export const ROSTER = [
   { codename: 'STUDIO-01', nickname: 'Remy', title: 'Creative Director', pod: 'fiverr', reports_to: 'MAILROOM-01', tier: 'draft',
     aliases: ['thumbnail', 'cover', 'logo', 'design', 'gig', 'fiverr', 'image', 'artwork', 'mockup', 'banner', 'poster'],
     does: 'Thumbnails, covers, product art, gig delivery (real image gen, code-capped spend).' },
+  // Vera — the 18th (PRD "Control Center" Part A). Ghostwrites social in HIS voice. Ships at draft-only like
+  // everyone else: the Control Center decides whether she may ever post, and posting connectors are
+  // deliberately not wired (operator deferred auto-posting — approved posts queue for him to publish).
+  { codename: 'SOCIAL-01', nickname: 'Vera', title: 'Social Ghostwriter', pod: 'social', reports_to: 'MAILROOM-01', tier: 'draft',
+    aliases: ['social', 'post', 'posts', 'linkedin', 'twitter', ' x ', 'thread', 'caption', 'ghostwrite', 'ghostwriter', 'content bank', 'vera'],
+    does: 'Drafts social posts in Vinicio\'s voice from the content bank. Never posts — every draft waits for him.' },
   { codename: 'RECON-DEV', nickname: 'Theo', title: 'SaaS Lead', pod: 'saas', reports_to: 'MAILROOM-01', tier: 'draft',
     aliases: ['recon', 'recontweaks', 'saas', 'support ticket', 'support', 'bug', 'release', 'changelog', 'feature', 'churn', 'patch'],
     does: 'ReconTweaks / SaaS support triage, releases, growth.' },

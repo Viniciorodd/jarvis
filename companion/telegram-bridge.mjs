@@ -270,7 +270,7 @@ async function askJarvis(text) {
 // something a reply jumps to on its own.
 async function handle(chat, text, thread) {
   text = (text || '').trim();
-  if (/^\/start/.test(text)) return send(chat, `Jarvis here. Text me anything — ask, draft, decide. Commands: /opps · /brief · /capture <thought> · /money · 🛑 /kill (halt all autonomous sending) · /resume · /killstatus.\n\nYour chat id is ${chat} — put it in .env as TELEGRAM_CHAT_ID to lock the bot to this phone.${isUnsupported() ? '' : '\n\nTip: each agent (Gideon, Hector, Elle, Victor…) now gets its own topic thread for updates/approvals — this thread is just for talking to me directly.'}`, thread);
+  if (/^\/start/.test(text)) return send(chat, `Jarvis here. Text me anything — ask, draft, decide. Commands: /opps · /brief · /capture <thought> · /money · /agents (who's on, and how much rope) · /off <name> · /tier <name> 0-2 · 🛑 /kill (halt everything) · /resume · /killstatus.\n\nYour chat id is ${chat} — put it in .env as TELEGRAM_CHAT_ID to lock the bot to this phone.${isUnsupported() ? '' : '\n\nTip: each agent (Gideon, Hector, Elle, Victor…) now gets its own topic thread for updates/approvals — this thread is just for talking to me directly.'}`, thread);
   if (/^\/brief/.test(text)) { const b = await get('/api/brief'); return send(chat, b.text || b.error || 'no brief yet', thread); }
   // ── AUTONOMOUS-OUTREACH KILL SWITCH from the phone (Phase 9). /kill halts ALL agent sending instantly;
   // /resume releases it; /killstatus reports. Deliberately simple + always available — this must never fail
@@ -286,6 +286,34 @@ async function handle(chat, text, thread) {
   if (/^\/killstatus\b/i.test(text)) {
     const r = await fetch(CP + '/maintenance/auto-send-kill').then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
     return send(chat, r.ok ? `Kill switch: ${r.kill ? '🛑 ON (nothing autonomous sends)' : '▶️ off'} · auto-send tier: ${r.tier}${r.tier === 0 ? ' (OFF — nothing sends anyway)' : ''}` : `⚠️ ${r.error || 'could not read status'}`, thread);
+  }
+  // ── CONTROL CENTER from the phone (PRD Part B/C). The panel at /control is on the PC; the switch has to
+  // work from wherever he is, or "I need that switch" isn't satisfied. Names are matched loosely (nickname
+  // OR codename, case-insensitive) because nobody types "CONNECT-01" on a phone.
+  if (/^\/agents\b/i.test(text)) {
+    const d = await fetch(COMPANION + '/api/control-center').then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+    if (!d.ok) return send(chat, `⚠️ Couldn't read the roster — ${d.error || 'unknown'}.`, thread);
+    const lines = (d.agents || []).map((a) => {
+      const mark = a.state === 'off' ? '⛔' : a.state === 'paused' ? '⏸' : (a.canActAlone ? '🟢' : '🟡');
+      return `${mark} ${a.nickname} — ${a.state}, tier ${a.tier}`;
+    });
+    return send(chat, `${d.killAll ? '🛑 KILL SWITCH IS ON — nothing autonomous runs.\n\n' : ''}${lines.join('\n')}\n\n🟢 acts alone · 🟡 needs your yes · ⏸ paused · ⛔ off\nChange it: /off Hector · /on Hector · /tier Hector 2`, thread);
+  }
+  const agentCmd = text.match(/^\/(off|on|pause|tier)\s+([A-Za-z0-9-]+)(?:\s+([0-2]))?/i);
+  if (agentCmd) {
+    const [, verb, who, tierArg] = agentCmd;
+    const d = await fetch(COMPANION + '/api/control-center').then((x) => x.json()).catch(() => ({ agents: [] }));
+    const hit = (d.agents || []).find((a) => a.nickname.toLowerCase() === who.toLowerCase() || a.codename.toLowerCase() === who.toLowerCase());
+    if (!hit) return send(chat, `I don't have an agent called "${who}". Send /agents for the list.`, thread);
+    const v = verb.toLowerCase();
+    if (v === 'tier' && tierArg === undefined) return send(chat, `Which tier? e.g. /tier ${hit.nickname} 1  (0 draft · 1 approve · 2 auto)`, thread);
+    const body = v === 'tier' ? { codename: hit.codename, tier: Number(tierArg) }
+      : { codename: hit.codename, state: v === 'on' ? 'active' : v === 'off' ? 'off' : 'paused' };
+    const r = await fetch(COMPANION + '/api/control-center', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+    if (!r.ok) return send(chat, `⚠️ Couldn't change ${hit.nickname} — ${r.error || 'unknown'}. Assume nothing changed.`, thread);
+    // Report what ACTUALLY took effect, not what was asked — an invalid tier is refused, and he should see that.
+    const ap = r.applied || {};
+    return send(chat, `✅ ${hit.nickname} is now ${ap.state || '?'}, tier ${ap.tier}${ap.tier === 0 ? ' (draft-only — needs your yes to act)' : ap.tier === 2 ? ' (acts alone, within its guardrails)' : ' (approve-to-act)'}.`, thread);
   }
   // The curated few — "send me the opportunities with detail." /opps or "opportunities"/"opps".
   if (/^\/opps/.test(text) || /^(opps|opportunities|what.?s good|any (good )?opportunities)\b/i.test(text)) {

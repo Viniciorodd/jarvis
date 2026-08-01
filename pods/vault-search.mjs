@@ -82,6 +82,27 @@ export function pickNoteToOpen(query = '', results = []) {
   return { note: null, candidates: list.slice(0, 5).map((h) => h.name) };
 }
 
+// I/O: every note TITLE in the vault, without opening a single file. Existence-by-name is a directory walk,
+// not a search — doing it via searchVault read all 6,115 notes' contents once per title and made the Control
+// Center take 19.7s to answer (measured 2026-08-01). Cheap enough to call on every request.
+export function listNoteNames(vaultDir, { maxFiles = 20000 } = {}) {
+  const out = [];
+  if (!vaultDir) return out;
+  const walk = (dir) => {
+    if (out.length >= maxFiles) return;
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (out.length >= maxFiles) return;
+      if (e.name.startsWith('.') || SKIP_DIRS.has(e.name)) continue;
+      if (e.isDirectory()) { walk(path.join(dir, e.name)); continue; }
+      if (e.name.toLowerCase().endsWith('.md')) out.push(e.name.replace(/\.md$/i, ''));
+    }
+  };
+  walk(vaultDir);
+  return out;
+}
+
 // I/O: walk the vault once and rank. Bounded on purpose — a personal vault is thousands of small files, and
 // an unbounded read would stall the chat turn that is supposed to feel instant.
 // Measured 2026-07-29 on the real Second Brain: 6,086 notes, ~2.5s for a COMPLETE scan. The old 4,000 default

@@ -3397,7 +3397,15 @@ const server = http.createServer(async (req, res) => {
       const O = await import('../pods/org.mjs');
       const people = (O.ROSTER || []).filter((p) => p && p.codename);
       const state = CC.loadControl();
-      return send(res, 200, JSON.stringify({ ok: true, killAll: !!state.killAll, agents: CC.rosterView(state, people) }));
+      const RR = await import('../pods/required-reading.mjs');
+      const V = await import('../pods/vault-search.mjs');
+      const vault = VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
+      // Part A: attach each agent's required reading, and CHECK the notes still exist. A renamed note would
+      // otherwise just stop being read — the agent keeps working and quietly loses his voice.
+      const agents = CC.rosterView(state, people).map((a) => ({ ...a, reading: RR.readingFor(a.codename) }));
+      let reading = { checked: 0, missing: [] };
+      try { reading = RR.verifyReading(V.listNoteNames(vault)); } catch { /* panel still renders */ }
+      return send(res, 200, JSON.stringify({ ok: true, killAll: !!state.killAll, agents, reading }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, agents: [] })); }
   }
   if (req.method === 'POST' && url.pathname === '/api/control-center') {

@@ -51,7 +51,60 @@ export function usageReport(usage = {}, now = new Date()) {
   return { day, providers: rows, totalRequests: rows.reduce((s, r) => s + r.requests, 0), totalTokens: rows.reduce((s, r) => s + r.tokens, 0) };
 }
 
-const COOLDOWN_MS = 15 * 60000; // a 429 rests that provider for 15 minutes
+const COOLDOWN_MS = 15 * 60000; // a 429 rests that MODEL for 15 minutes
+
+// A rate limit is per-MODEL, not per-provider. Cooling the whole provider contradicted this file's own stated
+// intent ("so a single rate-limited model rolls to its sibling before we abandon a provider entirely") and
+// was caught live on 2026-08-01: one gemma model 429'd and its sibling was skipped as "cooling down", so a
+// working vision model never got tried. Cooldowns are keyed provider|model; the usage COUNTERS stay
+// per-provider so the daily budget view is unchanged.
+export const coolKey = (providerId, model) => providerId + '|' + model;
+
+// LOOK at one image. Separate from complete() because the payload shape, the model list and the failure
+// mode are all different — a text model handed an image answers confidently about nothing, which is the one
+// outcome a camera feature must never have. Returns { ok, provider, model, text } or an honest failure.
+// The image is passed through and never written to disk anywhere in this path.
+export async function see({ dataUrl = '', prompt = '', maxTokens = 400, env = process.env, fetchImpl = fetch, now = new Date(), usageStore = null, persist = true } = {}) {
+  if (!/^data:image\/(png|jpe?g|webp);base64,/.test(String(dataUrl))) return { ok: false, error: 'need a base64 image data URL', tried: [] };
+  const { visionPlan } = await import('./providers.mjs');
+  const plan = visionPlan({ env });
+  if (!plan.length) return { ok: false, error: 'no vision-capable provider is configured (needs an OpenRouter, Gemini or Groq key)', tried: [] };
+  let usage = usageStore || loadUsage();
+  const tried = [];
+  const content = [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: dataUrl } }];
+  for (const hop of plan) {
+    if (isCooling(usage, coolKey(hop.providerId, hop.model), now)) { tried.push({ provider: hop.providerId, model: hop.model, skipped: 'cooling down' }); continue; }
+    try {
+      const r = await fetchImpl(hop.url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(hop.keyEnv && env[hop.keyEnv] ? { Authorization: 'Bearer ' + env[hop.keyEnv] } : {}) },
+        body: JSON.stringify({ model: hop.model, messages: [{ role: 'user', content }], max_tokens: maxTokens }),
+        signal: AbortSignal.timeout(45000),
+      });
+      if (r.status === 429 || r.status === 402) {
+        usage = noteUsage(usage, hop.providerId, { ok: false, now });
+        usage = noteUsage(usage, coolKey(hop.providerId, hop.model), { ok: false, cooldownUntil: new Date(new Date(now).getTime() + COOLDOWN_MS).toISOString(), now });
+        tried.push({ provider: hop.providerId, model: hop.model, status: r.status }); continue;
+      }
+      if (!r.ok) {
+        let detail = ''; try { detail = typeof r.text === 'function' ? (await r.text()).slice(0, 160) : ''; } catch { /* */ }
+        usage = noteUsage(usage, hop.providerId, { ok: false, now });
+        tried.push({ provider: hop.providerId, model: hop.model, status: r.status, detail }); continue;
+      }
+      const data = await r.json();
+      const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      if (!text) { usage = noteUsage(usage, hop.providerId, { ok: false, now }); tried.push({ provider: hop.providerId, model: hop.model, note: 'empty' }); continue; }
+      usage = noteUsage(usage, hop.providerId, { tokens: (data.usage && data.usage.total_tokens) || 0, ok: true, now });
+      if (persist) saveUsage(usage);
+      return { ok: true, provider: hop.providerId, model: hop.model, text: String(text).trim(), tried };
+    } catch (e) {
+      usage = noteUsage(usage, hop.providerId, { ok: false, now });
+      tried.push({ provider: hop.providerId, model: hop.model, error: String(e.message || e).slice(0, 80) });
+    }
+  }
+  if (persist) saveUsage(usage);
+  return { ok: false, error: 'no vision provider could look at that right now', tried };
+}
 
 // PURE: a deliberately rough token estimate for the OUTBOUND request. It only has to tell "comfortably under a
 // provider's ceiling" from "over it", so a crude ratio beats a tokenizer dependency. Two corrections learned
@@ -77,7 +130,7 @@ export async function complete({ messages = [], tools = null, needTools = false,
   const estTokens = estimateTokens(messages, tools, maxTokens);
 
   for (const hop of plan) {
-    if (isCooling(usage, hop.providerId, now)) { tried.push({ provider: hop.providerId, model: hop.model, skipped: 'cooling down' }); continue; }
+    if (isCooling(usage, coolKey(hop.providerId, hop.model), now)) { tried.push({ provider: hop.providerId, model: hop.model, skipped: 'cooling down' }); continue; }
     // Don't spend a round-trip discovering a published limit we already know. This is a SKIP, not a failure:
     // the provider is healthy, the payload just doesn't fit it, so it must not count against its error budget.
     if (hop.maxRequestTokens && estTokens > hop.maxRequestTokens) { tried.push({ provider: hop.providerId, model: hop.model, skipped: 'payload ~' + estTokens + ' tok exceeds its ' + hop.maxRequestTokens + ' limit' }); continue; }
@@ -92,8 +145,9 @@ export async function complete({ messages = [], tools = null, needTools = false,
         signal: AbortSignal.timeout(90000),
       });
       if (r.status === 429 || r.status === 402) {          // rate-limited / out of free quota → rest it
-        usage = noteUsage(usage, hop.providerId, { ok: false, cooldownUntil: new Date(new Date(now).getTime() + COOLDOWN_MS).toISOString(), now });
-        tried.push({ provider: hop.providerId, model: hop.model, status: r.status, note: 'rate-limited — cooling down' });
+        usage = noteUsage(usage, hop.providerId, { ok: false, now });
+        usage = noteUsage(usage, coolKey(hop.providerId, hop.model), { ok: false, cooldownUntil: new Date(new Date(now).getTime() + COOLDOWN_MS).toISOString(), now });
+        tried.push({ provider: hop.providerId, model: hop.model, status: r.status, note: 'rate-limited — cooling this model down' });
         continue;
       }
       if (!r.ok) {

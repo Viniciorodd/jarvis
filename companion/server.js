@@ -397,6 +397,8 @@ const TOOLS = [
       content: { type: 'string', description: 'the markdown body of the note' },
       folder: { type: 'string', description: 'optional vault subfolder, e.g. "04 - Personal"; defaults to "00 - System/Jarvis/Notes"' },
     }, required: ['title'] } },
+  { name: 'open_eyes', description: 'Open the CAMERA page so the operator can show you something ("what am I holding", "look at this", "can you see this", "read this label"). You CANNOT see through the camera on your own — this opens the page where HE presses the button and one frame is sent. Never claim to see anything until he has actually shown you.',
+    input_schema: { type: 'object', properties: {} } },
   { name: 'open_note', description: 'OPEN one of the operator\'s Obsidian notes BY NAME on his PC (it opens in Obsidian). Use for "open my Ana care note", "pull up the Brick Ave note", "open the gov pipeline note". Resolves the name to the real file and reports the path it actually opened — if no note matches, it says so and opens nothing. Use search_vault instead when he wants the CONTENTS rather than the note on screen.',
     input_schema: { type: 'object', properties: {
       name: { type: 'string', description: 'the note title or a close approximation, e.g. "Ana\'s Care"' },
@@ -1171,6 +1173,12 @@ async function runTool(name, input) {
   if (name === 'open_path') {
     return openTarget(input.target);
   }
+  if (name === 'open_eyes') {
+    // Jarvis cannot open the camera herself — HE presses the button. That asymmetry is the privacy promise,
+    // so the tool opens the page and says plainly that she has not seen anything yet.
+    await openTarget('http://localhost:' + PORT + '/eyes');
+    return { ok: true, opened: 'the camera page', note: 'You have NOT seen anything yet — he has to turn the camera on and press a button. Say so; do not describe anything until a look actually comes back.' };
+  }
   if (name === 'open_note') {
     // PRD "Desktop Presence" acceptance #2: open a NAMED Obsidian note. open_path needs an exact path, which
     // he never has in his head — he knows the note by its title. Resolve the name to a real file, then open
@@ -1329,7 +1337,7 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', open_note: 'opened a vault note', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', open_note: 'opened a vault note', open_eyes: 'opened the camera', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
@@ -1355,6 +1363,9 @@ const TRUTH_RULE = '\n\n## TRUTHFULNESS (non-negotiable — Lessons Ledger L-014
 // Refreshed on a timer and CACHED, because buildSystem() is synchronous and on the hot path of every turn —
 // a live fetch there would put network latency in front of every single reply. Stale-but-instant beats
 // fresh-but-slow for context; anything that must be exact gets read through a tool instead.
+// When the camera last looked. Used to refuse a rapid loop of "single" looks, which would be a standing
+// watch assembled out of individually-innocent requests.
+let lastLookAt = 0;
 let liveState = '';
 async function refreshLiveState() {
   try {
@@ -3388,6 +3399,30 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // ── CAMERA: one look, on request. His own rule (Desktop Presence PRD §3.1): "Never continuous recording…
+  // on-demand only, with a visible indicator when it looks." Enforced in code, not by the UI that draws the
+  // indicator: canLook() refuses `continuous`, refuses a reason-less call, and refuses a rapid loop of
+  // "single" looks (which is a watch with extra steps). The frame is never written to disk — it goes to the
+  // vision model and is dropped. Every look is logged to the record with its reason.
+  if (req.method === 'POST' && url.pathname === '/api/vision/look') {
+    try {
+      const b = await readBody(req);
+      const VZ = await import('../pods/vision.mjs');
+      const gate = VZ.canLook({ kind: b.kind || 'object', reason: b.reason || '', continuous: !!b.continuous, sinceLastLookMs: Date.now() - lastLookAt });
+      if (!gate.allow) return send(res, 200, JSON.stringify({ ok: false, refused: true, reason: gate.reason }));
+      lastLookAt = Date.now();
+      const G = await import('../pods/gateway/router.mjs');
+      const r = await G.see({ dataUrl: String(b.image || ''), prompt: VZ.LOOK_KINDS[b.kind || 'object'], env: envAll() });
+      if (!r.ok) return send(res, 200, JSON.stringify({ ok: false, error: r.error }));
+      // Strip any read of HIM the model volunteered despite being told not to — prompts are not guards.
+      const text = VZ.stripPersonalRead(r.text) || 'I could not make anything out.';
+      // Every look lands in the record with its REASON. A camera whose activations nobody can account for is
+      // exactly the thing he ruled out; the log is what makes "on-demand only" auditable rather than a claim.
+      fetch(CP_URL + '/events', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'action', actor: 'CONCIERGE-01', pod: 'personal', action: 'vision.look', rationale: `Looked (${b.kind || 'object'}) — ${String(b.reason || '').slice(0, 80)}` }) }).catch(() => {});
+      return send(res, 200, JSON.stringify({ ok: true, text, provider: r.provider + '/' + r.model }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // ── CONTROL CENTER (PRD Part B): the roster, each agent's switch + tier, and the global kill switch.
   // GET returns what each agent can ACTUALLY do right now (computed by the same gate the send path obeys,
   // so the panel can never show "off" while the agent keeps working).
@@ -4094,7 +4129,7 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
-  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname === '/control' ? 'control.html' : url.pathname === '/govcon-os' ? 'govcon-os.html' : url.pathname === '/finances' ? 'finances.html' : url.pathname === '/real-estate' ? 'real-estate.html' : url.pathname.replace(/^\/+/, '');
+  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname === '/control' ? 'control.html' : url.pathname === '/eyes' ? 'eyes.html' : url.pathname === '/govcon-os' ? 'govcon-os.html' : url.pathname === '/finances' ? 'finances.html' : url.pathname === '/real-estate' ? 'real-estate.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));

@@ -1,0 +1,202 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Eyes — Jarvis</title>
+<!--
+  eyes.html — the camera. Operator: "give jarvis access to my camera… what i am holding… control her with my
+  hands like tony stark does."
+
+  His own rule, from the Desktop Presence PRD: "Never continuous recording — a persistent watcher over a
+  machine holding legal, medical and financial data is an unacceptable privacy surface. On-demand only, with
+  a visible indicator when it looks."
+
+  So: the camera preview stays LOCAL to this page and no frame leaves the machine except on an explicit look,
+  which the server also refuses if it smells like a standing watch. Gesture detection runs entirely in this
+  page from frame differences — no model, no library, no network. Nothing is recorded, nothing is stored.
+-->
+<style>
+  :root { --teal-rgb: 90,190,180; --teal: #5abeb4; --cream: #e8e6e1; --dim: #7d8b96; }
+  body { margin: 0; background: #04070f; color: var(--cream); font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 24px 20px 60px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 18px; }
+  .stage { position: relative; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 16/9;
+    border: 1px solid rgba(var(--teal-rgb),.2); }
+  video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
+  /* The indicator is deliberately large and red. A subtle dot is how a camera becomes something you forget. */
+  .live { position: absolute; top: 12px; left: 12px; display: none; align-items: center; gap: 8px;
+    background: rgba(226,60,45,.92); color: #fff; padding: 7px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
+  .live.on { display: flex; }
+  .live i { width: 9px; height: 9px; border-radius: 50%; background: #fff; animation: blink .8s infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .off-note { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--dim); font-size: 13.5px; text-align: center; padding: 20px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  button { background: rgba(var(--teal-rgb),.1); border: 1px solid rgba(var(--teal-rgb),.28); color: var(--cream);
+    border-radius: 9px; padding: 9px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  button:hover:not(:disabled) { background: rgba(var(--teal-rgb),.2); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.danger { border-color: rgba(226,133,122,.4); color: #e2857a; }
+  .out { margin-top: 16px; padding: 14px 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; min-height: 22px;
+    border: 1px solid rgba(var(--teal-rgb),.16); background: rgba(var(--teal-rgb),.04); }
+  .out.err { border-color: rgba(226,133,122,.35); color: #e2857a; }
+  .ges { margin-top: 12px; font-size: 12px; color: var(--dim); }
+  .ges b { color: var(--teal); }
+  .note { margin-top: 22px; font-size: 12px; color: var(--dim); line-height: 1.65;
+    border: 1px solid rgba(var(--teal-rgb),.14); background: rgba(var(--teal-rgb),.03); border-radius: 11px; padding: 13px 15px; }
+</style>
+
+<div class="wrap">
+  <h1>Eyes</h1>
+  <div class="sub">Jarvis looks only when you ask. Nothing is recorded, nothing is stored, nothing leaves this machine until you press a button.</div>
+
+  <div class="stage">
+    <video id="v" playsinline muted></video>
+    <div class="live" id="live"><i></i> LOOKING — sending one frame</div>
+    <div class="off-note" id="offNote">Camera is off.</div>
+  </div>
+
+  <div class="bar">
+    <button id="start">📷 Turn the camera on</button>
+    <button id="look" disabled>👁 What am I holding?</button>
+    <button id="read" disabled>🔤 Read this</button>
+    <button id="ges" disabled>✋ Gestures: off</button>
+    <button id="stop" class="danger" disabled>■ Camera off</button>
+  </div>
+
+  <div class="out" id="out">Camera off. Turn it on when you want Jarvis to look at something.</div>
+  <div class="ges" id="gesOut"></div>
+
+  <div class="note">
+    <b>What this does and doesn't do.</b> One frame is sent only when you press a button — there is no
+    background watching, and the server refuses a rapid loop of looks as well as any "continuous" request.
+    Every look is written to your record with the reason. Gestures are detected <b>entirely in this page</b>
+    from frame-to-frame motion — no library, no model, no network.<br /><br />
+    Jarvis will not tell you how you feel. Reading emotion off a face is unreliable, and it would produce
+    confident wrong claims about you. She reports what's observable instead — hours at the desk, the hour of
+    the night.
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const v = $('v'), out = $('out'), live = $('live');
+  let stream = null, gesturesOn = false, prevFrame = null, prevX = null, rafId = null, lastFire = 0;
+
+  function say(t, err) { out.textContent = t; out.className = 'out' + (err ? ' err' : ''); }
+
+  async function start() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 }, audio: false });
+      v.srcObject = stream; await v.play();
+      $('offNote').style.display = 'none';
+      for (const id of ['look', 'read', 'ges', 'stop']) $(id).disabled = false;
+      $('start').disabled = true;
+      say('Camera on. Hold something up and press "What am I holding?"');
+    } catch (e) { say('Could not open the camera — ' + e.message, true); }
+  }
+
+  function stop() {
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    stream = null; v.srcObject = null;
+    gesturesOn = false; if (rafId) cancelAnimationFrame(rafId); rafId = null;
+    $('offNote').style.display = ''; $('ges').textContent = '✋ Gestures: off'; $('gesOut').textContent = '';
+    for (const id of ['look', 'read', 'ges', 'stop']) $(id).disabled = true;
+    $('start').disabled = false;
+    say('Camera off.');
+  }
+
+  function frameDataUrl() {
+    const c = document.createElement('canvas');
+    c.width = v.videoWidth || 640; c.height = v.videoHeight || 360;
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.8);
+  }
+
+  async function look(kind, reason) {
+    if (!stream) return;
+    live.className = 'live on';                 // the indicator goes up BEFORE the frame is sent
+    say('Looking…');
+    try {
+      const r = await fetch('/api/vision/look', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image: frameDataUrl(), kind, reason }),
+      });
+      const d = await r.json();
+      if (d.refused) say('Refused: ' + d.reason, true);
+      else if (!d.ok) say(d.error || 'Could not look.', true);
+      else say(d.text);
+    } catch (e) { say('Could not reach Jarvis — ' + e.message, true); }
+    finally { live.className = 'live'; }
+  }
+
+  // ── gestures: frame differencing into a 3x3 grid, all local ──
+  function motionCells() {
+    const w = 96, h = 54;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(v, 0, 0, w, h);
+    const cur = ctx.getImageData(0, 0, w, h).data;
+    if (!prevFrame) { prevFrame = cur; return null; }
+    const cells = new Array(9).fill(0), counts = new Array(9).fill(0);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const d = Math.abs(cur[i] - prevFrame[i]) + Math.abs(cur[i + 1] - prevFrame[i + 1]) + Math.abs(cur[i + 2] - prevFrame[i + 2]);
+        const cell = Math.floor(y / (h / 3)) * 3 + Math.floor(x / (w / 3));
+        cells[cell] += d > 60 ? 1 : 0; counts[cell] += 1;
+      }
+    }
+    prevFrame = cur;
+    return cells.map((n, i) => n / (counts[i] || 1));
+  }
+
+  function tick() {
+    if (!gesturesOn || !stream) return;
+    const cells = motionCells();
+    if (cells) {
+      const energy = cells.reduce((a, b) => a + b, 0) / 9;
+      const g = classify(cells, prevX, energy);
+      prevX = centre(cells) ?? prevX;
+      // Deliberate cooldown: a gesture that can fire every frame turns a stretch into a command storm.
+      if (g && Date.now() - lastFire > 1200) { lastFire = Date.now(); onGesture(g); }
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  // Mirrors pods/vision.mjs (eval-pinned there); duplicated here because this page ships to the browser as-is.
+  function centre(cells) {
+    const col = [0, 1, 2].map((c) => cells[c] + cells[c + 3] + cells[c + 6]);
+    const t = col.reduce((a, b) => a + b, 0);
+    return t ? (col[1] * 0.5 + col[2] * 1) / t : null;
+  }
+  function classify(cells, px, energy) {
+    if (energy < 0.18) return null;
+    if (cells.filter((c) => c > 0.35).length >= 7) return 'dismiss';
+    const col = [0, 1, 2].map((c) => cells[c] + cells[c + 3] + cells[c + 6]);
+    const t = col.reduce((a, b) => a + b, 0) || 1;
+    const x = (col[1] * 0.5 + col[2] * 1) / t;
+    if (px != null) { if (x - px > 0.28) return 'next'; if (px - x > 0.28) return 'prev'; }
+    if (col[1] / t > 0.6 && cells[4] > 0.4) return 'capture';
+    return null;
+  }
+
+  function onGesture(g) {
+    $('gesOut').innerHTML = 'gesture: <b>' + g + '</b>';
+    if (g === 'capture') look('object', 'hand gesture: hold-to-capture');
+    if (g === 'dismiss') { $('gesOut').innerHTML = 'gesture: <b>dismiss</b> — camera off'; stop(); }
+  }
+
+  $('start').addEventListener('click', start);
+  $('stop').addEventListener('click', stop);
+  $('look').addEventListener('click', () => look('object', 'he asked what he is holding'));
+  $('read').addEventListener('click', () => look('read', 'he asked to read what is on camera'));
+  $('ges').addEventListener('click', () => {
+    gesturesOn = !gesturesOn;
+    $('ges').textContent = '✋ Gestures: ' + (gesturesOn ? 'on' : 'off');
+    $('gesOut').textContent = gesturesOn ? 'watching for: palm across = camera off · sweep = next/prev · hold centre = look' : '';
+    prevFrame = null; prevX = null;
+    if (gesturesOn) tick(); else if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  });
+  window.addEventListener('beforeunload', stop);
+</script>

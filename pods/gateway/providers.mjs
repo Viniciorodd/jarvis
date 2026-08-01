@@ -88,6 +88,28 @@ export const PROVIDERS = [
   },
 ];
 
+// Vision-capable models, by provider, for the camera ("what am I holding?"). Kept SEPARATE from `models`
+// because a text model handed an image payload does not fail cleanly — it either errors oddly or, worse,
+// answers confidently about an image it never saw. Free tiers only, same as everything else here.
+// Names VERIFIED live on 2026-08-01 by querying each provider's own /models and filtering for image input —
+// my first guesses were all 404s, the same way the Cerebras names were. Never hand-write a model id here.
+// Groq's key currently exposes NO vision model, so it is absent rather than listed and failing.
+export const VISION_MODELS = {
+  'openrouter-free': ['nvidia/nemotron-nano-12b-v2-vl:free', 'google/gemma-4-31b-it:free', 'google/gemma-4-26b-a4b-it:free'],
+  'google-ai-studio': ['gemini-2.0-flash'],
+};
+
+// PURE: the try-list for an IMAGE request — only providers that actually have a vision model AND a key.
+export function visionPlan({ env = process.env } = {}) {
+  const out = [];
+  for (const p of PROVIDERS) {
+    const models = VISION_MODELS[p.id];
+    if (!models || !has(p, env)) continue;
+    for (const model of models) out.push({ providerId: p.id, label: p.label, url: p.url, keyEnv: p.keyEnv, model, vision: true });
+  }
+  return out;
+}
+
 const has = (p, env) => !p.keyEnv || !!(env[p.keyEnv] && String(env[p.keyEnv]).trim());
 
 // PURE: which providers are actually usable right now, in the order we should try them.

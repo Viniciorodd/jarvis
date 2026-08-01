@@ -32,7 +32,34 @@ scarce resource multiple jobs compete for. Until fixed, Vinicio's own manual pul
 whichever automated job fires first each day. Quota resets nightly at 8PM Eastern — a manual run any time
 between 8PM ET and the next morning's ~6am job is currently the only reliable window.
 
-### 🆕 2026-08-01 (latest, pt.2) — THE CONTROL CENTER: a switch that is code, not a label
+### 🆕 2026-08-01 (latest, pt.3) — EYES: Jarvis can look, on demand, and read his hands
+Operator: *"give jarvis access to my camera so that she can see with intelligence how i feel, what i am
+holding, and maybe even be able to control her with my hands like tony stark does."* Page: **`/eyes`**.
+- **"What am I holding" — built.** One frame, on a button press, → `see()` in the gateway → a vision model.
+  **Verified end-to-end** against a generated test image: it answered *"the red circle on a white background"*
+  — the actual content, not a guess. 7.7s, free tier.
+- **Gestures — built, dependency-free.** Palm across = camera off · sweep = next/prev · centred hold = look.
+  Frame-differencing into a 3×3 motion grid, computed **entirely in the page** — no model, no library, no
+  network. MediaPipe would be better but it is third-party CDN code, and his own Repo Security Audit SOP says
+  nothing ships without a logged CLEAN verdict. Four reliable gestures beat twenty flaky ones.
+- **"How I feel" — deliberately NOT built as emotion inference.** Reading an internal state off a face is
+  scientifically contested and fails hardest exactly where he lives: tired, in pain, worried about Ana,
+  concentrating. It would confidently misread *him* — the same failure class as every confabulation removed
+  this week, but personal. `observableNotes()` reports what is checkable instead: hours at the desk, no break
+  in 3h, "it's 2am". Every prompt forbids describing the person, and `stripPersonalRead()` deletes a mood read
+  if the model volunteers one anyway (prompts are not guards).
+- **Privacy, enforced in code** (his own rule from the Desktop Presence PRD): `canLook()` refuses
+  `continuous`, refuses a look with no stated reason, and refuses a rapid loop of "single" looks — which is a
+  standing watch assembled from innocent-looking parts. Frames are never written to disk. Every look is
+  logged to the record with its reason. The indicator is large and red and goes up BEFORE the frame is sent.
+- **Two real bugs caught in verification:** (1) I hand-wrote the vision model names and all four 404'd — same
+  mistake as Cerebras; they are now taken from each provider's live `/models` filtered by image input, and
+  Groq is absent because its key exposes none. (2) **A 429 on one model cooled the entire PROVIDER**, so its
+  working sibling was skipped — directly contradicting the router's own comment. Cooldowns are per
+  `provider|model` now; usage counters stay per-provider.
+- Evals **1036 → 1053**.
+
+### 2026-08-01 (pt.2) — THE CONTROL CENTER: a switch that is code, not a label
 From `PRD — Jarvis Control Center`. Part B shipped; the panel lives at **`/control`**.
 - **`pods/control-center.mjs`** (pure, 16 evals) — per-agent `state` (active/paused/off) + `tier` (0/1/2) and
   the global kill switch. Everything **fails closed**: a corrupt file, an unknown agent, a garbage tier, or no

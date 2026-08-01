@@ -32,7 +32,36 @@ scarce resource multiple jobs compete for. Until fixed, Vinicio's own manual pul
 whichever automated job fires first each day. Quota resets nightly at 8PM Eastern — a manual run any time
 between 8PM ET and the next morning's ~6am job is currently the only reliable window.
 
-### 🆕 2026-07-29 (latest, pt.6) — DATES: "Today" can finally mean today
+### 🆕 2026-08-01 (latest) — DESKTOP PRESENCE: the ask-overlay + the end of the tool-less brain
+From `PRD — Jarvis Desktop Presence & Computer Control` (vault). Build order #1–#3 shipped.
+- **The overlay** (`desktop/overlay.html` + `desktop/main.js`): frameless, always-on-top, `Ctrl+Shift+Space`,
+  Escape or click-away dismisses, floats over full-screen apps. `Ctrl+Shift+J` already existed but toggles the
+  FULL 1180×860 app — the same friction, faster. Each summon is a fresh ask, not a scrollback. It carries **no
+  node integration and no preload**: it only talks to the companion on 127.0.0.1:8095 over HTTP exactly like
+  the browser UI, so the overlay adds **no new privilege** to the machine. Hotkey registration fails silently
+  in Electron when another app owns the combo, so it tries three and logs which one bound.
+- **Quick-capture from the overlay** → `/api/cockpit/capture` (verified live: lands in `⚡ Quick Capture.md`),
+  and it reports a FAILED write instead of showing "captured ✓".
+- **`open_note`** (acceptance #2): opens a vault note BY NAME. **Caught before shipping** — ranked search
+  always returns its best guess, so *"zzz nonexistent note xyzzy"* scored **"📁 Book Notes"** top purely
+  because "note" appears in it, and `open_note` would have opened the wrong file and reported success.
+  `pickNoteToOpen` now requires the **title** to earn it (exact, or contains every term) and otherwise opens
+  NOTHING and offers candidates. Verified live both ways.
+- **⚠ THE BIG ONE — tools are now ON BY DEFAULT.** Which brain got tools used to be a regex classifier. It
+  leaked **three times**, and every leak produced a confident fabrication rather than a missing answer:
+  "create a note" → invented a path · "what do I know about Ana's NIH eval" → invented an entire PDF ·
+  **"open my Ana's Care note" → invented a folder, a filename, a fake tool transcript, and called Ana his
+  daughter.** Each fix widened the regex; each time a new phrasing walked through. The classifier was never
+  the bug: **a brain with no tools, asked about real things, fills the gap with fiction.** It only existed to
+  save money, and our own gateway made tool-calling free and ~4s. Now everything gets tools; the detectors
+  remain only to guard the tool-less fallback if the gateway is down. Plain chat is unaffected (3.9s, no tools).
+- **NOT built (and why):** on-demand context reading (§3.1), Tier-1 gating and per-capability toggles (§3.2),
+  Home Assistant (§3.4, the PRD itself marks it Phase 3). The PRD's own §6 says **ship the Control Center
+  first** — the toggles and kill switch for computer control belong there, and
+  `PRD — Jarvis Control Center` is still unbuilt. Everything shipped here is Tier-0 ("safe, do freely").
+- Evals **999 → 1004**.
+
+### 2026-07-29 — DATES: "Today" can finally mean today
 The gap found in pt.2: **0 of ~142 live tasks carried any date**, so no ranking could ever compute "due
 today". Jarvis now proposes; the operator confirms one at a time. `pods/task-dates.mjs` (pure, 19 evals).
 - **Deterministic on purpose** (doctrine rule 1 — code disposes). Dates are arithmetic over priority and

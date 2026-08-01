@@ -397,6 +397,10 @@ const TOOLS = [
       content: { type: 'string', description: 'the markdown body of the note' },
       folder: { type: 'string', description: 'optional vault subfolder, e.g. "04 - Personal"; defaults to "00 - System/Jarvis/Notes"' },
     }, required: ['title'] } },
+  { name: 'open_note', description: 'OPEN one of the operator\'s Obsidian notes BY NAME on his PC (it opens in Obsidian). Use for "open my Ana care note", "pull up the Brick Ave note", "open the gov pipeline note". Resolves the name to the real file and reports the path it actually opened — if no note matches, it says so and opens nothing. Use search_vault instead when he wants the CONTENTS rather than the note on screen.',
+    input_schema: { type: 'object', properties: {
+      name: { type: 'string', description: 'the note title or a close approximation, e.g. "Ana\'s Care"' },
+    }, required: ['name'] } },
   { name: 'timeline', description: 'Search the UNIFIED RECORD of everything that happened — every chat turn (both sides), every agent run, every approval, every error, newest first. This is the audit trail: use it for "what did you do yesterday/today", "what did we talk about", "when did we decide X", "what happened with Y", "did you already do Z", "what went wrong". Quote the timestamped lines it returns; never guess at history.',
     input_schema: { type: 'object', properties: {
       query: { type: 'string', description: 'optional keywords to filter by, e.g. "Brick Ave" or "outreach"' },
@@ -1167,6 +1171,29 @@ async function runTool(name, input) {
   if (name === 'open_path') {
     return openTarget(input.target);
   }
+  if (name === 'open_note') {
+    // PRD "Desktop Presence" acceptance #2: open a NAMED Obsidian note. open_path needs an exact path, which
+    // he never has in his head — he knows the note by its title. Resolve the name to a real file, then open
+    // it and report the path we actually opened (L-014: never claim, verify).
+    const vault = VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
+    const wanted = String(input.name || '').trim();
+    if (!wanted) throw new Error('note name required');
+    const V = await import('../pods/vault-search.mjs');
+    const hits = V.searchVault(wanted, { vaultDir: vault, limit: 8 }).results;
+    // Title must earn it — ranked search always returns SOMETHING, and opening its best guess is how you end
+    // up opening "Book Notes" because the word "note" was in the query.
+    const { note: pick, exact, candidates } = V.pickNoteToOpen(wanted, hits);
+    if (!pick) {
+      return {
+        ok: false, opened: false,
+        note: 'No note titled "' + wanted + '" in the vault — NOTHING was opened. Say so plainly.',
+        candidates: candidates.length ? candidates : undefined,
+        say: candidates.length ? 'Offer these as possibilities and ask which he meant. Do NOT open one on your own.' : undefined,
+      };
+    }
+    await openTarget(pick.file);
+    return { ok: true, opened: true, note: pick.name, path: pick.file, exact: !!exact };
+  }
   if (name === 'show_visual') {
     const type = ['map', 'image', 'web'].includes(input.type) ? input.type : 'web';
     const url = type === 'map' ? buildMapUrl(input.query) : String(input.query || '');
@@ -1302,7 +1329,7 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', open_note: 'opened a vault note', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
@@ -1543,10 +1570,20 @@ async function converse(history) {
     const lu = [...messages].reverse().find((m) => m.role === 'user');
     const t = typeof lu?.content === 'string' ? lu.content : '';
     const { looksLikeAction, needsRealData } = await import('../pods/chat-truth.mjs');
-    // Questions about his own world need TOOLS just as much as actions do — that is what "the Second Brain is
-    // Jarvis's memory" means in practice. Our own gateway made the tool brain free and ~4s, so the old
-    // "no tools on the free brain, to save money" tradeoff that created this gap no longer exists.
-    wantsAction = looksLikeAction(t) || needsRealData(t);
+    // TOOLS BY DEFAULT (2026-08-01). This used to be a classifier — give tools only when a regex judged the
+    // message to be an action or a data question. It leaked three times, and every leak produced a confident
+    // fabrication rather than a missing answer:
+    //   • "create a note in my vault"            → invented a path            (L-014)
+    //   • "What do I know about Ana's NIH eval"  → invented an entire PDF
+    //   • "open my Ana's Care note"              → invented a folder, a filename, and a fake tool transcript
+    // Each fix widened the regex; each time a new phrasing walked straight through. The classifier was never
+    // the bug — the bug is that a brain with NO TOOLS gets asked about real things and fills the gap with
+    // fiction, because "here it is" is the likely next token when nothing can contradict it.
+    // The only reason it existed was cost, and our own gateway made tool-calling free and ~4s. So: everything
+    // gets tools. The detectors below stay, but only to guard the tool-LESS fallback if the gateway is down.
+    wantsAction = true;
+    void looksLikeAction; void needsRealData;
+    void t;
   } catch { /* detection best-effort */ }
   // The free models are weak multi-step agents: asked to search the vault they re-ran near-identical searches
   // until the loop guard fired, then answered nothing (live, 2026-07-29 — 8 calls, 75s, no answer). Repeating

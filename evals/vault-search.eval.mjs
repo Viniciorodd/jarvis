@@ -2,7 +2,7 @@
 // memory". The bar: the right note first, real quoted excerpts (so the model never paraphrases from air), and
 // a hard NO-match rather than a weak guess, because a confident wrong note is worse than "I don't know".
 
-import { queryTerms, scoreNote, excerptFor } from '../pods/vault-search.mjs';
+import { queryTerms, scoreNote, excerptFor, pickNoteToOpen } from '../pods/vault-search.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -49,7 +49,34 @@ export default {
     { name: 'no match yields no excerpt rather than an unrelated line', run: () =>
       ok(excerptFor('milk and eggs', ['nih']).length === 0) },
 
+    // ── OPENING is stricter than searching (live catch, 2026-08-01) ──
+    { name: 'THE CATCH: a body-only match is NEVER opened ("note" matching "Book Notes")', run: () => {
+      const r = pickNoteToOpen('zzz nonexistent note xyzzy', [{ name: '📁 Book Notes', score: 30 }, { name: '📁 Course Notebooks', score: 20 }]);
+      return ok(r.note === null && r.candidates.length === 2, JSON.stringify(r));
+    } },
+
+    { name: 'an exact title opens, emoji and punctuation ignored', run: () => {
+      const r = pickNoteToOpen("Ana's Care", [{ name: "❤️ Ana's Care" }, { name: 'Other' }]);
+      return ok(r.note && r.exact === true && /Ana/.test(r.note.name), JSON.stringify(r.note));
+    } },
+
+    { name: 'a title containing EVERY term opens (partial titles still work)', run: () => {
+      const r = pickNoteToOpen('gov pipeline', [{ name: 'Gov Pipeline Board 2026' }]);
+      return ok(r.note && r.exact === false, JSON.stringify(r));
+    } },
+
+    { name: 'a title missing one term does NOT open — it asks instead', run: () => {
+      const r = pickNoteToOpen('gov pipeline budget', [{ name: 'Gov Pipeline Board' }]);
+      return ok(r.note === null && r.candidates.includes('Gov Pipeline Board'), JSON.stringify(r));
+    } },
+
+    { name: 'no results at all → nothing opened, nothing invented', run: () => {
+      const r = pickNoteToOpen('anything', []);
+      return ok(r.note === null && r.candidates.length === 0, JSON.stringify(r));
+    } },
+
     { name: 'garbage input does not throw', run: () =>
-      ok(scoreNote({}, ['x']) === 0 && excerptFor(null, ['x']).length === 0 && queryTerms(null).length === 0) },
+      ok(scoreNote({}, ['x']) === 0 && excerptFor(null, ['x']).length === 0 && queryTerms(null).length === 0
+        && pickNoteToOpen().note === null && pickNoteToOpen('x', null).note === null) },
   ],
 };

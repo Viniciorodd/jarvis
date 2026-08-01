@@ -59,6 +59,29 @@ export function excerptFor(text = '', terms = [], { radius = 1, max = 3 } = {}) 
   return out;
 }
 
+// PURE: pick the note to OPEN for a name. Opening is a visible action, so the bar is far higher than for a
+// search: a body-text match is not good enough. Live example (2026-08-01) — "zzz nonexistent note xyzzy"
+// scored "📁 Book Notes" top, purely because the word "note" appears in it. Ranked search is supposed to
+// always return its best guess; opening a wrong file and reporting success is the L-014 lie in a new costume.
+//
+// So a hit only qualifies if its TITLE earns it: an exact match after normalising, or a title containing
+// every meaningful term. Anything else returns null plus candidates, so Jarvis can ask instead of guess.
+const normName = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export function pickNoteToOpen(query = '', results = []) {
+  const list = Array.isArray(results) ? results : [];
+  const terms = queryTerms(query);
+  const wanted = normName(query);
+  if (!wanted || !list.length) return { note: null, candidates: list.slice(0, 5).map((h) => h.name) };
+  const exact = list.find((h) => normName(h.name) === wanted);
+  if (exact) return { note: exact, exact: true, candidates: [] };
+  const titled = list.find((h) => {
+    const n = String(h.name || '').toLowerCase();
+    return terms.length > 0 && terms.every((t) => n.includes(t));
+  });
+  if (titled) return { note: titled, exact: false, candidates: [] };
+  return { note: null, candidates: list.slice(0, 5).map((h) => h.name) };
+}
+
 // I/O: walk the vault once and rank. Bounded on purpose — a personal vault is thousands of small files, and
 // an unbounded read would stall the chat turn that is supposed to feel instant.
 // Measured 2026-07-29 on the real Second Brain: 6,086 notes, ~2.5s for a COMPLETE scan. The old 4,000 default

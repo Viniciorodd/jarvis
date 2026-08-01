@@ -397,6 +397,10 @@ const TOOLS = [
       content: { type: 'string', description: 'the markdown body of the note' },
       folder: { type: 'string', description: 'optional vault subfolder, e.g. "04 - Personal"; defaults to "00 - System/Jarvis/Notes"' },
     }, required: ['title'] } },
+  { name: 'show', description: 'PUT A SCREEN IN FRONT OF HIM. Use whenever he asks to see something: "show me the gov board", "pull up my money", "open the control center", "where are my businesses", "take me to today". You do the navigating — he should never have to find a tab. If there is no screen for what he asked, it tells you, and you say so plainly instead of sending him somewhere wrong.',
+    input_schema: { type: 'object', properties: {
+      what: { type: 'string', description: 'what he asked to see, in his own words — e.g. "the gov board", "my money", "control center"' },
+    }, required: ['what'] } },
   { name: 'look', description: 'LOOK through his camera, right here in the conversation. Use whenever he shows you something or asks what he is holding: "what am I holding", "look at this", "can you see this", "what is this", "read this label", "what does this say". It captures ONE frame and comes back with what is actually there — you do NOT need to open anything or send him to another screen. Never describe what you have not been shown.',
     input_schema: { type: 'object', properties: {
       kind: { type: 'string', description: 'object = what he is holding (default) · read = read text/labels · scene = the workspace' },
@@ -1176,6 +1180,19 @@ async function runTool(name, input) {
   if (name === 'open_path') {
     return openTarget(input.target);
   }
+  if (name === 'show') {
+    // Voice-first navigation. Resolving a route in the model's head means it invents `/pipeline` and walks
+    // him into a 404, so the destination comes from the fixed registry — and an unmatched phrase returns
+    // NOTHING rather than the nearest guess.
+    const S = await import('../pods/surfaces.mjs');
+    const hit = S.resolveSurface(String(input.what || ''));
+    if (!hit) {
+      return { ok: false, opened: false,
+        note: 'There is no screen for "' + String(input.what || '') + '" — say that plainly, do NOT invent one or navigate anywhere.',
+        available: S.surfaceMenu() };
+    }
+    return '__GOTO__' + JSON.stringify({ route: hit.route, name: hit.name, says: hit.says });
+  }
   if (name === 'look') {
     // Operator, 2026-08-01: "Jarvis was just ONE AI that could do everything… right now we have Jarvis, we're
     // talking, and now we have eyes, and it's just so many different tabs. It should be LESS tabs, more
@@ -1346,7 +1363,7 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', open_note: 'opened a vault note', look: 'looked through your camera', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', open_note: 'opened a vault note', look: 'looked through your camera', show: 'opened a screen for you', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
@@ -1584,6 +1601,7 @@ async function converse(history) {
   const actions = [];
   const visuals = [];
   let camera = null;                 // a pending look, handed to the page (the server cannot reach a webcam)
+  let goto = null;                   // a pending navigation, likewise — only the page can change screens
   // Does this turn ask for a real ACTION? If so, callClaude routes to the tool-capable action brain so it
   // actually does it (rather than the free brain refusing). Computed once from the latest user message.
   let wantsAction = false;
@@ -1619,7 +1637,7 @@ async function converse(history) {
     const toolUses = (resp.content || []).filter((b) => b.type === 'tool_use');
     if (resp.stop_reason !== 'tool_use' || toolUses.length === 0) {
       const text = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-      return { text, actions, visuals, camera, usage: resp.usage };
+      return { text, actions, visuals, camera, goto, usage: resp.usage };
     }
     messages.push({ role: 'assistant', content: resp.content });
     const results = [];
@@ -1641,6 +1659,10 @@ async function converse(history) {
       // A LOOK is a directive for the page (only the browser can reach a webcam). The model must be told
       // plainly that it has NOT seen anything yet, or it will narrate the contents of an image that does not
       // exist — the exact confabulation this whole system is built to prevent, with a camera attached.
+      if (ok && typeof out === 'string' && out.startsWith('__GOTO__')) {
+        try { goto = JSON.parse(out.slice('__GOTO__'.length)); } catch { /* skip */ }
+        out = 'Opening ' + (goto && goto.name ? goto.name : 'it') + ' for him now. Reply with ONE short line — do not describe what is on the screen, you have not read it.';
+      }
       if (ok && typeof out === 'string' && out.startsWith('__CAMERA__')) {
         try { camera = JSON.parse(out.slice('__CAMERA__'.length)); } catch { /* skip */ }
         out = 'The camera is capturing a frame now. You have NOT seen it yet — do not describe anything. Reply with one short line telling him you are looking; the result will reach him on its own.';
@@ -1659,9 +1681,9 @@ async function converse(history) {
     const final = await callClaude(messages, false);
     addUsage(final.usage);
     const text = (final.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-    if (text) return { text, actions, visuals, camera, usage: final.usage };
+    if (text) return { text, actions, visuals, camera, goto, usage: final.usage };
   } catch { /* fall through to the honest stop message */ }
-  return { text: "I searched but couldn't pull it together into an answer — the tool results are above. Ask me again and I'll narrow it down.", actions, visuals, camera };
+  return { text: "I searched but couldn't pull it together into an answer — the tool results are above. Ask me again and I'll narrow it down.", actions, visuals, camera, goto };
 }
 
 function send(res, code, body, type = 'application/json') {

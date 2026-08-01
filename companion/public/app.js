@@ -250,6 +250,13 @@ async function sendToJarvis(text) {
     // tabs… it should be less tabs, more focused work, more power." A camera you have to navigate to is a
     // feature; a camera that answers where you're already talking is a sense.
     if (data.camera) doLook(data.camera);
+    // She navigates; he never hunts for a tab. In-app hashes switch view without a reload; a real route is a
+    // page change, delayed slightly so her line is spoken/read before the screen moves under him.
+    if (data.goto && data.goto.route) {
+      const r = data.goto.route;
+      if (r.startsWith('/#')) { location.hash = r.slice(1); }
+      else if (r !== location.pathname) setTimeout(() => { location.href = r; }, 700);
+    }
     loadDash(); // a turn may have changed spend/tokens/HQ
     if (!speakOn) setTimeout(() => setState(wakeOn ? 'listening' : 'idle', wakeOn ? 'listening' : 'standby'), Math.min(5000, 1000 + data.text.length * 16));
   } catch (e) { typing.remove(); addMsg('err', e.message); setState('idle', 'standby'); }
@@ -268,7 +275,83 @@ function showVisual(v) {
   $('visualCap').textContent = (v.type === 'map' ? '🗺  ' : v.type === 'image' ? '🖼  ' : '🌐  ') + (v.caption || v.url);
   $('visual').hidden = false;
 }
-$('visualX').addEventListener('click', () => { $('visual').hidden = true; $('visualBody').innerHTML = ''; });
+$('visualX').addEventListener('click', () => { closeVisual(); });
+function closeVisual() { $('visual').hidden = true; $('visualBody').innerHTML = ''; $('visual').classList.remove('big'); }
+
+// ── HANDS (operator: "with his gesture he was able to move them as well") ──────────────────────────
+// Wave the panel away, or push it big. Frame-differencing into a 3x3 motion grid, computed here — no model,
+// no library, nothing leaves the machine. Mirrors pods/vision.mjs, which is eval-pinned.
+//
+// It only runs while something is ON SCREEN to control, and stops the camera the moment the panel closes.
+// A gesture watcher idling on an empty desk is a camera left running, which is the thing he ruled out.
+let gStream = null, gPrev = null, gPrevX = null, gRaf = null, gLast = 0;
+async function handsOn() {
+  if (gStream) return true;
+  try {
+    gStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 180 }, audio: false });
+    const vid = document.createElement('video');
+    vid.srcObject = gStream; vid.muted = true; vid.playsInline = true; await vid.play();
+    const cv = document.createElement('canvas'); cv.width = 96; cv.height = 54;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    const tick = () => {
+      if (!gStream) return;
+      ctx.drawImage(vid, 0, 0, 96, 54);
+      const cur = ctx.getImageData(0, 0, 96, 54).data;
+      if (gPrev) {
+        const cells = new Array(9).fill(0), counts = new Array(9).fill(0);
+        for (let y = 0; y < 54; y++) for (let x = 0; x < 96; x++) {
+          const i = (y * 96 + x) * 4;
+          const d = Math.abs(cur[i] - gPrev[i]) + Math.abs(cur[i + 1] - gPrev[i + 1]) + Math.abs(cur[i + 2] - gPrev[i + 2]);
+          const c = Math.floor(y / 18) * 3 + Math.floor(x / 32);
+          cells[c] += d > 60 ? 1 : 0; counts[c] += 1;
+        }
+        const norm = cells.map((n, i) => n / (counts[i] || 1));
+        const energy = norm.reduce((a, b) => a + b, 0) / 9;
+        const col = [0, 1, 2].map((c) => norm[c] + norm[c + 3] + norm[c + 6]);
+        const tot = col.reduce((a, b) => a + b, 0) || 1;
+        const x = (col[1] * 0.5 + col[2]) / tot;
+        let g = null;
+        if (energy >= 0.18) {
+          if (norm.filter((c) => c > 0.35).length >= 7) g = 'dismiss';
+          else if (gPrevX != null && x - gPrevX > 0.28) g = 'next';
+          else if (gPrevX != null && gPrevX - x > 0.28) g = 'prev';
+          else if (col[1] / tot > 0.6 && norm[4] > 0.4) g = 'expand';
+        }
+        gPrevX = tot ? x : gPrevX;
+        // 1.2s cooldown — a gesture that can fire every frame turns a stretch into a command storm.
+        if (g && Date.now() - gLast > 1200) { gLast = Date.now(); onHandGesture(g); }
+      }
+      gPrev = cur;
+      gRaf = requestAnimationFrame(tick);
+    };
+    tick();
+    return true;
+  } catch { handsOff(); return false; }
+}
+function handsOff() {
+  if (gRaf) cancelAnimationFrame(gRaf);
+  try { if (gStream) gStream.getTracks().forEach((t) => t.stop()); } catch { /* */ }
+  gStream = null; gRaf = null; gPrev = null; gPrevX = null;
+  const b = $('handsBtn'); if (b) b.classList.remove('on');
+}
+function onHandGesture(g) {
+  const panel = $('visual');
+  if (!panel || panel.hidden) return;         // nothing on screen to control
+  if (g === 'dismiss') { closeVisual(); handsOff(); return; }   // wave it away, and the camera goes with it
+  if (g === 'expand') panel.classList.toggle('big');
+  if (g === 'next' || g === 'prev') panel.classList.toggle('big');
+}
+// The camera only runs while a panel is up, and never on its own.
+const _showVisual = showVisual;
+showVisual = function (v) { _showVisual(v); if ($('handsBtn') && $('handsBtn').classList.contains('on')) handsOn(); };
+if ($('handsBtn')) $('handsBtn').addEventListener('click', async () => {
+  const b = $('handsBtn');
+  if (b.classList.contains('on')) { handsOff(); return; }
+  // Light the button only if the camera ACTUALLY opened — a lit indicator on a denied permission is a lie
+  // about whether anything is watching.
+  if (await handsOn()) b.classList.add('on');
+  else addMsg('err', 'I need camera permission for hand control.');
+});
 
 // ── dashboard ────────────────────────────────────────────────────────────
 const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

@@ -111,6 +111,21 @@ export function setAgent(state = {}, codename = '', patch = {}) {
   return next;
 }
 
+// PURE: apply one change to EVERY agent at once (operator: "instead of me having to go one by one").
+// Needs the roster, because state is sparse — agents sitting on defaults have no entry yet, and a bulk
+// change that only touched the ones already written would silently skip most of them.
+// Invalid values are refused wholesale rather than partially applied: half a bulk change is worse than none,
+// because he'd believe the whole roster moved.
+export function setAll(state = {}, roster = [], patch = {}) {
+  const people = (Array.isArray(roster) ? roster : []).filter((p) => p && p.codename);
+  if (!people.length) return state;
+  if (patch.state !== undefined && !STATES.includes(patch.state)) return state;
+  if (patch.tier !== undefined && !TIERS.includes(Number(patch.tier))) return state;
+  let next = { killAll: !!state.killAll, agents: { ...(state.agents || {}) } };
+  for (const p of people) next = setAgent(next, p.codename, patch);
+  return next;
+}
+
 // PURE: the global halt. Separate from per-agent state so flipping it back does NOT resurrect agents he
 // switched off individually — the kill switch is a blanket, not an undo.
 export function setKill(state = {}, on = true) {

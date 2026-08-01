@@ -18,13 +18,35 @@ app.isQuitting = false;
 // (without this, an unpackaged `electron .` run shows the generic Electron icon).
 if (process.platform === 'win32') app.setAppUserModelId('com.rodgate.jarvis');
 
-function startCompanion() {
-  if (!fs.existsSync(SERVER)) return; // skip if running outside the repo
-  server = spawn(process.execPath, [SERVER], {
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', COMPANION_PORT: String(PORT) },
-    stdio: 'inherit',
-  });
-  server.on('exit', (code) => { if (!app.isQuitting) console.error('companion exited', code); });
+// Is something already serving the companion on PORT? Two supervisors want that port — this app, and
+// scripts/run-loop.cmd (the keep-alive wrapper). Spawning blindly meant whichever lost the race died with
+// EADDRINUSE while the app still believed it had started a server, and every restart of the other one left a
+// window where the UI showed "Could not reach Jarvis — Failed to fetch". Ask first.
+function companionAlive(timeoutMs = 1200) {
+  return fetch('http://127.0.0.1:' + PORT + '/api/cockpit', { signal: AbortSignal.timeout(timeoutMs) })
+    .then((r) => r.ok).catch(() => false);
+}
+
+async function startCompanion() {
+  if (!fs.existsSync(SERVER)) return;            // running outside the repo
+  if (await companionAlive()) {                  // run-loop.cmd (or a dev run) already owns it — leave it be
+    console.log('[jarvis] companion already running on ' + PORT + ' — not starting a second one');
+    return;
+  }
+  const spawnOne = () => {
+    server = spawn(process.execPath, [SERVER], {
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', COMPANION_PORT: String(PORT) },
+      stdio: 'inherit',
+    });
+    server.on('exit', async (code) => {
+      if (app.isQuitting) return;
+      console.error('[jarvis] companion exited (' + code + ')');
+      // If the OTHER supervisor took the port, that's fine — it's serving. Only respawn when nothing is.
+      if (await companionAlive()) return;
+      setTimeout(() => { if (!app.isQuitting) spawnOne(); }, 3000);
+    });
+  };
+  spawnOne();
 }
 
 function createWindow() {

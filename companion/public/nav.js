@@ -95,6 +95,11 @@ var moreItems = {
   jMoreLend:    function(){ window.location.href = '/lendability'; },  /* Victor's business-credit & lendability desk */
   /* The redesign (U1/U4, 2026-07-17): ONE gov system + ONE money desk. These supersede the scattered
      pages above; the old ones stay reachable until U2 ports the last of their unique panels. */
+  /* Operator, 2026-08-01: "we want to make sure that everything we're building, we're building it onto Jarvis
+     itself — I don't know why we're building outside of it." Right: /control and /eyes shipped as pages you
+     had to know the URL for, which is not part of the app, it's next to it. They live in the shell now. */
+  jMoreControl: function(){ window.location.href = '/control'; },   /* agent on/off + autonomy tiers + kill */
+  jMoreEyes:    function(){ window.location.href = '/eyes'; },      /* the camera — on-demand looking */
   jMoreGovconOs: function(){ window.location.href = '/govcon-os'; },
   jMoreFinances: function(){ window.location.href = '/finances'; },
   jMoreMap:     function(){ triggerGhost('mapBtn'); },

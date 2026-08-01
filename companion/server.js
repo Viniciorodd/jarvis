@@ -3449,8 +3449,13 @@ const server = http.createServer(async (req, res) => {
       const CC = await import('../pods/control-center.mjs');
       let state = CC.loadControl();
       if (b.kill !== undefined) state = CC.setKill(state, !!b.kill);
-      else if (b.codename) state = CC.setAgent(state, String(b.codename), { state: b.state, tier: b.tier });
-      else return send(res, 200, JSON.stringify({ ok: false, error: 'need codename, or kill' }));
+      else if (b.all === true) {
+        // Bulk: every agent at once. Needs the roster because state is sparse — agents on defaults have no
+        // saved entry, and touching only the written ones would silently skip most of the team.
+        const O = await import('../pods/org.mjs');
+        state = CC.setAll(state, (O.ROSTER || []).filter((p) => p && p.codename), { state: b.state, tier: b.tier });
+      } else if (b.codename) state = CC.setAgent(state, String(b.codename), { state: b.state, tier: b.tier });
+      else return send(res, 200, JSON.stringify({ ok: false, error: 'need codename, all:true, or kill' }));
       CC.saveControl(state);
       // Echo back the RESOLVED policy, not what he asked for — an invalid tier is refused, and he should see
       // what actually took effect rather than assume his request landed.

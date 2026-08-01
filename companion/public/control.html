@@ -27,6 +27,15 @@
   .kill-b { background: rgba(226,133,122,.14); border: 1px solid rgba(226,133,122,.45); color: #e2857a;
     border-radius: 9px; padding: 9px 16px; font-size: 13px; }
   .kill-b:hover { background: rgba(226,133,122,.26); }
+  .bulk { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 12px 14px; border-radius: 12px;
+    margin-bottom: 18px; border: 1px solid rgba(var(--teal-rgb),.18); background: rgba(var(--teal-rgb),.04); }
+  .bulk-l { font-size: 10.5px; letter-spacing: .14em; color: var(--dim); margin-right: 4px; }
+  .bulk-sep { width: 1px; height: 20px; background: rgba(var(--teal-rgb),.2); margin: 0 5px; }
+  .bulk button { background: rgba(var(--teal-rgb),.09); border: 1px solid rgba(var(--teal-rgb),.24);
+    color: var(--cream); border-radius: 8px; padding: 7px 11px; font-size: 12px; }
+  .bulk button:hover { background: rgba(var(--teal-rgb),.18); }
+  .bulk button.warn { border-color: rgba(226,133,122,.4); color: #e2857a; }
+  .bulk button.warn:hover { background: rgba(226,133,122,.16); }
   .pod { font-size: 10.5px; letter-spacing: .16em; color: var(--dim); margin: 20px 0 8px; }
   .row { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 11px; margin-bottom: 7px;
     border: 1px solid rgba(var(--teal-rgb),.14); background: rgba(var(--teal-rgb),.03); }
@@ -48,6 +57,8 @@
 </style>
 
 <div class="wrap">
+  <a href="/" style="display:inline-block; margin-bottom:14px; font-size:12.5px; color:var(--teal);
+     text-decoration:none; opacity:.85;" title="Back to the JARVIS cockpit">← Jarvis</a>
   <h1>Control Center</h1>
   <div class="sub">Every agent, its switch, and how much it may do on its own. Changes take effect immediately.</div>
 
@@ -57,6 +68,20 @@
       <div class="kill-p" id="killP">Halts every autonomous agent action instantly. Approvals you've already given still stand.</div>
     </div>
     <button class="kill-b" id="killBtn">🛑 Halt everything</button>
+  </div>
+
+  <!-- Bulk controls. Operator: "instead of me having to go one by one, we can just click a button." Kept
+       separate from the kill switch above: the kill switch is an emergency blanket, this is normal operating
+       — turn the team on for the day, park it for the night, or grant a tier across the board. -->
+  <div class="bulk">
+    <span class="bulk-l">ALL 18 AGENTS</span>
+    <button data-all-state="active">▶ On</button>
+    <button data-all-state="paused">⏸ Pause</button>
+    <button data-all-state="off" class="warn">⛔ Off</button>
+    <span class="bulk-sep"></span>
+    <button data-all-tier="0">Tier 0 · draft</button>
+    <button data-all-tier="1">Tier 1 · approve</button>
+    <button data-all-tier="2" class="warn">Tier 2 · auto</button>
   </div>
 
   <div id="readWarn" style="display:none; padding:11px 14px; border-radius:10px; margin-bottom:16px; font-size:12.5px;
@@ -153,5 +178,17 @@
   }
 
   $('killBtn').addEventListener('click', () => post({ kill: !data.killAll }));
+
+  // Bulk. The two that GRANT reach (everyone Off, everyone Tier 2) confirm first — a mis-click that switches
+  // the whole company off, or hands every agent autonomy, is not something to discover afterwards.
+  for (const b of document.querySelectorAll('.bulk button')) {
+    b.addEventListener('click', () => {
+      const st = b.dataset.allState, tr = b.dataset.allTier;
+      const risky = st === 'off' || tr === '2';
+      const what = st ? 'switch ALL agents ' + st.toUpperCase() : 'put ALL agents on Tier 2 (they act alone)';
+      if (risky && !confirm(what + '?')) return;
+      post(st ? { all: true, state: st } : { all: true, tier: Number(tr) });
+    });
+  }
   load();
 </script>

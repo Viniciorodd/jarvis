@@ -3,7 +3,7 @@
 // guardrail is explicit: "a Tier-0 agent must be UNABLE to act, not merely told not to."
 // Everything fails CLOSED: corrupt state, unknown agent, garbage tier all resolve to "no".
 
-import { canAgentAct, agentPolicy, setAgent, setKill, rosterView, DEFAULT_AGENT } from '../pods/control-center.mjs';
+import { canAgentAct, agentPolicy, setAgent, setAll, setKill, rosterView, DEFAULT_AGENT } from '../pods/control-center.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 const S = (agents, killAll = false) => ({ killAll, agents });
@@ -82,6 +82,38 @@ export default {
       const next = setAgent(S({ A: { state: 'active', tier: 0 }, B: { state: 'active', tier: 0 } }), 'A', { tier: 2 });
       return ok(next.agents.A.tier === 2 && next.agents.B.tier === 0, JSON.stringify(next.agents));
     } },
+
+    // ── bulk controls (operator: "instead of me having to go one by one") ──
+    { name: 'BULK: one call moves EVERY agent, including ones with no saved entry yet', run: () => {
+      const roster = [{ codename: 'A' }, { codename: 'B' }, { codename: 'C' }];
+      const next = setAll({ killAll: false, agents: { A: { state: 'active', tier: 0 } } }, roster, { state: 'off' });
+      return ok(['A', 'B', 'C'].every((c) => next.agents[c].state === 'off'), JSON.stringify(next.agents));
+    } },
+
+    { name: 'BULK tier: all agents move together and it actually takes effect at the gate', run: () => {
+      const roster = [{ codename: 'A' }, { codename: 'B' }];
+      const next = setAll({}, roster, { tier: 2 });
+      return ok(canAgentAct({ state: next, codename: 'A', kind: 'act' }).allow === true
+        && canAgentAct({ state: next, codename: 'B', kind: 'act' }).allow === true, JSON.stringify(next.agents));
+    } },
+
+    { name: 'BULK: a bad value changes NOTHING — half a bulk change is worse than none', run: () => {
+      const roster = [{ codename: 'A' }, { codename: 'B' }];
+      const start = { killAll: false, agents: { A: { state: 'active', tier: 1 } } };
+      const badTier = setAll(start, roster, { tier: 9 });
+      const badState = setAll(start, roster, { state: 'banana' });
+      return ok(JSON.stringify(badTier) === JSON.stringify(start) && JSON.stringify(badState) === JSON.stringify(start), JSON.stringify(badTier));
+    } },
+
+    { name: 'BULK: setting state does not silently reset everyone\'s tier', run: () => {
+      const roster = [{ codename: 'A' }, { codename: 'B' }];
+      const start = { killAll: false, agents: { A: { state: 'active', tier: 2 }, B: { state: 'active', tier: 1 } } };
+      const next = setAll(start, roster, { state: 'paused' });
+      return ok(next.agents.A.tier === 2 && next.agents.B.tier === 1, JSON.stringify(next.agents));
+    } },
+
+    { name: 'BULK: an empty roster is a no-op, never a wipe', run: () =>
+      ok(JSON.stringify(setAll({ killAll: false, agents: { A: { state: 'off', tier: 0 } } }, [], { state: 'active' }).agents) === JSON.stringify({ A: { state: 'off', tier: 0 } })) },
 
     { name: 'setAgent REFUSES an invalid tier rather than silently coercing it', run: () => {
       const next = setAgent(S({ A: { state: 'active', tier: 1 } }), 'A', { tier: 7 });

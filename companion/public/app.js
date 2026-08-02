@@ -182,6 +182,42 @@ function setMsgText(el, text) {
   if (window.JDock) window.JDock.mirror('j', text);
 }
 
+// ── BLACKOUT WATCHDOG ─────────────────────────────────────────────────────
+// Operator, 2026-08-02, with a screenshot of an empty black window: "this is jarvis 90% of the time,
+// blacked." The shell-side cause (a webview that never retried after the companion restarted) is fixed in
+// desktop/shell.html — but a black screen must never be SILENT again whatever the cause, because a blank
+// window tells him nothing about whether to wait, reload, or restart.
+//
+// So: if the active view is still empty a few seconds after load, say so and offer the one-click fix.
+// Deliberately dumb and dependency-free — a watchdog that can itself fail is not a watchdog.
+(function blackoutWatchdog() {
+  function check() {
+    try {
+      const main = document.querySelector('.j-main');
+      const active = document.querySelector('.j-view.active') || main;
+      const text = (active && active.innerText || '').trim();
+      if (text.length > 40) return;                    // rendering fine
+      if (document.getElementById('blackoutNote')) return;
+      const n = document.createElement('div');
+      n.id = 'blackoutNote';
+      n.style.cssText = 'position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);z-index:9999;max-width:420px;'
+        + 'text-align:center;font:14px/1.6 system-ui;color:#cfe4e2;background:rgba(8,16,28,.95);padding:20px 24px;'
+        + 'border:1px solid rgba(90,190,180,.4);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.6)';
+      n.innerHTML = '<div style="font-size:15px;margin-bottom:6px">Jarvis loaded but this screen came up empty.</div>'
+        + '<div style="color:#7d97a0;font-size:12.5px;margin-bottom:14px">Usually a stale cache after the server restarted.</div>';
+      const b = document.createElement('button');
+      b.textContent = '↻ Reload';
+      b.style.cssText = 'background:rgba(90,190,180,.16);border:1px solid rgba(90,190,180,.45);color:#cfe4e2;'
+        + 'border-radius:9px;padding:9px 18px;font:inherit;font-size:13px;cursor:pointer';
+      b.addEventListener('click', () => { location.reload(true); });
+      n.appendChild(b);
+      document.body.appendChild(n);
+    } catch { /* a watchdog must never throw */ }
+  }
+  if (document.readyState === 'complete') setTimeout(check, 4000);
+  else window.addEventListener('load', () => setTimeout(check, 4000));
+})();
+
 // ── LOOKING, inside the conversation ──────────────────────────────────────
 // The server cannot reach a webcam, so it returns a directive and this does the capture. One frame, then the
 // track is stopped immediately — the camera light going out is the proof that nothing is still watching.

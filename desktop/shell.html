@@ -104,23 +104,72 @@
     }
   }
 
-  // Retry World until companion server is up, then reload the webview.
-  // Setting view.src to the same URL is a no-op in Electron — use reload() instead.
-  let worldReady = false;
+  // ── THE BLACKOUT FIX (operator, 2026-08-02: "this is jarvis 90% of the time, blacked") ────────────
+  //
+  // The old logic retried ONLY until the first successful load, then stopped watching. So the moment the
+  // companion restarted — a crash, a redeploy, run-loop.cmd cycling it, anything — the webview's page died
+  // and NOTHING ever brought it back. It sat on a blank error page until he quit and relaunched. The
+  // companion restarts often, which is exactly why he saw this most of the time rather than rarely.
+  //
+  // Now: a failed load is a RECOVERABLE state, not a terminal one. We watch `did-fail-load`, keep probing,
+  // and reload the instant the server answers again. And a black screen is never silent — he gets a visible
+  // "reconnecting" line, because a blank window tells you nothing about whether to wait or restart.
+  let worldReady = false, reconnecting = false;
+
+  function setStatus(msg){
+    let el = document.getElementById('reconn');
+    if (!msg){ if (el) el.remove(); return; }
+    if (!el){
+      el = document.createElement('div');
+      el.id = 'reconn';
+      el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;padding:9px 14px;font:12.5px/1.4 system-ui;'
+        + 'background:rgba(90,190,180,.12);color:#9fd6cf;border-top:1px solid rgba(90,190,180,.35);z-index:9999;text-align:center';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+  }
+
+  function probeWorld(){
+    return fetch(WORLD_URL, { cache:'no-store', signal:AbortSignal.timeout(1500) }).then(r => !!r).catch(() => false);
+  }
+
+  // Poll until the companion answers, then reload the view. Backs off gently so a long outage doesn't
+  // hammer the port, but stays responsive enough that a 3-second restart feels instant.
+  async function recoverWorld(){
+    if (reconnecting) return;
+    reconnecting = true;
+    let wait = 500;
+    for (;;){
+      if (await probeWorld()){
+        setStatus(null);
+        reconnecting = false;
+        worldReady = true;
+        if (surface === 'world') { try { view.reloadIgnoringCache(); } catch { view.src = WORLD_URL; } }
+        return;
+      }
+      setStatus('Jarvis is starting up — reconnecting…  (Ctrl+R to force)');
+      await new Promise(r => setTimeout(r, wait));
+      wait = Math.min(4000, Math.round(wait * 1.4));
+    }
+  }
+
+  // A load failure is the signal that matters. -3 is ABORTED (a navigation superseded by another) and is
+  // normal noise, not an outage — treating it as one would put us in a reload loop.
+  view.addEventListener('did-fail-load', (e) => {
+    if (e.errorCode === -3) return;
+    if (surface === 'world') recoverWorld();
+  });
+  view.addEventListener('did-finish-load', () => { if (surface === 'world') setStatus(null); });
+  // The renderer dying (OOM/crash) leaves the same black window, and never fires did-fail-load.
+  view.addEventListener('crashed', () => { if (surface === 'world') recoverWorld(); });
+  view.addEventListener('render-process-gone', () => { if (surface === 'world') recoverWorld(); });
+
   function goWorld(){
     surface = 'world';
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.surface === 'world'));
     if (worldReady) { view.reloadIgnoringCache(); return; }
-    view.src = WORLD_URL; // initial attempt (may show error page if server not up yet)
-    const check = () => fetch('http://localhost:8095/', { cache:'no-store', signal:AbortSignal.timeout(1200) })
-      .then(() => {
-        if (!worldReady) {
-          worldReady = true;
-          if (surface === 'world') view.reloadIgnoringCache(); // reload now that server is confirmed up
-        }
-      })
-      .catch(() => setTimeout(check, 800));
-    setTimeout(check, 600); // slight head-start for the companion server
+    view.src = WORLD_URL;      // first attempt; if the server isn't up this fails and recoverWorld takes over
+    recoverWorld();
   }
 
   // ESCAPE HATCH for a blacked-out webview (recurring blank Home/Today/Jarvis): Ctrl/Cmd+R or F5 force-reloads

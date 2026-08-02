@@ -126,13 +126,25 @@ async function showPending(chat, replyThread) {
     pushedApprovals.add(a.id); // mark seen so the 15s auto-pusher doesn't double-send
   }
 }
+// Operator, 2026-08-02: "so many spams that most of it is just noise... I'm just ignoring everything."
+// Measured: ZERO approval decisions in his last 200 events while the queue grew to 30. He tuned the channel
+// out, which makes every message worthless including the ones that matter.
+//
+// So this no longer pushes EVERY gate. pods/notify-policy.mjs decides — only a decision with money or a
+// deadline attached, a person waiting on him, or a real error. Routine outreach gates stay in the queue,
+// get counted in the end-of-day report, and are listed on demand by /pending. Nothing is lost; it just
+// stops interrupting him.
 async function pushApprovals() {
   if (!ALLOWED) return;
   const list = await cp('/approvals/pending');
   if (!Array.isArray(list)) return;
-  for (const a of list) {
-    if (pushedApprovals.has(a.id)) continue;
-    pushedApprovals.add(a.id);
+  const P = await import('../pods/notify-policy.mjs');
+  const fresh = list.filter((a) => !pushedApprovals.has(a.id));
+  // Mark everything seen, even what we choose not to send — otherwise a skipped gate is re-evaluated
+  // forever and would burst the moment the policy ever loosened.
+  fresh.forEach((a) => pushedApprovals.add(a.id));
+  const worth = fresh.filter((a) => P.worthABuzz({ kind: 'approval.request', action: a.action, rationale: a.rationale, payload: a.payload }));
+  for (const a of worth.slice(0, 3)) {
     const thread = await topicFor(a.actor); // e.g. Hector's own topic for a sub-outreach send gate
     const body = { chat_id: ALLOWED, text: approvalText(a), reply_markup: { inline_keyboard: [[{ text: '✅ Approve & send', callback_data: 'ap:' + a.id }, { text: '⏭ Skip', callback_data: 'sk:' + a.id }]] } };
     if (thread) body.message_thread_id = thread;
@@ -152,13 +164,22 @@ async function pushNarration() {
   if (!ALLOWED) return;
   const list = await cp('/events');
   if (!Array.isArray(list)) return;
-  const fresh = [];
+  let fresh = [];
   for (const ev of list) {
     if (seenEvents.has(ev.id)) continue;
     seenEvents.add(ev.id);
     fresh.push(ev);
   }
   if (!fresh.length) return;
+  // THE NOISE FILTER (2026-08-02). This loop used to narrate every meaningful agent action every 90s — which
+  // is what "so many spams from Jarvis" was. Agent activity is not news; it belongs in the end-of-day report
+  // and the Activity screen. Only what pods/notify-policy.mjs judges worth interrupting him for gets through,
+  // capped, so a backlog can never dump on his phone. Everything else stays marked-seen and silent.
+  const NP = await import('../pods/notify-policy.mjs');
+  const worthy = NP.pickBuzzes(fresh, { max: 3 });
+  if (!worthy.length) return;
+  const worthyIds = new Set(worthy.map((w) => w.id));
+  fresh = fresh.filter((ev) => worthyIds.has(ev.id));
   // ONE TOPIC PER AGENT: group this cycle's events by actor FIRST, then run each group through the same
   // rollupNarrations the old single-message version used — that function is the truth-contract guard
   // (evals/narrate*.eval.mjs), untouched; we're only changing WHERE each actor's rollup is delivered, not

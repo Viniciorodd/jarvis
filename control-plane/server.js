@@ -351,6 +351,36 @@ const server = http.createServer(async (req, res) => {
     // by this route; approving on Telegram buttons / HQ / cockpit is still the one human gate that
     // fires an executor (doctrine §9 rule 2). Best-effort: Telegram unconfigured → report WITHOUT
     // logging the nudged event (the first configured slot still fires); never throws.
+    // END-OF-DAY REPORT (operator, 2026-08-01): "instead of a whole bunch of notifications that are pretty
+    // much useless… at the end of the day, how many times we reached out to subs, how many opportunities we
+    // sorted. An end of day report instead of a live one."
+    //
+    // This REPLACES the 8am growth digest and the two approval nudges. What stays live is only what he named:
+    // a quote landing, or a sub asking something only he can answer (pods/gov/reply-triage.mjs pushes those
+    // the moment they're read). Everything else waits for this.
+    //
+    // Silent on a day where nothing happened — an evening "0, 0, 0" is the same noise in a new hat. Deduped
+    // per calendar day so a scheduler re-fire can't double-send.
+    if (req.method === 'POST' && p === '/maintenance/gov-eod-report') {
+      try {
+        const now = new Date();
+        const day = now.toLocaleDateString('en-CA');
+        if (store.readEvents({ kind: 'eod.report' }).some((e) => e.payload && e.payload.date === day))
+          return send(res, 200, { ok: true, skipped: 'already reported today' });
+        const E = await import('../pods/gov/eod-report.mjs');
+        const stats = E.eodStats(store.readEvents({}), day);
+        const pending = store.pendingApprovals().length;
+        const text = E.eodMessage(stats, { pendingApprovals: pending, stalled: [] });
+        if (!text) return send(res, 200, { ok: true, skipped: 'nothing happened today' });
+        const lib = await import('../pods/lib.mjs');
+        if (!lib.env('TELEGRAM_BOT_TOKEN') || !lib.env('TELEGRAM_CHAT_ID')) return send(res, 200, { ok: false, error: 'telegram not configured', text });
+        lib.notifyTelegram(text);
+        store.appendEvent({ kind: 'eod.report', actor: 'EXEC-01', pod: 'exec', action: 'eod.report', status: 'done',
+          rationale: `End-of-day report sent — ${stats.outreachSent} sub(s) contacted, ${stats.quotesIn} quote(s) in, ${pending} waiting on him`,
+          payload: { date: day, stats } });
+        return send(res, 200, { ok: true, sent: true, date: day, stats });
+      } catch (e) { return send(res, 200, { ok: false, error: e.message }); }
+    }
     if (req.method === 'POST' && p === '/maintenance/approvals-nudge') {
       try {
         const now = new Date();

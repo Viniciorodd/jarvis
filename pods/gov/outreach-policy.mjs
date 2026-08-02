@@ -17,7 +17,7 @@ import { canAgentAct } from '../control-center.mjs';
 // The phone-reachable kill switch (control-plane/auto-send.json, written by /maintenance/auto-send-kill).
 // Checked on EVERY decision so one tap halts autonomous sending everywhere, without a redeploy. Best-effort
 // read: no file = not killed (the switch is opt-in); a file that says kill:true always wins.
-const KILL_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'control-plane', 'auto-send.json');
+export const KILL_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'control-plane', 'auto-send.json');
 export function killSwitchOn() {
   try { return JSON.parse(fs.readFileSync(KILL_FILE, 'utf8')).kill === true; } catch { return false; }
 }
@@ -25,6 +25,30 @@ export function killSwitchOn() {
 // this is what makes 'flip Tier 1' a BUTTON instead of an .env edit on the NAS.
 export function tierFromFile() {
   try { const t = JSON.parse(fs.readFileSync(KILL_FILE, 'utf8')).tier; return Number.isFinite(Number(t)) ? Number(t) : null; } catch { return null; }
+}
+
+// ── DOES AN APPROVAL ACTUALLY SEND? ───────────────────────────────────────────────────────────────
+// Operator, 2026-08-02, on approvals that appeared to do nothing: *"I should be able to control every aspect
+// of the business from Telegram. If I am away, 200 miles from home, I want to make sure my business is still
+// running and that I can operate it."*
+//
+// GOV_AUTO_SEND was env-only, so approving on a machine without it produced a PREVIEW that looked like a
+// send. Worse, the only fix was editing .env on the NAS and restarting — impossible from a phone. It now
+// follows the same file-backed pattern as the kill switch and the tier, for exactly the reason written above
+// them: a switch has to be a BUTTON, not an .env edit on a box he can't reach.
+//
+// FILE WINS when set (he flipped it deliberately, from wherever he was). Env is the fallback for a fresh
+// install. Absent both → OFF, because the safe default for "does this really send email" is no.
+export function govSendFromFile() {
+  try {
+    const v = JSON.parse(fs.readFileSync(KILL_FILE, 'utf8')).govSend;
+    return typeof v === 'boolean' ? v : null;
+  } catch { return null; }
+}
+export function govSendOn(env = process.env) {
+  const f = govSendFromFile();
+  if (f !== null) return f;
+  return /^(1|true|yes|on)$/i.test(String(env.GOV_AUTO_SEND || ''));
 }
 
 export const TIERS = { 0: 'off', 1: 'sub-quote requests + follow-ups', 2: '+ prime introductions', 3: '+ sources-sought responses' };

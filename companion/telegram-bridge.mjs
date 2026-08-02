@@ -265,6 +265,19 @@ async function handleCallback(q) {
   else note = '✅ Approved.';
   await tg('answerCallbackQuery', { callback_query_id: q.id, text: note });
   try { await tg('editMessageText', { chat_id: chat, message_id: q.message.message_id, text: (q.message.text || '') + '\n\n' + note }); } catch { /* */ }
+  // A callback toast is a 2-second popup he can miss, and the edited message is easy to scroll past. When an
+  // approval did NOT result in a send, say so as a REAL message with the reason and the one-line fix —
+  // otherwise "I approved it" and "nothing happened" look identical, which is exactly what he reported.
+  if (decision === 'approve') {
+    const ex = r && r.executed;
+    if (ex && ex.error) {
+      await send(chat, `⚠️ You approved it, but the executor errored — nothing went out.\n${ex.error}`, q.message.message_thread_id);
+    } else if (ex && !ex.sent && ex.ok) {
+      await send(chat, '🅿️ You approved it — but auto-send is OFF, so that was a PREVIEW. Nothing left the building.\n\nTurn it on right here: /autosend on', q.message.message_thread_id);
+    } else if (ex && !ex.sent && !ex.ok) {
+      await send(chat, `⚠️ You approved it, but the send FAILED — nothing went out.\n${ex.reason || 'no reason given'}`, q.message.message_thread_id);
+    }
+  }
 }
 
 async function askJarvis(text) {
@@ -303,6 +316,29 @@ async function handle(chat, text, thread) {
   if (/^\/resume\b/i.test(text)) {
     const r = await fetch(CP + '/maintenance/auto-send-kill', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kill: false }) }).then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
     return send(chat, r.ok ? '▶️ Kill switch released. Your AUTO_SEND_TIER setting governs again (Tier 0 = still nothing sends).' : `⚠️ Could not release it — ${r.error || 'unknown'}.`, thread);
+  }
+  // ── APPROVALS THAT ACTUALLY SEND, controllable from the phone ────────────────────────────────────
+  // Operator, 2026-08-02: "if there's an error with the action... we should be able to get a message stating
+  // why this didn't happen. I should also be able to respond and say activate the government auto sending.
+  // I should be able to control every aspect of the business from Telegram — if I am 200 miles from home I
+  // want to make sure my business is still running and that I can operate it."
+  if (/^\/autosend\b/i.test(text)) {
+    const arg = (text.match(/^\/autosend\s+(on|off|status)?/i) || [])[1];
+    if (!arg || /status/i.test(arg)) {
+      const r = await fetch(CP + '/maintenance/gov-auto-send').then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+      if (!r.ok) return send(chat, `⚠️ Couldn't read it — ${r.error || 'control-plane unreachable'}.`, thread);
+      return send(chat, r.on
+        ? `📤 Auto-send is ON (from the ${r.source}) — approving actually sends the email.`
+        : `🅿️ Auto-send is OFF (from the ${r.source}) — approving only PREVIEWS; nothing leaves.\nTurn it on: /autosend on`, thread);
+    }
+    const on = /on/i.test(arg);
+    const r = await fetch(CP + '/maintenance/gov-auto-send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ on }) }).then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+    // Report what ACTUALLY took effect. Saying "done" on a failed write is how he ends up believing the
+    // business is running while it quietly isn't.
+    if (!r.ok) return send(chat, `⚠️ Could NOT change it — ${r.error || 'unknown'}. Assume it is still ${on ? 'off' : 'on'}.`, thread);
+    return send(chat, on
+      ? '📤 Auto-send ON. From now on, approving a gov email actually SENDS it. (/autosend off to stop.)'
+      : '🅿️ Auto-send OFF. Approving now previews only — nothing leaves the building.', thread);
   }
   if (/^\/killstatus\b/i.test(text)) {
     const r = await fetch(CP + '/maintenance/auto-send-kill').then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));

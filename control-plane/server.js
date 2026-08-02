@@ -83,7 +83,9 @@ const server = http.createServer(async (req, res) => {
           const gov = await import('../pods/gov/sender.mjs');
           const job = gov.approvalToSend(reqEv);
           if (job) {
-            const auto = /^(1|true|yes|on)$/i.test(process.env.GOV_AUTO_SEND || '');
+            // File-backed so he can flip it from Telegram while away (see govSendOn). Env is the fallback.
+            const P = await import('../pods/gov/outreach-policy.mjs');
+            const auto = P.govSendOn();
             const r = await gov.sendGovEmail({ file: job.file, dryRun: !auto });
             const action = r.sent ? 'email.sent' : (r.ok ? 'email.preview' : 'email.failed');
             store.appendEvent({ kind: 'action', actor: 'GOV-SEND', pod: 'gov', action, reversible: false, status: r.ok ? 'done' : 'error',
@@ -361,6 +363,30 @@ const server = http.createServer(async (req, res) => {
     //
     // Silent on a day where nothing happened — an evening "0, 0, 0" is the same noise in a new hat. Deduped
     // per calendar day so a scheduler re-fire can't double-send.
+    // GOV AUTO-SEND, flippable from anywhere (Telegram /autosend, the UI, a curl from a hotel room).
+    // GET reports the truth including WHERE the setting came from, so "why didn't it send" is answerable
+    // without SSH-ing into the NAS.
+    if (p === '/maintenance/gov-auto-send') {
+      try {
+        const P = await import('../pods/gov/outreach-policy.mjs');
+        if (req.method === 'POST') {
+          const b = await readBody(req);
+          if (typeof b.on !== 'boolean') return send(res, 400, { ok: false, error: 'need { on: true|false }' });
+          const f = P.KILL_FILE || null;
+          const fs2 = await import('node:fs');
+          const path2 = await import('node:path');
+          const file = f || path2.join(process.cwd(), 'control-plane', 'auto-send.json');
+          let cur = {};
+          try { cur = JSON.parse(fs2.readFileSync(file, 'utf8')); } catch { /* first write */ }
+          fs2.mkdirSync(path2.dirname(file), { recursive: true });
+          fs2.writeFileSync(file, JSON.stringify({ ...cur, govSend: b.on }, null, 2));
+          store.appendEvent({ kind: 'meta', actor: 'operator', pod: 'gov', action: 'gov.autosend.set', status: 'done',
+            rationale: `Approvals now ${b.on ? 'SEND for real' : 'preview only (nothing leaves)'}`, payload: { on: b.on } });
+          return send(res, 200, { ok: true, on: b.on });
+        }
+        return send(res, 200, { ok: true, on: P.govSendOn(), source: P.govSendFromFile() !== null ? 'switch' : 'env' });
+      } catch (e) { return send(res, 200, { ok: false, error: e.message }); }
+    }
     if (req.method === 'POST' && p === '/maintenance/gov-eod-report') {
       try {
         const now = new Date();

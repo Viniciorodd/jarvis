@@ -234,6 +234,9 @@ function stopLook(vid) {
 async function sendToJarvis(text) {
   if (busy || !text.trim()) return;
   stopSpeaking();                       // a new turn silences whatever she was saying
+  // "Close that" / "move it left" act on the workspace instantly — no model, no round-trip. Only when a
+  // panel is actually open, so these words mean nothing when there is nothing to act on.
+  if (holoVoice(text)) { addMsg('you', text); lastConvo = Date.now(); return; }
   busy = true; lastConvo = Date.now(); if (hint) hint.style.display = 'none';
   addMsg('you', text); history.push({ role: 'user', content: text });
   setState('thinking', 'thinking…'); const typing = addTyping();
@@ -249,6 +252,8 @@ async function sendToJarvis(text) {
     // A LOOK happens right here, in the conversation. Operator, 2026-08-01: "it's just so many different
     // tabs… it should be less tabs, more focused work, more power." A camera you have to navigate to is a
     // feature; a camera that answers where you're already talking is a sense.
+    // MATERIALISE — real data lands on the workspace as a panel he can grab, instead of being read at him.
+    if (data.holo && window.HOLO) window.HOLO.open(data.holo);
     if (data.camera) doLook(data.camera);
     // She navigates; he never hunts for a tab. In-app hashes switch view without a reload; a real route is a
     // page change, delayed slightly so her line is spoken/read before the screen moves under him.
@@ -335,11 +340,35 @@ function handsOff() {
   const b = $('handsBtn'); if (b) b.classList.remove('on');
 }
 function onHandGesture(g) {
+  // Holograms first — that's the workspace he actually arranges. Falls back to the old visual panel.
+  if (window.HOLO && window.HOLO.count()) {
+    if (g === 'dismiss') { window.HOLO.closeTop(); if (!window.HOLO.count()) handsOff(); return; }
+    if (g === 'expand') { window.HOLO.expand(); return; }
+    if (g === 'next') { window.HOLO.cycle(false); return; }
+    if (g === 'prev') { window.HOLO.cycle(true); return; }
+    return;
+  }
   const panel = $('visual');
   if (!panel || panel.hidden) return;         // nothing on screen to control
   if (g === 'dismiss') { closeVisual(); handsOff(); return; }   // wave it away, and the camera goes with it
   if (g === 'expand') panel.classList.toggle('big');
   if (g === 'next' || g === 'prev') panel.classList.toggle('big');
+}
+
+// Voice verbs for the workspace, handled in CODE before the brain — "close that" must never wait on a model,
+// and must never cost a round-trip. Returns true when it swallowed the utterance.
+function holoVoice(text) {
+  if (!window.HOLO || !window.HOLO.count()) return false;
+  const t = String(text || '').toLowerCase().trim();
+  if (/^(close|dismiss|hide|get rid of|clear)\s+(that|this|it|the panel|that panel)\b/.test(t)) return window.HOLO.closeTop();
+  if (/^(close|clear|dismiss|hide)\s+(everything|all|them all|all of them|the panels)\b/.test(t)) { window.HOLO.closeAll(); return true; }
+  if (/^(expand|maximi[sz]e|make (it|that) bigger|full ?screen|blow (it|that) up)\b/.test(t)) return window.HOLO.expand();
+  if (/^(minimi[sz]e|shrink|make (it|that) smaller|restore)\b/.test(t)) return window.HOLO.expand();
+  if (/^(next|switch|cycle)\b/.test(t)) return window.HOLO.cycle(false);
+  if (/^(back|previous|prev)\b/.test(t)) return window.HOLO.cycle(true);
+  const mv = t.match(/^move (?:it|that|this)? ?(left|right|up|down)\b/);
+  if (mv) return window.HOLO.move(mv[1]);
+  return false;
 }
 // The camera only runs while a panel is up, and never on its own.
 const _showVisual = showVisual;

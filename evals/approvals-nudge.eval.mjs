@@ -29,30 +29,36 @@ const ids = (due) => due.map((j) => j.id);
 export default {
   agent: 'approvals-nudge',
   cases: [
-    { name: 'schedule.json: both nudge jobs exist, at 12 + 16, POSTing /maintenance/approvals-nudge (route enforces weekdays)', run: () => {
-      const mid = job('approvals-nudge-midday'), aft = job('approvals-nudge-afternoon');
-      return ok(!!mid && !!aft
-        && mid.at_hour === 12 && aft.at_hour === 16
-        && mid.endpoint === '/maintenance/approvals-nudge' && aft.endpoint === '/maintenance/approvals-nudge'
-        && mid.type === 'maintenance' && aft.type === 'maintenance'
-        && mid.cadence_hours === 24 && aft.cadence_hours === 24
-        && mid.at_dow == null && aft.at_dow == null, JSON.stringify({ mid, aft }));
+    // CONTRACT CHANGED 2026-08-01 by operator decision: "instead of a whole bunch of notifications that
+    // are pretty much useless... an end of day report instead of a live one." The two daytime nudges and the
+    // 8am growth digest were RETIRED; one 20:00 report replaces them. These cases now pin the new contract —
+    // including that the retired jobs stay gone, so they can't quietly creep back in.
+    { name: 'the three daytime Telegrams are RETIRED and stay retired', run: () => {
+      const gone = ['approvals-nudge-midday', 'approvals-nudge-afternoon', 'gov-growth-digest'].filter((id) => job(id));
+      return ok(gone.length === 0, 'still scheduled: ' + gone.join(','));
     } },
-    { name: 'dueJobs at 12:05 local → midday due, afternoon not yet (hour < 16)', run: () => {
-      const due = ids(dueJobs(policy, at(12, 5), {}));
-      return ok(due.includes('approvals-nudge-midday') && !due.includes('approvals-nudge-afternoon'), due.join(','));
+    { name: 'ONE end-of-day report at 20:00, POSTing /maintenance/gov-eod-report', run: () => {
+      const j = job('gov-eod-report');
+      return ok(!!j && j.at_hour === 20 && j.endpoint === '/maintenance/gov-eod-report'
+        && j.type === 'maintenance' && j.cadence_hours === 24 && j.at_dow == null, JSON.stringify(j));
     } },
-    { name: 'dueJobs at 16:05 with midday already run today → afternoon due, midday rests (daily anchor)', run: () => {
-      const due = ids(dueJobs(policy, at(16, 5), { 'approvals-nudge-midday': at(12, 5).toISOString() }));
-      return ok(due.includes('approvals-nudge-afternoon') && !due.includes('approvals-nudge-midday'), due.join(','));
+    { name: 'the EOD report is DUE in the evening and not before', run: () => {
+      const evening = ids(dueJobs(policy, at(20, 5), {}));
+      const midday = ids(dueJobs(policy, at(12, 5), {}));
+      return ok(evening.includes('gov-eod-report') && !midday.includes('gov-eod-report'), JSON.stringify({ evening: evening.includes('gov-eod-report'), midday: midday.includes('gov-eod-report') }));
+    } },
+    { name: 'it rests once it has run today, and comes back tomorrow', run: () => {
+      const sameDay = ids(dueJobs(policy, at(20, 30), { 'gov-eod-report': at(20, 5).toISOString() }));
+      const nextDay = ids(dueJobs(policy, at(20, 5), { 'gov-eod-report': new Date(2026, 6, 14, 20, 5).toISOString() }));
+      return ok(!sameDay.includes('gov-eod-report') && nextDay.includes('gov-eod-report'), JSON.stringify({ sameDay, nextDay }));
     } },
     { name: 'dueJobs at 4 AM local → NOTHING fires (working_hours guard — the 4-5 AM Telegram bug stays dead)', run: () => {
       const due = ids(dueJobs(policy, at(4, 0), {}));
       return ok(due.length === 0, due.join(',') || 'empty');
     } },
-    { name: 'next-day reset: midday ran yesterday → due again at 12:05 today', run: () => {
-      const due = ids(dueJobs(policy, at(12, 5), { 'approvals-nudge-midday': new Date(2026, 6, 14, 12, 5).toISOString() }));
-      return ok(due.includes('approvals-nudge-midday'), due.join(','));
+    { name: 'the 4 AM guard still holds for the EOD report (no 4 AM Telegram, ever)', run: () => {
+      const due = ids(dueJobs(policy, at(4, 0), { 'gov-eod-report': new Date(2026, 6, 14, 20, 5).toISOString() }));
+      return ok(!due.includes('gov-eod-report') && due.length === 0, due.join(',') || 'empty');
     } },
     { name: 'docker-compose pins TZ=${TZ:-America/New_York} on control-plane + scheduler + telegram-bridge', run: () => {
       const yml = read('docker-compose.yml');

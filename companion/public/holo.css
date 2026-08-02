@@ -1,0 +1,92 @@
+/* holo.css — the hologram look. Operator: "Do you know how Jarvis pops up information in a hologram?
+   That's what we want. Control, movements, impressiveness."
+
+   The restraint that keeps it usable: the CHROME is cinematic, the CONTENT is plain. Glow on a border reads
+   as a hologram; glow on a dollar figure reads as unreadable. Panels are translucent so the room behind them
+   still shows, which is the whole visual idea — information floating over the work, not replacing it. */
+
+.holo-layer {
+  position: fixed; inset: 0; z-index: 40;
+  pointer-events: none;                    /* the canvas itself never eats a click — only panels do */
+}
+.holo-panel {
+  position: absolute; pointer-events: auto;
+  display: flex; flex-direction: column;
+  border-radius: 14px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(8,16,28,.90), rgba(6,12,22,.94));
+  border: 1px solid rgba(90,190,180,.34);
+  box-shadow: 0 0 0 1px rgba(90,190,180,.07), 0 18px 60px rgba(0,0,0,.62), 0 0 70px rgba(90,190,180,.10) inset;
+  backdrop-filter: blur(14px) saturate(1.15);
+  color: #dfe8ec;
+  transition: box-shadow .18s ease, border-color .18s ease, opacity .18s ease, transform .18s ease;
+}
+.holo-panel.focused {
+  border-color: rgba(90,190,180,.68);
+  box-shadow: 0 0 0 1px rgba(90,190,180,.16), 0 22px 70px rgba(0,0,0,.68), 0 0 90px rgba(90,190,180,.16) inset;
+}
+.holo-panel.max { left: 3vw !important; top: 3vh !important; width: 94vw !important; height: 94vh !important; }
+
+/* Materialise: it should look like it ARRIVED, not like a div appeared. Fast enough not to be in the way. */
+@keyframes holoIn {
+  0%   { opacity: 0; transform: translateY(14px) scale(.965); filter: blur(7px); }
+  55%  { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.holo-panel.materialize { animation: holoIn .42s cubic-bezier(.2,.9,.25,1); }
+.holo-panel.closing { opacity: 0; transform: scale(.965) translateY(8px); }
+@keyframes holoPulse { 50% { border-color: rgba(90,190,180,1); } }
+.holo-panel.pulse { animation: holoPulse .5s ease 1; }
+
+/* A scanline sheen across the top edge — the one purely decorative touch, and it stays out of the content. */
+.holo-panel::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(90,190,180,.85), transparent);
+}
+
+.holo-bar {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 11px; cursor: grab; user-select: none;
+  background: rgba(90,190,180,.055); border-bottom: 1px solid rgba(90,190,180,.16);
+}
+.holo-bar:active { cursor: grabbing; }
+.holo-dot { width: 7px; height: 7px; border-radius: 50%; background: #5abeb4; box-shadow: 0 0 9px #5abeb4; flex: none; }
+.holo-title { flex: 1; font-size: 12.5px; letter-spacing: .04em; color: #cfe4e2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.holo-btns { display: flex; gap: 3px; flex: none; }
+.holo-btn {
+  background: transparent; border: 0; color: #7d97a0; font: inherit; font-size: 13px;
+  cursor: pointer; padding: 2px 7px; border-radius: 6px; line-height: 1;
+}
+.holo-btn:hover { background: rgba(90,190,180,.16); color: #dfe8ec; }
+.holo-btn.x:hover { background: rgba(226,133,122,.22); color: #e2857a; }
+
+.holo-body { flex: 1; overflow: auto; padding: 12px 14px; font-size: 13.5px; line-height: 1.6; }
+.holo-text { white-space: pre-wrap; }
+.holo-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.holo-frame { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+.holo-body:has(.holo-img), .holo-body:has(.holo-frame) { padding: 0; }
+
+/* Rows: the shape most Jarvis data already has. Deliberately plain — this is the part he READS. */
+.holo-rows { display: flex; flex-direction: column; }
+.holo-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: baseline;
+  padding: 8px 2px; border-bottom: 1px solid rgba(90,190,180,.10);
+}
+.holo-row:last-child { border-bottom: 0; }
+.holo-row-l { color: #dfe8ec; }
+.holo-row-v { color: #5abeb4; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.holo-row-s { grid-column: 1 / -1; font-size: 11.5px; color: #7d97a0; }
+.holo-empty { color: #7d97a0; font-size: 12.5px; padding: 10px 2px; }
+
+.holo-grip {
+  position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 48%, rgba(90,190,180,.5) 50%, transparent 56%);
+}
+
+/* Phone: a floating window you drag with a thumb is a bad trade, so panels dock to the bottom instead. */
+@media (max-width: 700px) {
+  .holo-panel {
+    left: 8px !important; right: 8px !important; width: auto !important;
+    top: auto !important; bottom: 8px; height: 62vh !important;
+  }
+  .holo-grip { display: none; }
+}

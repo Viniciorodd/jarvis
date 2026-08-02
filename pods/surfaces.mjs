@@ -124,6 +124,35 @@ export function primarySurfaces() { return SURFACES.filter((s) => s.primary); }
 //
 // Deliberately NARROW. It must fire on "pull up my focus tab" and stay out of the way of "what did we decide
 // about focus", which is a question for the brain, not a navigation.
+// ── DATA ON THE WORKSPACE ─────────────────────────────────────────────────────────────────────────
+// Operator: *"it's just bringing the data to the chat and reading it to me like it's Claude or ChatGPT."*
+// So "put my approvals up on the screen" must materialise a PANEL, not navigate and not recite. Left to the
+// model it picked `show` over `materialize` — the descriptions overlap and it guessed. Decided in code
+// instead, same as navigation: the phrasing is unambiguous, so a model should never be in the loop.
+const HOLO_SOURCES = {
+  pipeline: ['pipeline', 'gov pipeline', 'the board', 'opportunities', 'bids', 'gov board'],
+  approvals: ['approvals', 'approval queue', 'what needs my approval', 'waiting on me', 'my approvals', 'decisions', 'sign offs', 'sign-offs'],
+  tasks: ['tasks', 'my tasks', 'todo', 'to do', 'to-do', 'task list', 'what i have to do'],
+  agents: ['agents', 'the team', 'my team', 'roster', 'the agents', 'my agents'],
+  money: ['money', 'the money', 'finances', 'income', 'revenue', 'the numbers', 'p&l', 'pnl'],
+  subs: ['subs', 'subcontractors', 'the bench', 'sub bench', 'my subs'],
+  record: ['the record', 'activity', 'the log', 'what happened', 'history', 'timeline'],
+};
+// "put X up", "show me X on screen", "display X" — a request to SEE data, not to go somewhere.
+const HOLO_RE = /\b(put|throw|bring|pop)\b[^.?!]{0,24}\b(up|on (the )?screen|on screen)\b|\bon (the )?screen\b|\bas a panel\b|\bhologram\b/i;
+export function holoIntent(text = '') {
+  const t = String(text || '').toLowerCase().trim();
+  if (!t || t.length > 90) return null;
+  if (!HOLO_RE.test(t)) return null;
+  let best = null, bestLen = 0;
+  for (const [source, words] of Object.entries(HOLO_SOURCES)) {
+    for (const w of words) {
+      if (w.length > bestLen && new RegExp('(^|\\s)' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|\\s)').test(t)) { best = source; bestLen = w.length; }
+    }
+  }
+  return best;
+}
+
 const NAV_RE = /^\s*(please\s+)?(can you\s+|could you\s+)?(go to|take me to|bring up|pull up|pull|open up|open|show me|show|display|navigate to|jump to|switch to)\b/i;
 export function navIntent(text = '') {
   const t = String(text || '').trim();

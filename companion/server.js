@@ -397,6 +397,12 @@ const TOOLS = [
       content: { type: 'string', description: 'the markdown body of the note' },
       folder: { type: 'string', description: 'optional vault subfolder, e.g. "04 - Personal"; defaults to "00 - System/Jarvis/Notes"' },
     }, required: ['title'] } },
+  { name: 'materialize', description: 'PUT REAL DATA ON SCREEN as a floating panel he can drag, resize and close — not text in the chat. Use this whenever he asks to SEE information rather than hear it: "show me my pipeline", "put my tasks up", "pull up that note", "show me the numbers", "display the roster". Far better than reciting a list into the conversation. Choose `source` for live data, or pass your own rows/text.',
+    input_schema: { type: 'object', properties: {
+      source: { type: 'string', description: 'live data to display: pipeline | approvals | tasks | agents | money | subs | record' },
+      title: { type: 'string', description: 'panel title he will read' },
+      text: { type: 'string', description: 'plain text to display, when not using a source' },
+    }, required: [] } },
   { name: 'show', description: 'PUT A SCREEN IN FRONT OF HIM. Use whenever he asks to see something: "show me the gov board", "pull up my money", "open the control center", "where are my businesses", "take me to today". You do the navigating — he should never have to find a tab. If there is no screen for what he asked, it tells you, and you say so plainly instead of sending him somewhere wrong.',
     input_schema: { type: 'object', properties: {
       what: { type: 'string', description: 'what he asked to see, in his own words — e.g. "the gov board", "my money", "control center"' },
@@ -1180,6 +1186,70 @@ async function runTool(name, input) {
   if (name === 'open_path') {
     return openTarget(input.target);
   }
+  if (name === 'materialize') {
+    // Operator: "it's just bringing the data to the chat and reading it to me like it's Claude or ChatGPT.
+    // We're not building what we actually wanna build." Right — so data goes ON SCREEN as a panel he can
+    // grab, and it is fed from the SAME endpoints the rest of Jarvis reads. A hologram of invented numbers
+    // would be the confabulation problem with better lighting.
+    const src = String(input.source || '').toLowerCase();
+    const title = String(input.title || '').trim();
+    const spec = { kind: 'rows', title: title || 'Jarvis', rows: [] };
+    const get = async (p) => { try { return await fetch('http://127.0.0.1:' + PORT + p, { signal: AbortSignal.timeout(9000) }).then((r) => r.json()); } catch { return null; } };
+
+    if (src === 'pipeline' || src === 'gov') {
+      // The board comes back as COLUMNS of cards (verified against the live endpoint — my first guess at
+      // `board.cards` returned an empty panel, which would have shipped looking like an empty pipeline).
+      const d = await get('/api/gov-board');
+      const cards = ((d && d.columns) || []).flatMap((col) => (col.cards || []).map((c) => ({ ...c, _stage: col.name || col.stage || col.label || '' })));
+      spec.title = title || 'Gov pipeline';
+      spec.rows = cards.slice(0, 25).map((c) => ({
+        label: c.title,
+        value: c._stage || '',
+        sub: [c.agency, c.placeState, c.who === 'you' ? 'YOUR MOVE' : ''].filter(Boolean).join(' · '),
+      }));
+      spec.empty = 'No opportunities on the board.';
+    } else if (src === 'approvals') {
+      const d = await get('/api/cockpit');
+      spec.title = title || 'Waiting on you';
+      spec.rows = ((d && d.approvals) || []).map((a) => ({ label: a.title, value: a.count > 1 ? '×' + a.count : '', sub: a.pod || '' }));
+      spec.empty = 'Nothing waiting on you.';
+    } else if (src === 'tasks' || src === 'today') {
+      const d = await get('/api/cockpit');
+      const t = (d && d.tasks) || {};
+      spec.title = title || 'Today';
+      spec.rows = ((t.focus || []).length ? t.focus : (t.active || [])).slice(0, 20).map((x) => ({ label: x.text, value: x.due || '', sub: x.reason || '' }));
+      spec.empty = 'Nothing queued.';
+    } else if (src === 'agents' || src === 'roster' || src === 'team') {
+      const d = await get('/api/control-center');
+      spec.title = title || 'The team';
+      spec.rows = ((d && d.agents) || []).map((a) => ({ label: a.nickname + ' — ' + (a.title || ''), value: 'T' + a.tier, sub: a.state !== 'active' ? a.state.toUpperCase() : (a.canActAlone ? 'acts alone' : 'needs your yes') }));
+    } else if (src === 'money' || src === 'finance') {
+      const d = await get('/api/business?id=finance');
+      const m = (d && d.money) || {};
+      spec.title = title || 'Money';
+      spec.rows = [
+        { label: 'This month', value: '$' + Number(m.mtd || 0).toLocaleString() },
+        { label: 'Goal', value: '$' + Number(m.goal || 10000).toLocaleString() },
+        { label: 'To go', value: '$' + Number(m.remaining || 0).toLocaleString(), sub: (m.pct || 0) + '% there' },
+      ];
+    } else if (src === 'subs') {
+      const d = await get('/api/gov/subs');
+      const subs = (d && (d.subs || d.rows)) || [];
+      spec.title = title || 'Subcontractors';
+      spec.rows = subs.slice(0, 25).map((s) => ({ label: s.name, value: s.verified ? '✓ verified' : '', sub: s.contact_email || 'no email' }));
+      spec.empty = 'No subs on the bench yet.';
+    } else if (src === 'record' || src === 'timeline') {
+      const d = await get('/api/timeline?days=2&limit=25');
+      spec.title = title || 'The record';
+      spec.rows = ((d && d.rows) || []).map((r) => ({ label: r.what, value: String(r.ts).slice(11, 16), sub: r.kind }));
+      spec.empty = 'Nothing recorded.';
+    } else if (input.text) {
+      spec.kind = 'text'; spec.text = String(input.text); spec.title = title || 'Jarvis';
+    } else {
+      return { ok: false, note: 'Unknown source. Real ones: pipeline, approvals, tasks, agents, money, subs, record — or pass `text`. Do NOT invent data to display.' };
+    }
+    return '__HOLO__' + JSON.stringify(spec);
+  }
   if (name === 'show') {
     // Voice-first navigation. Resolving a route in the model's head means it invents `/pipeline` and walks
     // him into a 404, so the destination comes from the fixed registry — and an unmatched phrase returns
@@ -1363,7 +1433,7 @@ async function runTool(name, input) {
 
 // a short action label for the UI
 function actionLabel(name, input, result, ok) {
-  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', open_note: 'opened a vault note', look: 'looked through your camera', show: 'opened a screen for you', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
+  const verb = { list_dir: 'looked in', scan: 'scanned', read_file: 'read', make_dir: 'created folder', write_file: 'wrote', create_note: 'created a vault note', search_vault: 'searched your Second Brain', timeline: 'checked the record', open_note: 'opened a vault note', look: 'looked through your camera', show: 'opened a screen for you', materialize: 'put it on your screen', edit_file: 'edited', move_path: 'moved', delete_path: 'quarantined', open_path: 'opened', show_visual: 'displayed', generate_image: 'generated image', read_hq: 'checked HQ', get_report: 'pulled report', command_org: 'commanded the org', add_reminder: 'saved reminder', list_reminders: 'listed reminders', read_email: 'read email', read_calendar: 'checked calendar', read_tasks: 'checked tasks', morning_brief: 'briefed you', triage_inbox: 'triaged the inbox', draft_gmail_reply: 'drafted a Gmail reply', weekly_pl: 'pulled the P&L', notion_search: 'searched Notion', notion_read: 'read Notion page' }[name] || name;
   const tgt = name === 'move_path' ? `${input.from} → ${input.to}` : (input.target || input.path || input.query || input.prompt || '');
   return { tool: name, label: `${verb} ${tgt}`.trim(), ok, detail: ok ? '' : String(result).slice(0, 120) };
 }
@@ -1602,6 +1672,7 @@ async function converse(history) {
   const visuals = [];
   let camera = null;                 // a pending look, handed to the page (the server cannot reach a webcam)
   let goto = null;                   // a pending navigation, likewise — only the page can change screens
+  let holo = null;                   // a panel to materialise on the workspace canvas
   // Does this turn ask for a real ACTION? If so, callClaude routes to the tool-capable action brain so it
   // actually does it (rather than the free brain refusing). Computed once from the latest user message.
   let wantsAction = false;
@@ -1637,7 +1708,7 @@ async function converse(history) {
     const toolUses = (resp.content || []).filter((b) => b.type === 'tool_use');
     if (resp.stop_reason !== 'tool_use' || toolUses.length === 0) {
       const text = (resp.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-      return { text, actions, visuals, camera, goto, usage: resp.usage };
+      return { text, actions, visuals, camera, goto, holo, usage: resp.usage };
     }
     messages.push({ role: 'assistant', content: resp.content });
     const results = [];
@@ -1659,6 +1730,10 @@ async function converse(history) {
       // A LOOK is a directive for the page (only the browser can reach a webcam). The model must be told
       // plainly that it has NOT seen anything yet, or it will narrate the contents of an image that does not
       // exist — the exact confabulation this whole system is built to prevent, with a camera attached.
+      if (ok && typeof out === 'string' && out.startsWith('__HOLO__')) {
+        try { holo = JSON.parse(out.slice('__HOLO__'.length)); } catch { /* skip */ }
+        out = 'It is on his screen now as a panel he can drag and close. Say ONE short line — do NOT read the contents out, he is looking at them.';
+      }
       if (ok && typeof out === 'string' && out.startsWith('__GOTO__')) {
         try { goto = JSON.parse(out.slice('__GOTO__'.length)); } catch { /* skip */ }
         out = 'Opening ' + (goto && goto.name ? goto.name : 'it') + ' for him now. Reply with ONE short line — do not describe what is on the screen, you have not read it.';
@@ -1681,9 +1756,9 @@ async function converse(history) {
     const final = await callClaude(messages, false);
     addUsage(final.usage);
     const text = (final.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
-    if (text) return { text, actions, visuals, camera, goto, usage: final.usage };
+    if (text) return { text, actions, visuals, camera, goto, holo, usage: final.usage };
   } catch { /* fall through to the honest stop message */ }
-  return { text: "I searched but couldn't pull it together into an answer — the tool results are above. Ask me again and I'll narrow it down.", actions, visuals, camera, goto };
+  return { text: "I searched but couldn't pull it together into an answer — the tool results are above. Ask me again and I'll narrow it down.", actions, visuals, camera, goto, holo };
 }
 
 function send(res, code, body, type = 'application/json') {
@@ -1890,6 +1965,20 @@ const server = http.createServer(async (req, res) => {
         const lastNav = messages[messages.length - 1];
         const navText = typeof lastNav?.content === 'string' ? lastNav.content : '';
         const S = await import('../pods/surfaces.mjs');
+        // "Put my approvals up on the screen" → a PANEL, decided in code. The model kept choosing `show`
+        // (navigate) over `materialize` because the two descriptions overlap; this removes the guess.
+        const holoSrc = S.holoIntent(navText);
+        if (holoSrc) {
+          const spec = await runTool('materialize', { source: holoSrc });
+          if (typeof spec === 'string' && spec.startsWith('__HOLO__')) {
+            const panel = JSON.parse(spec.slice('__HOLO__'.length));
+            return send(res, 200, JSON.stringify({
+              text: `${panel.title} — on your screen.`,
+              actions: [{ ok: true, label: 'put it on your screen' }],
+              holo: panel,
+            }));
+          }
+        }
         const hit = S.navIntent(navText);
         if (hit) {
           return send(res, 200, JSON.stringify({

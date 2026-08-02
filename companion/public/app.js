@@ -437,6 +437,23 @@ window.addEventListener('drop', async (e) => {
 });
 
 // ── voice in (browser STT fallback — note: not available inside the Electron app) ──
+// Is Jarvis talking right now? Either voice path counts — ElevenLabs/Kokoro play through an <audio>, the
+// browser fallback through speechSynthesis. If we don't check both, one of them still feeds her own words
+// back into the recogniser.
+function jarvisIsSpeaking() {
+  try { if (curAudio && !curAudio.paused && !curAudio.ended) return true; } catch { /* */ }
+  try { if ('speechSynthesis' in window && speechSynthesis.speaking) return true; } catch { /* */ }
+  return false;
+}
+// In open-conversation mode every finalised fragment used to fire a turn, so thinking out loud — or simply
+// pausing mid-sentence — made her jump in. A real instruction is more than one word.
+function isRealUtterance(said) {
+  const s = String(said || '').trim();
+  if (s.length < 4) return false;
+  if (s.split(/\s+/).length < 2) return false;
+  return !/^(uh|um|er|hmm+|mm+|ah|oh|ok|okay|yeah|yep|no|wait|so|and|but|like)$/i.test(s);
+}
+
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, wakeOn = false, listening = false;
 function ensureRec() {
@@ -446,13 +463,21 @@ function ensureRec() {
   rec.onresult = (ev) => {
     const said = ev.results[ev.results.length - 1][0].transcript.trim();
     const now = Date.now();
+    // Operator, 2026-08-01: "she keeps on waking up while I'm talking to her." Two causes, both here:
+    //
+    //  1. The mic never stopped while SHE was speaking, so her own voice came back through the speakers and
+    //     re-triggered her — she was interrupting herself. Barge-in is handled by mic LEVEL (meterMicStream),
+    //     so ignoring transcripts during her speech costs nothing and stops the loop.
+    //  2. A turn already in flight didn't block the next one, so a pause mid-sentence fired a second turn on
+    //     top of the first.
+    if (busy || jarvisIsSpeaking()) return;
     if (wakeOn) {
       if (/\bjarvis\b/i.test(said)) {
         const cmd = said.replace(/^.*?\bjarvis\b[\s,:.!-]*/i, '').trim();
         lastConvo = now;
         if (cmd.length > 1) sendToJarvis(cmd); else { addMsg('j', 'Yes?'); speak('Yes?'); }
-      } else if (openConvo && (now - lastConvo) < CONVO_WINDOW && said) { sendToJarvis(said); }
-    } else if (said) sendToJarvis(said);
+      } else if (openConvo && (now - lastConvo) < CONVO_WINDOW && isRealUtterance(said)) { sendToJarvis(said); }
+    } else if (isRealUtterance(said)) sendToJarvis(said);
   };
   rec.onerror = () => { listening = false; };
   rec.onend = () => { listening = false; if (wakeOn && !usingDgWake) { try { rec.start(); listening = true; } catch {} } else if (!busy) setState('idle', 'standby'); };
@@ -483,8 +508,9 @@ async function dgWakeSegment() {
   dgRec = new MediaRecorder(dgStream, MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : {});
   dgRec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
   dgRec.onstop = async () => {
-    const speaking = curAudio && !curAudio.paused && !curAudio.ended; // don't transcribe her own voice
-    if (!busy && !speaking && chunks.length) {
+    // Same guard as the browser path — checks BOTH voice engines, not just the <audio> one, or her own
+    // words come straight back in through the mic and she interrupts herself.
+    if (!busy && !jarvisIsSpeaking() && chunks.length) {
       try {
         const blob = new Blob(chunks, { type: 'audio/webm' });
         const r = await fetch('/api/stt', { method: 'POST', headers: { 'content-type': 'audio/webm' }, body: blob });
@@ -494,7 +520,7 @@ async function dgWakeSegment() {
           const cmd = said.replace(/^.*?\bjarvis\b[\s,:.!-]*/i, '').trim();
           lastConvo = now;
           wakeCommand(cmd);
-        } else if (openConvo && (now - lastConvo) < CONVO_WINDOW && said.length > 1) {
+        } else if (openConvo && (now - lastConvo) < CONVO_WINDOW && isRealUtterance(said)) {
           sendToJarvis(said);                                  // open conversation: no wake needed
         }
       } catch { /* ignore a dropped segment */ }

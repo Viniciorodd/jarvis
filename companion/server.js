@@ -1882,6 +1882,23 @@ const server = http.createServer(async (req, res) => {
     try {
       const { messages } = await readBody(req);
       if (!Array.isArray(messages) || !messages.length) return send(res, 400, JSON.stringify({ error: 'messages required' }));
+      // NAVIGATION IS DETERMINISTIC (doctrine #1: code disposes). "Pull up my focus tab" resolved correctly
+      // every way he phrased it, but the free brain didn't call `show` and he was left unable to reach the
+      // screen he needed. Routing a KNOWN destination through a model's judgement is the same mistake as
+      // letting it invent the route. This answers instantly, costs nothing, and cannot forget.
+      try {
+        const lastNav = messages[messages.length - 1];
+        const navText = typeof lastNav?.content === 'string' ? lastNav.content : '';
+        const S = await import('../pods/surfaces.mjs');
+        const hit = S.navIntent(navText);
+        if (hit) {
+          return send(res, 200, JSON.stringify({
+            text: `${hit.name} — ${hit.says}.`,
+            actions: [{ ok: true, label: 'opened ' + hit.name }],
+            goto: { route: hit.route, name: hit.name, says: hit.says },
+          }));
+        }
+      } catch { /* fall through to the brain */ }
       // Voice expense capture: "Hey Jarvis, I spent $40 on gas today" → parsed + logged in CODE (money is
       // never LLM-guessed, doctrine #1) and confirmed out loud — no model call. Falls through if it isn't one.
       try {

@@ -51,8 +51,14 @@ export const SURFACES = [
     says: 'ideas waiting on your yes',
     aliases: ['ideas', 'idea vault', 'suggestions'] },
   { id: 'focus',     route: '/focus',       name: 'Focus',
-    says: 'time and focus',
-    aliases: ['focus', 'time', 'deep work'] },
+    says: 'time and focus — where you log productive time',
+    aliases: ['focus', 'time', 'deep work', 'focus time', 'log time', 'log my time', 'time log', 'timer', 'productive time'] },
+  { id: 'personal',  route: '/#personal',   name: 'Personal',
+    says: 'the personal side — Ana, health, family',
+    aliases: ['personal', 'ana', 'health', 'family', 'personal stuff'] },
+  { id: 'activity',  route: '/#activity',   name: 'Activity',
+    says: 'everything Jarvis and the agents did',
+    aliases: ['activity', 'the log', 'what happened', 'history', 'what did you do', 'the record', 'timeline'] },
   { id: 'quickwins', route: '/quickwins',   name: 'Quick wins',
     says: 'fast-close one-off jobs',
     aliases: ['quick wins', 'quickwins', 'easy money', 'small jobs'] },
@@ -107,6 +113,25 @@ export function resolveSurface(text = '') {
 
 // PURE: the drawer list — only the surfaces that earn a permanent tab.
 export function primarySurfaces() { return SURFACES.filter((s) => s.primary); }
+
+// PURE: is this message ONLY a request to see a screen? Then the navigation must not depend on a model
+// remembering to call a tool.
+//
+// Operator, 2026-08-01, blocked: *"I asked her to pull up my focus tab, and she didn't do it. So at this
+// point I need to log some time that I was productive, and I can't do it."* The resolver got `/focus` right
+// every way he phrased it — the free brain simply didn't call `show`. Routing a known destination through a
+// model's judgement is the same mistake as letting it invent the route: doctrine #1, code disposes.
+//
+// Deliberately NARROW. It must fire on "pull up my focus tab" and stay out of the way of "what did we decide
+// about focus", which is a question for the brain, not a navigation.
+const NAV_RE = /^\s*(please\s+)?(can you\s+|could you\s+)?(go to|take me to|bring up|pull up|pull|open up|open|show me|show|display|navigate to|jump to|switch to)\b/i;
+export function navIntent(text = '') {
+  const t = String(text || '').trim();
+  if (!t || t.length > 60) return null;              // a long sentence is a request, not a destination
+  if (/\?\s*$/.test(t)) return null;                 // a question is for the brain
+  if (!NAV_RE.test(t)) return null;
+  return resolveSurface(t);
+}
 
 // PURE: what Jarvis can offer when she doesn't recognise a request — real options only, never invented ones.
 export function surfaceMenu() { return SURFACES.map((s) => s.name + ' (' + s.says + ')'); }

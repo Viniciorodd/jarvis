@@ -1182,3 +1182,9 @@ body.dock-open .j-dock-fab{ display:none; }
   box-shadow: 0 30px 90px rgba(0,0,0,.6); }
 .visual.big .visual-body { height: calc(92vh - 46px); }
 .visual.big .visual-body iframe, .visual.big .visual-body img { width: 100%; height: 100%; object-fit: contain; }
+
+/* Drawer: four daily drivers, then everything else below a rule — reachable in one tap without
+   menu-hunting, but visually secondary so the top of the list stays calm (2026-08-01). */
+.j-drawer-rule { height: 1px; margin: 10px 14px; background: rgba(255,255,255,.09); }
+.j-drawer-item.sec { opacity: .62; font-size: 13px; }
+.j-drawer-item.sec:hover { opacity: 1; }

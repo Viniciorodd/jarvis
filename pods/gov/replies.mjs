@@ -64,6 +64,25 @@ export async function gatherSubResponses({ op = null } = {}) {
     const sub = byEmail.get(m.from);
     if (!sub) continue; // only parse replies from subs we actually reached out to
     const parsed = await parseReply(m.body);
+    // TRIAGE EVERY REPLY, even one the extractor made nothing of. `if (!parsed) continue` silently discarded
+    // any reply without a quote — which is exactly what a sub ASKING A QUESTION looks like. They got no
+    // answer, the operator never heard, and the bid died weeks later with nothing in the log to explain it.
+    const RT = await import('./reply-triage.mjs');
+    const triage = RT.triageReply({ body: m.body, subject: m.subject || '', parsed });
+    if (triage.who === 'you') {
+      const line = RT.replyAlert({ subName: sub.name, oppTitle: (op && op.title) || '', triage });
+      if (line) {
+        await emit({ kind: 'action', actor: 'CONNECT-01', pod: 'gov', action: 'sub.reply.needs_you', reversible: true, rationale: line, payload: { sub: sub.id, kind: triage.kind, questions: triage.questions } });
+        // The ONE class of live Telegram he asked to keep: a quote landed, or a sub needs him to answer.
+        try { const L = await import('../lib.mjs'); L.notifyTelegram(line); } catch { /* the event still carries it */ }
+      }
+    }
+    if (triage.kind === 'auto') {
+      // An autoresponder is not contact. Recording it would restart the follow-up ladder and make a silent
+      // sub look responsive — so it is logged and skipped, and the chase continues.
+      await emit({ kind: 'trace', actor: 'CONNECT-01', pod: 'gov', action: 'sub.reply.auto', rationale: `${sub.name}: autoresponder — still waiting`, payload: { sub: sub.id } });
+      continue;
+    }
     if (!parsed) continue;
     if (parsed.quote) sub.quote = parsed.quote;
     if (parsed.past_performance) sub.past_performance_notes = parsed.past_performance;

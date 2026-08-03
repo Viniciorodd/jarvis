@@ -3544,6 +3544,47 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // ── GATEKEEPER: what saying yes actually costs (PRD "protect the yes") ────────────────────────────
+  // LLM PROPOSES / CODE DISPOSES, exactly as the doctrine requires: a model reads the request and estimates
+  // the physical facts (hours, miles, start time) — the things language actually carries — and every number
+  // that matters is then computed in pods/gatekeeper.mjs. A model must never decide what a favor costs him
+  // or whether he can say no; that is arithmetic, and arithmetic is what makes the boundary true.
+  if (req.method === 'POST' && url.pathname === '/api/gatekeeper') {
+    try {
+      const b = await readBody(req);
+      const text = String(b.request || '').trim();
+      if (!text) return send(res, 200, JSON.stringify({ ok: false, error: 'paste the request' }));
+      const G = await import('../pods/gatekeeper.mjs');
+
+      // Estimate the physical shape of the ask. Conservative defaults when the model gives nothing —
+      // an unknown must never read as "free".
+      let est = {};
+      try {
+        const R = await import('../pods/gateway/router.mjs');
+        const sys = 'Estimate the PHYSICAL facts of this favor request. Reply with ONLY JSON: '
+          + '{"hours":number,"drivingHours":number,"waitHours":number,"miles":number,"startHour":number|null,'
+          + '"tolls":number,"food":number,"who":string,"tier":"inner"|"friend"|"acquaintance","counter":string}. '
+          + 'hours = time doing the thing itself. startHour = 24h clock if a time is stated, else null. '
+          + 'tier: inner = spouse/parent/sibling. counter = a shorter version he could offer instead. '
+          + 'Estimate from the text only. Do not invent details.';
+        const r = await R.complete({ messages: [{ role: 'system', content: sys }, { role: 'user', content: text }], maxTokens: 300, env: envAll() });
+        const m = r.ok && r.message && String(r.message.content || '').match(/\{[\s\S]*\}/);
+        if (m) est = JSON.parse(m[0]);
+      } catch { /* the cost still computes from defaults */ }
+
+      const creep = G.creepRisk(text);
+      const cost = G.trueCost({
+        hours: est.hours, drivingHours: est.drivingHours, waitHours: est.waitHours, miles: est.miles,
+        tolls: est.tolls, food: est.food, startHour: est.startHour,
+        hourRate: Number(b.hourRate) || 60, creepMultiplier: creep.multiplier,
+      });
+      const prop = b.owedHours != null ? G.proportionality({ askHours: cost.totalHours, owedHours: b.owedHours }) : null;
+      const v = G.verdict({ cost, creep, alignment: b.alignment || 'neutral', tier: est.tier || b.tier || 'friend', yesBudgetLeftHours: b.yesBudgetLeftHours, proportion: prop });
+      const say = G.script({ verdict: v.verdict, who: est.who || b.who || '', reason: v.why, counter: est.counter });
+
+      return send(res, 200, JSON.stringify({ ok: true, cost, creep, verdict: v, script: say, proportion: prop, estimated: est }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // ── CAMERA: one look, on request. His own rule (Desktop Presence PRD §3.1): "Never continuous recording…
   // on-demand only, with a visible indicator when it looks." Enforced in code, not by the UI that draws the
   // indicator: canLook() refuses `continuous`, refuses a reason-less call, and refuses a rapid loop of

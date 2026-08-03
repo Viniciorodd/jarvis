@@ -333,6 +333,33 @@ async function handle(chat, text, thread) {
   // why this didn't happen. I should also be able to respond and say activate the government auto sending.
   // I should be able to control every aspect of the business from Telegram — if I am 200 miles from home I
   // want to make sure my business is still running and that I can operate it."
+  // ── GATEKEEPER (PRD "protect the yes"). Telegram is primary because that is where the asks actually
+  // arrive — he pastes it and gets the true cost, a verdict, and words he can send. Nothing auto-replies to
+  // a real person, ever (PRD §6): Jarvis drafts, Vinicio sends.
+  const gate = text.match(/^\/(?:gate|cost|ask)\s+([\s\S]+)/i);
+  if (gate) {
+    const r = await fetch(COMPANION + '/api/gatekeeper', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ request: gate[1] }),
+    }).then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+    if (!r.ok) return send(chat, `⚠️ Couldn't work that out — ${r.error || 'unknown'}.`, thread);
+    const c = r.cost, v = r.verdict;
+    const mark = { yes: '✅ YES', counter: '🔁 YES, BUT', defer: '⏸ DEFER', no: '❌ NO' }[v.verdict] || v.verdict;
+    const lines = [
+      `${mark} — ${v.why}`,
+      '',
+      `⏱ ${c.totalHours}h${c.recoveryDays ? `  (incl. ${c.recoveryDays} recovery day${c.recoveryDays > 1 ? 's' : ''})` : ''}`,
+      `💵 $${c.cash} out of pocket · $${c.timeValue} of your time`,
+      `= ${'$' + c.total} real cost`,
+    ];
+    if (r.creep && r.creep.count >= 2) {
+      lines.push('', `🪜 Stacking risk: ${r.creep.risk} — ${r.creep.markers.join(' · ')}`);
+      lines.push(`   If it grows like the JFK weekend: ~${c.expectedHours}h`);
+    }
+    if (r.proportion && r.proportion.disproportionate) lines.push('', `⚖️ ${r.proportion.note}`);
+    lines.push('', '━━ send this ━━', r.script);
+    return send(chat, lines.join('\n'), thread);
+  }
   if (/^\/autosend\b/i.test(text)) {
     const arg = (text.match(/^\/autosend\s+(on|off|status)?/i) || [])[1];
     if (!arg || /status/i.test(arg)) {

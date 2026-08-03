@@ -32,7 +32,30 @@ scarce resource multiple jobs compete for. Until fixed, Vinicio's own manual pul
 whichever automated job fires first each day. Quota resets nightly at 8PM Eastern — a manual run any time
 between 8PM ET and the next morning's ~6am job is currently the only reliable window.
 
-### 🆕 2026-08-01 (latest, pt.3) — EYES: Jarvis can look, on demand, and read his hands
+### 🆕 2026-08-02 (latest) — GATEKEEPER: the true cost of yes, and a calendar that defends itself
+From `PRD — Jarvis Gatekeeper (protect the yes)`. His problem: *"They ask for favors, I cave... When I want
+to come up with a reason to say no, I can never find one."*
+- **The reframe drove the design.** He doesn't need EXCUSES — excuses get caught and compound. He needs the
+  true cost, because a true boundary is unbreakable. So `pods/gatekeeper.mjs` is arithmetic, and an eval
+  forbids any script from containing a doctor/appointment/emergency (L-014 pointed at his personal life).
+- **NOT a refusal engine.** Lake trip → YES (rest is a goal); inner circle gets a warmth-first default.
+- **The three JFK mechanics**: CREEP (scores the ask as it will END UP — 6 markers), RECOVERY (counted as a
+  degraded day, +4h, not a lost 24), RECIPROCITY (both directions; *"you're in credit, free to choose"* —
+  never *"they owe you"*, pinned by an eval).
+- **Live on both acceptance cases:** JFK weekend → COUNTER, 5/6 creep markers, 16h + 1 recovery day, $1,060,
+  ~40h if it grows. Lake trip → YES. Telegram: `/gate` `/cost` `/ask`.
+- **§3d CALENDAR WATCHER** — the ambient layer, every 3h. *"It currently requires him to remember to ask it."*
+  A "30-minute coffee" computes to **115 minutes** (30 + 50 travel + 10 prep + 25 re-focus). Restraint is the
+  feature: `keep` is the common answer, and it fails CLOSED to silence on any unplanned state (an eval caught
+  that it would have pinged on an unrecognised action). Verified silent on his real calendar, then verified it
+  DOES speak on a colliding event — so the silence is judgement, not breakage. Never moves or cancels; he taps.
+- **Also today:** the boilerplate gate fixed at its SOURCE (chief-of-staff/router.mjs stored the doctrine
+  sentence as the rationale — the reason it leaked to four surfaces); **18 junk gates purged, 30 → 12**, every
+  survivor a real bid; `/autosend` made file-backed so he can flip it from his phone; Telegram noise cut to
+  decisions-with-money-or-a-person-waiting; the desktop blackout fixed (a dead webview never retried).
+- Evals **1112 → 1156**.
+
+### 2026-08-01 (pt.3) — EYES: Jarvis can look, on demand, and read his hands
 Operator: *"give jarvis access to my camera so that she can see with intelligence how i feel, what i am
 holding, and maybe even be able to control her with my hands like tony stark does."* Page: **`/eyes`**.
 - **"What am I holding" — built.** One frame, on a button press, → `see()` in the gateway → a vision model.

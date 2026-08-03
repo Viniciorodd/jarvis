@@ -101,6 +101,13 @@ Instant, no waiting. If a screen doesn't exist she says so rather than guessing.
 | "create a note called X" | writes it, then reads it back to prove it |
 | "what did we talk about yesterday" | the unified record — chat, agents, approvals |
 
+### Your goals
+> "show me my goals" · or the **Goals** item in the drawer
+
+Ten years of goals as a map. Node size = how many times you wrote it. Lines = a shared prerequisite.
+Press **Rebuild the map** to find the connections, click a goal for its chain, **🖼 Picture this goal** for a
+vision-board image.
+
 ### Her eyes
 > "what am I holding?" · "read this label" · "look at this"
 

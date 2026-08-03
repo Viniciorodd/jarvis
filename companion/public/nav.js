@@ -100,6 +100,7 @@ var moreItems = {
      had to know the URL for, which is not part of the app, it's next to it. They live in the shell now. */
   jMoreControl: function(){ window.location.href = '/control'; },   /* agent on/off + autonomy tiers + kill */
   jMoreEyes:    function(){ window.location.href = '/eyes'; },      /* the camera — on-demand looking */
+  jMoreGoals:   function(){ window.location.href = '/goals'; },     /* ten years of goals, as a picture */
   jMoreGovconOs: function(){ window.location.href = '/govcon-os'; },
   jMoreFinances: function(){ window.location.href = '/finances'; },
   jMoreMap:     function(){ triggerGhost('mapBtn'); },

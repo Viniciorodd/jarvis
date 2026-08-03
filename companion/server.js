@@ -3601,6 +3601,27 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(out));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
+  // GOAL IMAGERY — his vision-board idea: *"a goal gets a generated image that puts you in the scene."*
+  // ONE goal at a time and only when he asks. Generating 552 images unprompted would cost real money for
+  // pictures he never looks at, and the note itself calls the image a way to make a goal concrete — which
+  // only works for the handful he's actually chasing.
+  if (req.method === 'POST' && url.pathname === '/api/goals/image') {
+    try {
+      const b = await readBody(req);
+      const title = String(b.title || '').trim();
+      if (!title) return send(res, 200, JSON.stringify({ ok: false, error: 'which goal?' }));
+      // Reuses the existing generator rather than adding a second image path.
+      const out = await runTool('generate_image', {
+        prompt: `A cinematic, photorealistic vision-board image representing this personal goal achieved: "${title}". `
+          + 'Aspirational, warm natural light, sense of arrival and calm. No text, no words, no logos, no watermarks. '
+          + 'Do not depict any identifiable real person.',
+        size: '1024x1024',
+      });
+      const url2 = typeof out === 'string' ? out : (out && (out.url || out.path));
+      if (!url2) return send(res, 200, JSON.stringify({ ok: false, error: 'the image generator returned nothing' }));
+      return send(res, 200, JSON.stringify({ ok: true, url: String(url2).startsWith('http') || String(url2).startsWith('/') ? url2 : '/' + url2 }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // REVERSE-ENGINEER: goals only CONNECT through their action chains, so without this the graph has 552
   // nodes and zero edges — a prettier list, which is exactly what he already has. An LLM does this step
   // because breaking "own a private jet" into prerequisites is language work; the overlap maths that follows
@@ -4489,7 +4510,7 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
-  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname === '/control' ? 'control.html' : url.pathname === '/eyes' ? 'eyes.html' : url.pathname === '/govcon-os' ? 'govcon-os.html' : url.pathname === '/finances' ? 'finances.html' : url.pathname === '/real-estate' ? 'real-estate.html' : url.pathname.replace(/^\/+/, '');
+  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname === '/control' ? 'control.html' : url.pathname === '/goals' ? 'goals.html' : url.pathname === '/eyes' ? 'eyes.html' : url.pathname === '/govcon-os' ? 'govcon-os.html' : url.pathname === '/finances' ? 'finances.html' : url.pathname === '/real-estate' ? 'real-estate.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));

@@ -143,6 +143,16 @@
       "at_hour": 20,
       "endpoint": "/maintenance/gov-eod-report",
       "command": "the one end-of-day Telegram — subs contacted, opportunities scanned, quotes in, what is stalled, what is waiting on him (deterministic, no LLM; silent on a nothing day; deduped to one per calendar day)"
+    },
+    {
+      "id": "calendar-watch",
+      "person": "MAILROOM-01",
+      "pod": "chief-of-staff",
+      "type": "maintenance",
+      "cadence_hours": 3,
+      "endpoint": "/api/calendar/watch",
+      "target": "companion",
+      "command": "cost every NEW calendar event and speak ONLY when it collides with protected work, could be an email, or is bigger than it looks (deterministic; never moves or cancels anything — he taps)"
     }
   ]
 }

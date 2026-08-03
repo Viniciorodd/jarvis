@@ -3544,6 +3544,48 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // ── THE CALENDAR WATCHER (PRD §3d) ────────────────────────────────────────────────────────────────
+  // "This fixes the system's biggest weakness: it currently requires him to remember to ask it. A calendar
+  // watcher runs whether or not he thinks to. That's the line between a tool and an assistant."
+  //
+  // Runs on a schedule, costs every NEW event, and pings only when there is something worth saying. It never
+  // moves or cancels anything — it drafts and suggests, he taps (PRD §3d guardrail).
+  if (req.method === 'POST' && url.pathname === '/api/calendar/watch') {
+    try {
+      const C = await import('../pods/gatekeeper-calendar.mjs');
+      const events = await google.calendarUpcoming({ days: 10, max: 40 }).catch(() => []);
+      const seenFile = path.join(__dirname, 'data', 'calendar-seen.json');
+      let seen = {};
+      try { seen = JSON.parse(fs.readFileSync(seenFile, 'utf8')) || {}; } catch { /* first run */ }
+
+      // Protected blocks = anything already on his calendar that names deep work. That is what makes
+      // "I have work I can't move" literally true rather than an excuse (PRD §6).
+      const protectedBlocks = (events || []).filter((e) => /block|deep work|build|focus|redos|gov send|proposal/i.test(String(e.summary || '')));
+      const fresh = (events || []).filter((e) => e && e.id && !seen[e.id]);
+
+      const alerts = [];
+      for (const e of fresh) {
+        // Recovery debt isn't tracked yet (that's the Commitment Ledger, PRD build-order step 2). Passing 0
+        // means the watcher simply won't use that signal — better than inventing a number that would make
+        // it nag about events for a reason that isn't real.
+        const ev = C.evaluateEvent({ event: e, protectedBlocks, recoveryDaysOutstanding: 0 });
+        const line = C.eventAlert(e, ev);
+        seen[e.id] = { ts: new Date().toISOString(), action: ev.action };
+        if (line) alerts.push({ id: e.id, summary: e.summary, action: ev.action, line });
+      }
+      try { fs.mkdirSync(path.dirname(seenFile), { recursive: true }); fs.writeFileSync(seenFile, JSON.stringify(seen, null, 2)); } catch { /* best-effort */ }
+
+      // Cap the burst — the first run sees every event on the calendar at once.
+      const send3 = alerts.slice(0, 3);
+      if (send3.length) {
+        try {
+          const L = await import('../pods/lib.mjs');
+          L.notifyTelegram(send3.map((a) => a.line).join('\n\n───\n\n'));
+        } catch { /* the response still carries them */ }
+      }
+      return send(res, 200, JSON.stringify({ ok: true, checked: (events || []).length, fresh: fresh.length, alerted: send3.length, alerts: send3 }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // ── GATEKEEPER: what saying yes actually costs (PRD "protect the yes") ────────────────────────────
   // LLM PROPOSES / CODE DISPOSES, exactly as the doctrine requires: a model reads the request and estimates
   // the physical facts (hours, miles, start time) — the things language actually carries — and every number

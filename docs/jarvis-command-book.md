@@ -40,6 +40,17 @@ There are three places to reach Jarvis, and they do different things:
 | `/pause Hector` | stops new work, keeps what you already approved |
 | `/tier Hector 2` | 0 = drafts only · 1 = needs your yes · 2 = acts alone |
 
+
+### Protect your time
+| Say | What happens |
+|---|---|
+| `/gate <the request>` | the **true cost** of saying yes — hours, dollars, recovery days, stacking risk — plus a verdict and a message you can send |
+| `/cost <the request>` · `/ask <the request>` | same thing |
+
+She also **watches your calendar** every 3 hours. A new event that collides with protected work, could be an
+email, or is bigger than it looks gets one ping with a suggestion. Everything else: silence.
+*She never moves or cancels anything — she drafts, you tap.*
+
 ### Ask
 | Say | What happens |
 |---|---|

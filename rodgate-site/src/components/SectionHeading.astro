@@ -1,0 +1,16 @@
+---
+// The eyebrow + bronze-rule opener. Recurs on every surface —
+// componentised so it is never re-typeset by hand.
+const { eyebrow, title, lead, as: Tag = 'h2' } = Astro.props;
+---
+<div class="sh">
+  <hr class="rule-open" />
+  {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+  <Tag class="h2 sh__title">{title}</Tag>
+  {lead && <p class="lead sh__lead measure">{lead}</p>}
+</div>
+
+<style>
+  .sh__title { margin-top: var(--space-2); }
+  .sh__lead { margin-top: var(--space-4); }
+</style>

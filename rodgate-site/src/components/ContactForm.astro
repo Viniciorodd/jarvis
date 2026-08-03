@@ -1,7 +1,6 @@
 ---
-// Netlify Forms — static-friendly. Submissions notify vinicio@rodgategroup.com
-// (configure the notification email in the Netlify dashboard → Forms).
-import Icon from './Icon.astro';
+// Netlify Forms. Notifications route to vinicio@rodgategroup.com
+// (set in Netlify dashboard → Forms → capability-briefing).
 ---
 <form
   name="capability-briefing"
@@ -9,51 +8,56 @@ import Icon from './Icon.astro';
   data-netlify="true"
   netlify-honeypot="bot-field"
   action="/contact/thanks"
-  class="card p-6 md:p-8"
+  class="card cf"
 >
   <input type="hidden" name="form-name" value="capability-briefing" />
-  <p hidden>
-    <label>Don't fill this out: <input name="bot-field" /></label>
-  </p>
+  <p hidden><label>Leave blank: <input name="bot-field" /></label></p>
 
-  <div class="grid gap-5 sm:grid-cols-2">
-    <label class="block">
-      <span class="text-sm font-semibold text-fg">Name <span class="text-destructive">*</span></span>
-      <input type="text" name="name" required autocomplete="name"
-        class="mt-1.5 w-full rounded-[var(--r-md)] border border-border bg-[var(--color-bg)] px-3.5 py-2.5 text-fg placeholder:text-muted-fg/70 focus:border-primary" />
+  <div class="cf__grid">
+    <label>
+      <span class="field-label">Name <abbr title="required">*</abbr></span>
+      <input class="input" type="text" name="name" required autocomplete="name" />
     </label>
-    <label class="block">
-      <span class="text-sm font-semibold text-fg">Organization</span>
-      <input type="text" name="organization" autocomplete="organization"
-        class="mt-1.5 w-full rounded-[var(--r-md)] border border-border bg-[var(--color-bg)] px-3.5 py-2.5 text-fg placeholder:text-muted-fg/70 focus:border-primary" />
+    <label>
+      <span class="field-label">Organization</span>
+      <input class="input" type="text" name="organization" autocomplete="organization" />
     </label>
-    <label class="block">
-      <span class="text-sm font-semibold text-fg">Email <span class="text-destructive">*</span></span>
-      <input type="email" name="email" required autocomplete="email"
-        class="mt-1.5 w-full rounded-[var(--r-md)] border border-border bg-[var(--color-bg)] px-3.5 py-2.5 text-fg placeholder:text-muted-fg/70 focus:border-primary" />
+    <label>
+      <span class="field-label">Email <abbr title="required">*</abbr></span>
+      <input class="input" type="email" name="email" required autocomplete="email" />
     </label>
-    <label class="block">
-      <span class="text-sm font-semibold text-fg">Requirement type</span>
-      <select name="requirement"
-        class="mt-1.5 w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-fg focus:border-primary">
-        <option>Custodial & Janitorial</option>
-        <option>Grounds & Landscaping</option>
-        <option>Trash & Haul-Away</option>
-        <option>Facilities Support</option>
+    <label>
+      <span class="field-label">Requirement</span>
+      <select class="input" name="requirement">
+        <option>Custodial &amp; janitorial</option>
+        <option>Grounds &amp; landscaping</option>
+        <option>Trash &amp; haul-away</option>
+        <option>Facilities support</option>
         <option>Subcontracting / teaming</option>
         <option>Other</option>
       </select>
     </label>
   </div>
 
-  <label class="mt-5 block">
-    <span class="text-sm font-semibold text-fg">Message</span>
-    <textarea name="message" rows="5"
-      placeholder="Tell us about the requirement, location, and timeline."
-      class="mt-1.5 w-full rounded-[var(--r-md)] border border-border bg-[var(--color-bg)] px-3.5 py-2.5 text-fg placeholder:text-muted-fg/70 focus:border-primary"></textarea>
+  <label class="cf__full">
+    <span class="field-label">Scope</span>
+    <textarea class="input" name="message" rows="5"
+      placeholder="The buildings, the square footage, and the frequency."></textarea>
+    <span class="cf__hint">Tell us those three and you get a price and a staffing plan — once, in writing.</span>
   </label>
 
-  <button type="submit" class="btn btn-gold mt-6">
-    Send request <Icon name="arrow-right" size={17} />
-  </button>
+  <button type="submit" class="btn btn-accent cf__submit">Send request</button>
 </form>
+
+<style>
+  .cf { padding: var(--space-8); }
+  .cf__grid { display: grid; gap: var(--space-5); }
+  @media (min-width: 620px) { .cf__grid { grid-template-columns: 1fr 1fr; } }
+  .cf__full { display: block; margin-top: var(--space-5); }
+  .cf__hint {
+    display: block; margin-top: var(--space-2);
+    font-family: var(--font-ui); font-size: var(--text-xs); color: var(--slate-500);
+  }
+  .cf__submit { margin-top: var(--space-6); }
+  abbr { color: var(--red-600); text-decoration: none; }
+</style>

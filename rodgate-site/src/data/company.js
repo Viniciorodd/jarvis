@@ -7,10 +7,17 @@
 // "certified" status beyond self-certified SDB.
 // ────────────────────────────────────────────────────────────
 
+// ─── Brand switch ───────────────────────────────────────────
+// The keystone mark is an original proposal, not a recovered asset.
+// Flip to false to run the system on a plain-type wordmark instead —
+// every other asset still works. See /logo-options to compare.
+export const SHOW_MARK = true;
+
 export const company = {
   legalName: 'Rodgate, LLC',
   dba: 'Rodgate Group',
-  tagline: "Proudly keeping America's facilities clean, safe, and mission-ready.",
+  // Voice: sell the outcome, not the thing. Sentence case. No emoji.
+  tagline: 'Facilities kept to standard, on contract.',
 
   uei: 'Z1SWBFEK7EM4',
   cage: '18S75',
@@ -113,22 +120,23 @@ export const services = [
   },
 ];
 
+// Voice: plainspoken and provable. Diagnose, don't pitch.
 export const differentiators = [
   {
-    title: 'Self-Certified Small Disadvantaged Business',
-    body: 'Minority-Owned, Hispanic American Owned — a small business built to serve government.',
+    title: 'The owner answers the phone',
+    body: 'No account layer, no call centre. You talk to the person accountable for the work.',
   },
   {
-    title: 'Owner-managed accountability',
-    body: 'Direct accountability, fast response, no layers between the requirement and the decision-maker.',
+    title: 'Crews sized to the requirement',
+    body: 'Vetted regional crews across PA, NJ, NY, and FL. We staff to the scope, not to a template.',
   },
   {
-    title: 'Vetted regional crews',
-    body: 'Teams sized to each job across PA, NJ, NY, and FL — coordinated under one point of contact.',
+    title: 'Registered and current',
+    body: 'Active SAM registration through February 2027, All Awards. PA Commonwealth vendor and COSTARS.',
   },
   {
-    title: 'Dual procurement pipeline',
-    body: 'SAM.gov registered and a PA Commonwealth / COSTARS cooperative vendor.',
+    title: 'Only what we can back',
+    body: 'Small Business, Small Disadvantaged (self-certified), Minority-Owned, Hispanic American Owned. Nothing else claimed.',
   },
 ];
 

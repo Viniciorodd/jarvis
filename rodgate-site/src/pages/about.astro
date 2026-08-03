@@ -1,77 +1,80 @@
 ---
 import Base from '../layouts/Base.astro';
 import PageHeader from '../components/PageHeader.astro';
-import Icon from '../components/Icon.astro';
 import { company } from '../data/company.js';
-
-const values = [
-  { icon: 'shield-check', title: 'Accountability', body: 'Owner-managed means the person answering for the work is the person you talk to. No layers, no runaround.' },
-  { icon: 'handshake', title: 'In writing', body: 'Clear scope, clear expectations, before work begins. Honesty is how we earn the next contract.' },
-  { icon: 'badge-check', title: 'Boring excellence', body: 'Reliable delivery beats flash. We do the fundamentals consistently and let the record speak.' },
-];
 ---
-<Base title="About" description="Rodgate Group is a family-driven, owner-managed small business built to serve federal, state, and local government with accountability and reliability.">
+<Base title="About" description="Rodgate Group is an owner-managed janitorial and facilities support contractor in Nanticoke, Pennsylvania.">
   <PageHeader
-    num="—"
     eyebrow="About"
-    title="A family-driven small business"
-    lead="Owner-managed accountability is not a slogan for us — it is the whole model."
+    title="Owner-managed, and it shows"
+    lead="No account layer. No call centre. The person accountable for the work is the person you reach."
   />
 
-  <div class="container section-tight">
-    <div class="reveal grid gap-10 md:grid-cols-[1.4fr_1fr]">
-      <div class="prose-none">
-        <h2 class="font-heading text-2xl font-bold text-fg">Who we are</h2>
-        <div class="mt-4 space-y-4 text-[17px] leading-relaxed text-muted-fg">
-          <p>
-            {company.legalName} (DBA {company.dba}) is a {company.businessType.split('·')[0].trim()},
-            founded to serve federal, state, and local government with dependable facilities
-            services — custodial and janitorial, grounds and landscaping, trash and haul-away,
-            and broader facilities support.
-          </p>
-          <p>
-            We are a self-certified Small Disadvantaged, Minority-Owned (Hispanic American) small
-            business. We coordinate vetted regional crews across
-            {' '}{company.serviceArea.join(', ')} and stand behind the work as an owner-managed firm
-            — one point of contact, direct accountability, and everything agreed in writing.
-          </p>
-          <p>
-            We are early in our journey and honest about it. We are building our past performance
-            the right way: reliable delivery on real contracts, no borrowed credentials, no
-            overclaiming. When a prime or a contracting officer works with Rodgate, they get a
-            partner who treats every requirement like it matters — because to us, it does.
-          </p>
+  <section class="section">
+    <div class="container about">
+      <div class="about__main">
+        <p class="about__p">
+          {company.legalName}, doing business as {company.dba}, is a janitorial and
+          facilities support contractor based in Nanticoke, Pennsylvania. We serve
+          federal, state, and local government across {company.serviceArea.join(', ')}.
+        </p>
+        <p class="about__p">
+          The work is custodial and janitorial, grounds and landscaping, trash and
+          haul-away, and broader facilities support. We coordinate vetted regional crews
+          and size them to the requirement. Scope is agreed in writing before anyone
+          starts.
+        </p>
+        <p class="about__p">
+          We are a small company and we are early. We would rather be the contractor that
+          never surprises you than the one with the longest brochure. That means we claim
+          only the classifications we hold, we list only past performance we can
+          substantiate, and we price once and stand behind it.
+        </p>
+
+        <hr class="rule-hair about__sep" />
+
+        <p class="eyebrow">Classifications held</p>
+        <div class="about__pills">
+          {company.status.map((s) => <span class="badge">{s}</span>)}
         </div>
       </div>
 
-      <aside class="card h-fit p-6">
-        <h2 class="font-heading text-sm font-bold uppercase tracking-wider text-muted-fg">Leadership</h2>
-        <div class="mt-4 flex items-center gap-4">
-          <span class="grid h-14 w-14 place-items-center rounded-[8px] bg-primary font-heading text-xl font-semibold text-[var(--on-primary)]">VR</span>
-          <div>
-            <p class="font-heading text-lg font-semibold text-fg">{company.poc}</p>
-            <p class="text-sm text-muted-fg">{company.pocTitle}</p>
-          </div>
-        </div>
-        <hr class="my-5 border-border" />
-        <ul class="space-y-3 text-sm">
-          <li class="flex items-center gap-2 text-muted-fg"><Icon name="mail" size={16} class="shrink-0" /><a href={`mailto:${company.email}`} class="hover:text-fg">{company.email}</a></li>
-          <li class="flex items-center gap-2 text-muted-fg"><Icon name="phone" size={16} class="shrink-0" /><a href={`tel:${company.phoneHref}`} class="hover:text-fg">{company.phone}</a></li>
-          <li class="flex items-start gap-2 text-muted-fg"><Icon name="map-pin" size={16} class="mt-0.5 shrink-0" /> {company.address}</li>
-        </ul>
+      <aside class="card about__card">
+        <p class="eyebrow about__cardh">Point of contact</p>
+        <p class="about__poc">{company.poc}</p>
+        <p class="about__role">{company.pocTitle}</p>
+        <hr class="rule-hair about__sep2" />
+        <table class="spec">
+          <tbody>
+            <tr><th scope="row">Email</th><td><a href={`mailto:${company.email}`} class="link">{company.email}</a></td></tr>
+            <tr><th scope="row">Phone</th><td><a href={`tel:${company.phoneHref}`} class="link">{company.phone}</a></td></tr>
+            <tr><th scope="row">Address</th><td class="prose">{company.address}</td></tr>
+            <tr><th scope="row">Entity</th><td class="prose">{company.businessType}</td></tr>
+          </tbody>
+        </table>
       </aside>
     </div>
-
-    <div class="reveal mt-14 grid gap-6 md:grid-cols-3">
-      {values.map((v) => (
-        <div class="card p-6">
-          <span class="grid h-11 w-11 place-items-center rounded-[8px] bg-[var(--color-muted)] text-primary">
-            <Icon name={v.icon} size={22} />
-          </span>
-          <h3 class="mt-4 font-heading text-lg font-semibold text-fg">{v.title}</h3>
-          <p class="mt-2 text-[15px] text-muted-fg">{v.body}</p>
-        </div>
-      ))}
-    </div>
-  </div>
+  </section>
 </Base>
+
+<style>
+  .about { display: grid; gap: var(--space-12); align-items: start; }
+  @media (min-width: 940px) { .about { grid-template-columns: 1.25fr 0.75fr; gap: var(--space-16); } }
+  .about__p {
+    font-family: var(--font-body); font-size: var(--text-lg);
+    line-height: 1.7; max-width: var(--measure);
+  }
+  .about__p + .about__p { margin-top: var(--space-5); }
+  .about__sep { margin-block: var(--space-8); }
+  .about__pills { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+
+  .about__card { padding: var(--space-6); }
+  .about__cardh { display: block; }
+  .about__poc {
+    margin-top: var(--space-3);
+    font-family: var(--font-display); font-weight: 700; font-size: var(--text-xl);
+    letter-spacing: var(--tracking-tight);
+  }
+  .about__role { font-family: var(--font-body); color: var(--color-text-muted); }
+  .about__sep2 { margin-block: var(--space-5); }
+</style>

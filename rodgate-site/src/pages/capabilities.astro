@@ -5,52 +5,67 @@ import CapabilityTable from '../components/CapabilityTable.astro';
 import Icon from '../components/Icon.astro';
 import { company } from '../data/company.js';
 ---
-<Base title="Capabilities & Company Data" description="Rodgate Group capability statement: UEI, CAGE, NAICS, PSC/FSC, socio-economic status, SAM.gov registration, and service area.">
+<Base title="Capability statement" description="Rodgate Group capability statement: UEI, CAGE, NAICS, PSC/FSC, socio-economic status, SAM.gov registration, and service area.">
   <PageHeader
-    num="—"
     eyebrow="Capability statement"
-    title="Company data & registrations"
-    lead="Everything a contracting officer or prime's procurement office needs to qualify Rodgate — on one page, ready to print or screenshot."
+    title="Company data and registrations"
+    lead="Everything a contracting officer or a prime's procurement office needs to qualify us. Built to print and photocopy cleanly."
   />
 
-  <div class="container section-tight">
-    <div class="reveal mb-8 flex flex-wrap items-center justify-between gap-4">
-      <p class="max-w-xl text-muted-fg">
-        {company.legalName} (DBA {company.dba}) is registered in SAM.gov and the Commonwealth of
-        Pennsylvania procurement system. All data below is current as of our active registration.
-      </p>
-      <a href={company.capabilityPdf} download class="btn btn-gold no-print">
-        <Icon name="download" size={17} /> Download capability statement (PDF)
-      </a>
-    </div>
-
-    <div class="reveal"><CapabilityTable /></div>
-
-    <div class="reveal mt-8 grid gap-6 md:grid-cols-2">
-      <div class="card p-6">
-        <h2 class="flex items-center gap-2 font-heading text-lg font-semibold text-fg">
-          <Icon name="badge-check" size={20} class="text-primary" /> Socio-economic status
-        </h2>
-        <div class="mt-4 flex flex-wrap gap-2">
-          {company.status.map((s) => (
-            <span class="tag tag--navy">{s}</span>
-          ))}
-        </div>
-        <p class="mt-4 text-sm text-muted-fg">
-          Self-certified only. Rodgate does not claim 8(a), HUBZone, SDVOSB, or WOSB status.
+  <section class="section">
+    <div class="container">
+      <div class="intro">
+        <p class="intro__text">
+          {company.legalName} is registered in SAM with an active All Awards registration
+          through February 2027, and is a Commonwealth of Pennsylvania procurement vendor.
+          <br />Every code below is exact. Nothing is claimed that is not held.
         </p>
+        <a href={company.capabilityPdf} download class="btn btn-accent no-print">
+          <Icon name="download" size={14} stroke={1.75} /> Download PDF
+        </a>
       </div>
-      <div class="card p-6">
-        <h2 class="flex items-center gap-2 font-heading text-lg font-semibold text-fg">
-          <Icon name="map-pin" size={20} class="text-primary" /> Service area
-        </h2>
-        <div class="mt-4 flex flex-wrap gap-2">
-          {company.serviceArea.map((s) => (
-            <span class="tag">{s}</span>
-          ))}
+
+      <CapabilityTable />
+
+      <div class="notes">
+        <div class="card notes__card">
+          <p class="eyebrow">Classifications held</p>
+          <div class="notes__pills">
+            {company.status.map((s) => <span class="badge">{s}</span>)}
+          </div>
+          <p class="notes__body">
+            Self-certified. Rodgate does not hold and does not claim 8(a), HUBZone,
+            SDVOSB, or WOSB status.
+          </p>
         </div>
-        <p class="mt-4 text-sm text-muted-fg">{company.bonding}</p>
+        <div class="card notes__card">
+          <p class="eyebrow">Service area</p>
+          <div class="notes__pills">
+            {company.serviceArea.map((s) => <span class="badge">{s}</span>)}
+          </div>
+          <p class="notes__body">{company.bonding}</p>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 </Base>
+
+<style>
+  .intro {
+    display: flex; flex-wrap: wrap; align-items: flex-start;
+    justify-content: space-between; gap: var(--space-6);
+    margin-bottom: var(--space-8);
+  }
+  .intro__text {
+    max-width: 62ch;
+    font-family: var(--font-body); font-size: var(--text-lg); color: var(--color-text-muted);
+  }
+  .notes { display: grid; gap: var(--space-6); margin-top: var(--space-8); }
+  @media (min-width: 780px) { .notes { grid-template-columns: 1fr 1fr; } }
+  .notes__card { padding: var(--space-6); }
+  .notes__pills { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+  .notes__body {
+    margin-top: var(--space-4);
+    font-family: var(--font-body); font-size: var(--text-base); color: var(--color-text-muted);
+  }
+</style>

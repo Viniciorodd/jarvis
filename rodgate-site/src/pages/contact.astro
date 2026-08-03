@@ -2,66 +2,67 @@
 import Base from '../layouts/Base.astro';
 import PageHeader from '../components/PageHeader.astro';
 import ContactForm from '../components/ContactForm.astro';
-import Icon from '../components/Icon.astro';
 import { company } from '../data/company.js';
 ---
-<Base title="Contact" description="Request a capability briefing from Rodgate Group. Serving federal, state, and local government across PA, NJ, NY, and FL.">
+<Base title="Contact" description="Request a capability briefing from Rodgate Group. Serving federal, state, and local government in PA, NJ, NY, and FL.">
   <PageHeader
-    num="—"
     eyebrow="Contact"
     title="Request a capability briefing"
-    lead="Tell us about your requirement — location, scope, and timeline — and we'll respond promptly."
+    lead="Tell us the buildings, the square footage, and the frequency. You get a price and a staffing plan — once, in writing."
   />
 
-  <div class="container section-tight">
-    <div class="grid gap-10 md:grid-cols-[1.4fr_1fr]">
-      <div class="reveal">
-        <ContactForm />
-      </div>
+  <section class="section">
+    <div class="container ct">
+      <ContactForm />
 
-      <aside class="reveal space-y-6">
-        <div class="card p-6">
-          <h2 class="font-heading text-lg font-semibold text-fg">Direct contact</h2>
-          <ul class="mt-4 space-y-4 text-[15px]">
-            <li class="flex items-start gap-3">
-              <Icon name="badge-check" size={18} class="mt-0.5 shrink-0 text-primary" />
-              <span><span class="font-semibold text-fg">{company.poc}</span><br /><span class="text-muted-fg">{company.pocTitle}</span></span>
-            </li>
-            <li class="flex items-center gap-3">
-              <Icon name="mail" size={18} class="shrink-0 text-primary" />
-              <a href={`mailto:${company.email}`} class="font-semibold text-primary hover:underline">{company.email}</a>
-            </li>
-            <li class="flex items-center gap-3">
-              <Icon name="phone" size={18} class="shrink-0 text-primary" />
-              <a href={`tel:${company.phoneHref}`} class="font-semibold text-primary hover:underline">{company.phone}</a>
-            </li>
-            <li class="flex items-start gap-3">
-              <Icon name="map-pin" size={18} class="mt-0.5 shrink-0 text-primary" />
-              <span class="text-muted-fg">{company.address}</span>
-            </li>
-          </ul>
+      <aside class="ct__side">
+        <div class="card ct__card">
+          <p class="eyebrow ct__h">Direct</p>
+          <p class="ct__poc">{company.poc}</p>
+          <p class="ct__role">{company.pocTitle}</p>
+          <hr class="rule-hair ct__sep" />
+          <table class="spec">
+            <tbody>
+              <tr><th scope="row">Email</th><td><a href={`mailto:${company.email}`} class="link">{company.email}</a></td></tr>
+              <tr><th scope="row">Phone</th><td><a href={`tel:${company.phoneHref}`} class="link">{company.phone}</a></td></tr>
+              <tr><th scope="row">Address</th><td class="prose">{company.address}</td></tr>
+            </tbody>
+          </table>
         </div>
 
-        <div class="rounded-[var(--r-lg)] border border-border bg-[var(--color-muted)] p-6">
-          <h2 class="flex items-center gap-2 font-heading text-sm font-bold uppercase tracking-wider text-muted-fg">
-            <Icon name="map-pin" size={16} /> Service area
-          </h2>
-          <div class="mt-3 flex flex-wrap gap-2">
-            {company.serviceArea.map((s) => (
-              <span class="tag">{s}</span>
-            ))}
+        <div class="card ct__card">
+          <p class="eyebrow ct__h">Service area</p>
+          <div class="ct__pills">
+            {company.serviceArea.map((s) => <span class="badge">{s}</span>)}
           </div>
         </div>
 
-        <div class="card p-6">
-          <p class="text-xs font-bold uppercase tracking-wider text-muted-fg">Registrations</p>
-          <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold text-fg">
-            <span>UEI {company.uei}</span>
-            <span>CAGE {company.cage}</span>
-            <span>SAM.gov Active</span>
-          </div>
+        <div class="card ct__card">
+          <p class="eyebrow ct__h">Registration</p>
+          <table class="spec">
+            <tbody>
+              <tr><th scope="row">UEI</th><td>{company.uei}</td></tr>
+              <tr><th scope="row">CAGE</th><td>{company.cage}</td></tr>
+              <tr><th scope="row">SAM.gov</th><td class="prose">Active — All Awards</td></tr>
+            </tbody>
+          </table>
         </div>
       </aside>
     </div>
-  </div>
+  </section>
 </Base>
+
+<style>
+  .ct { display: grid; gap: var(--space-10); align-items: start; }
+  @media (min-width: 940px) { .ct { grid-template-columns: 1.3fr 0.7fr; gap: var(--space-12); } }
+  .ct__side { display: grid; gap: var(--space-5); }
+  .ct__card { padding: var(--space-6); }
+  .ct__h { display: block; }
+  .ct__poc {
+    margin-top: var(--space-3);
+    font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg);
+  }
+  .ct__role { font-family: var(--font-body); font-size: var(--text-base); color: var(--color-text-muted); }
+  .ct__sep { margin-block: var(--space-5); }
+  .ct__pills { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+</style>

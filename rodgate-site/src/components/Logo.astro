@@ -1,0 +1,65 @@
+---
+/**
+ * Rodgate logo lockup.
+ *
+ * The keystone mark: a keystone tapering downward with an arch opening cut
+ * from its base — "gate" in the name, keystone for Pennsylvania, an aperture
+ * rather than a picture of a service. One closed path (evenodd), so it holds
+ * at 16px, survives 1-colour and fax, and embroiders in two threads.
+ *
+ * Wordmark is ALWAYS "RODGATE" — never "RodGate" — Archivo 700 at +0.18em.
+ *
+ * `showMark` is wired to a single switch in src/data/company.js so the mark
+ * can be kept or dropped system-wide from one line.
+ */
+const {
+  showMark = true,
+  tone = 'slate',        // slate | white | bronze
+  size = 32,
+  sub = true,            // show the "GROUP" sub-line
+  class: cls = '',
+} = Astro.props;
+
+const colors = {
+  slate: 'var(--slate-700)',
+  white: '#ffffff',
+  bronze: 'var(--bronze-600)',
+};
+const c = colors[tone] ?? colors.slate;
+const subColor = tone === 'white' ? 'rgba(255,255,255,.62)' : 'var(--slate-500)';
+---
+<span class={`logo ${cls}`} style={`--logo-c:${c};--logo-sub:${subColor};--logo-size:${size}px`}>
+  {showMark && (
+    <svg class="logo__mark" viewBox="0 0 32 32" width={size} height={size}
+      xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+      <path fill-rule="evenodd" clip-rule="evenodd" fill="var(--logo-c)"
+        d="M4 3 H28 L23.5 29 H8.5 Z M13 29 V19.5 A3 3 0 0 1 19 19.5 V29 Z" />
+    </svg>
+  )}
+  <span class="logo__type">
+    <span class="logo__word">RODGATE</span>
+    {sub && <span class="logo__sub">Group</span>}
+  </span>
+</span>
+
+<style>
+  .logo { display: inline-flex; align-items: center; gap: 10px; }
+  .logo__mark { display: block; flex: none; }
+  .logo__type { display: flex; flex-direction: column; line-height: 1; }
+  .logo__word {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: calc(var(--logo-size) * 0.56);
+    letter-spacing: var(--tracking-mark);
+    color: var(--logo-c);
+  }
+  .logo__sub {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: calc(var(--logo-size) * 0.28);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--logo-sub);
+    margin-top: 3px;
+  }
+</style>

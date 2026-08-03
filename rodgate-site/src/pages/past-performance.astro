@@ -4,79 +4,103 @@ import PageHeader from '../components/PageHeader.astro';
 import Icon from '../components/Icon.astro';
 import { company } from '../data/company.js';
 
-// Honest framing — no fabricated logos or metrics. Real case studies
-// drop into `caseStudies` cleanly once contracts close.
-const caseStudies = [];
+// Voice rule: never overstate past performance. A bracketed placeholder is
+// correct; generic filler prose is not. Real contracts drop in here.
+const contracts = [];
 
-const pipeline = [
-  { label: 'Federal', body: 'Actively responding to facilities, janitorial, and grounds sources-sought and solicitations as a small-business subcontractor and prime.' },
-  { label: 'State & cooperative', body: 'Registered PA Commonwealth vendor and COSTARS cooperative — positioned for state and local facilities requirements.' },
-  { label: 'Teaming', body: 'Building relationships with prime contractors across PA, NJ, NY, and FL to deliver custodial and grounds scope under established past performance.' },
+const posture = [
+  { k: 'Federal', v: 'Responding to facilities, janitorial, and grounds sources-sought and solicitations as a small-business prime and subcontractor.' },
+  { k: 'State and cooperative', v: 'Commonwealth of Pennsylvania procurement vendor and COSTARS cooperative member.' },
+  { k: 'Teaming', v: `Building prime relationships across ${company.serviceAreaAbbr.join(', ')} to carry custodial and grounds scope under established past performance.` },
 ];
 ---
-<Base title="Past Performance" description="Rodgate Group is actively building past performance across PA/NJ/NY/FL federal, state, and local facilities contracts.">
+<Base title="Past performance" description="Rodgate Group is building past performance across PA, NJ, NY, and FL federal, state, and local facilities contracts.">
   <PageHeader
-    num="—"
     eyebrow="Past performance"
-    title="Earning our record, one contract at a time"
-    lead="Rodgate is a young, focused firm building a facilities-services track record the honest way — through reliable delivery on real contracts, not borrowed credentials."
+    title="Only verified contracts are listed"
+    lead="Rodgate is a young company. We would rather show you an honest record than a padded one — this page lists what we can substantiate, and nothing else."
   />
 
-  <div class="container section-tight">
-    {caseStudies.length === 0 ? (
-      <div class="reveal card p-8 md:p-10">
-        <h2 class="font-heading text-2xl font-bold text-fg">Actively building past performance</h2>
-        <p class="mt-3 max-w-2xl text-muted-fg">
-          {company.legalName} is actively building past performance across
-          {' '}{company.serviceAreaAbbr.join('/')} federal, state, and local facilities contracts.
-          Rather than present placeholder clients or invented metrics, this page reflects exactly
-          where we are — and will feature completed engagements as contracts close.
-        </p>
+  <section class="section">
+    <div class="container">
+      {contracts.length === 0 ? (
+        <div class="card empty">
+          <p class="eyebrow">Current status</p>
+          <h2 class="empty__title">No awarded contracts listed at this time.</h2>
+          <p class="empty__body">
+            We are actively building past performance across
+            {' '}{company.serviceAreaAbbr.join('/')} federal, state, and local facilities work.
+            <br />When a contract closes and can be verified, it appears here with the agency,
+            the scope, the period, and a reference — not before.
+          </p>
 
-        <div class="mt-8 grid gap-6 md:grid-cols-3">
-          {pipeline.map((p) => (
-            <div class="rounded-[var(--r-md)] border border-border bg-[var(--color-bg)] p-6">
-              <span class="grid h-10 w-10 place-items-center rounded-[7px] bg-primary/10 text-primary">
-                <Icon name="handshake" size={20} />
-              </span>
-              <h3 class="mt-4 font-heading text-base font-semibold text-fg">{p.label}</h3>
-              <p class="mt-2 text-sm text-muted-fg">{p.body}</p>
-            </div>
-          ))}
-        </div>
+          <hr class="rule-hair empty__sep" />
 
-        <div class="mt-8 rounded-[var(--r-md)] border border-primary/20 bg-primary/5 p-6">
-          <h3 class="flex items-center gap-2 font-heading text-base font-semibold text-primary">
-            <Icon name="shield-check" size={18} /> What primes and contracting officers can count on
-          </h3>
-          <ul class="mt-3 grid gap-2 sm:grid-cols-2">
+          <p class="eyebrow">Where we stand</p>
+          <table class="spec empty__spec">
+            <tbody>
+              {posture.map((p) => (
+                <tr><th scope="row">{p.k}</th><td class="prose">{p.v}</td></tr>
+              ))}
+            </tbody>
+          </table>
+
+          <hr class="rule-hair empty__sep" />
+
+          <p class="eyebrow">What a prime can rely on today</p>
+          <ul class="empty__list">
             {[
-              'Owner-managed accountability — one point of contact',
-              'Vetted regional crews sized to each requirement',
-              'SAM.gov registered and PA Commonwealth / COSTARS vendor',
-              'Everything in writing; clear scope before work begins',
-            ].map((item) => (
-              <li class="flex items-start gap-2 text-[15px] text-fg">
-                <Icon name="check" size={18} class="mt-0.5 shrink-0 text-accent" /> {item}
-              </li>
+              'Owner-managed — one point of contact, accountable for the work',
+              'Crews sized to the requirement, not to a template',
+              'Active SAM registration and PA Commonwealth / COSTARS vendor status',
+              'Scope agreed in writing before work begins',
+            ].map((i) => (
+              <li><Icon name="check" size={15} stroke={1.75} /><span>{i}</span></li>
             ))}
           </ul>
         </div>
-      </div>
-    ) : (
-      <div class="grid gap-6 md:grid-cols-2">
-        {caseStudies.map((c) => (
-          <article class="rounded-2xl border border-border bg-surface p-6 shadow-card">
-            <h3 class="font-heading text-lg font-semibold text-fg">{c.title}</h3>
-            <p class="mt-2 text-muted-fg">{c.summary}</p>
-          </article>
-        ))}
-      </div>
-    )}
+      ) : (
+        <div class="grid">
+          {contracts.map((c) => (
+            <article class="card contract">
+              <h2>{c.agency}</h2>
+              <p>{c.scope}</p>
+            </article>
+          ))}
+        </div>
+      )}
 
-    <div class="reveal mt-10 flex flex-col items-start gap-4 rounded-[var(--r-lg)] border border-border bg-[var(--color-muted)] p-8 sm:flex-row sm:items-center sm:justify-between">
-      <p class="font-heading text-lg font-semibold text-fg">Considering Rodgate for a teaming opportunity?</p>
-      <a href="/contact" class="btn btn-gold shrink-0">Start a conversation <Icon name="arrow-right" size={17} /></a>
+      <div class="cta">
+        <h2 class="cta__title">Considering Rodgate as a subcontractor?</h2>
+        <a href="/contact" class="btn btn-accent">Start a conversation</a>
+      </div>
     </div>
-  </div>
+  </section>
 </Base>
+
+<style>
+  .empty { padding: var(--space-10); }
+  .empty__title { margin-top: var(--space-3); font-size: var(--text-2xl); max-width: 24ch; }
+  .empty__body {
+    margin-top: var(--space-4); max-width: 66ch;
+    font-family: var(--font-body); font-size: var(--text-lg); color: var(--color-text-muted);
+  }
+  .empty__sep { margin-block: var(--space-8); }
+  .empty__spec { margin-top: var(--space-4); }
+  .empty__list { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+  .empty__list li {
+    display: flex; gap: var(--space-3); padding-block: 6px;
+    font-family: var(--font-body); font-size: var(--text-base);
+  }
+  .empty__list li :global(svg) { color: var(--bronze-600); flex: none; margin-top: 5px; }
+
+  .cta {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: var(--space-5);
+    background: var(--stone-100);
+    border-top: 3px solid var(--slate-700);
+    padding: var(--space-8);
+    margin-top: var(--space-8);
+  }
+  .cta__title { font-size: var(--text-xl); }
+</style>

@@ -4,61 +4,97 @@ import PageHeader from '../components/PageHeader.astro';
 import Icon from '../components/Icon.astro';
 import { services, company } from '../data/company.js';
 ---
-<Base title="Services" description="Custodial & janitorial, grounds & landscaping, trash & haul-away, and facilities support for federal, state, and local government.">
+<Base title="Services" description="Custodial and janitorial, grounds and landscaping, trash and haul-away, and facilities support for federal, state, and local government.">
   <PageHeader
-    num="—"
     eyebrow="Services"
-    title="Facilities services, one point of accountability"
-    lead="Recurring custodial, grounds, haul-away, and facilities support — delivered through vetted regional crews across PA, NJ, NY, and FL, coordinated under an owner-managed firm."
+    title="Four service lines, one point of accountability"
+    lead={`Vetted regional crews across ${company.serviceAreaAbbr.join(', ')}. We staff to the scope, not to a template.`}
   />
 
-  <div class="container section-tight">
-    <div class="space-y-6">
-      {services.map((s) => (
-        <article id={s.slug} class="reveal card scroll-mt-28 p-7 md:p-9">
-          <div class="grid gap-7 md:grid-cols-[auto_1fr]">
-            <span class="grid h-14 w-14 place-items-center rounded-xl bg-muted text-primary">
-              <Icon name={s.icon} size={28} />
-            </span>
-            <div>
-              <h2 class="font-heading text-2xl font-bold text-fg">{s.name}</h2>
-              <p class="mt-2 text-muted-fg">{s.short}</p>
+  <section class="section">
+    <div class="container svcs">
+      {services.map((s, i) => (
+        <article id={s.slug} class="card svc">
+          <header class="svc__head">
+            <span class="svc__n mono">{String(i + 1).padStart(2, '0')}</span>
+            <span class="svc__ic"><Icon name={s.icon} size={22} stroke={1.75} /></span>
+            <h2 class="svc__title">{s.name}</h2>
+          </header>
+          <p class="svc__lede">{s.short}</p>
 
-              <h3 class="mt-6 font-heading text-sm font-bold uppercase tracking-wider text-primary">Scope</h3>
-              <ul class="mt-3 space-y-2">
+          <hr class="rule-hair svc__sep" />
+
+          <div class="svc__cols">
+            <div>
+              <p class="eyebrow">Scope</p>
+              <ul class="svc__list">
                 {s.scope.map((item) => (
-                  <li class="flex items-start gap-2.5 text-[15px] text-fg">
-                    <Icon name="check" size={18} class="mt-0.5 shrink-0 text-accent" /> {item}
-                  </li>
+                  <li><Icon name="check" size={15} stroke={1.75} /><span>{item}</span></li>
                 ))}
               </ul>
-
-              <div class="mt-6 flex flex-wrap gap-6">
-                <div>
-                  <p class="text-xs font-bold uppercase tracking-wider text-muted-fg">Typical engagement</p>
-                  <p class="mt-1 text-[15px] text-fg">{s.engagement}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-bold uppercase tracking-wider text-muted-fg">Relevant PSC / FSC</p>
-                  <div class="mt-1.5 flex flex-wrap gap-2">
-                    {s.psc.map((code) => (
-                      <span class="tag tag--navy">{code}</span>
-                    ))}
-                  </div>
-                </div>
+            </div>
+            <div class="svc__meta">
+              <div>
+                <p class="eyebrow">Typical engagement</p>
+                <p class="svc__metaval">{s.engagement}</p>
+              </div>
+              <div>
+                <p class="eyebrow">Relevant PSC / FSC</p>
+                <div class="svc__tags">{s.psc.map((c) => <span class="tag">{c}</span>)}</div>
               </div>
             </div>
           </div>
         </article>
       ))}
-    </div>
 
-    <div class="reveal mt-12 flex flex-col items-start gap-4 rounded-[var(--r-lg)] border border-border bg-[var(--color-muted)] p-8 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="font-heading text-xl font-semibold text-fg">Have a requirement in {company.serviceAreaAbbr.join(', ')}?</h2>
-        <p class="mt-1 text-muted-fg">Request a capability briefing and we'll respond promptly.</p>
+      <div class="cta">
+        <div>
+          <h2 class="cta__title">Have a requirement in {company.serviceAreaAbbr.join(', ')}?</h2>
+          <p class="cta__body">Tell us the buildings, the square footage, and the frequency.</p>
+        </div>
+        <a href="/contact" class="btn btn-accent">Request a briefing</a>
       </div>
-      <a href="/contact" class="btn btn-gold shrink-0">Request a briefing <Icon name="arrow-right" size={17} /></a>
     </div>
-  </div>
+  </section>
 </Base>
+
+<style>
+  .svcs { display: grid; gap: var(--space-6); }
+  .svc { padding: var(--space-8); }
+  .svc__head { display: flex; align-items: center; gap: var(--space-4); }
+  .svc__n { font-size: var(--text-xs); color: var(--bronze-600); }
+  .svc__ic { color: var(--slate-500); display: grid; place-items: center; }
+  .svc__title { font-size: var(--text-2xl); }
+  .svc__lede {
+    margin-top: var(--space-3); max-width: 66ch;
+    font-family: var(--font-body); font-size: var(--text-lg); color: var(--color-text-muted);
+  }
+  .svc__sep { margin-block: var(--space-6); }
+  .svc__cols { display: grid; gap: var(--space-8); }
+  @media (min-width: 780px) { .svc__cols { grid-template-columns: 1.3fr 1fr; gap: var(--space-12); } }
+
+  .svc__list { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
+  .svc__list li {
+    display: flex; gap: var(--space-3); padding-block: 5px;
+    font-family: var(--font-body); font-size: var(--text-base);
+  }
+  .svc__list li :global(svg) { color: var(--bronze-600); flex: none; margin-top: 5px; }
+
+  .svc__meta { display: grid; gap: var(--space-6); align-content: start; }
+  .svc__metaval {
+    margin-top: var(--space-2);
+    font-family: var(--font-body); font-size: var(--text-base); color: var(--color-text-muted);
+  }
+  .svc__tags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+
+  .cta {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: var(--space-5);
+    background: var(--stone-100);
+    border-top: 3px solid var(--slate-700);
+    padding: var(--space-8);
+    margin-top: var(--space-6);
+  }
+  .cta__title { font-size: var(--text-xl); }
+  .cta__body { margin-top: 6px; font-family: var(--font-body); color: var(--color-text-muted); }
+</style>

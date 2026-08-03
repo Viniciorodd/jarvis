@@ -89,7 +89,18 @@ function isSendGate(a) {
 }
 function approvalText(a) {
   const p = a.payload || {};
-  const title = p.title || a.rationale || a.action || 'Needs your approval';
+  // Never headline with the gate's own doctrine sentence. The fix at the source (chief-of-staff/router.mjs)
+  // stops NEW gates carrying it, but 16 already in his queue do — and he cannot act on "Treated as
+  // irreversible — gated for your approval", which is what he actually received. Prefer a real subject.
+  const boilerplate = /treated as irreversible|gated for your approval|doctrine\s*§|requires (?:your )?approval|awaiting approval/i;
+  const raw = String(a.rationale || '').trim();
+  const who = (p.assignee && (p.assignee.nickname || p.assignee.codename)) || a.actor || '';
+  const title = p.title
+    || (raw && !boilerplate.test(raw) ? raw : '')
+    || String(p.summary || '').trim()
+    || String(p.proposed_step || '').trim()
+    || [who, a.action].filter(Boolean).join(' — ')
+    || 'Needs your approval';
   const detail = p.detail || (p.to ? 'To: ' + p.to : '');
   const excerpt = draftExcerpt(p.file);
   let note = '';

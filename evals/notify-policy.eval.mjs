@@ -28,7 +28,19 @@ export default {
 
     // ── what genuinely earns it ──
     { name: 'a SUBMIT decision buzzes — deadline and money attached', run: () =>
-      ok(worthABuzz({ kind: 'approval.request', action: 'submit', payload: { title: 'B100 Deep Clean' } })) },
+      ok(worthABuzz({ kind: 'approval.request', pod: 'gov', action: 'submit', payload: { title: 'B100 Deep Clean' } })) },
+
+    // The live case, 2026-08-02: 16 of his 30 pending items were chief-of-staff routing steps. One asked him
+    // to approve "Read the Gov Pipeline Board BEFORE reporting status" — a doctrine instruction to an agent,
+    // not a decision a human can make. These are what taught him the channel was worthless.
+    { name: 'THE JUNK: a chief-of-staff routing step NEVER buzzes, even as a "submit"', run: () =>
+      ok(!worthABuzz({ kind: 'approval.request', pod: 'chief-of-staff', action: 'submit',
+        rationale: 'Treated as irreversible — gated for your approval (doctrine §9 rule 2).',
+        payload: { summary: 'Read the Gov Pipeline Board before reporting status.' } })) },
+
+    { name: 'a gate that NAMES nothing cannot buzz — he could not act on it anyway', run: () =>
+      ok(!worthABuzz({ kind: 'approval.request', pod: 'gov', action: 'submit',
+        rationale: 'Treated as irreversible — gated for your approval (doctrine §9 rule 2).' })) },
 
     { name: 'a sub waiting on HIM buzzes — they cannot quote until he answers', run: () =>
       ok(worthABuzz(ev('sub.reply.needs_you', { rationale: '❓ Acme needs an answer' }))) },

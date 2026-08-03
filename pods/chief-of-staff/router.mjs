@@ -197,10 +197,20 @@ export async function routeCommand({ text, source = 'api', commandId = null, sto
 
   let outcome;
   if (gate.gate) {
+    // THE ROOT OF THE BOILERPLATE (operator, 2026-08-02: "I get this message all the time and I don't know
+    // what it means or its purpose"). `rationale` used to be gate.reason — the doctrine sentence explaining
+    // WHY something is gated — while the thing actually being gated sat unused in payload.summary. Every
+    // surface that reads rationale then showed him "Treated as irreversible — gated for your approval
+    // (doctrine §9 rule 2)" and nothing else. It leaked to the Telegram card, the approval queue, the
+    // catch-up feed and the narration; I patched three of those downstream before finding this.
+    //
+    // The rationale is now WHAT is waiting. The doctrine reason moves to the payload, where it belongs —
+    // it is an explanation for the record, not a headline for a human.
+    const subject = String(c.summary || '').trim() || String(c.proposed_step || '').trim();
     const rec = store.appendEvent({
       kind: 'approval.request', actor, pod: c.pod, action: c.intent, status: 'pending', reversible: false,
-      rationale: gate.reason, ref: commandId,
-      payload: { assignee: c.person, summary: c.summary, proposed_step: c.proposed_step, action_kind: c.action_kind, source },
+      rationale: subject || `${c.action_kind || 'action'} needs your decision`, ref: commandId,
+      payload: { assignee: c.person, summary: c.summary, proposed_step: c.proposed_step, action_kind: c.action_kind, source, gateReason: gate.reason },
     });
     outcome = { type: 'approval', id: rec.id };
   } else {

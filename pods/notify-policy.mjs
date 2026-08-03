@@ -37,9 +37,18 @@ export function worthABuzz(ev = {}) {
   if (ev.status === 'error') return true;
   if (NEVER.test(action)) return false;
   if (WORTH_IT.test(action)) return true;
-  // An approval request only earns a buzz if it is a REAL decision — a submit or a spend. A routine
-  // outreach send is not something to stop his day for; it lands in the end-of-day count.
-  if (kind === 'approval.request') return /submit|invoice|payment|award|sign/i.test(String(ev.action || ''));
+  // An approval request only earns a buzz if it is a REAL decision — a submit or a spend on a BUSINESS pod.
+  //
+  // `chief-of-staff` is the router's own dispatch layer, not a business. Its gates are internal routing
+  // steps — one of them asked him to approve "Read the Gov Pipeline Board BEFORE reporting status", which is
+  // a doctrine instruction to an agent, not a decision a human can make. Sixteen of his thirty pending items
+  // were these, and they are exactly what taught him the channel was worthless (2026-08-02).
+  if (kind === 'approval.request') {
+    if (String(ev.pod || '') === 'chief-of-staff') return false;
+    if (!/submit|invoice|payment|award|sign/i.test(String(ev.action || ''))) return false;
+    // And it must NAME something. A gate whose only text is the doctrine boilerplate cannot be acted on.
+    return !!buzzText(ev);
+  }
   return false;
 }
 

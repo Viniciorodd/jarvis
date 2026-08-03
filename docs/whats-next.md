@@ -1,6 +1,51 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-07-24. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+_Updated 2026-08-03. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+
+### 🆕 2026-08-03 (latest) — The goal engine became a FILTER, and the crisis gate that should have shipped first
+
+Operator handed over two vault notes as the spec: `PRD — Goal Visualizer & Reverse-Engineering Engine` and
+`🎯 Goal Registry — 10 years, every source`. Both changed what this thing is.
+
+**🚨 The P0 safety gate — found broken, fixed first.** The PRD says outright: the journals contain
+*"I want to die"* (2025-04-16) and a naive `"I want to…"` extractor scrapes it as a goal. Probed against
+`pods/goals-import.mjs` as written: **six of nine crisis phrasings came back as goals** — "die soon",
+"kill myself", "hurt myself badly", "stop existing". The literal journal line survived only by accident —
+`cleanTitle` reduced it to the single word "die" and a rule about WORD COUNT dropped it. A word-count rule is
+not a safety rule; it would have failed on "I want to die already". Now `isCrisisContent()` runs before every
+other rule and is exported, so every future reader of his journals shares ONE list. 9 evals pin it.
+Also shipped alongside: the chore filter ("Buy groceries" passes the aspiration verbs) and third-party
+exclusion (book highlights are the author's words; four Apple Notes are pasted assistant replies).
+
+**The registry replaced the fuzzy matcher.** `goals.json` was already in his vault — 91 goals, 23 actions,
+three tiers, verbatim quotes, and REAL dependency edges (`goal.req[] → action.id`). The previous build inferred
+edges by comparing action strings and needed an LLM pass to invent the actions first. New `pods/goal-registry.mjs`
+consumes the curated DAG: closure with the `any|all` flag (the PRD's own modelling trap — an OR read as an AND
+inflated two side-quests to 58 phantom unlocks), derived `unlocks`, free-wins, tiers, decay, chains, boundaries.
+27 evals.
+
+**The number that matters, corrected.** Sends unlock **67 goals — but only 19 live ones**; the other 48 are
+dream-tier written between 19 and 22. Every ranking leads with the live count, because ranking by the dream
+count lets a dormant wish list pick his Monday.
+
+**Home now says what the work is FOR.** The ONE thing reads: *"Review, sign & submit the proposal — Cleaning
+Control Towers' Windows → moves 19 of your goals: A small ranch or farm · His mother rests, travels, and never
+worries about money again · Ana free of sickle cell."* That adjacency is the anti-shelf mechanism.
+
+**Shipped:** crisis/chore/third-party filters · `pods/goal-registry.mjs` · `/api/goals` (registry-backed),
+`/api/goals/decide` (keep/retire/achieved → `companion/data/goal-decisions.json`, never mutating his vault
+file), `/api/goals/chain`, `/api/goals/candidates` (the re-ingest feed) · `goals.html` rebuilt on the DAG with
+tier filters, provenance quotes, decay lines, still-yours toggles, deep links (`/goals?goal=g_ranch`) ·
+Hard Day Protocol (heavy-day switch hides the leverage table AND strips the "then…" ladder off open chains).
+
+**Still open from the PRD:** the data gaps he must close himself — re-OCR the Notability `.note` files at full
+resolution (only page 1 was ever read, from a thumbnail; the single largest untapped source), extract the
+1.36 GB nested Notion zip to recover the `Goals & Aspirations` table, transcribe the 20 pending voice memos,
+OCR the 3 `.mindnode` files. And **91 goals are still `unconfirmed`** — the tiers are machine-inferred until
+he taps still-mine / retire / already-happened. The PRD's own headline question: *is the ranch really the
+destination, and the castle really retired?*
+
+Evals **1228 green**.
 
 ### 🆕 2026-07-29 (latest, pt.4) — SAM.gov quota is being burned by automated jobs before Vinicio's own manual runs
 Operator ran `node scripts/sam-scout.mjs --naics 561210,561720,561990 --days 14` himself this morning (fresh

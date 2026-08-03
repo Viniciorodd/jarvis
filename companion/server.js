@@ -174,6 +174,30 @@ if (!VAULT_DIR) { try { const m = fs.readFileSync(path.join(__dirname, '..', '.e
 let _tasksMod = null;
 function tasksEngine() { return (_tasksMod ||= import('../control-plane/tasks.mjs')); }
 const vaultOpt = () => (VAULT_DIR ? { vaultDir: VAULT_DIR } : {});
+// Named todayISO, not todayStr: the cockpit handler already block-scopes a `const todayStr` that is a
+// STRING. Shadowing is legal and both work, but one name meaning two types in one file is a trap.
+const todayISO = () => new Date().toLocaleDateString('en-CA');   // local YYYY-MM-DD
+
+// ── The curated goal registry ──────────────────────────────────────────────────────────────────────
+// He built `goals.json` by hand out of eight apps — 91 goals, 23 actions, three tiers, and a verbatim quote
+// on the nodes that carry one. It lives in the VAULT, not the repo, so that editing it in Obsidian and
+// editing it through Jarvis are the same act. Anything else recreates the exact problem the whole registry
+// exists to solve: another place he has to remember to look.
+const vaultRoot = () => VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
+function goalsJsonPath() { return path.join(vaultRoot(), '05 - Knowledge', 'Goals', 'goals.json'); }
+function readGoalRegistry() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(goalsJsonPath(), 'utf8'));
+    return (raw && Array.isArray(raw.goals) && Array.isArray(raw.actions)) ? raw : null;
+  } catch { return null; }   // missing file is a real state — the caller says so instead of throwing
+}
+// His keep/retire/achieved decisions live HERE, never inside goals.json. See /api/goals/decide.
+const goalStatePath = () => path.join(__dirname, 'data', 'goal-decisions.json');
+function readGoalState() { try { return JSON.parse(fs.readFileSync(goalStatePath(), 'utf8')) || {}; } catch { return {}; } }
+function writeGoalState(st) {
+  try { fs.mkdirSync(path.dirname(goalStatePath()), { recursive: true }); } catch { /* exists */ }
+  fs.writeFileSync(goalStatePath(), JSON.stringify(st, null, 2));
+}
 
 // Gov pipeline board (pods/gov/pipeline.mjs, ESM) + the operator's manual dispositions (won/lost/passed).
 let _govMod = null;
@@ -1246,14 +1270,16 @@ async function runTool(name, input) {
     } else if (src === 'goals') {
       const d = await get('/api/goals');
       spec.title = title || 'Your goals';
-      // The ranked action list, not the goal list — the point is what to DO, and the leverage number is
-      // what turns ten years of scattered wishes into an order of operations.
-      spec.rows = ((d && d.next) || []).map((n) => ({
-        label: n.action,
-        value: n.leverage > 1 ? '×' + n.leverage : '',
-        sub: n.leverage > 1 ? 'moves: ' + n.unlocks.slice(0, 3).join(' · ') : (n.unlocks[0] || ''),
+      // The ranked ACTION list, not the goal list — the point is what to DO, and the leverage number is what
+      // turns ten years of scattered wishes into an order of operations. The count shown is the LIVE one:
+      // an action that unblocks 67 goals sounds enormous until you notice 48 of them are dream-tier.
+      const gById = new Map(((d && d.goals) || []).map((g) => [g.id, g.t]));
+      spec.rows = ((d && d.leverage) || []).slice(0, 10).map((n) => ({
+        label: n.title,
+        value: n.live > 1 ? '×' + n.live : '',
+        sub: n.live > 0 ? 'moves: ' + n.liveGoals.slice(0, 3).map((id) => gById.get(id) || id).join(' · ') : (n.status || ''),
       }));
-      spec.empty = 'No goals imported yet.';
+      spec.empty = 'No goal registry yet.';
     } else if (input.text) {
       spec.kind = 'text'; spec.text = String(input.text); spec.title = title || 'Jarvis';
     } else {
@@ -3555,50 +3581,116 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
-  // ── GOALS: ten years of scattered ambitions, connected ────────────────────────────────────────────
+  // ── GOALS: the filter and the router ─────────────────────────────────────────────────────────────
   // *"Having written goals sometimes feels like writing something and putting it on a shelf and never
-  // seeing them again."* So this reads what he ALREADY WROTE — a goal system whose first step is "now type
-  // in all your goals" is one he abandons on day one. Cached, because walking 6,142 notes takes a moment.
+  // seeing them again... if you're not constantly thinking about a goal, seeing it, you're not pursuing it."*
+  //
+  // The SOURCE OF TRUTH is his curated registry — `05 - Knowledge/Goals/goals.json` in the vault, which he
+  // built by hand out of eight apps: 91 goals, 23 actions, three tiers, verbatim quotes, and real dependency
+  // edges. It is a proper DAG, so the connections drawn on screen are HIS structure rather than my guess at
+  // it. The vault harvest that used to serve this route is demoted to `/api/goals/candidates` — it inferred
+  // edges by comparing action strings and needed an LLM pass to invent the actions first.
   if (req.method === 'GET' && url.pathname === '/api/goals') {
+    try {
+      const R = await import('../pods/goal-registry.mjs');
+      const data = readGoalRegistry();
+      if (!data) return send(res, 200, JSON.stringify({ ok: false, error: 'no goal registry found', hint: goalsJsonPath() }));
+      // Hard Day Protocol (registry §6) — he can ask for it, and any surface can pass it through.
+      const hardDay = url.searchParams.get('hardDay') === '1';
+      const out = R.registryView(data, { state: readGoalState(), today: todayISO(), hardDay });
+      return send(res, 200, JSON.stringify({ ...out, source: 'registry', file: goalsJsonPath() }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  // STILL YOURS? — keep / retire / it already happened.
+  //
+  // Two thirds of everything he has ever written down is dream-tier, written between 19 and 22, and the
+  // registry's own finding is that the dream tier is what makes him feel behind. So the highest-value thing
+  // this engine does isn't planning — it is *"permission to retire a goal without it counting as quitting."*
+  //
+  // Writes to OUR state file, never back into his goals.json. He hand-built that file and may hand-edit it
+  // again; a program that rewrites it can silently eat a quote he typed at 2am. Same pattern as
+  // pods/gov/pipeline-state.json.
+  if (req.method === 'POST' && url.pathname === '/api/goals/decide') {
+    try {
+      const b = await readBody(req);
+      const id = String(b.id || '').trim();
+      const decision = String(b.decision || '').trim();
+      if (!id || !['keep', 'retire', 'achieved', 'undo'].includes(decision)) {
+        return send(res, 200, JSON.stringify({ ok: false, error: 'need id + decision (keep|retire|achieved|undo)' }));
+      }
+      const st = readGoalState();
+      st.decisions = st.decisions || {};
+      if (decision === 'undo') delete st.decisions[id];
+      else st.decisions[id] = { decision, at: new Date().toISOString() };
+      writeGoalState(st);
+      return send(res, 200, JSON.stringify({ ok: true, id, decision }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  // ONE GOAL'S CHAIN — reverse-engineered down to something he can start this quarter.
+  if (req.method === 'GET' && url.pathname === '/api/goals/chain') {
+    try {
+      const R = await import('../pods/goal-registry.mjs');
+      const data = readGoalRegistry();
+      if (!data) return send(res, 200, JSON.stringify({ ok: false, error: 'no goal registry found' }));
+      const goals = R.applyDecisions(data.goals || [], readGoalState());
+      const g = goals.find((x) => x.id === url.searchParams.get('id'));
+      if (!g) return send(res, 200, JSON.stringify({ ok: false, error: 'no such goal' }));
+      return send(res, 200, JSON.stringify({ ok: true, goal: g, ...R.chainFor(g, data.actions || []) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  // CANDIDATES — goals he has written in the vault that the registry doesn't carry yet.
+  //
+  // This is the anti-decay half. The registry is a snapshot of ten years; without a feed it slowly becomes
+  // the shelf it was built to replace. Everything here has passed the crisis suppression list, the chore
+  // filter and the third-party exclusion in pods/goals-import.mjs — nothing reaches this response unfiltered.
+  // Cached, because walking 6,142 notes takes a moment.
+  if (req.method === 'GET' && url.pathname === '/api/goals/candidates') {
     try {
       const cacheFile = path.join(__dirname, 'data', 'goals-cache.json');
       const maxAgeMs = 6 * 3600000;
+      let cached = null;
       if (!url.searchParams.get('refresh')) {
         try {
           const c = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-          if (c && Date.now() - Date.parse(c.built) < maxAgeMs) return send(res, 200, JSON.stringify(c));
+          if (c && Date.now() - Date.parse(c.built) < maxAgeMs && Array.isArray(c.goals)) cached = c;
         } catch { /* rebuild */ }
       }
-      const I = await import('../pods/goals-import.mjs');
-      const G = await import('../pods/goals.mjs');
-      const vault = VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
-      const SKIP = new Set(['.obsidian', '.trash', '.git', '.smart-env', 'node_modules', '.jarvis-trash']);
-      const lists = [];
-      (function walk(d) {
-        let es; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
-        for (const e of es) {
-          if (e.name.startsWith('.') || SKIP.has(e.name)) continue;
-          const p = path.join(d, e.name);
-          if (e.isDirectory()) { walk(p); continue; }
-          if (!e.name.toLowerCase().endsWith('.md')) continue;
-          try {
-            if (fs.statSync(p).size > 400000) continue;
-            const g = I.goalsFromLines(fs.readFileSync(p, 'utf8').split(/\r?\n/), e.name);
-            if (g.length) lists.push(g);
-          } catch { /* skip unreadable */ }
-        }
-      })(vault);
-      const goals = I.mergeGoals(lists);
-      const out = {
-        ok: true, built: new Date().toISOString(), count: goals.length,
-        goals,
-        graph: G.goalGraph(goals),
-        next: G.nextActions(goals, { limit: 8 }),
-        // Written repeatedly over ten years IS the signal — he kept coming back to these.
-        mostWritten: [...goals].sort((a, b) => b.mentions - a.mentions).slice(0, 12).map((g) => ({ title: g.title, mentions: g.mentions, category: g.category })),
-      };
-      try { fs.mkdirSync(path.dirname(cacheFile), { recursive: true }); fs.writeFileSync(cacheFile, JSON.stringify(out)); } catch { /* best-effort */ }
-      return send(res, 200, JSON.stringify(out));
+      if (!cached) {
+        const I = await import('../pods/goals-import.mjs');
+        const vault = VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
+        const SKIP = new Set(['.obsidian', '.trash', '.git', '.smart-env', 'node_modules', '.jarvis-trash']);
+        const lists = [];
+        (function walk(d) {
+          let es; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+          for (const e of es) {
+            if (e.name.startsWith('.') || SKIP.has(e.name)) continue;
+            const p = path.join(d, e.name);
+            if (e.isDirectory()) { walk(p); continue; }
+            if (!e.name.toLowerCase().endsWith('.md')) continue;
+            try {
+              if (fs.statSync(p).size > 400000) continue;
+              const g = I.goalsFromLines(fs.readFileSync(p, 'utf8').split(/\r?\n/), e.name);
+              if (g.length) lists.push(g);
+            } catch { /* skip unreadable */ }
+          }
+        })(vault);
+        cached = { ok: true, built: new Date().toISOString(), goals: I.mergeGoals(lists) };
+        try { fs.mkdirSync(path.dirname(cacheFile), { recursive: true }); fs.writeFileSync(cacheFile, JSON.stringify(cached)); } catch { /* best-effort */ }
+      }
+      // Anything already in the registry is not a candidate. Loose match, because the registry's phrasing is
+      // his cleaned-up version of the same want — exact equality would re-offer half the list every week.
+      const reg = readGoalRegistry();
+      const flat = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+      const known = ((reg && reg.goals) || []).map((g) => flat(g.t));
+      const seen = (t) => { const n = flat(t);
+        return known.some((k) => k === n || (k.length > 12 && n.length > 12 && (k.includes(n) || n.includes(k)))); };
+      const fresh = cached.goals.filter((g) => !seen(g.title) && g.status !== 'achieved');
+      return send(res, 200, JSON.stringify({ ok: true, built: cached.built, scanned: cached.goals.length,
+        // Written repeatedly over the years IS the signal — he kept coming back to these.
+        candidates: fresh.sort((a, b) => b.mentions - a.mentions).slice(0, 60) }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
   // GOAL IMAGERY — his vision-board idea: *"a goal gets a generated image that puts you in the scene."*
@@ -3622,22 +3714,23 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, JSON.stringify({ ok: true, url: String(url2).startsWith('http') || String(url2).startsWith('/') ? url2 : '/' + url2 }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
-  // REVERSE-ENGINEER: goals only CONNECT through their action chains, so without this the graph has 552
-  // nodes and zero edges — a prettier list, which is exactly what he already has. An LLM does this step
-  // because breaking "own a private jet" into prerequisites is language work; the overlap maths that follows
-  // stays in code (pods/goals.mjs), because a ranking that reshuffles every run is a toy.
+  // REVERSE-ENGINEER — for CANDIDATES only, now that the curated registry states its own edges.
   //
-  // Runs on the MOST-WRITTEN goals, not all 552. Writing something down four times across ten years is his
-  // own signal about what he actually wants, and it keeps this to one affordable pass.
+  // This used to serve the whole graph, because the harvested set has no dependency information at all: 552
+  // nodes, zero edges, a prettier version of the shelf. That job is done by `goals.json` today. What is still
+  // genuinely useful is breaking down a goal he has written SINCE the registry was built, so it can be
+  // reviewed and folded in with a chain already attached.
+  //
+  // The LLM does this step because turning "own a private jet" into prerequisites is language work. The
+  // overlap maths stays in code, because a ranking that reshuffles every run is a toy.
   if (req.method === 'POST' && url.pathname === '/api/goals/reverse') {
     try {
       const b = await readBody(req);
       const limit = Math.max(1, Math.min(30, Number(b.limit) || 12));
-      const base = await fetch('http://127.0.0.1:' + PORT + '/api/goals', { signal: AbortSignal.timeout(120000) }).then((r) => r.json());
+      const base = await fetch('http://127.0.0.1:' + PORT + '/api/goals/candidates', { signal: AbortSignal.timeout(120000) }).then((r) => r.json());
       if (!base.ok) return send(res, 200, JSON.stringify({ ok: false, error: base.error || 'import failed' }));
-      const picked = [...base.goals]
+      const picked = (base.candidates || [])
         .filter((g) => g.status !== 'achieved')
-        .sort((a, b2) => b2.mentions - a.mentions)
         .slice(0, limit);
 
       const R = await import('../pods/gateway/router.mjs');
@@ -3931,6 +4024,35 @@ const server = http.createServer(async (req, res) => {
     if (govNextAction) oneThing = { text: govNextAction.text + ' — ' + govNextAction.title, kind: 'gov', deadline: govNextAction.deadline, url: govNextAction.url };
     else if (tasks.dueToday && tasks.dueToday[0]) oneThing = { text: tasks.dueToday[0].text, kind: 'task', id: tasks.dueToday[0].id };
     else if (tasks.active && tasks.active[0]) oneThing = { text: tasks.active[0].text, kind: 'task', id: tasks.active[0].id };
+
+    // WHY THIS ONE THING — the anti-shelf mechanism, and the reason the PRD insists the goals live next to
+    // the money and the pipeline rather than in an app of their own.
+    //
+    // A gov move is an outbound send, and sending is the root of his entire goal graph. So the card can say
+    // what the work is FOR, in the names of the goals it moves: the ranch, his mother resting, Ana's cure.
+    // Ten years of goals stop being a document he has to remember to open and become the reason the task on
+    // the screen is worth doing.
+    //
+    // Attached ONLY to a gov move. Claiming an unrelated errand "moves 19 goals" would be a lie, and one
+    // dishonest badge would cost the number all of its meaning.
+    if (oneThing && oneThing.kind === 'gov') {
+      try {
+        const R = await import('../pods/goal-registry.mjs');
+        const reg = readGoalRegistry();
+        if (reg) {
+          const goals = R.applyDecisions(reg.goals || [], readGoalState());
+          const top = R.topAction(goals, reg.actions || []);
+          if (top && top.live > 0) {
+            // Trim at the registry's own " - " descriptor separator: "A small ranch or farm - greens,
+            // trees, sheep, goats..." is the full entry, but three of those is an unreadable line on a
+            // glance card. The head of each title is the goal; the tail is the picture of it.
+            const nameOf = new Map(goals.map((g) => [g.id, String(g.t || '').split(' - ')[0].trim()]));
+            oneThing.moves = { count: top.live, action: top.title,
+              goals: top.liveGoals.slice(0, 3).map((id) => nameOf.get(id) || id) };
+          }
+        }
+      } catch { /* the glance never breaks because the registry is missing */ }
+    }
     let tax = null;
     try { const { taxStatus } = await import('../pods/tax/status.mjs'); const s = await taxStatus();
       const upcomingDeadlines = (s.upcomingDeadlines || []).slice(0, 2)

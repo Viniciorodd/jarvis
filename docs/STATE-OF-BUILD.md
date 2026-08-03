@@ -68,6 +68,23 @@ and rack up real submit history so workflows can earn promotion up the ladder.
 6. Research-&-Risk desk (monitor + journal only) — ❌ (not built)
 
 ## Built beyond the original plan (real, but off the critical path)
+- ✅ **Goal engine — the filter and the router (2026-08-03)** — reads his hand-built vault registry
+  `05 - Knowledge/Goals/goals.json` (91 goals · 23 actions · tiers true/operating/dream · verbatim quotes ·
+  real `req[]→action` and `blockedBy[]` edges). `pods/goal-registry.mjs` is pure + eval-pinned (27 cases):
+  closure with the `any|all` flag, derived `unlocks` (never stored), free-wins, tier split, decay lines,
+  chains, and the six hard boundaries in CODE (trading off · no flips · no new ventures · no set-aside claim ·
+  no >$10 unasked · no public traction claims). Every ranking leads with the LIVE count — sends unlock 67
+  goals but only **19 live** ones; ranking by the 48 dream-tier goals would let a wish list written at
+  nineteen pick his Monday. Routes: `/api/goals` (+`?hardDay=1`), `/api/goals/decide`, `/api/goals/chain`,
+  `/api/goals/candidates`. Decisions live in `companion/data/goal-decisions.json` — his curated vault file is
+  never rewritten. `/goals` draws the DAG in canvas (no CDN), deep-linkable (`/goals?goal=g_ranch`).
+  Home's ONE thing now names what the work moves. **Hard Day Protocol** honored: the heavy-day switch hides
+  the leverage table and strips the "then…" ladder off any open chain.
+- 🚨 **Crisis-content suppression list (2026-08-03)** — the PRD's P0 safety gate, and it was genuinely broken:
+  six of nine crisis phrasings were being scraped as GOALS, with the literal journal line saved only by an
+  accident of word count. `isCrisisContent()` in `pods/goals-import.mjs` now runs before every other rule and
+  is exported so every future reader of his journals shares one list. Plus the chore filter and third-party
+  exclusion. 9 evals pin it — nobody can widen a length rule and quietly reopen the hole.
 - ✅ **JARVIS Companion** — voice-first "her" desktop app (orb UI, file hands, HQ fusion, now: open-files,
   drag-drop, visuals, dashboard, Deepgram wake). Powerful, but it's an extra surface the build-engineer
   order didn't ask for yet.

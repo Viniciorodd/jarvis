@@ -70,6 +70,13 @@ iPhone/iPad — nothing is exposed to the public internet.
     Analysis+artifact only (never sends). Spec: `docs/superpowers/specs/2026-07-24-gov-rfp-shredder-phase1-design.md`.
   - Front-end: `companion/public/index.html` (Home + Today tab + Gov overlay), `today.js`/`today.css`
     (Home glance + Today + gov-board styles), `govboard.js`. Theme follows `data-theme` via shared CSS vars.
+- **Goals (the filter and the router)**: source of truth is his hand-built vault registry
+  `<VAULT>/05 - Knowledge/Goals/goals.json` (91 goals, 23 actions, tiers, verbatim quotes, real DAG edges).
+  Engine `pods/goal-registry.mjs` (pure, eval-pinned) → `/api/goals` (+`?hardDay=1`), `/api/goals/decide`,
+  `/api/goals/chain`, `/api/goals/candidates`. Decisions in `companion/data/goal-decisions.json` — **never
+  rewrite his goals.json**. UI `companion/public/goals.html`. 🚨 The crisis-content suppression list
+  (`isCrisisContent`, `pods/goals-import.mjs`) is a P0 SAFETY GATE — his journals contain "I want to die";
+  it runs before every other import rule and every future reader of his journals must use it.
 - HQ API contract: documented at the top of `hq/server.js` (POST /api/event, /api/approval, GET /api/state).
 - Room/rank unlock thresholds: `hq/config/rooms.json` (rooms) and the RANKS list in `hq/public/app.js`.
 - n8n workflows are exported JSON in `n8n/workflows/` — they are the source of truth; if you

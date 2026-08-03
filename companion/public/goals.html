@@ -3,230 +3,478 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Goals — Jarvis</title>
 <!--
-  goals.html — ten years of goals, as a picture.
+  goals.html — the filter and the router.
 
   Operator: "having written goals sometimes feels like writing something and putting it on a shelf and never
-  seeing them again... I would like to have a visualization, not only images, but also connections."
+  seeing them again... if you're not constantly thinking about a goal, seeing it, you're not pursuing it."
 
-  The graph is drawn with a small force layout in canvas — no library, nothing from a CDN (his Repo Security
-  Audit rule). Node size = how often he wrote it over ten years, because that is his own signal about what he
-  actually wants. Edges = a shared prerequisite, which is the whole insight: a jet and a Lamborghini are the
-  same problem underneath.
+  WHAT IS DRAWN. Not goals connected to goals — goals connected to the ACTIONS they need, and actions to the
+  actions in front of them. That is the real shape of his registry, and it makes the finding visible instead
+  of merely reported: one hub with almost everything hanging off it. His own registry put it plainly — 67 of
+  91 goals sit on top of the same single unblocked action, and that action is sending.
+
+  Node size = leverage (how many LIVE goals an action moves) for actions, and how many times he wrote it
+  across ten years for goals — his own signal about what he actually wants, not mine.
+
+  Drawn with a small spring layout in canvas: no library, nothing from a CDN, per his Repo Security Audit rule.
+
+  TONE. The compassion clause governs every string on this page. The decay counter says when he last wrote a
+  goal, never that he is late. There is no gap number, no "days behind", no progress bar against a target.
+  The heavy-day switch takes even the leverage table away and leaves one thing that costs nothing.
 -->
 <style>
-  :root { --teal-rgb: 90,190,180; --teal: #5abeb4; --cream: #e8e6e1; --dim: #7d8b96; }
+  :root { --teal-rgb: 90,190,180; --teal: #5abeb4; --cream: #e8e6e1; --dim: #7d8b96; --line: rgba(90,190,180,.16); }
+  * { box-sizing: border-box; }
   body { margin: 0; background: #04070f; color: var(--cream); font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
-  .wrap { max-width: 1200px; margin: 0 auto; padding: 22px 20px 60px; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 22px 20px 60px; }
   a.back { display: inline-block; margin-bottom: 12px; font-size: 12.5px; color: var(--teal); text-decoration: none; opacity: .85; }
   h1 { font-size: 21px; margin: 0 0 4px; }
-  .sub { color: var(--dim); font-size: 13px; margin-bottom: 16px; }
-  .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+
+  /* THE ONE THING — the router's answer, above everything else. */
+  .one { border: 1px solid rgba(var(--teal-rgb),.3); background: linear-gradient(180deg, rgba(var(--teal-rgb),.10), rgba(var(--teal-rgb),.03));
+    border-radius: 14px; padding: 15px 18px; margin-bottom: 16px; }
+  .one .lab { font-size: 10.5px; letter-spacing: .18em; color: var(--teal); margin-bottom: 6px; }
+  .one .t { font-size: 17px; line-height: 1.35; }
+  .one .why { font-size: 12.5px; color: var(--dim); margin-top: 7px; line-height: 1.5; }
+
+  .bar { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; align-items: center; }
   button { background: rgba(var(--teal-rgb),.1); border: 1px solid rgba(var(--teal-rgb),.28); color: var(--cream);
-    border-radius: 9px; padding: 8px 13px; font: inherit; font-size: 12.5px; cursor: pointer; }
+    border-radius: 9px; padding: 7px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
   button:hover:not(:disabled) { background: rgba(var(--teal-rgb),.2); }
-  button:disabled { opacity: .45; cursor: default; }
-  .status { font-size: 12px; color: var(--dim); }
-  .grid { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
-  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-  #cv { width: 100%; height: 560px; display: block; border-radius: 14px;
-    border: 1px solid rgba(var(--teal-rgb),.2); background: radial-gradient(circle at 50% 40%, #071120, #04070f 70%); cursor: grab; }
+  button:disabled { opacity: .4; cursor: default; }
+  button.on { background: rgba(var(--teal-rgb),.28); border-color: rgba(var(--teal-rgb),.5); }
+  .status { font-size: 12px; color: var(--dim); margin-left: auto; }
+
+  .grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; }
+  @media (max-width: 950px) { .grid { grid-template-columns: 1fr; } }
+  #cv { width: 100%; height: 580px; display: block; border-radius: 14px; border: 1px solid rgba(var(--teal-rgb),.2);
+    background: radial-gradient(circle at 50% 40%, #071120, #04070f 70%); cursor: grab; touch-action: none; }
   #cv:active { cursor: grabbing; }
-  .side { border: 1px solid rgba(var(--teal-rgb),.16); background: rgba(var(--teal-rgb),.03); border-radius: 14px; padding: 14px 16px; }
-  .side h2 { font-size: 11px; letter-spacing: .16em; color: var(--dim); margin: 0 0 10px; font-weight: 500; }
-  .act { padding: 9px 0; border-bottom: 1px solid rgba(var(--teal-rgb),.10); }
-  .act:last-child { border-bottom: 0; }
-  .act-t { font-size: 13.5px; }
-  .act-n { color: var(--teal); font-size: 12px; font-variant-numeric: tabular-nums; }
-  .act-s { font-size: 11.5px; color: var(--dim); margin-top: 3px; }
-  .detail { margin-top: 14px; }
-  .detail img { width: 100%; border-radius: 10px; display: block; margin-top: 10px; }
-  .empty { color: var(--dim); font-size: 12.5px; }
+
+  .side { border: 1px solid var(--line); background: rgba(var(--teal-rgb),.03); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+  .side h2 { font-size: 10.5px; letter-spacing: .16em; color: var(--dim); margin: 0 0 10px; font-weight: 500; }
+  .row { padding: 8px 0; border-bottom: 1px solid rgba(var(--teal-rgb),.09); cursor: pointer; }
+  .row:last-child { border-bottom: 0; }
+  .row:hover .rt { color: var(--teal); }
+  .rt { font-size: 13px; line-height: 1.35; }
+  .rn { color: var(--teal); font-size: 12px; font-variant-numeric: tabular-nums; float: right; margin-left: 8px; }
+  .rs { font-size: 11.5px; color: var(--dim); margin-top: 3px; line-height: 1.45; }
+  .muted { color: var(--dim); font-size: 12.5px; line-height: 1.55; }
+
+  /* the detail panel */
+  .d-tier { display: inline-block; font-size: 10.5px; letter-spacing: .1em; padding: 2px 8px; border-radius: 20px; margin-right: 6px; }
+  .t-true { background: rgba(20,184,166,.18); color: #5eead4; }
+  .t-operating { background: rgba(59,130,246,.18); color: #93c5fd; }
+  .t-dream { background: rgba(148,163,184,.14); color: #cbd5e1; }
+  .unconf { border-bottom: 1px dotted var(--dim); cursor: help; font-size: 11px; color: var(--dim); }
+  .quote { border-left: 2px solid rgba(var(--teal-rgb),.4); padding: 4px 0 4px 11px; margin: 10px 0; font-size: 13px;
+    line-height: 1.55; color: #cfd8de; font-style: italic; }
+  .chain { margin-top: 10px; }
+  .step { display: flex; gap: 9px; align-items: flex-start; padding: 5px 0; font-size: 12.5px; line-height: 1.4; }
+  .step .dot { color: var(--dim); flex: 0 0 auto; width: 46px; font-size: 10.5px; letter-spacing: .05em; }
+  .step.go .dot { color: var(--teal); }
+  .step.go { color: var(--cream); }
+  .step:not(.go) { color: var(--dim); }
+  .decide { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+  .decide button { font-size: 11.5px; padding: 6px 10px; }
+  .src { font-size: 11px; color: var(--dim); margin-top: 8px; }
+  #pic img { width: 100%; border-radius: 10px; display: block; margin-top: 11px; }
+  .note { font-size: 11.5px; color: var(--dim); margin-top: 10px; line-height: 1.5; }
 </style>
 
 <div class="wrap">
   <a class="back" href="/">← Jarvis</a>
   <h1>Goals</h1>
-  <div class="sub">Every goal you've written, and where they share a path. Node size = how many times you wrote it.</div>
+  <div class="sub" id="sub">loading…</div>
+
+  <div class="one" id="one" hidden>
+    <div class="lab" id="oneLab">START HERE</div>
+    <div class="t" id="oneT"></div>
+    <div class="why" id="oneWhy"></div>
+  </div>
 
   <div class="bar">
-    <button id="build">⟳ Rebuild the map</button>
-    <button id="img" disabled>🖼 Picture this goal</button>
-    <span class="status" id="status">loading…</span>
+    <button data-tier="all" class="f on">Everything</button>
+    <button data-tier="true" class="f">Yours</button>
+    <button data-tier="operating" class="f">The route</button>
+    <button data-tier="dream" class="f">Dormant</button>
+    <button id="heavy" title="Shows one thing that costs nothing, and puts the numbers away.">🌙 Heavy day</button>
+    <span class="status" id="status"></span>
   </div>
 
   <div class="grid">
     <canvas id="cv"></canvas>
     <div>
-      <div class="side">
-        <h2>WHAT MOVES THE MOST</h2>
-        <div id="acts"><div class="empty">Build the map to see this.</div></div>
+      <div class="side" id="detailBox" hidden>
+        <h2 id="detailH">THIS GOAL</h2>
+        <div id="detail"></div>
       </div>
-      <div class="side detail" id="detail" style="display:none"></div>
+      <div class="side" id="freeBox" hidden>
+        <h2>COSTS NOTHING · NEEDS NOBODY</h2>
+        <div id="free"></div>
+      </div>
+      <div class="side" id="levBox">
+        <h2>WHAT MOVES THE MOST</h2>
+        <div id="lev"><div class="muted">loading…</div></div>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-  const $ = (id) => document.getElementById(id);
-  const cv = $('cv'), ctx = cv.getContext('2d');
-  let data = null, nodes = [], edges = [], selected = null, dragging = null, raf = null;
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var D = null, tierFilter = 'all', heavy = false, sel = null;
+  var nodes = [], edges = [], byId = {};
 
-  function fit() {
-    const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-    cv.width = r.width * dpr; cv.height = r.height * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    return { w: r.width, h: r.height };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function short(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+
+  /* ── load ───────────────────────────────────────────────────────────────────────────────────── */
+  function load() {
+    $('status').textContent = 'loading…';
+    fetch('/api/goals' + (heavy ? '?hardDay=1' : ''))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { $('sub').textContent = d.error || 'no registry found'; $('status').textContent = ''; return; }
+        D = d; render();
+      })
+      .catch(function (e) { $('status').textContent = String(e.message || e); });
   }
 
-  // A tiny force layout. No library — his security rule says nothing ships from a CDN without an audit, and
-  // 60 lines of spring physics is not worth a dependency.
-  function layout(graph) {
-    const { w, h } = fit();
-    nodes = graph.nodes.map((n, i) => ({
-      ...n,
-      x: w / 2 + Math.cos((i / graph.nodes.length) * Math.PI * 2) * Math.min(w, h) * 0.32,
-      y: h / 2 + Math.sin((i / graph.nodes.length) * Math.PI * 2) * Math.min(w, h) * 0.32,
-      vx: 0, vy: 0,
-      r: Math.min(26, 8 + (n.mentions || 1) * 2.2 + n.links * 0.8),
-    }));
-    edges = graph.edges.map((e) => ({ ...e, a: nodes.find((n) => n.id === e.from), b: nodes.find((n) => n.id === e.to) })).filter((e) => e.a && e.b);
-    if (raf) cancelAnimationFrame(raf);
-    let ticks = 0;
-    (function step() {
-      const { w: W, h: H } = { w: cv.clientWidth, h: cv.clientHeight };
-      for (const n of nodes) {
-        if (n === dragging) continue;
-        for (const m of nodes) {
-          if (m === n) continue;
-          const dx = n.x - m.x, dy = n.y - m.y;
-          const d2 = Math.max(400, dx * dx + dy * dy);
-          const f = 9000 / d2;                       // repulsion so labels don't pile up
-          n.vx += (dx / Math.sqrt(d2)) * f; n.vy += (dy / Math.sqrt(d2)) * f;
+  /* ── the headline ───────────────────────────────────────────────────────────────────────────── */
+  function renderOne() {
+    var box = $('one');
+    if (heavy) {
+      /* Hard Day Protocol: one free win. No targets recited, no deadlines, no gap number. */
+      var w = D.oneThing;
+      if (!w) { box.hidden = true; return; }
+      box.hidden = false;
+      $('oneLab').textContent = 'ONE THING, AND IT COSTS NOTHING';
+      $('oneT').textContent = w.t;
+      $('oneWhy').textContent = 'No money, no permission, nobody to wait on.';
+      return;
+    }
+    var a = D.oneThing;
+    if (!a || !a.title) { box.hidden = true; return; }
+    box.hidden = false;
+    $('oneLab').textContent = 'START HERE';
+    $('oneT').textContent = a.title;
+    var names = (a.liveGoals || []).map(function (id) { var g = byId[id]; return g ? g.t : id; });
+    /* The LIVE count leads. 67 sounds enormous until you notice 48 of them were written at nineteen. */
+    $('oneWhy').textContent = a.live
+      ? 'Moves ' + a.live + ' of the goals you’re actually chasing' +
+        (a.unlocks > a.live ? ' (and ' + (a.unlocks - a.live) + ' dormant ones)' : '') + ': ' +
+        names.slice(0, 4).join(' · ') + (names.length > 4 ? ' …' : '')
+      : (a.note || '');
+  }
+
+  /* ── the leverage table + the free wins ─────────────────────────────────────────────────────── */
+  function renderSide() {
+    $('levBox').hidden = heavy;                 /* heavy day: the numbers go away entirely */
+    if (!heavy) {
+      var rows = (D.leverage || []).filter(function (a) { return a.live > 0; }).slice(0, 9);
+      $('lev').innerHTML = rows.length ? rows.map(function (a) {
+        var names = (a.liveGoals || []).map(function (id) { return (byId[id] || {}).t || id; });
+        return '<div class="row" data-act="' + esc(a.id) + '">' +
+          '<span class="rn">' + (a.live > 1 ? '×' + a.live : '') + '</span>' +
+          '<div class="rt">' + esc(a.title) + '</div>' +
+          '<div class="rs">' + (a.status === 'blocked' ? 'waiting on something first · ' : '') +
+          esc(names.slice(0, 3).join(' · ')) + '</div></div>';
+      }).join('') : '<div class="muted">Nothing ranked yet.</div>';
+    }
+    var f = D.freeWins || [];
+    $('freeBox').hidden = !f.length;
+    $('free').innerHTML = f.map(function (g) {
+      return '<div class="row" data-goal="' + esc(g.id) + '"><div class="rt">' + esc(g.t) + '</div>' +
+        '<div class="rs">' + esc(g.decay || '') + '</div></div>';
+    }).join('');
+  }
+
+  /* ── one goal, in full ──────────────────────────────────────────────────────────────────────── */
+  function showGoal(id) {
+    var g = byId[id];
+    if (!g || !g.t) { return; }
+    sel = id;
+    $('detailBox').hidden = false;
+    $('detailH').textContent = 'THIS GOAL';
+    var tier = g.retired ? 'retired' : (g.status === 'achieved' ? 'already happened' : g.tier);
+    var h = '<div><span class="d-tier t-' + esc(g.tier) + '">' + esc(String(tier).toUpperCase()) + '</span>' +
+      /* "Nothing inferred is asserted" — the tier is a machine guess until he says otherwise. */
+      (!g.confirmed && !g.retired ? '<span class="unconf" title="Machine-inferred. Nothing here is settled until you say so.">unconfirmed</span>' : '') +
+      '</div><div class="rt" style="margin-top:8px;font-size:15px">' + esc(g.t) + '</div>';
+    if (g.decay) h += '<div class="rs">' + esc(g.decay) + (g.n > 1 ? ' · written ' + g.n + ' times' : '') + '</div>';
+    /* Provenance, in his own words. Without it an imported list is just another shelf. */
+    if (g.q) h += '<div class="quote">“' + esc(g.q) + '”</div>';
+    if (g.src && g.src.length) h += '<div class="src">from: ' + esc(g.src.join(' · ')) + '</div>';
+    if (g.blocked) h += '<div class="note">Shown, never planned — ' + esc(g.blocked.toLowerCase()) + '.</div>';
+    h += '<div class="chain" id="chain"></div>';
+    h += '<div class="decide">' +
+      '<button data-dec="keep">Still mine</button>' +
+      '<button data-dec="retire">Retire it</button>' +
+      '<button data-dec="achieved">Already happened</button>' +
+      '<button data-dec="pic">🖼 Picture it</button></div>';
+    h += '<div id="pic"></div>';
+    $('detail').innerHTML = h;
+
+    fetch('/api/goals/chain?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (c) {
+      var el = $('chain'); if (!el) { return; }
+      if (!c.ok) { el.innerHTML = ''; return; }
+      if (!c.planned) { el.innerHTML = '<div class="note">' + esc(c.why || '') + '</div>'; return; }
+      /* On a heavy day the LADDER comes off. The full chain reads "then $10,000/mo, then debt cleared,
+         then two years of filed returns" — every rung a thing he hasn't done, which is precisely the
+         feeling the Hard Day Protocol exists to keep off the screen. What survives is what he could
+         start, because that is help rather than an accounting. */
+      var steps = heavy ? c.chain.filter(function (s) { return s.startable; }) : c.chain;
+      el.innerHTML = '<h2 style="margin:15px 0 2px;font-size:10.5px;letter-spacing:.16em;color:#7d8b96;font-weight:500">' +
+        (heavy ? 'WHERE IT STARTS' : 'WHAT IT TAKES') + '</h2>' +
+        steps.map(function (s) {
+          return '<div class="step ' + (s.startable ? 'go' : '') + '"><span class="dot">' +
+            (s.startable ? 'START' : 'then') + '</span><span>' + esc(s.title) +
+            (s.cost === 'free' ? ' · free' : '') + '</span></div>';
+        }).join('');
+    });
+  }
+
+  function showAction(id) {
+    var a = (D.leverage || []).filter(function (x) { return x.id === id; })[0];
+    if (!a) { return; }
+    sel = id; $('detailBox').hidden = false; $('detailH').textContent = 'THIS ACTION';
+    var names = (a.liveGoals || []).map(function (g) { return (byId[g] || {}).t || g; });
+    $('detail').innerHTML = '<div class="rt" style="font-size:15px">' + esc(a.title) + '</div>' +
+      '<div class="rs">' + (a.status === 'blocked' ? 'waiting on something first' : 'you can start this') +
+      (a.cost === 'free' ? ' · costs nothing' : '') + '</div>' +
+      (a.note ? '<div class="quote">' + esc(a.note) + '</div>' : '') +
+      '<div class="note">Moves ' + a.live + ' of the goals you’re chasing' +
+      (a.unlocks > a.live ? ', and ' + (a.unlocks - a.live) + ' dormant ones' : '') + '.</div>' +
+      (names.length ? '<div class="chain">' + names.map(function (n) {
+        return '<div class="step go"><span class="dot">→</span><span>' + esc(n) + '</span></div>'; }).join('') + '</div>' : '');
+  }
+
+  function decide(dec) {
+    if (!sel) { return; }
+    if (dec === 'pic') { picture(); return; }
+    var keep = sel;
+    fetch('/api/goals/decide', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: sel, decision: dec }) })
+      .then(function (r) { return r.json(); })
+      .then(function () {
+        $('status').textContent = 'saved';
+        fetch('/api/goals' + (heavy ? '?hardDay=1' : '')).then(function (r) { return r.json(); }).then(function (d) {
+          if (d.ok) { D = d; render(); showGoal(keep); }
+        });
+      });
+  }
+
+  /* ONE goal at a time and only when he asks. 91 unprompted images would cost real money for pictures he
+     never looks at, and the point of the image is to make a goal concrete — which only works for the few
+     he is actually chasing. */
+  function picture() {
+    var g = byId[sel]; if (!g) { return; }
+    $('pic').innerHTML = '<div class="note">drawing…</div>';
+    fetch('/api/goals/image', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: g.t }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var el = $('pic'); if (!el) { return; }
+        el.innerHTML = d.ok ? '<img src="' + esc(d.url) + '" alt="" />'
+          : '<div class="note">' + esc(d.error || 'no image') + '</div>';
+      });
+  }
+
+  /* ── the graph ──────────────────────────────────────────────────────────────────────────────── */
+  function build() {
+    var cats = {}; (D.categories || []).forEach(function (c) { cats[c.id] = c.color; });
+    var acts = D.actions || [];
+    var lev = {}; (D.leverage || []).forEach(function (a) { lev[a.id] = a; });
+    var goals = (D.goals || []).filter(function (g) { return tierFilter === 'all' || g.tier === tierFilter; });
+
+    nodes = []; edges = [];
+
+    /* Only the actions some visible goal actually needs — otherwise every filter still draws the whole
+       machine and the picture stops meaning anything. Walk the chain upward until it stops growing. */
+    var need = {};
+    goals.forEach(function (g) { (g.req || []).forEach(function (r) { need[r] = true; }); });
+    var grew = true;
+    while (grew) {
+      grew = false;
+      acts.forEach(function (a) {
+        if (!need[a.id]) { return; }
+        (a.blockedBy || []).forEach(function (b) { if (!need[b]) { need[b] = true; grew = true; } });
+      });
+    }
+
+    acts.forEach(function (a) {
+      if (!need[a.id]) { return; }
+      var L = lev[a.id] || { live: 0, unlocks: 0 };
+      nodes.push({ id: a.id, kind: 'action', label: a.title, r: 7 + Math.min(16, L.live * 1.6),
+        color: a.status === 'blocked' ? '#64748b' : '#5abeb4', dashed: false, faded: a.status === 'blocked' });
+    });
+    goals.forEach(function (g) {
+      nodes.push({ id: g.id, kind: 'goal', label: g.t, r: 4 + Math.min(9, (g.n || 1) * 1.1),
+        color: cats[g.cat] || '#94a3b8',
+        /* dream tier renders dashed: present and visible, explicitly not planned */
+        dashed: g.tier === 'dream', faded: !!g.blocked || !!g.retired });
+      (g.req || []).forEach(function (r) { if (need[r]) { edges.push([g.id, r]); } });
+    });
+    acts.forEach(function (a) {
+      if (!need[a.id]) { return; }
+      (a.blockedBy || []).forEach(function (b) { if (need[b]) { edges.push([a.id, b]); } });
+    });
+
+    var idx = {}; nodes.forEach(function (n, i) { idx[n.id] = i; });
+    edges = edges.filter(function (e) { return idx[e[0]] !== undefined && idx[e[1]] !== undefined; })
+      .map(function (e) { return [idx[e[0]], idx[e[1]]]; });
+
+    /* Deterministic start positions — a graph that lands differently on every load is disorienting. */
+    nodes.forEach(function (n, i) {
+      var ang = i * 2.399, rad = 40 + (i % 9) * 26;
+      n.x = Math.cos(ang) * rad; n.y = Math.sin(ang) * rad; n.vx = 0; n.vy = 0;
+    });
+    layout();
+  }
+
+  /* A small spring layout. Sixty lines of physics beats a CDN dependency he'd have to audit. */
+  function layout() {
+    for (var it = 0; it < 320; it++) {
+      var k = 1 - it / 340;
+      for (var i = 0; i < nodes.length; i++) {
+        var a = nodes[i];
+        for (var j = i + 1; j < nodes.length; j++) {
+          var b = nodes[j], dx = b.x - a.x, dy = b.y - a.y;
+          var d2 = dx * dx + dy * dy || 0.01, d = Math.sqrt(d2);
+          if (d < 300) {
+            var rep = 1100 / d2;
+            a.vx -= (dx / d) * rep; a.vy -= (dy / d) * rep;
+            b.vx += (dx / d) * rep; b.vy += (dy / d) * rep;
+          }
         }
-        n.vx += (W / 2 - n.x) * 0.0016; n.vy += (H / 2 - n.y) * 0.0016;   // gentle centring
+        a.vx -= a.x * 0.0026; a.vy -= a.y * 0.0026;      /* a gentle pull toward the middle */
       }
-      for (const e of edges) {                        // springs pull connected goals together
-        const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y;
-        const d = Math.max(1, Math.hypot(dx, dy));
-        const f = (d - 150) * 0.0025;
-        if (e.a !== dragging) { e.a.vx += (dx / d) * f; e.a.vy += (dy / d) * f; }
-        if (e.b !== dragging) { e.b.vx -= (dx / d) * f; e.b.vy -= (dy / d) * f; }
-      }
-      for (const n of nodes) {
-        if (n === dragging) continue;
-        n.vx *= 0.84; n.vy *= 0.84;
-        n.x = Math.max(n.r + 4, Math.min(W - n.r - 4, n.x + n.vx));
-        n.y = Math.max(n.r + 4, Math.min(H - n.r - 4, n.y + n.vy));
-      }
-      draw();
-      if (++ticks < 600 || dragging) raf = requestAnimationFrame(step);
-    })();
+      edges.forEach(function (e) {
+        var a = nodes[e[0]], b = nodes[e[1]];
+        var dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        var f = (d - 76) * 0.013;
+        a.vx += (dx / d) * f; a.vy += (dy / d) * f; b.vx -= (dx / d) * f; b.vy -= (dy / d) * f;
+      });
+      nodes.forEach(function (n) { n.x += n.vx * k; n.y += n.vy * k; n.vx *= 0.82; n.vy *= 0.82; });
+    }
   }
+
+  var cv = $('cv'), ctx = cv.getContext('2d'), view = { x: 0, y: 0, s: 1 };
+  function fit() {
+    var r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    cv.width = Math.max(1, r.width * dpr); cv.height = Math.max(1, r.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!nodes.length) { return; }
+    var xs = nodes.map(function (n) { return n.x; }), ys = nodes.map(function (n) { return n.y; });
+    var xMin = Math.min.apply(null, xs), xMax = Math.max.apply(null, xs);
+    var yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
+    view.s = Math.min(r.width / (xMax - xMin + 150), r.height / (yMax - yMin + 110), 1.7);
+    view.x = r.width / 2 - ((xMax + xMin) / 2) * view.s;
+    view.y = r.height / 2 - ((yMax + yMin) / 2) * view.s;
+  }
+  var P = function (n) { return { x: n.x * view.s + view.x, y: n.y * view.s + view.y }; };
 
   function draw() {
-    const W = cv.clientWidth, H = cv.clientHeight;
-    ctx.clearRect(0, 0, W, H);
-    ctx.lineWidth = 1;
-    for (const e of edges) {
-      const hot = selected && (e.a === selected || e.b === selected);
-      ctx.strokeStyle = hot ? 'rgba(90,190,180,.75)' : 'rgba(90,190,180,.16)';
-      ctx.beginPath(); ctx.moveTo(e.a.x, e.a.y); ctx.lineTo(e.b.x, e.b.y); ctx.stroke();
-    }
-    for (const n of nodes) {
-      const on = n === selected;
-      ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fillStyle = on ? 'rgba(90,190,180,.9)' : (n.links ? 'rgba(90,190,180,.32)' : 'rgba(125,139,150,.28)');
-      ctx.fill();
-      ctx.strokeStyle = on ? '#5abeb4' : 'rgba(90,190,180,.45)'; ctx.stroke();
-      // Only label what he can read — everything labelled at once is a hairball.
-      if (n.r > 13 || on) {
-        ctx.fillStyle = on ? '#e8e6e1' : '#9fb4bb';
-        ctx.font = (on ? '600 ' : '') + '11.5px system-ui';
-        ctx.textAlign = 'center';
-        ctx.fillText(n.title.slice(0, 26), n.x, n.y + n.r + 13);
+    var r = cv.getBoundingClientRect();
+    ctx.clearRect(0, 0, r.width, r.height);
+    edges.forEach(function (e) {
+      var a = P(nodes[e[0]]), b = P(nodes[e[1]]);
+      ctx.strokeStyle = 'rgba(90,190,180,.16)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    });
+    nodes.forEach(function (n) {
+      var p = P(n), rr = Math.max(3, n.r * view.s);
+      ctx.globalAlpha = n.faded ? 0.42 : 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, rr, 0, 6.284);
+      if (n.kind === 'action') {
+        ctx.fillStyle = n.color; ctx.fill();
+        ctx.strokeStyle = 'rgba(232,230,225,.5)'; ctx.lineWidth = 1; ctx.stroke();
+      } else if (n.dashed) {
+        /* dormant: outline only, so it is present without competing for his attention */
+        ctx.setLineDash([3, 3]); ctx.strokeStyle = n.color; ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]);
+      } else {
+        ctx.fillStyle = n.color; ctx.fill();
       }
-    }
+      if (n.id === sel) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); }
+      ctx.globalAlpha = 1;
+      /* Label the hubs only. 114 labels at once is a hairball, not a picture. */
+      if (n.kind === 'action' && rr > 9) {
+        ctx.fillStyle = 'rgba(232,230,225,.92)';
+        ctx.font = '11px -apple-system, Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(short(n.label, 26), p.x, p.y - rr - 5);
+      }
+    });
   }
 
+  /* drag a node; click one to open it */
+  var drag = null, moved = false;
   function at(ev) {
-    const r = cv.getBoundingClientRect();
-    const x = ev.clientX - r.left, y = ev.clientY - r.top;
-    return nodes.find((n) => Math.hypot(n.x - x, n.y - y) <= n.r + 4) || null;
+    var r = cv.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+    for (var i = nodes.length - 1; i >= 0; i--) {
+      var p = P(nodes[i]), rr = Math.max(6, nodes[i].r * view.s);
+      if ((mx - p.x) * (mx - p.x) + (my - p.y) * (my - p.y) < rr * rr + 36) { return nodes[i]; }
+    }
+    return null;
   }
-  cv.addEventListener('mousedown', (ev) => { const n = at(ev); if (n) { dragging = n; select(n); if (!raf) layout({ nodes: data.graph.nodes, edges: data.graph.edges }); } });
-  cv.addEventListener('mousemove', (ev) => {
-    if (!dragging) return;
-    const r = cv.getBoundingClientRect();
-    dragging.x = ev.clientX - r.left; dragging.y = ev.clientY - r.top; draw();
-  });
-  window.addEventListener('mouseup', () => { dragging = null; });
-
-  function select(n) {
-    selected = n;
-    $('img').disabled = false;
-    const g = (data.goals || []).find((x) => x.id === n.id) || {};
-    const d = $('detail');
-    d.style.display = '';
-    d.innerHTML = '<h2>' + (n.title || '').replace(/</g, '&lt;') + '</h2>'
-      + '<div class="act-s">' + (g.category || '') + ' · written ' + (g.mentions || 1) + '×'
-      + (g.sources && g.sources.length ? ' · ' + g.sources.slice(0, 2).join(', ') : '') + '</div>'
-      + ((g.actions || []).length
-        ? '<div style="margin-top:10px">' + g.actions.map((a) => '<div class="act-s">→ ' + String(a).replace(/</g, '&lt;') + '</div>').join('') + '</div>'
-        : '<div class="act-s" style="margin-top:10px">No action chain yet — rebuild the map.</div>');
+  cv.addEventListener('pointerdown', function (e) { drag = at(e); moved = false; if (drag) { cv.setPointerCapture(e.pointerId); } });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) { return; }
+    moved = true;
+    var r = cv.getBoundingClientRect();
+    drag.x = (e.clientX - r.left - view.x) / view.s; drag.y = (e.clientY - r.top - view.y) / view.s;
     draw();
-  }
-
-  function renderActions() {
-    const el = $('acts');
-    const list = (data && data.next) || [];
-    if (!list.length) { el.innerHTML = '<div class="empty">Nothing yet.</div>'; return; }
-    el.innerHTML = list.map((n) => '<div class="act"><div class="act-t">' + String(n.action).replace(/</g, '&lt;')
-      + (n.leverage > 1 ? ' <span class="act-n">×' + n.leverage + '</span>' : '') + '</div>'
-      + '<div class="act-s">' + (n.unlocks || []).slice(0, 3).join(' · ').replace(/</g, '&lt;') + '</div></div>').join('');
-  }
-
-  async function load(build) {
-    $('status').textContent = build ? 'reverse-engineering your goals… (this takes a minute)' : 'loading…';
-    $('build').disabled = true;
-    try {
-      const r = build
-        ? await fetch('/api/goals/reverse', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ limit: 14 }) })
-        : await fetch('/api/goals');
-      data = await r.json();
-      if (!data.ok) { $('status').textContent = data.error || 'could not load'; return; }
-      if (!data.graph || !data.graph.nodes.length) { $('status').textContent = 'no goals found'; return; }
-      // Before the reverse-engineering pass there are no edges — say so plainly rather than showing a
-      // scatter of disconnected dots and letting him think that's the answer.
-      const connected = data.graph.edges.length;
-      $('status').textContent = data.graph.nodes.length + ' goals · ' + connected + ' shared paths'
-        + (connected === 0 ? ' — press "Rebuild the map" to find the connections' : '');
-      layout(data.graph);
-      renderActions();
-    } catch (e) { $('status').textContent = 'error: ' + e.message; }
-    finally { $('build').disabled = false; }
-  }
-
-  // AI imagery — his "vision board" idea, one goal at a time and only on request, because generating 552
-  // images unasked would cost real money for pictures he never looks at.
-  $('img').addEventListener('click', async () => {
-    if (!selected) return;
-    $('img').disabled = true; $('status').textContent = 'picturing “' + selected.title + '”…';
-    try {
-      const r = await fetch('/api/goals/image', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id: selected.id, title: selected.title }),
-      }).then((x) => x.json());
-      if (r.ok && r.url) {
-        const d = $('detail');
-        const im = document.createElement('img'); im.src = r.url; im.alt = selected.title;
-        d.appendChild(im);
-        $('status').textContent = 'done.';
-      } else $('status').textContent = r.error || 'could not generate an image';
-    } catch (e) { $('status').textContent = 'error: ' + e.message; }
-    finally { $('img').disabled = false; }
+  });
+  cv.addEventListener('pointerup', function () {
+    if (drag && !moved) {
+      if (drag.kind === 'goal') { showGoal(drag.id); } else { showAction(drag.id); }
+      draw();
+    }
+    drag = null;
   });
 
-  $('build').addEventListener('click', () => load(true));
-  window.addEventListener('resize', () => { if (data && data.graph) layout(data.graph); });
-  load(false);
+  /* ── render ─────────────────────────────────────────────────────────────────────────────────── */
+  function render() {
+    byId = {}; (D.goals || []).forEach(function (g) { byId[g.id] = g; });
+    var t = D.tiers || {};
+    $('sub').textContent = heavy
+      ? 'The map is here whenever you want it.'
+      : t['true'] + ' yours · ' + t.operating + ' the route · ' + t.dream + ' dormant' +
+        (t.retired ? ' · ' + t.retired + ' retired' : '') +
+        (t.achieved ? ' · ' + t.achieved + ' done' : '') +
+        ' — a big circle is an action that moves a lot of them.';
+    $('status').textContent = (!heavy && D.unconfirmed) ? D.unconfirmed + ' still unconfirmed' : '';
+    renderOne(); renderSide(); build(); fit(); draw();
+    /* ?goal=g_ranch opens one goal directly — so "show me the ranch" can land on the thing itself
+       rather than on a map he then has to search. */
+    var want = new URLSearchParams(location.search).get('goal');
+    if (!sel && want && byId[want]) { sel = want; }
+    /* Re-draw whatever is open. Without this the panel keeps the HTML it had before the heavy-day switch,
+       and the ladder it is supposed to hide stays on screen. */
+    if (sel && byId[sel]) { showGoal(sel); draw(); }
+  }
+
+  document.addEventListener('click', function (e) {
+    var f = e.target.closest('.f');
+    if (f) {
+      tierFilter = f.getAttribute('data-tier');
+      var all = document.querySelectorAll('.f');
+      for (var i = 0; i < all.length; i++) { all[i].classList.toggle('on', all[i] === f); }
+      build(); fit(); draw(); return;
+    }
+    if (e.target.id === 'heavy') { heavy = !heavy; e.target.classList.toggle('on', heavy); load(); return; }
+    var row = e.target.closest('[data-goal]');
+    if (row) { showGoal(row.getAttribute('data-goal')); draw(); return; }
+    var arow = e.target.closest('[data-act]');
+    if (arow) { showAction(arow.getAttribute('data-act')); draw(); return; }
+    var dec = e.target.closest('[data-dec]');
+    if (dec) { decide(dec.getAttribute('data-dec')); }
+  });
+  window.addEventListener('resize', function () { fit(); draw(); });
+  load();
+})();
 </script>

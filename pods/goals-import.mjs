@@ -15,6 +15,49 @@
 
 const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim();
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// 🚨 THE SAFETY GATE. P0, and it runs before every other rule in this file.
+//
+// From the PRD, verbatim: *"The journals contain 'I want to die' (2025-04-16). A naive 'I want to…'
+// extractor scrapes it as a goal. This is a P0 safety gate, not a nice-to-have."*
+//
+// It was right. Probed against the extractor as written, SIX of nine crisis phrasings came back as goals —
+// "die soon", "kill myself", "hurt myself badly", "stop existing". The literal journal line survived only by
+// accident: cleanTitle reduced it to the single word "die", and a rule about word COUNT happened to drop it.
+// A word-count rule is not a safety rule. It would have failed on "I want to die already".
+//
+// What this prevents is concrete: the worst night of his life, rendered as a node on his vision board, sized
+// by how many times he wrote it, sitting next to the ranch.
+//
+// Deliberately BROAD. Suppressing a real goal costs one node he can re-add. A miss puts that on the screen.
+// This is the one place in the codebase where a false positive is unambiguously the cheap error.
+const CRISIS = new RegExp([
+  'kill(ing)? my ?self', 'end(ing)? (my life|it all|my own life)', 'take (my|his) own life', 'suicid',
+  'want(ing)? to die', 'wanna die', 'wish(ed)? (i (was|were) )?(dead|never born)',
+  '(don\'?t|do not|no longer) want to (live|be here|exist|wake up|go on)',
+  'no reason to (live|go on)', 'better off (dead|without me)', 'nobody would (miss|notice)',
+  '(hurt|harm|cut)(ing)? my ?self', 'self ?harm', 'disappear forever', 'stop existing',
+  'sleep forever', 'never wake up', 'give up on (everything|life|myself)',
+].join('|'), 'i');
+
+// PURE: is this line crisis content? Exported because every future reader of his journals needs the SAME
+// list — the re-ingest pipeline, the idea miner, anything that learns from what he wrote on a bad night.
+// One shared gate, not a copy per consumer that drifts.
+export function isCrisisContent(text = '') { return CRISIS.test(String(text || '')); }
+
+// Chores misfiled as goals. From the harvest: Notion's Goals DB mixes *"Buy a Mansion in Dubai ($40M)"* with
+// *"Take the garbage out."* — and "buy" is an aspiration verb, so the errands sail straight through.
+// Unfiltered, the registry said the graph comes out ~70% renovation errands.
+const CHORE = /\b(garbage|trash|laundry|dishes|dishwasher|groceries|grocery|vacuum|mow|lawn|oil change|car wash|haircut|refill|restock|renew|pay (the )?(bill|rent|water|electric)|take out|drop off|pick up|batteries|light ?bulb|filter|toilet|sink|gutter|shovel|salt|paper towels|toilet paper|detergent|dog food|litter)\b/i;
+
+// Not his words. Book highlights are the author's; the harvest found four Apple Notes that read like his
+// goals and are pasted assistant replies written TO him. Only first-person self-authored text becomes a node.
+const ASSISTANT = /\b(as an ai|i'?m an ai|language model|here'?s a (plan|breakdown|list|summary)|here are (some|a few|the) (steps|ways|ideas|tips)|i'?d be happy to|certainly[!,]|sure[!,] here|let me know if you|hope this helps|in conclusion|## step \d)/i;
+
+// PURE: is this whole document someone else's writing? Checked once per file rather than per line, because
+// the tell ("Certainly! Here's a plan…") appears at the top and the goals-looking lines come after it.
+export function thirdPartyDoc(text = '') { return ASSISTANT.test(String(text || '').slice(0, 4000)); }
+
 // Lines that look like an aspiration rather than a task or a note.
 const GOAL_RE = /^(?:i (?:want|wish|would like|plan|aim|intend) to|own|buy|build|start|launch|reach|hit|achieve|become|acquire|get to|retire|travel|visit|learn|master|earn|make|save|pay off|invest)\b/i;
 
@@ -48,9 +91,14 @@ const ARTEFACT = /\.\.\/|%20|https?:|\]\(|\{\{|^\||\bdataview\b|\btemplat/i;
 // ranking is the one number the whole product depends on being trustworthy.
 export function looksLikeGoal(line = '') {
   const raw = clean(line);
+  // 🚨 FIRST, ALWAYS. Before length, before shape, before anything — see the CRISIS block above.
+  if (isCrisisContent(raw)) return false;
   const s = raw.replace(/^[-*+•]\s*/, '').replace(/^\[[ xX]\]\s*/, '');
   if (s.length < 8 || s.length > 160) return false;
   if (/^#{1,6}\s/.test(raw)) return false;                    // a heading is a section, not a goal
+  if (/^>/.test(raw)) return false;                           // a blockquote is quoted material — his book
+                                                              // highlights are the AUTHOR's ambitions, not his
+  if (CHORE.test(s)) return false;                            // "Buy groceries" passes the aspiration verbs
   if (ARTEFACT.test(raw)) return false;                       // a template/link, not an ambition
   if (NOT_A_GOAL.test(s)) return false;
   if (/\?$/.test(s)) return false;                            // a question is not a goal
@@ -88,7 +136,11 @@ export function cleanTitle(text = '') {
 export function goalsFromLines(lines = [], file = '') {
   const out = [];
   let section = '';
-  for (const raw of (Array.isArray(lines) ? lines : [])) {
+  const all = (Array.isArray(lines) ? lines : []);
+  // Whole-document check, not per line: the tell ("Certainly! Here's a plan…") sits at the top and the
+  // goal-shaped lines come after it, so a line-level rule never sees it.
+  if (thirdPartyDoc(all.join('\n'))) return out;
+  for (const raw of all) {
     const h = /^#{1,6}\s+(.*)$/.exec(String(raw));
     if (h) { section = clean(h[1]); continue; }
     if (!looksLikeGoal(raw)) continue;

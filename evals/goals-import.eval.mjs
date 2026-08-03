@@ -4,7 +4,7 @@
 // off a shopping list pollutes the graph and drags the leverage ranking, and that ranking is the one number
 // the whole product depends on being trustworthy.
 
-import { looksLikeGoal, categorize, goalsFromLines, mergeGoals, cleanTitle } from '../pods/goals-import.mjs';
+import { looksLikeGoal, categorize, goalsFromLines, mergeGoals, cleanTitle, isCrisisContent, thirdPartyDoc } from '../pods/goals-import.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -100,6 +100,56 @@ export default {
     { name: 'achieved anywhere means achieved', run: () => {
       const merged = mergeGoals([goalsFromLines(['Buy a house'], 'a.md'), goalsFromLines(['- [x] Buy a house'], 'b.md')]);
       return ok(merged[0].status === 'achieved', merged[0].status);
+    } },
+
+    // ── 🚨 THE SAFETY GATE ─────────────────────────────────────────────────────────────────────────
+    // PRD §4, and it is the reason this suite exists at all: the journals contain "I want to die"
+    // (2025-04-16). Before this filter, SIX of nine crisis phrasings came back as goals. The literal
+    // journal line survived only because cleanTitle reduced it to "die" and a WORD-COUNT rule dropped it.
+    // These cases exist so nobody can ever widen a length or word rule and quietly reopen the hole.
+    { name: '🚨 the exact journal line is never a goal', run: () =>
+      ok(!looksLikeGoal('I want to die') && isCrisisContent('I want to die')) },
+
+    { name: '🚨 crisis content is suppressed in every phrasing, not just the one on file', run: () => {
+      const leaks = ['I want to die already', 'I want to die soon', 'I wish to end it all',
+        'I want to kill myself', 'I want to stop existing', 'I want to hurt myself badly',
+        'I want to disappear forever', 'I want to give up on everything', 'I want to sleep forever',
+        'I dont want to live anymore', 'I want to end my life', 'I want to take my own life',
+      ].filter(looksLikeGoal);
+      return ok(leaks.length === 0, 'LEAKED: ' + JSON.stringify(leaks));
+    } },
+
+    { name: '🚨 suppression does not depend on word count (the accident that saved us)', run: () =>
+      // "die" alone is one word and was dropped by the filler rule. "die already" is two and was NOT.
+      ok(!looksLikeGoal('I want to die already') && !looksLikeGoal('I want to die')) },
+
+    { name: '🚨 the gate is exported so every reader of his journals shares ONE list', run: () =>
+      ok(isCrisisContent('kill myself') && !isCrisisContent('Buy a mansion in Dubai')) },
+
+    // ── the chore filter (PRD §4) ──────────────────────────────────────────────────────────────────
+    // "buy" is an aspiration verb, so the errands sail straight through without this.
+    { name: 'chores misfiled as goals are dropped', run: () => {
+      const kept = ['Buy groceries for the week', 'Take the garbage out', 'Buy laundry detergent',
+        'Get an oil change', 'Buy toilet paper'].filter(looksLikeGoal);
+      return ok(kept.length === 0, JSON.stringify(kept));
+    } },
+
+    { name: 'the $40M mansion survives the same filter that kills the garbage', run: () =>
+      // The registry's own example of the pair that must not be treated alike.
+      ok(looksLikeGoal('Buy a Mansion in Dubai') && !looksLikeGoal('Take the garbage out')) },
+
+    // ── third-party exclusion (PRD §4) ─────────────────────────────────────────────────────────────
+    { name: 'a pasted assistant reply contributes no goals', run: () =>
+      ok(thirdPartyDoc('Certainly! Here is a plan to build wealth:')
+        && goalsFromLines(['Certainly! Here are some steps:', '- Buy a mansion in Dubai'], 'x.md').length === 0) },
+
+    { name: 'a book highlight is the author ambition, not his', run: () =>
+      ok(!looksLikeGoal('> Build a company that outlives you')) },
+
+    { name: 'his own goals still survive all three filters', run: () => {
+      const lost = ['Buy a Mansion in Dubai', 'I want to own a private jet', 'Buy my mom a house',
+        'Learn Italian fluently', 'I want to travel the world'].filter((g) => !looksLikeGoal(g));
+      return ok(lost.length === 0, 'LOST: ' + JSON.stringify(lost));
     } },
 
     { name: 'empty / garbage input does not throw', run: () =>

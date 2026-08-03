@@ -61,6 +61,19 @@
     else if(o.kind === 'approval') meta.appendChild(el('span','j-ot-tag gov','Awaiting your sign-off'));
     else if(o.kind === 'task') meta.appendChild(el('span','j-ot-tag','From your tasks'));
     if(o.deadline) meta.appendChild(el('span','j-ot-due','due '+o.deadline));
+
+    /* WHAT IT'S FOR. Ten years of goals only stop being a shelf if they show up where the work happens.
+       A gov move is an outbound send, and sending is the root of his whole goal graph — so the card names
+       what this actually moves: the ranch, his mother resting, Ana's cure. Click through to the map. */
+    var old = $id('jOtMoves'); if(old) old.remove();
+    if(o.moves && o.moves.count){
+      var m = el('div','j-ot-moves', '→ moves ' + o.moves.count + ' of your goals: ' + o.moves.goals.join(' · '));
+      m.id = 'jOtMoves';
+      m.style.cssText = 'font-size:11.5px;opacity:.72;margin-top:7px;line-height:1.45;cursor:pointer;';
+      m.title = 'Open the goal map';
+      m.addEventListener('click', function(){ window.location.href = '/goals'; });
+      card.appendChild(m);
+    }
   }
 
   function renderTax(t){

@@ -1243,6 +1243,17 @@ async function runTool(name, input) {
       spec.title = title || 'The record';
       spec.rows = ((d && d.rows) || []).map((r) => ({ label: r.what, value: String(r.ts).slice(11, 16), sub: r.kind }));
       spec.empty = 'Nothing recorded.';
+    } else if (src === 'goals') {
+      const d = await get('/api/goals');
+      spec.title = title || 'Your goals';
+      // The ranked action list, not the goal list — the point is what to DO, and the leverage number is
+      // what turns ten years of scattered wishes into an order of operations.
+      spec.rows = ((d && d.next) || []).map((n) => ({
+        label: n.action,
+        value: n.leverage > 1 ? '×' + n.leverage : '',
+        sub: n.leverage > 1 ? 'moves: ' + n.unlocks.slice(0, 3).join(' · ') : (n.unlocks[0] || ''),
+      }));
+      spec.empty = 'No goals imported yet.';
     } else if (input.text) {
       spec.kind = 'text'; spec.text = String(input.text); spec.title = title || 'Jarvis';
     } else {
@@ -3544,6 +3555,97 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // ── GOALS: ten years of scattered ambitions, connected ────────────────────────────────────────────
+  // *"Having written goals sometimes feels like writing something and putting it on a shelf and never
+  // seeing them again."* So this reads what he ALREADY WROTE — a goal system whose first step is "now type
+  // in all your goals" is one he abandons on day one. Cached, because walking 6,142 notes takes a moment.
+  if (req.method === 'GET' && url.pathname === '/api/goals') {
+    try {
+      const cacheFile = path.join(__dirname, 'data', 'goals-cache.json');
+      const maxAgeMs = 6 * 3600000;
+      if (!url.searchParams.get('refresh')) {
+        try {
+          const c = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+          if (c && Date.now() - Date.parse(c.built) < maxAgeMs) return send(res, 200, JSON.stringify(c));
+        } catch { /* rebuild */ }
+      }
+      const I = await import('../pods/goals-import.mjs');
+      const G = await import('../pods/goals.mjs');
+      const vault = VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
+      const SKIP = new Set(['.obsidian', '.trash', '.git', '.smart-env', 'node_modules', '.jarvis-trash']);
+      const lists = [];
+      (function walk(d) {
+        let es; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+        for (const e of es) {
+          if (e.name.startsWith('.') || SKIP.has(e.name)) continue;
+          const p = path.join(d, e.name);
+          if (e.isDirectory()) { walk(p); continue; }
+          if (!e.name.toLowerCase().endsWith('.md')) continue;
+          try {
+            if (fs.statSync(p).size > 400000) continue;
+            const g = I.goalsFromLines(fs.readFileSync(p, 'utf8').split(/\r?\n/), e.name);
+            if (g.length) lists.push(g);
+          } catch { /* skip unreadable */ }
+        }
+      })(vault);
+      const goals = I.mergeGoals(lists);
+      const out = {
+        ok: true, built: new Date().toISOString(), count: goals.length,
+        goals,
+        graph: G.goalGraph(goals),
+        next: G.nextActions(goals, { limit: 8 }),
+        // Written repeatedly over ten years IS the signal — he kept coming back to these.
+        mostWritten: [...goals].sort((a, b) => b.mentions - a.mentions).slice(0, 12).map((g) => ({ title: g.title, mentions: g.mentions, category: g.category })),
+      };
+      try { fs.mkdirSync(path.dirname(cacheFile), { recursive: true }); fs.writeFileSync(cacheFile, JSON.stringify(out)); } catch { /* best-effort */ }
+      return send(res, 200, JSON.stringify(out));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+  // REVERSE-ENGINEER: goals only CONNECT through their action chains, so without this the graph has 552
+  // nodes and zero edges — a prettier list, which is exactly what he already has. An LLM does this step
+  // because breaking "own a private jet" into prerequisites is language work; the overlap maths that follows
+  // stays in code (pods/goals.mjs), because a ranking that reshuffles every run is a toy.
+  //
+  // Runs on the MOST-WRITTEN goals, not all 552. Writing something down four times across ten years is his
+  // own signal about what he actually wants, and it keeps this to one affordable pass.
+  if (req.method === 'POST' && url.pathname === '/api/goals/reverse') {
+    try {
+      const b = await readBody(req);
+      const limit = Math.max(1, Math.min(30, Number(b.limit) || 12));
+      const base = await fetch('http://127.0.0.1:' + PORT + '/api/goals', { signal: AbortSignal.timeout(120000) }).then((r) => r.json());
+      if (!base.ok) return send(res, 200, JSON.stringify({ ok: false, error: base.error || 'import failed' }));
+      const picked = [...base.goals]
+        .filter((g) => g.status !== 'achieved')
+        .sort((a, b2) => b2.mentions - a.mentions)
+        .slice(0, limit);
+
+      const R = await import('../pods/gateway/router.mjs');
+      const sys = 'Break this goal into 3-5 PREREQUISITE ACTIONS — what has to be true before it happens. '
+        + 'Use SHORT, GENERAL phrasing so the same prerequisite across different goals reads identically '
+        + '(e.g. always "grow liquid net worth", never "grow my net worth substantially"). '
+        + 'Reply with ONLY a JSON array of strings. No prose.';
+      const out = [];
+      for (const g of picked) {
+        let actions = [];
+        try {
+          const r = await R.complete({ messages: [{ role: 'system', content: sys }, { role: 'user', content: g.title }], maxTokens: 220, env: envAll() });
+          const m = r.ok && r.message && String(r.message.content || '').match(/\[[\s\S]*\]/);
+          if (m) actions = JSON.parse(m[0]).filter((x) => typeof x === 'string').map((x) => x.trim()).filter(Boolean).slice(0, 5);
+        } catch { /* a goal we couldn't break down keeps zero actions rather than invented ones */ }
+        out.push({ ...g, actions });
+      }
+      const G = await import('../pods/goals.mjs');
+      const result = {
+        ok: true, built: new Date().toISOString(), goals: out,
+        graph: G.goalGraph(out), next: G.nextActions(out, { limit: 10 }), orphans: G.orphanGoals(out),
+      };
+      try {
+        const f = path.join(__dirname, 'data', 'goals-graph.json');
+        fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(result, null, 2));
+      } catch { /* best-effort */ }
+      return send(res, 200, JSON.stringify(result));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
   // ── THE CALENDAR WATCHER (PRD §3d) ────────────────────────────────────────────────────────────────
   // "This fixes the system's biggest weakness: it currently requires him to remember to ask it. A calendar
   // watcher runs whether or not he thinks to. That's the line between a tool and an assistant."

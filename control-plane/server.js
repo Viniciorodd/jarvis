@@ -363,6 +363,36 @@ const server = http.createServer(async (req, res) => {
     //
     // Silent on a day where nothing happened — an evening "0, 0, 0" is the same noise in a new hat. Deduped
     // per calendar day so a scheduler re-fire can't double-send.
+    // AGENT CONTROL — the Control Center's state, living HERE where the agents actually run.
+    //
+    // Found 2026-08-03: the Control Center wrote agent-control.json on the PC, but auto-outreach runs on the
+    // NAS and read its own (nonexistent) copy — so every agent resolved to the safe default, Tier 0, and the
+    // switch he was flipping reached nothing. A control surface that doesn't reach what it controls is worse
+    // than none. Same file-backed pattern as the kill switch and the tier, for the same reason.
+    if (p === '/maintenance/agent-control') {
+      try {
+        const CC = await import('../pods/control-center.mjs');
+        if (req.method === 'POST') {
+          const b = await readBody(req);
+          let state = CC.loadControl();
+          if (b.kill !== undefined) state = CC.setKill(state, !!b.kill);
+          else if (b.all === true) {
+            const O = await import('../pods/org.mjs');
+            state = CC.setAll(state, (O.ROSTER || []).filter((x) => x && x.codename), { state: b.state, tier: b.tier });
+          } else if (b.codename) state = CC.setAgent(state, String(b.codename), { state: b.state, tier: b.tier });
+          else return send(res, 400, { ok: false, error: 'need codename, all:true, or kill' });
+          CC.saveControl(state);
+          const applied = b.codename ? CC.agentPolicy(state, String(b.codename)) : null;
+          store.appendEvent({ kind: 'meta', actor: 'operator', pod: 'system', action: 'agent.control.set', status: 'done',
+            rationale: b.codename ? `${b.codename} → ${applied.state}, tier ${applied.tier}` : (b.kill !== undefined ? `kill switch ${b.kill ? 'ON' : 'off'}` : 'bulk change'),
+            payload: { codename: b.codename || null, applied, kill: state.killAll } });
+          return send(res, 200, { ok: true, killAll: !!state.killAll, applied });
+        }
+        const O = await import('../pods/org.mjs');
+        const state = CC.loadControl();
+        return send(res, 200, { ok: true, killAll: !!state.killAll, agents: CC.rosterView(state, (O.ROSTER || []).filter((x) => x && x.codename)) });
+      } catch (e) { return send(res, 200, { ok: false, error: e.message }); }
+    }
     // GOV AUTO-SEND, flippable from anywhere (Telegram /autosend, the UI, a curl from a hotel room).
     // GET reports the truth including WHERE the setting came from, so "why didn't it send" is answerable
     // without SSH-ing into the NAS.

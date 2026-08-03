@@ -3761,7 +3761,19 @@ const server = http.createServer(async (req, res) => {
       const CC = await import('../pods/control-center.mjs');
       const O = await import('../pods/org.mjs');
       const people = (O.ROSTER || []).filter((p) => p && p.codename);
-      const state = CC.loadControl();
+      // THE NAS IS THE SOURCE OF TRUTH — that is where the agents actually run and read their tiers from.
+      // Reading the PC's local copy is what made the Control Center a panel that controlled nothing
+      // (found 2026-08-03). Local state is the fallback only when the control-plane is unreachable, so the
+      // page still renders offline instead of going blank.
+      let state = null, fromNas = false;
+      try {
+        const r = await fetch(CP_URL + '/maintenance/agent-control', { signal: AbortSignal.timeout(5000) }).then((x) => x.json());
+        if (r && r.ok && Array.isArray(r.agents)) {
+          state = { killAll: !!r.killAll, agents: Object.fromEntries(r.agents.map((a) => [a.codename, { state: a.state, tier: a.tier }])) };
+          fromNas = true;
+        }
+      } catch { /* fall back to local */ }
+      if (!state) state = CC.loadControl();
       const RR = await import('../pods/required-reading.mjs');
       const V = await import('../pods/vault-search.mjs');
       const vault = VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
@@ -3770,12 +3782,25 @@ const server = http.createServer(async (req, res) => {
       const agents = CC.rosterView(state, people).map((a) => ({ ...a, reading: RR.readingFor(a.codename) }));
       let reading = { checked: 0, missing: [] };
       try { reading = RR.verifyReading(V.listNoteNames(vault)); } catch { /* panel still renders */ }
-      return send(res, 200, JSON.stringify({ ok: true, killAll: !!state.killAll, agents, reading }));
+      return send(res, 200, JSON.stringify({ ok: true, killAll: !!state.killAll, agents, reading, source: fromNas ? 'nas' : 'local (control-plane unreachable)' }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message, agents: [] })); }
   }
   if (req.method === 'POST' && url.pathname === '/api/control-center') {
     try {
       const b = await readBody(req);
+      // Write to the NAS FIRST — that is the copy the agents obey. Writing only locally is what made the
+      // switch cosmetic. If the control-plane is unreachable we say so rather than reporting a change that
+      // will never take effect.
+      try {
+        const r = await fetch(CP_URL + '/maintenance/agent-control', {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b),
+          signal: AbortSignal.timeout(6000),
+        }).then((x) => x.json());
+        if (r && r.ok) return send(res, 200, JSON.stringify({ ...r, source: 'nas' }));
+        if (r && r.error) return send(res, 200, JSON.stringify({ ok: false, error: r.error }));
+      } catch (e) {
+        return send(res, 200, JSON.stringify({ ok: false, error: 'control-plane unreachable — the change would NOT reach the agents: ' + e.message }));
+      }
       const CC = await import('../pods/control-center.mjs');
       let state = CC.loadControl();
       if (b.kill !== undefined) state = CC.setKill(state, !!b.kill);

@@ -325,6 +325,96 @@ export function applyProposals(goals = [], store = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
+// WHAT CHANGED — the anti-shelf loop.
+//
+// His whole complaint about written goals: *"you write something, put it on a shelf, and never see it
+// again."* A ladder that looks identical every time he opens it becomes that shelf, no matter how good the
+// first look was. So the engine remembers where he stood and tells him what moved.
+//
+// This is also the honest counterweight to a decade of restating the same goals: over ten years the registry
+// can only say "you wrote this eight times". Over one month, this can say "this became reachable."
+
+// PURE: reduce a ladder to the small shape worth remembering. Storing the whole thing would mean a diff
+// churns on cosmetic changes — a re-worded goal is not movement.
+export function snapshot(lad = {}, reality = {}, at = '') {
+  const rung = {};
+  for (const r of (lad.rungs || [])) for (const g of (r.goals || [])) rung[g.id] = r.rung;
+  const caps = {};
+  for (const [c, v] of Object.entries(reality || {})) caps[c] = { value: v.value, partial: !!v.partial };
+  return {
+    at: String(at || ''),
+    rung,
+    pending: (lad.pending || []).map((g) => g.id).sort(),
+    noPath: (lad.noPath || []).map((g) => g.id).sort(),
+    caps,
+    afforded: (lad.edges || []).filter((e) => e.kind === 'affords').map((e) => e.from + '>' + e.to).sort(),
+  };
+}
+
+const nameOf = (goals, id) => {
+  const g = (Array.isArray(goals) ? goals : []).find((x) => x && x.id === id);
+  return (g && g.t) || id;
+};
+
+// PURE: what actually moved between two snapshots. Only real movement — a goal that stayed on rung 3 says
+// nothing, and saying it anyway is how a "what's new" feed teaches him to stop reading it.
+export function changes(before = {}, after = {}, goals = [], caps = {}) {
+  const out = { measured: [], improved: [], reachable: [], climbed: [], slipped: [], afforded: [], placed: [] };
+  if (!before || !before.at) return out;
+  const b = before, a = after || {};
+  // Capabilities: newly known, or moved in the direction that helps.
+  for (const [c, v] of Object.entries(a.caps || {})) {
+    const was = (b.caps || {})[c];
+    const label = (caps[c] && caps[c].label) || c;
+    if (!was) { out.measured.push({ cap: c, label, value: v.value }); continue; }
+    if (typeof v.value !== 'number' || typeof was.value !== 'number' || v.value === was.value) continue;
+    const dir = (caps[c] && caps[c].dir) || 'up';
+    const better = dir === 'down' ? v.value < was.value : v.value > was.value;
+    if (better) out.improved.push({ cap: c, label, from: was.value, to: v.value });
+  }
+  // Goals: became reachable, dropped a rung, or got placed at all.
+  for (const [id, r] of Object.entries(a.rung || {})) {
+    const was = (b.rung || {})[id];
+    const t = nameOf(goals, id);
+    if (was === undefined) {
+      // It was on a shelf and now stands on the ladder — the single most encouraging thing that can happen.
+      if ((b.pending || []).includes(id) || (b.noPath || []).includes(id)) out.placed.push({ id, t, rung: r });
+      continue;
+    }
+    if (r === 1 && was > 1) { out.reachable.push({ id, t }); continue; }
+    if (r < was) out.climbed.push({ id, t, from: was, to: r });
+    // Slipping is reported too. A ladder that only ever shows good news is a ladder he stops believing.
+    else if (r > was) out.slipped.push({ id, t, from: was, to: r });
+  }
+  const wasAff = new Set(b.afforded || []);
+  for (const e of (a.afforded || [])) {
+    if (wasAff.has(e)) continue;
+    const [from, to] = e.split('>');
+    out.afforded.push({ from, to, fromT: nameOf(goals, from), toT: nameOf(goals, to) });
+  }
+  return out;
+}
+
+// PURE: did anything move at all? The Jarvis tone rule is "never fill silence" — on a week where nothing
+// changed, the strip does not render rather than saying "no changes!".
+export function moved(ch = {}) {
+  return Object.values(ch || {}).some((v) => Array.isArray(v) && v.length > 0);
+}
+
+// PURE: one plain line per change. Compassion clause: a slip is stated, never scored.
+export function changeLines(ch = {}) {
+  const out = [];
+  for (const m of (ch.measured || [])) out.push(`You told Jarvis your ${m.label.toLowerCase()}.`);
+  for (const i of (ch.improved || [])) out.push(`${i.label} moved from ${i.from} to ${i.to}.`);
+  for (const p of (ch.placed || [])) out.push(`“${p.t}” has a path now.`);
+  for (const r of (ch.reachable || [])) out.push(`“${r.t}” is within reach today.`);
+  for (const c of (ch.climbed || [])) out.push(`“${c.t}” moved ${c.from - c.to} rung${c.from - c.to > 1 ? 's' : ''} closer.`);
+  for (const a of (ch.afforded || [])) out.push(`“${a.fromT}” now brings “${a.toT}” with it.`);
+  for (const s of (ch.slipped || [])) out.push(`“${s.t}” sits a rung further out than it did.`);
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
 // REVERSE-ENGINEERING ONE GOAL — *"what neeeeeds to happen before i get there."*
 
 // PURE: the gap, lowest rung first, with the capabilities named and his real numbers attached.

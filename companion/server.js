@@ -207,6 +207,14 @@ function writeToldReality(st) {
   try { fs.mkdirSync(path.dirname(toldPath()), { recursive: true }); } catch { /* exists */ }
   fs.writeFileSync(toldPath(), JSON.stringify(st, null, 2));
 }
+// Ladder snapshots — the memory that makes "what changed" possible. One per day at most; a diff against a
+// snapshot taken five minutes ago would always be empty and teach him the strip is dead.
+const goalHistPath = () => path.join(__dirname, 'data', 'goal-history.json');
+function readGoalHistory() { try { return JSON.parse(fs.readFileSync(goalHistPath(), 'utf8')) || { snaps: [] }; } catch { return { snaps: [] }; } }
+function writeGoalHistory(h) {
+  try { fs.mkdirSync(path.dirname(goalHistPath()), { recursive: true }); } catch { /* exists */ }
+  fs.writeFileSync(goalHistPath(), JSON.stringify(h, null, 2));
+}
 const goalPropPath = () => path.join(__dirname, 'data', 'goal-proposals.json');
 function readGoalProposals() { try { return JSON.parse(fs.readFileSync(goalPropPath(), 'utf8')) || {}; } catch { return {}; } }
 function writeGoalProposals(st) {
@@ -3873,8 +3881,98 @@ const server = http.createServer(async (req, res) => {
       const blocking = Object.entries(tally).sort((a, b2) => b2[1] - a[1])
         .map(([cap, n]) => ({ cap, label: H.CAPS[cap].label, unit: H.CAPS[cap].unit, blocks: n,
           why: reality[cap] ? 'only partly known' : 'never measured' }));
+      // ── WHAT CHANGED (phase 5) ───────────────────────────────────────────────────────────────────
+      // His complaint about written goals was that you shelve them and never see them again. A ladder that
+      // looks identical every visit IS that shelf. So we remember where he stood and say what moved.
+      const hist = readGoalHistory();
+      hist.snaps = Array.isArray(hist.snaps) ? hist.snaps : [];
+      const today = todayISO();
+      const snap = H.snapshot(l, reality, today);
+      // Compare against the newest snapshot from a DIFFERENT day — same-day would always be empty.
+      const prev = hist.snaps.filter((x) => x && x.at && x.at !== today).slice(-1)[0] || {};
+      const ch = H.changes(prev, snap, goals, H.CAPS);
+      if (!hist.snaps.some((x) => x && x.at === today)) {
+        hist.snaps.push(snap);
+        if (hist.snaps.length > 24) hist.snaps = hist.snaps.slice(-24);   // two years of monthly-ish marks
+        try { writeGoalHistory(hist); } catch { /* best-effort */ }
+      }
       return send(res, 200, JSON.stringify({ ok: true, ...l, reality, caps: H.CAPS, unknown, blocking,
+        // Silence when nothing moved — the tone rule is "never fill silence", so the strip does not render.
+        changed: H.moved(ch) ? { since: prev.at || '', lines: H.changeLines(ch), detail: ch } : null,
         placed: goals.length, total: (data.goals || []).length }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  // GENERATE TO-DOS FROM THE GAP — *"generate tasks and to dos based on my reality so that i could get to
+  // the business purchase."*
+  //
+  // The ladder says what must become TRUE. This says what to do on Tuesday. It works on ONE capability — the
+  // next gap — because a plan that hands him fourteen things is the to-do list he already rejected.
+  //
+  // Every suggestion passes gateTask() before he sees it: crisis suppression, his six boundaries, no
+  // dream-tier planning, nothing vague. Refusals are counted and returned rather than hidden.
+  if (req.method === 'POST' && url.pathname === '/api/goals/tasks') {
+    try {
+      const H = await import('../pods/goal-horizon.mjs');
+      const T = await import('../pods/goal-tasks.mjs');
+      const Rg = await import('../pods/goal-registry.mjs');
+      const b = await readBody(req);
+      const data = readGoalRegistry();
+      if (!data) return send(res, 200, JSON.stringify({ ok: false, error: 'no goal registry found' }));
+      const reality = await readReality();
+      const goals = H.applyProposals(Rg.applyDecisions(data.goals || [], readGoalState()), readGoalProposals());
+      const goal = goals.find((g) => g.id === String(b.id || '').trim());
+      if (!goal) return send(res, 200, JSON.stringify({ ok: false, error: 'no such goal' }));
+      if (goal.tier === 'dream') return send(res, 200, JSON.stringify({ ok: false, error: 'dream tier is surfaced once a year, not planned' }));
+
+      const rev = H.reverse(goal, goals, reality);
+      if (rev.reachable) return send(res, 200, JSON.stringify({ ok: true, tasks: [], note: 'nothing is in the way of this one' }));
+      const gap = rev.nextGap;
+      if (!gap) return send(res, 200, JSON.stringify({ ok: false, error: 'no gap modelled for this goal yet' }));
+
+      const have = gap.known ? `${gap.have} ${gap.unit}` : 'never measured';
+      const sys = 'You write 2-4 concrete to-dos a solo business owner can START THIS WEEK. Each is one '
+        + 'finishable action, phrased as an instruction, under 140 characters. Name real, specific steps '
+        + '(who to call, what to pull, what to write). No advice, no "consider", no "explore", no encouragement.\n'
+        + 'HARD RULES — never suggest: trading or day-trading of any kind · flipping real estate · starting a '
+        + 'new business or venture · claiming 8(a)/HUBZone/SDVOSB/WOSB status · spending more than $10 without '
+        + 'asking him first · any public claim about revenue or traction.\n'
+        + 'Reply with ONLY a JSON array of strings. No prose.';
+      const ask = `GOAL: ${goal.t}\nTHE GAP: ${gap.label} — he needs ${gap.need} ${gap.unit}, currently ${have}.`
+        + (gap.via && gap.via.length ? `\nThis gap is closed by: ${gap.via.map((v) => v.t).join('; ')}` : '')
+        + `\nWhat should he do this week to move ${gap.label.toLowerCase()}?`;
+
+      const R = await import('../pods/gateway/router.mjs');
+      let raw = [];
+      try {
+        const r = await R.complete({ messages: [{ role: 'system', content: sys }, { role: 'user', content: ask }], maxTokens: 500, env: envAll() });
+        const m = r.ok && r.message && String(r.message.content || '').match(/\[[\s\S]*\]/);
+        if (m) raw = JSON.parse(m[0]);
+      } catch { /* a round we could not read proposes nothing rather than something invented */ }
+      const ground = T.groundTasks(raw, { goal, cap: gap.cap });
+      return send(res, 200, JSON.stringify({ ok: true, goal: { id: goal.id, t: goal.t },
+        gap: { cap: gap.cap, label: gap.label, need: gap.need, have: gap.known ? gap.have : null, unit: gap.unit,
+          known: gap.known, reason: gap.known ? '' : 'never measured' },
+        tasks: ground.kept, refused: ground.dropped,
+        due: T.dueIn(7, todayISO()) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  // ACCEPT ONE — it stops being a suggestion and becomes a line in his vault, indistinguishable from one he
+  // typed. Nothing is written until he presses it: the whole engine proposes, he disposes.
+  if (req.method === 'POST' && url.pathname === '/api/goals/tasks/accept') {
+    try {
+      const T = await import('../pods/goal-tasks.mjs');
+      const b = await readBody(req);
+      const text = String(b.text || '').trim();
+      const gate = T.gateTask(text, { tier: String(b.tier || '') });
+      // Gated AGAIN on the way in. The generator already checked, but this endpoint is reachable on its own,
+      // and a boundary that only holds on the happy path is not a boundary.
+      if (!gate.ok) return send(res, 200, JSON.stringify({ ok: false, error: 'refused: ' + gate.why }));
+      const { addTask } = await tasksEngine();
+      const due = String(b.due || '').match(/^\d{4}-\d{2}-\d{2}$/) ? b.due : T.dueIn(7, todayISO());
+      const out = addTask(text + ' 📅 ' + due + ' #jarvis', vaultOpt());
+      return send(res, 200, JSON.stringify({ ok: true, added: (out && out.line) || text, file: out && out.file, due }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
 

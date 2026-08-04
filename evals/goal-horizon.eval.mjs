@@ -9,7 +9,7 @@
 // reverse-engineer a plan out of the invention.
 
 import { CAPS, isCap, capOf, meets, unmet, affords, affordedMap, blockers, layers, ladder, reverse,
-  groundProposal, applyProposals, HORIZONS } from '../pods/goal-horizon.mjs';
+  groundProposal, applyProposals, HORIZONS, snapshot, changes, moved, changeLines, CAPS as C2 } from '../pods/goal-horizon.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -325,9 +325,78 @@ export default {
       return ok(g.horizonConfirmed === true && g.horizon === '10y');
     } },
 
+    // ── WHAT CHANGED — the anti-shelf loop ─────────────────────────────────────────────────────────
+    // "You write something, put it on a shelf, and never see it again." A ladder that looks identical every
+    // time he opens it IS that shelf, however good the first look was.
+    { name: 'a goal that leaves the pending shelf is reported as placed', run: () => {
+      const before = snapshot(ladder(GOALS, REALITY), REALITY, '2026-07-01');
+      const after = snapshot(ladder(GOALS, MEASURED), MEASURED, '2026-08-04');
+      const ch = changes(before, after, GOALS, C2);
+      return ok(ch.placed.some((p) => p.id === 'g_biz'), JSON.stringify(ch.placed));
+    } },
+
+    { name: 'a newly measured capability is reported', run: () => {
+      const before = snapshot(ladder(GOALS, REALITY), REALITY, '2026-07-01');
+      const after = snapshot(ladder(GOALS, MEASURED), MEASURED, '2026-08-04');
+      const caps = changes(before, after, GOALS, C2).measured.map((m) => m.cap).sort();
+      return ok(caps.join() === 'credit_score,liquid_capital', JSON.stringify(caps));
+    } },
+
+    { name: 'a capability moving the RIGHT way counts as improvement', run: () => {
+      const worse = { ...MEASURED, debt_load: { value: 900, source: 'x', asOf: 'x' } };
+      const b = snapshot(ladder(GOALS, worse), worse, '2026-07-01');
+      const a = snapshot(ladder(GOALS, MEASURED), MEASURED, '2026-08-04');
+      // debt_load counts DOWN: 900 -> 572 is an improvement, not a decline.
+      const ch = changes(b, a, GOALS, C2);
+      return ok(ch.improved.some((i) => i.cap === 'debt_load' && i.from === 900 && i.to === 572), JSON.stringify(ch.improved));
+    } },
+
+    { name: 'a goal becoming reachable today is the headline', run: () => {
+      const richer = { ...MEASURED, filed_years: { value: 2, source: 'x', asOf: 'x' },
+        liquid_capital: { value: 250000, source: 'x', asOf: 'x' }, credit_score: { value: 700, source: 'x', asOf: 'x' } };
+      const b = snapshot(ladder(GOALS, MEASURED), MEASURED, '2026-07-01');
+      const a = snapshot(ladder(GOALS, richer), richer, '2026-08-04');
+      return ok(changes(b, a, GOALS, C2).reachable.some((r) => r.id === 'g_biz'));
+    } },
+
+    { name: '⚠ slipping backwards is reported too', run: () => {
+      // A ladder that only ever shows good news is a ladder he stops believing.
+      const richer = { ...MEASURED, filed_years: { value: 2, source: 'x', asOf: 'x' },
+        liquid_capital: { value: 250000, source: 'x', asOf: 'x' }, credit_score: { value: 700, source: 'x', asOf: 'x' } };
+      const b = snapshot(ladder(GOALS, richer), richer, '2026-07-01');
+      const a = snapshot(ladder(GOALS, MEASURED), MEASURED, '2026-08-04');
+      return ok(changes(b, a, GOALS, C2).slipped.length > 0, JSON.stringify(changes(b, a, GOALS, C2).slipped));
+    } },
+
+    { name: '⚠ an unchanged month says NOTHING rather than "no changes!"', run: () => {
+      // Jarvis tone rule: never fill silence.
+      const snap = snapshot(ladder(GOALS, MEASURED), MEASURED, '2026-07-01');
+      const ch = changes(snap, { ...snap, at: '2026-08-04' }, GOALS, C2);
+      return ok(!moved(ch) && changeLines(ch).length === 0, JSON.stringify(ch));
+    } },
+
+    { name: 'the first ever look has nothing to compare against', run: () =>
+      ok(!moved(changes({}, snapshot(ladder(GOALS, REALITY), REALITY, '2026-08-04'), GOALS, C2))) },
+
+    { name: 'change lines state facts, never scores', run: () => {
+      const before = snapshot(ladder(GOALS, REALITY), REALITY, '2026-07-01');
+      const after = snapshot(ladder(GOALS, MEASURED), MEASURED, '2026-08-04');
+      const lines = changeLines(changes(before, after, GOALS, C2));
+      const shaming = lines.some((l) => /(behind|late|failed|missed|still not|should have|only)/i.test(l));
+      return ok(lines.length > 0 && !shaming, JSON.stringify(lines.slice(0, 4)));
+    } },
+
+    { name: 'a snapshot keeps only what is worth diffing', run: () => {
+      // Storing the whole ladder would make the diff churn on cosmetics — a re-worded goal is not movement.
+      const s = snapshot(ladder(GOALS, MEASURED), MEASURED, '2026-08-04');
+      return ok(s.at === '2026-08-04' && s.rung && s.caps && Array.isArray(s.pending) && Array.isArray(s.afforded)
+        && !JSON.stringify(s).includes('Lamborghini'), Object.keys(s).join(','));
+    } },
+
     { name: 'empty / garbage input does not throw', run: () => {
       const l = ladder(); const r = reverse();
-      return ok(l.rungs.length === 0 && l.pending.length === 0 && r.steps.length === 0 && unmet().length === 0
+      return ok(l.rungs.length === 0 && l.pending.length === 0 && !moved(changes()) && changeLines().length === 0
+        && r.steps.length === 0 && unmet().length === 0
         && !affords().afforded && affordedMap().size === 0 && layers().size === 0);
     } },
   ],

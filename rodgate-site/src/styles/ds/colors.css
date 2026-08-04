@@ -1,0 +1,69 @@
+:root{
+  /* ── Quarry Slate — primary. Reads near-black in 1-color print and on fax. ── */
+  --slate-900:#12181B;
+  --slate-800:#1E2A30;
+  --slate-700:#2B3A42;  /* PRIMARY */
+  --slate-600:#3D5059;
+  --slate-500:#54686F;
+  --slate-400:#6B7C85;
+  --slate-300:#94A3AA;
+  --slate-200:#BCC6CA;
+  --slate-100:#DCE2E4;
+  --slate-50:#EEF1F2;
+
+  /* ── Keystone Bronze — accent. The one saturated colour; AA on white. ── */
+  --bronze-800:#4E360E;
+  --bronze-700:#6E4C15;
+  --bronze-600:#8A6220;  /* ACCENT */
+  --bronze-500:#A8791F;
+  --bronze-300:#D9BE7C;
+  --bronze-100:#EFE3C9;
+  --bronze-50:#F8F1E1;
+
+  /* ── Stone — warm paper neutrals. Documents sit on these, never pure white. ── */
+  --stone-300:#C7C1B4;
+  --stone-200:#D7D2C8;
+  --stone-100:#E7E3DA;
+  --stone-50:#F4F2EC;   /* PAPER */
+  --white:#FFFFFF;
+
+  /* ── Semantic status — muted, institutional; all AA on white ── */
+  --green-600:#2E6B4B;
+  --green-100:#DCE9E1;
+  --amber-600:#8A5B10;
+  --amber-100:#F3E6CC;
+  --red-600:#9B2A22;
+  --red-100:#F0DAD7;
+  --info-600:#2B5566;
+  --info-100:#DBE6EB;
+
+  /* ── Semantic aliases — use these in components ── */
+  --text-strong:var(--slate-900);
+  --text-body:var(--slate-800);
+  --text-muted:var(--slate-500);
+  --text-faint:var(--slate-400);
+  --text-on-dark:var(--stone-50);
+  --text-on-dark-muted:var(--slate-200);
+  --text-accent:var(--bronze-700);
+  --text-link:var(--bronze-700);
+  --text-link-hover:var(--bronze-800);
+
+  --surface-page:var(--stone-50);
+  --surface-card:var(--white);
+  --surface-sunken:var(--stone-100);
+  --surface-inverse:var(--slate-800);
+  --surface-inverse-deep:var(--slate-900);
+  --surface-accent-soft:var(--bronze-50);
+
+  --border-hairline:var(--stone-200);
+  --border-default:var(--stone-300);
+  --border-strong:var(--slate-700);
+  --border-inverse:rgba(255,255,255,.16);
+  --border-accent:var(--bronze-600);
+
+  --focus-ring:var(--bronze-600);
+  --focus-ring-inverse:var(--bronze-300);
+
+  --rule-heavy:var(--slate-700);   /* 3px section rules */
+  --rule-light:var(--stone-300);   /* 1px table + list rules */
+}

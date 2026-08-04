@@ -42,8 +42,11 @@ export const company = {
   statePipeline: 'PA Commonwealth procurement vendor (Vendor #0000568553) · COSTARS cooperative',
 
   // Authoritative per Vinicio (2026-07-24): all four.
+  // NOTE: the design system readme still says PA/NJ/FL — it needs updating there.
   serviceArea: ['Pennsylvania', 'New Jersey', 'New York', 'Florida'],
   serviceAreaAbbr: ['PA', 'NJ', 'NY', 'FL'],
+  // For running prose, where a bare comma list reads wrong.
+  serviceAreaProse: 'Pennsylvania, New Jersey, New York, and Florida',
 
   // Careful phrasing — registration-level only, NOT per-solicitation.
   bonding:

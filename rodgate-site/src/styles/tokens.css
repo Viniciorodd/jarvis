@@ -1,302 +1,190 @@
 /* ══════════════════════════════════════════════════════════
-   RODGATE GROUP — Keystone Ledger
-   Implementation of the Rodgate Group Design System.
+   RODGATE GROUP — site stylesheet
 
-   Strategic idea: behave like a government RECORDS DOCUMENT,
-   not a website. Near-black quarry slate, one restrained
-   bronze accent, warm paper neutrals, rules instead of
-   shadows. Every asset must survive 1-colour black,
-   1-colour white, and fax-quality reproduction.
+   Tokens are NOT defined here. src/styles/ds/ holds the
+   Rodgate Group Design System token files VERBATIM, as
+   exported from the published system. Never edit those —
+   re-export instead. This file only adds the component
+   classes the public site needs, built on those tokens.
 
-   HARD RULES (do not "improve" these):
-   · Flat colour backgrounds only — no gradients, no photos,
-     no illustration, no pattern, no texture, no backdrop-filter.
-   · Radii 2–4px only. Nothing pill-shaped except status dots
-     and the switch. Documents use 0.
-   · Motion is functional only — no scroll-reveal, no parallax,
-     no card tilt, no bounce, no count-up.
+   System rules enforced below (do not "improve" these):
+   · Flat colour only — no gradients, photos, patterns,
+     textures, or backdrop-filter.
+   · Radii 2–4px. Nothing pill-shaped except status dots.
+   · Motion is functional only — no scroll-reveal, parallax,
+     card tilt, bounce, or count-up.
    · Bronze = links, eyebrows, rules, and exactly ONE button
-     per page. Never body copy.
+     per view. Never body copy.
    · At most two background tones on a page.
    ══════════════════════════════════════════════════════════ */
 
+@import './ds/typography.css';
+@import './ds/colors.css';
+@import './ds/spacing.css';
+@import './ds/elevation.css';
+@import './ds/motion.css';
+@import './ds/base.css';
+
+/* ── Local aliases ─────────────────────────────────────────
+   Short names used by this site's components, mapped onto the
+   system tokens above. Values are the system's, not ours.    */
 :root {
-  /* ── Quarry Slate ─────────────────────────────────────── */
-  --slate-900: #12181b;   /* text */
-  --slate-800: #1e272c;   /* dark hero / inverse surface */
-  --slate-700: #2b3a42;   /* primary */
-  --slate-600: #3c4f59;
-  --slate-500: #566a75;
-  --slate-400: #7b8b94;
-  --slate-300: #a8b4ba;
-  --slate-200: #cbd3d7;
-  --slate-100: #e3e8ea;
-
-  /* ── Keystone Bronze — the single saturated colour ────── */
-  --bronze-700: #6e4e19;  /* hover */
-  --bronze-600: #8a6220;  /* accent (AA on white) */
-  --bronze-500: #a8792f;
-  --bronze-400: #c09a5b;  /* on slate surfaces */
-
-  /* ── Stone — warm paper neutrals ──────────────────────── */
-  --stone-50: #f4f2ec;    /* page */
-  --stone-100: #eae7df;   /* sunken */
-  --stone-200: #dcd8ce;   /* hairline on paper */
-  --white: #ffffff;       /* card */
-
-  /* ── Status — muted on purpose, never out-shouts bronze ─ */
-  --green-600: #2e6b4b;
-  --amber-600: #8a5b10;
-  --red-600: #9b2a22;
-  --info-600: #2b5566;
-
-  /* ── Semantic aliases ─────────────────────────────────── */
-  --color-page: var(--stone-50);
-  --color-card: var(--white);
-  --color-sunken: var(--stone-100);
-  --color-inverse: var(--slate-800);
-  --color-text: var(--slate-900);
-  --color-text-muted: var(--slate-600);
-  --color-text-quiet: var(--slate-500);
+  --color-page: var(--surface-page);
+  --color-card: var(--surface-card);
+  --color-sunken: var(--surface-sunken);
+  --color-inverse: var(--surface-inverse);
+  --color-text: var(--text-strong);
+  --color-text-muted: var(--text-muted);
+  --color-text-quiet: var(--text-faint);
   --color-accent: var(--bronze-600);
-  --border-hairline: var(--stone-200);
-  --border-rule: var(--slate-700);
 
-  /* on inverse surfaces */
-  --inverse-text: #eef0ee;
-  --inverse-muted: #b3bec4;
-  --inverse-hairline: rgba(255, 255, 255, .16);
+  --inverse-text: var(--text-on-dark);
+  --inverse-muted: var(--text-on-dark-muted);
+  --inverse-hairline: var(--border-inverse);
   --inverse-panel: rgba(255, 255, 255, .03);
 
-  /* ── Type ─────────────────────────────────────────────── */
-  --font-display: 'Archivo', Arial, Helvetica, sans-serif;
-  --font-ui: 'Archivo', Arial, Helvetica, sans-serif;
-  --font-body: 'Source Serif 4', Georgia, Cambria, 'Times New Roman', serif;
-  --font-mono: 'IBM Plex Mono', Consolas, 'Courier New', monospace;
+  --ease: var(--ease-standard);
+  --dur-1: var(--duration-instant);
+  --dur-2: var(--duration-fast);
+  --dur-3: var(--duration-base);
+  --dur-4: var(--duration-slow);
 
-  /* 1.200 minor third off a 15px UI base */
-  --text-2xs: 11px;
-  --text-xs: 12px;
-  --text-sm: 13px;
-  --text-base: 15px;
-  --text-lg: 18px;
-  --text-xl: 21px;
-  --text-2xl: 26px;
-  --text-3xl: 31px;
-  --text-4xl: 37px;
-  --text-5xl: 45px;
-  --text-6xl: 64px;
-
-  --tracking-tight: -0.02em;
-  --tracking-caps: 0.12em;
-  --tracking-mark: 0.18em;
-  --measure: 68ch;
-
-  /* ── Spacing — 4px grid ───────────────────────────────── */
-  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
-  --space-5: 20px;  --space-6: 24px;  --space-8: 32px;  --space-10: 40px;
-  --space-12: 48px; --space-16: 64px; --space-20: 80px; --space-24: 96px;
-  --space-32: 128px;
-
-  --container: 1120px;
-  --narrow: 720px;
-  --gutter: 24px;
-
-  /* ── Radii — deliberately small ───────────────────────── */
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 4px;
-
-  /* ── Elevation — three shallow, cool-grey levels ──────── */
-  --shadow-1: 0 1px 2px rgba(18, 24, 27, .06);
-  --shadow-2: 0 2px 6px rgba(18, 24, 27, .08);
-  --shadow-3: 0 6px 16px rgba(18, 24, 27, .10);
-
-  /* ── Motion — functional only ─────────────────────────── */
-  --ease: cubic-bezier(.2, 0, .2, 1);
-  --dur-1: 80ms;
-  --dur-2: 120ms;
-  --dur-3: 180ms;
-  --dur-4: 260ms;
+  --container: var(--container-max);
+  --narrow: var(--container-narrow);
+  --border-rule: var(--rule-heavy);
 }
 
-/* ══ Base ══════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+/* Body prose is the serif; UI chrome stays sans (base.css sets sans). */
+body { font-size: var(--text-md); line-height: var(--leading-relaxed); }
 
-body {
-  margin: 0;
-  background: var(--color-page);
-  color: var(--color-text);
-  font-family: var(--font-body);
-  font-size: var(--text-lg);
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
+/* Links inside prose keep the system underline; nav/buttons opt out. */
+a.btn, a.nav__link, a.nav__mlink, a.svc__row, .ft__list a, .logo, header a, footer a {
+  text-decoration: none;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  line-height: 1.12;
-  letter-spacing: var(--tracking-tight);
-  color: var(--color-text);
-  margin: 0;
-}
-
-p { margin: 0; }
-a { color: inherit; text-decoration: none; }
-
-/* Codes and identifiers are ALWAYS monospaced and exact. */
-.mono, code, kbd, samp {
-  font-family: var(--font-mono);
-  font-size: 0.94em;
-  letter-spacing: 0;
-}
-
-::selection { background: var(--bronze-400); color: var(--slate-900); }
-
-/* Focus — 2px bronze outline at 2px offset */
-:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
-  outline: 2px solid var(--bronze-600);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
+.mono, code, kbd, samp { font-family: var(--font-data); letter-spacing: 0; }
 
 /* ══ Layout ════════════════════════════════════════════ */
 .container {
   width: 100%;
-  max-width: var(--container);
+  max-width: var(--container-max);
   margin-inline: auto;
   padding-inline: var(--gutter);
 }
-.narrow { max-width: var(--narrow); }
+.narrow { max-width: var(--container-narrow); }
 .measure { max-width: var(--measure); }
 
 .section { padding-block: var(--space-24); }
 .section-sm { padding-block: var(--space-16); }
 
-.surface-paper { background: var(--color-page); }
-.surface-white { background: var(--color-card); }
-.surface-sunken { background: var(--color-sunken); }
-.surface-inverse { background: var(--color-inverse); color: var(--inverse-text); }
+.surface-paper { background: var(--surface-page); }
+.surface-white { background: var(--surface-card); }
+.surface-sunken { background: var(--surface-sunken); }
+.surface-inverse { background: var(--surface-inverse); color: var(--text-on-dark); }
+.surface-inverse h1, .surface-inverse h2, .surface-inverse h3 { color: var(--text-on-dark); }
 
 /* ══ Type roles ════════════════════════════════════════ */
 .display {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: clamp(37px, 5.2vw, 64px);
-  line-height: 1.04;
+  font-weight: var(--weight-bold);
+  font-size: clamp(35px, 5.2vw, 64px);
+  line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
 }
-.h2 { font-size: clamp(26px, 3.2vw, 37px); }
+.h2 { font-size: clamp(29px, 3.2vw, 42px); }
 .h3 { font-size: var(--text-xl); }
 
 .eyebrow {
   font-family: var(--font-ui);
   font-size: var(--text-2xs);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
-  color: var(--color-text-quiet);
+  color: var(--text-muted);
 }
-.surface-inverse .eyebrow { color: var(--bronze-400); }
+.surface-inverse .eyebrow { color: var(--bronze-300); }
 
 .label {
   font-family: var(--font-ui);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
 
 .lead {
   font-family: var(--font-body);
-  font-size: var(--text-xl);
-  line-height: 1.55;
-  color: var(--color-text-muted);
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+  color: var(--text-muted);
 }
 
-/* ══ Section opener: 3px bronze rule at 44px ═══════════ */
+/* ══ Rules — the three weights that structure every layout ══ */
 .rule-open {
-  display: block;
-  width: 44px;
-  height: 3px;
-  background: var(--bronze-600);
-  border: 0;
-  margin: 0 0 var(--space-4);
+  display: block; width: 44px; height: var(--stroke-heavy);
+  background: var(--bronze-600); border: 0; margin: 0 0 var(--space-4);
 }
-.surface-inverse .rule-open { background: var(--bronze-400); }
+.surface-inverse .rule-open { background: var(--bronze-300); }
+.rule-doc { border: 0; border-top: var(--stroke-heavy) solid var(--rule-heavy); margin: 0; }
+.rule-hair { border: 0; border-top: var(--stroke-hairline) solid var(--rule-light); margin: 0; }
 
-/* 3px slate rule — document headers */
-.rule-doc { border: 0; border-top: 3px solid var(--border-rule); margin: 0; }
-.rule-hair { border: 0; border-top: 1px solid var(--border-hairline); margin: 0; }
-
-/* ══ Buttons — uppercase Archivo, 3px radius, no gloss ══ */
+/* ══ Buttons ═══════════════════════════════════════════ */
 .btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+  display: inline-flex; align-items: center; gap: var(--space-2);
   font-family: var(--font-ui);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
   padding: 13px 20px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background var(--dur-2) var(--ease),
-              border-color var(--dur-2) var(--ease),
-              color var(--dur-2) var(--ease),
-              transform var(--dur-1) var(--ease);
+  transition: var(--transition-control), transform var(--duration-instant) var(--ease-standard);
 }
-.btn:active { transform: translateY(1px); }
+.btn:active { transform: translateY(1px); }   /* 1px nudge — no scale, no bounce */
 
-/* accent — exactly ONE per page */
 .btn-accent { background: var(--bronze-600); color: var(--white); }
-.btn-accent:hover { background: var(--bronze-700); }
+.btn-accent:hover { background: var(--bronze-700); color: var(--white); }
 
 .btn-primary { background: var(--slate-700); color: var(--white); }
-.btn-primary:hover { background: var(--slate-800); }
+.btn-primary:hover { background: var(--slate-800); color: var(--white); }
 
-.btn-secondary { background: transparent; color: var(--slate-700); border-color: var(--slate-300); }
-.btn-secondary:hover { background: var(--stone-100); border-color: var(--slate-400); }
+.btn-secondary { background: transparent; color: var(--slate-700); border-color: var(--border-default); }
+.btn-secondary:hover { background: var(--stone-100); border-color: var(--slate-400); color: var(--slate-700); }
 
-.btn-inverse { background: transparent; color: var(--inverse-text); border-color: rgba(255,255,255,.32); }
-.btn-inverse:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.6); }
+.btn-inverse { background: transparent; color: var(--text-on-dark); border-color: rgba(255,255,255,.32); }
+.btn-inverse:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.6); color: var(--text-on-dark); }
 
 .btn:disabled, .btn[aria-disabled='true'] { opacity: .42; pointer-events: none; }
 
-/* ══ Badges — uppercase status stamps ══════════════════ */
+/* ══ Badge — uppercase status stamp ════════════════════ */
 .badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--font-ui);
   font-size: var(--text-2xs);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
   padding: 4px 9px;
-  border: 1px solid var(--slate-300);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
-  color: var(--slate-600);
+  color: var(--text-muted);
   background: transparent;
 }
-.surface-inverse .badge { border-color: var(--inverse-hairline); color: var(--inverse-text); }
+.surface-inverse .badge { border-color: var(--border-inverse); color: var(--text-on-dark); }
 .badge-dot::before {
-  content: '';
-  width: 6px; height: 6px;
-  border-radius: 999px;              /* dots may be round */
+  content: ''; width: 6px; height: 6px;
+  border-radius: var(--radius-full);   /* dots may be round */
   background: var(--green-600);
 }
 
-/* ══ Tag — code chip, monospaced ═══════════════════════ */
+/* ══ Tag — monospaced code chip ════════════════════════ */
 .tag {
-  display: inline-flex;
-  align-items: center;
-  font-family: var(--font-mono);
+  display: inline-flex; align-items: center;
+  font-family: var(--font-data);
   font-size: var(--text-xs);
   padding: 3px 8px;
   border: 1px solid var(--border-hairline);
@@ -305,100 +193,92 @@ a { color: inherit; text-decoration: none; }
   color: var(--slate-700);
 }
 
-/* ══ Cards — no lift, no tilt, border darkens only ═════ */
+/* ══ Card — border darkens on hover. No lift, tilt, or scale. ══ */
 .card {
-  background: var(--color-card);
+  background: var(--surface-card);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-1);
-  transition: border-color var(--dur-3) var(--ease);
+  transition: border-color var(--duration-base) var(--ease-standard);
 }
-.card:hover { border-color: var(--slate-300); }
-.card-accent-edge { border-top: 3px solid var(--bronze-600); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+.card:hover { border-color: var(--border-default); }
+.card-accent-edge { border-top: var(--stroke-heavy) solid var(--bronze-600); }
 .card-inverse {
   background: var(--inverse-panel);
-  border-color: var(--inverse-hairline);
-  color: var(--inverse-text);
+  border-color: var(--border-inverse);
+  color: var(--text-on-dark);
   box-shadow: none;
 }
 
-/* ══ SpecTable — the most-read component ═══════════════ */
+/* ══ SpecTable — the most-read component in the brand ══ */
 .spec { width: 100%; border-collapse: collapse; }
 .spec th, .spec td {
-  text-align: left;
-  padding: 11px var(--space-4);
-  border-bottom: 1px solid var(--border-hairline);
-  vertical-align: top;
+  text-align: left; padding: 11px var(--space-4);
+  border-bottom: 1px solid var(--rule-light); vertical-align: top;
 }
 .spec tr:last-child th, .spec tr:last-child td { border-bottom: 0; }
 .spec th {
   font-family: var(--font-ui);
   font-size: var(--text-2xs);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
-  color: var(--color-text-quiet);
+  color: var(--text-muted);
   white-space: nowrap;
   width: 210px;
 }
-.spec td { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text); }
+.spec td { font-family: var(--font-data); font-size: var(--text-sm); color: var(--text-strong); }
 .spec td.prose { font-family: var(--font-body); font-size: var(--text-base); }
 
-.card-inverse .spec th { color: var(--bronze-400); }
-.card-inverse .spec td { color: var(--inverse-text); }
-.card-inverse .spec th, .card-inverse .spec td { border-color: var(--inverse-hairline); }
+.card-inverse .spec th { color: var(--bronze-300); }
+.card-inverse .spec td { color: var(--text-on-dark); }
+.card-inverse .spec th, .card-inverse .spec td { border-color: var(--border-inverse); }
 
 /* ══ Forms ═════════════════════════════════════════════ */
 .field-label {
   display: block;
   font-family: var(--font-ui);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
-  color: var(--slate-600);
+  color: var(--text-muted);
   margin-bottom: var(--space-2);
 }
 .input {
   width: 100%;
   font-family: var(--font-body);
   font-size: var(--text-base);
-  color: var(--color-text);
+  color: var(--text-strong);
   background: var(--white);
-  border: 1px solid var(--slate-300);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 10px 12px;
-  transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+  transition: var(--transition-control);
 }
 .input:focus {
   outline: none;
   border-color: var(--bronze-600);
   box-shadow: 0 0 0 3px rgba(138, 98, 32, .16);
 }
-.input::placeholder { color: var(--slate-400); }
+.input::placeholder { color: var(--text-faint); }
 
-/* ══ Links ═════════════════════════════════════════════ */
-.link {
-  color: var(--bronze-600);
-  border-bottom: 1px solid rgba(138, 98, 32, .35);
-  transition: border-color var(--dur-2) var(--ease);
-}
-.link:hover { border-bottom-color: var(--bronze-600); }
-.surface-inverse .link { color: var(--bronze-400); border-bottom-color: rgba(192, 154, 91, .4); }
+.link { color: var(--text-link); }
+.link:hover { color: var(--text-link-hover); }
+.surface-inverse .link, .card-inverse .link { color: var(--bronze-300); }
 
-/* ══ Motion: reduced ═══════════════════════════════════ */
+/* ══ Reduced motion ════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
   .btn:active { transform: none; }
 }
 
-/* ══ Print — this is where it is actually judged ═══════ */
+/* ══ Print — where this brand is actually judged ═══════ */
 @media print {
-  @page { margin: 0.75in; }
+  @page { margin: var(--page-margin-print); }
   .no-print { display: none !important; }
-  body { background: #fff; color: #000; font-size: 11pt; }
+  body { background: var(--white); color: #000; font-size: 11pt; }
   .card, .spec { box-shadow: none; border-radius: 0; }
-  .surface-inverse { background: #fff !important; color: #000 !important; }
-  .surface-inverse * { color: #000 !important; }
-  a { text-decoration: none; color: #000; }
+  .surface-inverse { background: var(--white) !important; }
+  .surface-inverse, .surface-inverse * { color: #000 !important; }
 }

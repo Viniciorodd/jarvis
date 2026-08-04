@@ -30,10 +30,11 @@ const subColor = tone === 'white' ? 'rgba(255,255,255,.62)' : 'var(--slate-500)'
 ---
 <span class={`logo ${cls}`} style={`--logo-c:${c};--logo-sub:${subColor};--logo-size:${size}px`}>
   {showMark && (
-    <svg class="logo__mark" viewBox="0 0 32 32" width={size} height={size}
+    <!-- Path copied verbatim from the design system's assets/logo-mark.svg -->
+    <svg class="logo__mark" viewBox="0 0 64 64" width={size} height={size}
       xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-      <path fill-rule="evenodd" clip-rule="evenodd" fill="var(--logo-c)"
-        d="M4 3 H28 L23.5 29 H8.5 Z M13 29 V19.5 A3 3 0 0 1 19 19.5 V29 Z" />
+      <path fill="var(--logo-c)" fill-rule="evenodd"
+        d="M4 6h56l-6 52H10L4 6Zm19 52V37a9 9 0 0 1 18 0v21H23Z" />
     </svg>
   )}
   <span class="logo__type">

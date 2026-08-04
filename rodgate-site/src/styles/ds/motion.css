@@ -1,0 +1,11 @@
+:root{
+  /* Motion is functional only: state feedback, never decoration. No bounce, no parallax. */
+  --duration-instant:80ms; /* @kind other */
+  --duration-fast:120ms; /* @kind other */
+  --duration-base:180ms; /* @kind other */
+  --duration-slow:260ms; /* @kind other */
+  --ease-standard:cubic-bezier(.2,0,.2,1); /* @kind other */
+  --ease-out:cubic-bezier(0,0,.2,1); /* @kind other */
+  --ease-in:cubic-bezier(.4,0,1,1); /* @kind other */
+  --transition-control:color var(--duration-fast) var(--ease-standard),background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard),box-shadow var(--duration-fast) var(--ease-standard);
+}

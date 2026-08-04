@@ -6,7 +6,7 @@ import { company } from '../data/company.js';
 
 const {
   title,
-  description = `${company.legalName} (DBA ${company.dba}) — owner-managed janitorial and facilities support contractor serving federal, state, and local government in ${company.serviceArea.join(', ')}.`,
+  description = `${company.legalName} (DBA ${company.dba}) — owner-managed janitorial and facilities support contractor serving federal, state, and local government in ${company.serviceAreaProse}.`,
 } = Astro.props;
 
 const fullTitle = title ? `${title} · Rodgate Group` : 'Rodgate Group — Facilities kept to standard, on contract';
@@ -27,12 +27,9 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
 
+    <!-- Font faces are imported by the design system's own typography.css. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
   </head>
   <body>
     <a href="#main" class="skip">Skip to content</a>

@@ -1,0 +1,47 @@
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap");
+
+:root{
+  /* families — both free/open, Google Fonts hosted, with Word/Docs-safe fallbacks */
+  --font-sans:"Archivo","Archivo Fallback",Arial,Helvetica,sans-serif;
+  --font-serif:"Source Serif 4",Georgia,Cambria,"Times New Roman",serif;
+  --font-mono:"IBM Plex Mono",Consolas,"Courier New",monospace;
+
+  /* semantic roles */
+  --font-display:var(--font-sans);
+  --font-ui:var(--font-sans);
+  --font-body:var(--font-serif);
+  --font-data:var(--font-mono);
+
+  /* size scale — 1.200 minor third, 16px base */
+  --text-2xs:11px;
+  --text-xs:12px;
+  --text-sm:13px;
+  --text-base:15px;
+  --text-md:17px;
+  --text-lg:20px;
+  --text-xl:24px;
+  --text-2xl:29px;
+  --text-3xl:35px;
+  --text-4xl:42px;
+  --text-5xl:52px;
+  --text-6xl:64px;
+
+  /* weights */
+  --weight-regular:400;
+  --weight-medium:500;
+  --weight-semibold:600;
+  --weight-bold:700;
+
+  /* line heights */
+  --leading-tight:1.08;
+  --leading-snug:1.25;
+  --leading-normal:1.5;
+  --leading-relaxed:1.65;
+
+  /* tracking */
+  --tracking-tight:-0.02em;
+  --tracking-normal:0;
+  --tracking-wide:0.04em;
+  --tracking-caps:0.12em;  /* eyebrows, labels, small caps runs */
+  --tracking-mark:0.18em;  /* wordmark lockup */
+}

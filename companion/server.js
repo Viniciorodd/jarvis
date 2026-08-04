@@ -199,6 +199,72 @@ function writeGoalState(st) {
   fs.writeFileSync(goalStatePath(), JSON.stringify(st, null, 2));
 }
 
+// ── HIS CURRENT REALITY — layer 0 of the ladder ────────────────────────────────────────────────────
+// Operator, 2026-08-04: *"we have to look at my current reality, and generate tasks and to dos based on my
+// reality so that i could get to the business purchase."*
+//
+// So the bottom of the goal graph is not a form he fills in — it is assembled from the pods that already
+// know. That is also the one thing a vision-board app can never do.
+//
+// EVERY VALUE CARRIES A SOURCE AND A DATE, and anything we cannot source is simply ABSENT rather than zero.
+// This matters more here than anywhere else in the codebase: his credit report currently returns no score at
+// all, and his unit list still contains a template row reading "Add your first unit address here" with rent
+// 0. Counting either as zero would invent a reality and then reverse-engineer a plan out of the invention.
+async function readReality() {
+  const R = {};
+  // `partial` = a LOWER BOUND. Real money we can see, and knowingly not all of it. The engine treats those
+  // asymmetrically (see meets() in pods/goal-horizon.mjs) instead of pretending a part is the whole.
+  const put = (cap, value, source, partial) => {
+    if (value === null || value === undefined || (typeof value === 'number' && !Number.isFinite(value))) return;
+    R[cap] = { value, source, asOf: todayISO(), partial: !!partial };
+  };
+  const self = async (p) => {
+    try { return await fetch('http://127.0.0.1:' + PORT + p, { signal: AbortSignal.timeout(6000) }).then((r) => r.json()); }
+    catch { return null; }        // a pod that is down leaves the capability UNKNOWN, which is the truth
+  };
+
+  const [debts, credit, focus, re] = await Promise.all([
+    self('/api/finance/debts'), self('/api/finance/credit'), self('/api/focus'), self('/api/real-estate'),
+  ]);
+
+  if (debts && debts.totals) put('debt_load', Number(debts.totals.monthly), 'debt tracker');
+  if (credit) {
+    // latestScorePerSource is `{}` until he pulls a report — so this stays absent, and the engine will tell
+    // him "go find this out" instead of planning around a number nobody has.
+    const scores = Object.values(credit.latestScorePerSource || {})
+      .map((s) => Number(s && (s.score !== undefined ? s.score : s))).filter(Number.isFinite);
+    if (scores.length) put('credit_score', Math.max.apply(null, scores), 'credit desk');
+    if (Number.isFinite(Number(credit.readinessPct))) put('business_credit', Number(credit.readinessPct), 'lendability desk');
+  }
+  if (focus && Number.isFinite(Number(focus.avgPerActiveDay))) {
+    put('free_hours', Math.round((Number(focus.avgPerActiveDay) * 7) / 60), 'focus pod');
+  }
+  if (re && Array.isArray(re.units)) {
+    // Skip the template row. A placeholder counted as a unit is a fabricated asset.
+    const real = re.units.filter((u) => u && u.address && !/add your first|update with real/i.test(String(u.address) + String(u.notes || '')));
+    if (real.length) {
+      const rent = real.reduce((s, u) => s + (Number(u.rent) || 0) + (Number(u.hap) || 0), 0);
+      // PARTIAL: rent is the only income stream Jarvis can currently total. His own registry puts the real
+      // figure at ~$3,350/mo, so this is a floor, not the number. Flagged rather than quietly shipped as
+      // complete — a ladder built on an understated position is as wrong as one built on an inflated one.
+      if (rent > 0) put('monthly_net', rent, 'real-estate portfolio (rent only)', true);
+    }
+  }
+  // Rodgate LLC exists — this one is a fact of record, not a measurement.
+  put('operating_entity', true, 'Rodgate LLC');
+  try {
+    const { taxStatus } = await import('../pods/tax/status.mjs');
+    const s = await taxStatus();
+    if (s && Number.isFinite(Number(s.filedYears))) put('filed_years', Number(s.filedYears), 'tax pod');
+  } catch { /* absent → unknown */ }
+  try {
+    const board = await govBoardData();
+    const won = (board && board.columns || []).flatMap((c) => c.cards || []).filter((c) => c && c.disposition === 'won');
+    put('past_performance', won.length, 'gov pipeline');
+  } catch { /* absent → unknown */ }
+  return R;
+}
+
 // Gov pipeline board (pods/gov/pipeline.mjs, ESM) + the operator's manual dispositions (won/lost/passed).
 let _govMod = null;
 function govPipeline() { return (_govMod ||= import('../pods/gov/pipeline.mjs')); }
@@ -3625,6 +3691,21 @@ const server = http.createServer(async (req, res) => {
       else st.decisions[id] = { decision, at: new Date().toISOString() };
       writeGoalState(st);
       return send(res, 200, JSON.stringify({ ok: true, id, decision }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  // WHERE HE ACTUALLY STANDS — the bottom rung, and what we still don't know about it.
+  //
+  // The `unknown` list is as important as the values: an engine that quietly assumed zero for the numbers
+  // nobody has looked up would produce a confident plan built on a fiction.
+  if (req.method === 'GET' && url.pathname === '/api/goals/reality') {
+    try {
+      const H = await import('../pods/goal-horizon.mjs');
+      const reality = await readReality();
+      const known = Object.keys(reality);
+      const unknown = Object.keys(H.CAPS).filter((c) => !known.includes(c))
+        .map((c) => ({ cap: c, label: H.CAPS[c].label, unit: H.CAPS[c].unit }));
+      return send(res, 200, JSON.stringify({ ok: true, asOf: todayISO(), reality, caps: H.CAPS, unknown }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
 

@@ -1,6 +1,44 @@
 # Where we are & what's next (handoff — read this first in a new chat)
 
-_Updated 2026-08-03. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+_Updated 2026-08-04. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
+
+### 🆕 2026-08-04 — The Jarvis Design System, checked and applied
+
+He shared the published **Jarvis Design System** (claude.ai/design, "Jarvis Design System") and the v1
+`goal-graph.html`, and asked whether it's implemented. Mostly yes — the system was BUILT from this codebase
+and says so: *"Nothing here was invented from a screenshot. Every token, geometry value and copy pattern was
+lifted from running code."* Its listed sources are `companion/public/style.css`, `holo.css`, `govcon-os.css`,
+`today.css`, `orb.js`, `control.html`, `pods/org.mjs`, `pods/gov/pipeline.mjs` and the brand brief.
+
+**Two pages were off-contract, and both were mine.** `/goals` (shipped the same day) and `/eyes` invented
+their own palette — `#04070f`, `#5abeb4`, `#e8e6e1`, `#7d8b96` — and never loaded `style.css`, so neither read
+`data-theme`. That breaks the system's own rule (*"tint with rgba(var(--teal-rgb),α) — never invent a hex"*)
+and meant both stayed dark inside a True White app, with `/goals` painting near-white graph labels onto white.
+Both now bootstrap the theme, load `style.css`, and take every colour from the contract. The canvas samples
+the tokens on each draw, so a theme switch repaints instead of needing a reload — verified by reading pixels
+back: in True White the dominant painted colour is `rgb(13,148,136)`, the AA-safe light-theme teal.
+
+**Adopted the system's real numbers** rather than approximations: radii 15 (the one thing) / 14 (cards) /
+12 (metric tiles) / 10 (buttons) / full (chips + tabs); type 14 body, 13.5 dense rows, 12 meta, caps labels
+10/500/.12em; weights 300 greeting-only, 500 workhorse, 600 headings+money; tabular numerals on every count
+("no exceptions").
+
+**Deliberately still hardcoded, each commented:** the video stage (`#000` — a camera feed, not a surface), the
+LIVE indicator (red in both themes — a privacy signal), and "Camera is off." (fixed grey; it sits inside the
+black stage where `var(--dim)` would vanish in True White).
+
+**v1's missing views ported into `/goals`:** the goal LIST is the default tab again (v1 had it right — the
+graph is a finding you absorb once, the list is the workspace), the shared-action BAR CHART the PRD calls
+"the whole point" (solid = live, faint = dormant), four KPI counters, search, and five sorts. NOT ported:
+v1's export button — it exists only because v1 has no server and decisions must be pasted back by hand;
+`/goals` persists them server-side.
+
+**Two open items the design system is waiting on HIM for:** (1) confirm the mono typeface — JetBrains Mono is
+loaded as a candidate and the codebase never chose one; (2) the three named identity directions + four
+presence states, which the author deliberately left un-guessed.
+
+⚠ Note: a parallel Claude session (Opus 4.8) committed `b63a459` in this same working tree — the *Rodgate
+site* design system under `rodgate-site/`. Unrelated to Jarvis, no overlap.
 
 ### 🆕 2026-08-03 (latest) — The goal engine became a FILTER, and the crisis gate that should have shipped first
 

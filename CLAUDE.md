@@ -75,6 +75,10 @@ iPhone/iPad — nothing is exposed to the public internet.
   **capabilities** (a goal *produces* cash flow/credit/collateral; another *requires* it — so the Lambo is a
   byproduct of the business, not its sibling). Read
   `docs/superpowers/specs/2026-08-04-goal-horizon-engine-design.md` BEFORE changing anything under goals.
+  All 5 phases shipped 2026-08-04: `pods/goal-horizon.mjs` (capabilities, affords, ladder, snapshots/diff)
+  + `pods/goal-tasks.mjs` (generated to-dos). Routes `/api/goals/{reality,ladder,propose,confirm,tasks,
+  tasks/accept,reality/set}`. 🚨 `gateTask()` guards every generated task — boundaries, crisis list,
+  invented contacts (L-009), vagueness. Unknown ≠ zero; partial values are lower bounds.
 - **Goals (the filter and the router, as built)**: source of truth is his hand-built vault registry
   `<VAULT>/05 - Knowledge/Goals/goals.json` (91 goals, 23 actions, tiers, verbatim quotes, real DAG edges).
   Engine `pods/goal-registry.mjs` (pure, eval-pinned) → `/api/goals` (+`?hardDay=1`), `/api/goals/decide`,

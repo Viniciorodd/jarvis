@@ -23,7 +23,13 @@ a liquid-capital figure, 5 on a credit score, 5 on a complete monthly-net number
 directly (Enter commits). Feeding two test numbers moved 6 goals off the pending shelf and grew the ladder to
 2 rungs — then the test values were cleared. **Until he types those three numbers, the climb cannot climb.**
 
-Not built: phase 4 (gap → task generation, boundary-gated) and phase 5 (re-layer + "what changed").
+**Phase 4 (to-dos) + phase 5 (what changed) BUILT 2026-08-04.** `pods/goal-tasks.mjs` gates every generated
+task: crisis list · his six boundaries · no dream-tier planning · nothing vague · **no invented contacts**
+(the free-tier model really did return "Contact John the financial advisor" — L-009) · nothing too thin
+("Pull credit report" names no target). Irreversible steps are flagged YOURS TO PRESS, not hidden. Accepting
+one writes a checkbox into `⚡ Quick Capture` with an Obsidian due date; `/api/goals/tasks/accept` re-gates on
+the way in. Phase 5 snapshots the ladder into `goal-history.json` and reports what moved — including slips —
+and renders NOTHING on a week where nothing changed.
 
 ### 🔴 2026-08-04 (READ FIRST) — He rejected the goal engine: "just another to-do list, another tracker"
 

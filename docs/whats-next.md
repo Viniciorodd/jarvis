@@ -2,6 +2,29 @@
 
 _Updated 2026-08-04. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
+### 🆕 2026-08-04 (pt.2) — Horizon Engine phases 1-3 BUILT
+
+Spec: `docs/superpowers/specs/2026-08-04-goal-horizon-engine-design.md`. `pods/goal-horizon.mjs` (pure,
+eval-pinned, 43 cases). Routes: `/api/goals/reality`, `/api/goals/ladder`, `/api/goals/propose`,
+`/api/goals/confirm`, `/api/goals/reality/set`. UI: **The climb** is the default tab on `/goals`.
+
+- **Capabilities, not shared tasks.** `affords(A,B)` derived when A's production covers B's unmet needs.
+  His Lambo/business case is the centrepiece eval.
+- **Layer 0 is live** — debt tracker, lendability desk, focus pod, rental portfolio, gov pipeline. Six
+  capabilities sourced, five honestly absent.
+- **Three shelves, not two:** on a rung · pending (never measured) · no path (known miss nothing produces).
+  The first build put the RANCH and $10k/mo on rung 1 — "no known path" rendering as "within reach".
+- **Unknown ≠ zero, placeholders ≠ assets, partial = lower bound** (and the lower-bound asymmetry FLIPS
+  between up-capabilities and down-capabilities).
+- **31 proposals generated + grounded**, dream tier skipped. All 91 goals remain unconfirmed.
+
+🔴 **WHERE IT STANDS RIGHT NOW: the ladder is one rung tall, and that is the honest answer.** 7 goals wait on
+a liquid-capital figure, 5 on a credit score, 5 on a complete monthly-net number. The page asks for them
+directly (Enter commits). Feeding two test numbers moved 6 goals off the pending shelf and grew the ladder to
+2 rungs — then the test values were cleared. **Until he types those three numbers, the climb cannot climb.**
+
+Not built: phase 4 (gap → task generation, boundary-gated) and phase 5 (re-layer + "what changed").
+
 ### 🔴 2026-08-04 (READ FIRST) — He rejected the goal engine: "just another to-do list, another tracker"
 
 He is right, and the correction is a MODEL change, not a UI change.

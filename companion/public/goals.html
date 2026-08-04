@@ -97,6 +97,49 @@
   .src { font-size: 11px; color: var(--dim); margin-top: 8px; }
   #pic img { width: 100%; border-radius: 10px; display: block; margin-top: 11px; }
   .note { font-size: 12px; color: var(--dim); margin-top: 10px; line-height: 1.5; }
+
+  /* ── KPI tiles — 12px radius is the system's metric-tile token ─────────────────────────────────── */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .kpi .n { font-size: 38px; font-weight: 600; line-height: 1.05; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .kpi .l { font-size: 12px; color: var(--dim); margin-top: 4px; line-height: 1.45; }
+  .kpi.hero { border-color: rgba(var(--teal-rgb),.42); }
+  .kpi.hero .n { color: var(--teal); font-size: 46px; }
+
+  /* ── view tabs ─────────────────────────────────────────────────────────────────────────────────── */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; flex-wrap: wrap; }
+  .tab { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--dim);
+    font: inherit; font-size: 14px; font-weight: 500; padding: 10px 14px; cursor: pointer; min-height: 44px; }
+  .tab:hover { color: var(--cream); background: none; }
+  .tab[aria-selected="true"] { color: var(--cream); border-bottom-color: var(--teal); background: none; }
+  input[type=search], select { background: var(--panel); border: 1px solid var(--line); color: var(--cream);
+    border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 13px; min-height: 34px; }
+  input[type=search] { min-width: 190px; }
+  input[type=search]:focus-visible, select:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  /* ── the goal list — v1's default view, and the one that is actually decidable ─────────────────── */
+  .cat-head { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--dim); margin: 16px 0 4px; }
+  .cat-head:first-child { margin-top: 0; }
+  .g-row { display: flex; gap: 11px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .g-row:hover .g-t { color: var(--teal); }
+  .g-row .g-n { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; flex: 0 0 auto; width: 26px; text-align: right; }
+  .g-t { font-size: 13.5px; line-height: 1.4; flex: 1 1 auto; }
+  .g-m { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+  .g-row.done .g-t, .g-row.gone .g-t { text-decoration: line-through; color: var(--dim); }
+  .g-row.dream .g-t { color: var(--dim); }
+
+  /* ── the shared-action bars — the PRD calls this "the whole point" ─────────────────────────────── */
+  .bars { padding: 4px 0; }
+  .bar-row { padding: 9px 0; cursor: pointer; }
+  .bar-row:hover .b-t { color: var(--teal); }
+  .b-t { font-size: 13.5px; line-height: 1.35; display: flex; justify-content: space-between; gap: 12px; }
+  .b-n { color: var(--teal); font-weight: 600; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+  .track { height: 9px; border-radius: 999px; background: rgba(var(--teal-rgb),.10); margin-top: 6px; overflow: hidden; display: flex; }
+  .fill { background: var(--teal); height: 100%; }
+  /* the dormant remainder, shown but muted — it is real and it is not what should drive Monday */
+  .fill.dormant { background: rgba(var(--teal-rgb),.26); }
+  .b-s { font-size: 11.5px; color: var(--dim); margin-top: 5px; line-height: 1.45; }
+  .stage > [hidden] { display: none; }
 </style>
 
 <div class="wrap">
@@ -104,13 +147,34 @@
   <h1>Goals</h1>
   <div class="sub" id="sub">loading…</div>
 
+  <div class="kpis" id="kpis" hidden>
+    <div class="kpi hero"><div class="n" id="k-lev">—</div><div class="l" id="k-lev-l">goals share one unblocked action</div></div>
+    <div class="kpi"><div class="n" id="k-total">—</div><div class="l">goals mapped, with full paths</div></div>
+    <div class="kpi"><div class="n" id="k-free">—</div><div class="l">blocked by nothing — free today</div></div>
+    <div class="kpi"><div class="n" id="k-dec">—</div><div class="l">decisions you've made</div></div>
+  </div>
+
   <div class="one" id="one" hidden>
     <div class="lab" id="oneLab">START HERE</div>
     <div class="t" id="oneT"></div>
     <div class="why" id="oneWhy"></div>
   </div>
 
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-v="list" aria-selected="true">Every goal &amp; its path</button>
+    <button class="tab" role="tab" data-v="graph" aria-selected="false">The graph</button>
+    <button class="tab" role="tab" data-v="lev" aria-selected="false">Shared actions</button>
+  </div>
+
   <div class="bar">
+    <input type="search" id="q" placeholder="Search your goals…" aria-label="Search your goals" />
+    <select id="sort" aria-label="Sort">
+      <option value="cat">Group by category</option>
+      <option value="n">Most restated first</option>
+      <option value="last">Most recent first</option>
+      <option value="first">Oldest first</option>
+      <option value="steps">Fewest steps first</option>
+    </select>
     <button data-tier="all" class="f on">Everything</button>
     <button data-tier="true" class="f">Yours</button>
     <button data-tier="operating" class="f">The route</button>
@@ -120,7 +184,11 @@
   </div>
 
   <div class="grid">
-    <canvas id="cv"></canvas>
+    <div class="stage">
+      <div id="v-list"></div>
+      <canvas id="cv" hidden></canvas>
+      <div id="v-lev" class="bars" hidden></div>
+    </div>
     <div>
       <div class="side" id="detailBox" hidden>
         <h2 id="detailH">THIS GOAL</h2>
@@ -130,10 +198,6 @@
         <h2>COSTS NOTHING · NEEDS NOBODY</h2>
         <div id="free"></div>
       </div>
-      <div class="side" id="levBox">
-        <h2>WHAT MOVES THE MOST</h2>
-        <div id="lev"><div class="muted">loading…</div></div>
-      </div>
     </div>
   </div>
 </div>
@@ -141,7 +205,7 @@
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
-  var D = null, tierFilter = 'all', heavy = false, sel = null;
+  var D = null, tierFilter = 'all', heavy = false, sel = null, view_ = 'list';
   var nodes = [], edges = [], byId = {};
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
@@ -199,26 +263,113 @@
       : (a.note || '');
   }
 
-  /* ── the leverage table + the free wins ─────────────────────────────────────────────────────── */
+  /* ── the free wins ──────────────────────────────────────────────────────────────────────────── */
   function renderSide() {
-    $('levBox').hidden = heavy;                 /* heavy day: the numbers go away entirely */
-    if (!heavy) {
-      var rows = (D.leverage || []).filter(function (a) { return a.live > 0; }).slice(0, 9);
-      $('lev').innerHTML = rows.length ? rows.map(function (a) {
-        var names = (a.liveGoals || []).map(function (id) { return (byId[id] || {}).t || id; });
-        return '<div class="row" data-act="' + esc(a.id) + '">' +
-          '<span class="rn">' + (a.live > 1 ? '×' + a.live : '') + '</span>' +
-          '<div class="rt">' + esc(a.title) + '</div>' +
-          '<div class="rs">' + (a.status === 'blocked' ? 'waiting on something first · ' : '') +
-          esc(names.slice(0, 3).join(' · ')) + '</div></div>';
-      }).join('') : '<div class="muted">Nothing ranked yet.</div>';
-    }
     var f = D.freeWins || [];
     $('freeBox').hidden = !f.length;
     $('free').innerHTML = f.map(function (g) {
       return '<div class="row" data-goal="' + esc(g.id) + '"><div class="rt">' + esc(g.t) + '</div>' +
         '<div class="rs">' + esc(g.decay || '') + '</div></div>';
     }).join('');
+  }
+
+  /* ── the KPI row ────────────────────────────────────────────────────────────────────────────── */
+  function renderKpis() {
+    /* On a heavy day the counters go with the rest of the numbers. A tile reading "0 decisions you've
+       made" on a bad day is a scoreboard, and the Hard Day Protocol says no scoreboard. */
+    $('kpis').hidden = heavy;
+    if (heavy) { return; }
+    var t = D.tiers || {}, top = (D.leverage || [])[0];
+    $('k-lev').textContent = top ? top.live : '—';
+    $('k-lev-l').innerHTML = top
+      ? 'goals share one unblocked action: <strong>' + esc(short(top.title.split(' (')[0], 34)) + '</strong>'
+      : 'goals share one unblocked action';
+    $('k-total').textContent = (D.goals || []).length;
+    $('k-free').textContent = (D.freeWins || []).length;
+    $('k-dec').textContent = (D.goals || []).length - (D.unconfirmed || 0);
+  }
+
+  /* ── EVERY GOAL & ITS PATH — the default view ───────────────────────────────────────────────────
+     v1 opened on the list, not the graph, and that was the right call. The graph shows him THAT
+     everything converges; the list is what he can actually read down and decide on. A hairball is a
+     finding, not a workspace. */
+  function goalSteps(g) { return (g.req || []).length; }
+  function renderList() {
+    var q = ($('q').value || '').toLowerCase().trim();
+    var sort = $('sort').value;
+    var list = (D.goals || []).filter(function (g) {
+      if (tierFilter !== 'all' && g.tier !== tierFilter) { return false; }
+      if (!q) { return true; }
+      return (String(g.t || '') + ' ' + String(g.q || '') + ' ' + String(g.cat || '')).toLowerCase().indexOf(q) >= 0;
+    });
+    var catName = {}; (D.categories || []).forEach(function (c) { catName[c.id] = c.label; });
+    var cmp = {
+      n: function (a, b) { return (b.n || 0) - (a.n || 0); },
+      last: function (a, b) { return String(b.last || '').localeCompare(String(a.last || '')); },
+      first: function (a, b) { return String(a.first || '').localeCompare(String(b.first || '')); },
+      steps: function (a, b) { return goalSteps(a) - goalSteps(b); },
+    }[sort];
+    var html = '';
+    if (sort === 'cat') {
+      var groups = {};
+      list.forEach(function (g) { (groups[g.cat] = groups[g.cat] || []).push(g); });
+      Object.keys(groups).forEach(function (c) {
+        html += '<div class="cat-head">' + esc((catName[c] || c || 'other').toUpperCase()) + '</div>';
+        groups[c].sort(function (a, b) { return (b.n || 0) - (a.n || 0); }).forEach(function (g) { html += rowFor(g); });
+      });
+    } else {
+      list.slice().sort(cmp).forEach(function (g) { html += rowFor(g); });
+    }
+    $('v-list').innerHTML = html || '<div class="muted">Nothing matches that.</div>';
+    $('status').textContent = heavy ? '' : (list.length + ' of ' + (D.goals || []).length +
+      ((D.unconfirmed && !q) ? ' · ' + D.unconfirmed + ' unconfirmed' : ''));
+  }
+  function rowFor(g) {
+    var cls = 'g-row' + (g.tier === 'dream' ? ' dream' : '') + (g.retired ? ' gone' : '') +
+      (g.status === 'achieved' ? ' done' : '');
+    var steps = goalSteps(g);
+    var meta = [];
+    if (g.decay) { meta.push(g.decay); }
+    if (g.n > 1) { meta.push('written ' + g.n + '×'); }
+    /* An unmodelled goal says so rather than looking like a goal that needs nothing. */
+    meta.push(g.blocked ? g.blocked.toLowerCase() : (steps ? steps + (steps === 1 ? ' step' : ' steps') : 'no chain yet'));
+    return '<div class="' + cls + '" data-goal="' + esc(g.id) + '">' +
+      '<span class="g-n">' + (g.n || 1) + '×</span>' +
+      '<span><span class="g-t">' + esc(g.t) + '</span>' +
+      '<div class="g-m">' + esc(meta.join(' · ')) + '</div></span></div>';
+  }
+
+  /* ── SHARED ACTIONS — the bar chart the PRD calls "the whole point" ──────────────────────────── */
+  function renderBars() {
+    var rows = (D.leverage || []).filter(function (a) { return a.unlocks > 0; });
+    var max = rows.length ? Math.max.apply(null, rows.map(function (a) { return a.unlocks; })) : 1;
+    $('v-lev').innerHTML = rows.length ? rows.map(function (a) {
+      var names = (a.liveGoals || []).map(function (id) { return (byId[id] || {}).t || id; });
+      var dormant = a.unlocks - a.live;
+      return '<div class="bar-row" data-act="' + esc(a.id) + '">' +
+        '<div class="b-t"><span>' + esc(a.title) + '</span>' +
+        '<span class="b-n">' + a.live + (dormant ? ' <span style="opacity:.5">+' + dormant + '</span>' : '') + '</span></div>' +
+        '<div class="track">' +
+          '<span class="fill" style="width:' + (a.live / max * 100).toFixed(1) + '%"></span>' +
+          '<span class="fill dormant" style="width:' + (dormant / max * 100).toFixed(1) + '%"></span>' +
+        '</div>' +
+        '<div class="b-s">' + (a.status === 'blocked' ? 'waiting on something first · ' : (a.cost === 'free' ? 'costs nothing · ' : 'you can start this · ')) +
+        esc(names.slice(0, 3).join(' · ')) + '</div></div>';
+    }).join('') +
+      '<div class="note">Solid = goals you\'re chasing. Faint = dormant ones from the dream tier.</div>'
+      : '<div class="muted">Nothing ranked yet.</div>';
+  }
+
+  /* ── views ──────────────────────────────────────────────────────────────────────────────────── */
+  function setView(v) {
+    view_ = v;
+    var tabs = document.querySelectorAll('.tab');
+    for (var i = 0; i < tabs.length; i++) { tabs[i].setAttribute('aria-selected', String(tabs[i].getAttribute('data-v') === v)); }
+    $('v-list').hidden = v !== 'list';
+    $('cv').hidden = v !== 'graph';
+    $('v-lev').hidden = v !== 'lev';
+    /* the canvas can only be measured once it is visible */
+    if (v === 'graph') { fit(); draw(); }
   }
 
   /* ── one goal, in full ──────────────────────────────────────────────────────────────────────── */
@@ -481,9 +632,8 @@
       : t['true'] + ' yours · ' + t.operating + ' the route · ' + t.dream + ' dormant' +
         (t.retired ? ' · ' + t.retired + ' retired' : '') +
         (t.achieved ? ' · ' + t.achieved + ' done' : '') +
-        ' — a big circle is an action that moves a lot of them.';
-    $('status').textContent = (!heavy && D.unconfirmed) ? D.unconfirmed + ' still unconfirmed' : '';
-    renderOne(); renderSide(); build(); fit(); draw();
+        ' — nothing has been removed. You decide.';
+    renderOne(); renderKpis(); renderSide(); renderList(); renderBars(); build(); setView(view_);
     /* ?goal=g_ranch opens one goal directly — so "show me the ranch" can land on the thing itself
        rather than on a map he then has to search. */
     var want = new URLSearchParams(location.search).get('goal');
@@ -494,12 +644,14 @@
   }
 
   document.addEventListener('click', function (e) {
+    var tab = e.target.closest('.tab');
+    if (tab) { setView(tab.getAttribute('data-v')); return; }
     var f = e.target.closest('.f');
     if (f) {
       tierFilter = f.getAttribute('data-tier');
       var all = document.querySelectorAll('.f');
       for (var i = 0; i < all.length; i++) { all[i].classList.toggle('on', all[i] === f); }
-      build(); fit(); draw(); return;
+      renderList(); build(); if (view_ === 'graph') { fit(); draw(); } return;
     }
     if (e.target.id === 'heavy') { heavy = !heavy; e.target.classList.toggle('on', heavy); load(); return; }
     var row = e.target.closest('[data-goal]');
@@ -509,7 +661,9 @@
     var dec = e.target.closest('[data-dec]');
     if (dec) { decide(dec.getAttribute('data-dec')); }
   });
-  window.addEventListener('resize', function () { fit(); draw(); });
+  $('q').addEventListener('input', function () { renderList(); if (view_ !== 'list') { setView('list'); } });
+  $('sort').addEventListener('change', renderList);
+  window.addEventListener('resize', function () { if (view_ === 'graph') { fit(); draw(); } });
   load();
 })();
 </script>

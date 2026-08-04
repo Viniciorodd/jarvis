@@ -8,8 +8,8 @@
 // still holds a placeholder row. An engine that reads either as zero would invent a reality and then
 // reverse-engineer a plan out of the invention.
 
-import { CAPS, isCap, capOf, meets, unmet, affords, affordedMap, blockers, layers, ladder, reverse }
-  from '../pods/goal-horizon.mjs';
+import { CAPS, isCap, capOf, meets, unmet, affords, affordedMap, blockers, layers, ladder, reverse,
+  groundProposal, applyProposals, HORIZONS } from '../pods/goal-horizon.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -21,6 +21,14 @@ const REALITY = {
   free_hours:    { value: 20,    source: 'focus pod', asOf: '2026-08-04' },
   operating_entity: { value: true, source: 'Rodgate LLC', asOf: '2026-08-04' },
   // credit_score and liquid_capital are DELIBERATELY absent — that is the live truth.
+};
+
+// The same position once he has actually pulled the numbers. Placement tests use THIS, because an unmeasured
+// requirement makes a goal unplaceable-pending rather than unreachable, and the two must not be conflated.
+const MEASURED = {
+  ...REALITY,
+  credit_score:   { value: 640,  source: 'myFICO', asOf: '2026-08-04' },
+  liquid_capital: { value: 8000, source: 'accounts', asOf: '2026-08-04' },
 };
 
 const BUSINESS = {
@@ -51,7 +59,20 @@ const TAXES = {
   requires: [{ cap: 'monthly_net', value: 8000 }],
   produces: [{ cap: 'filed_years', value: 2 }],
 };
-const GOALS = [BUSINESS, LAMBO, SENDS, TAXES];
+// The two links that make the chain to the business complete. Without something that PRODUCES capital and
+// credit, the business has no modelled path at all — which the engine correctly refuses to place, and which
+// is exactly the state his real registry is in until he fills these in.
+const SAVE = {
+  id: 'g_save', t: 'A $250k war chest', tier: 'operating', horizon: '3y',
+  requires: [{ cap: 'monthly_net', value: 10000 }],
+  produces: [{ cap: 'liquid_capital', value: 250000 }],
+};
+const CREDIT = {
+  id: 'g_credit', t: 'Credit repaired to 720', tier: 'operating', horizon: '1y',
+  requires: [{ cap: 'debt_load', value: 1500 }],
+  produces: [{ cap: 'credit_score', value: 720 }],
+};
+const GOALS = [BUSINESS, LAMBO, SENDS, TAXES, SAVE, CREDIT];
 
 export default {
   agent: 'goal-horizon',
@@ -113,7 +134,7 @@ export default {
     } },
 
     { name: 'the ladder climbs: sends → filed years → the business', run: () => {
-      const L = layers(GOALS, REALITY);
+      const L = layers(GOALS, MEASURED);
       return ok(L.get('g_sends') < L.get('g_taxes') && L.get('g_taxes') < L.get('g_biz'),
         JSON.stringify([...L]));
     } },
@@ -121,21 +142,70 @@ export default {
     { name: 'height is DERIVED from the gap, not read off his stated horizon', run: () => {
       // The Lambo says '10y' and the business says '3y', yet the Lambo sits ABOVE the business, because the
       // business is what pays for it. A layout driven by the typed horizon would have inverted them.
-      const L = layers(GOALS, REALITY);
+      const L = layers(GOALS, MEASURED);
       return ok(L.get('g_lambo') > L.get('g_biz'), 'lambo=' + L.get('g_lambo') + ' biz=' + L.get('g_biz'));
     } },
 
     { name: 'the ladder re-layers when his reality changes', run: () => {
-      const richer = { ...REALITY, filed_years: { value: 2, source: 'tax pod', asOf: '2026-08-04' },
+      const richer = { ...MEASURED, filed_years: { value: 2, source: 'tax pod', asOf: '2026-08-04' },
         liquid_capital: { value: 250000, source: 'accounts', asOf: '2026-08-04' },
         credit_score: { value: 700, source: 'myFICO', asOf: '2026-08-04' } };
-      const before = layers(GOALS, REALITY).get('g_biz');
+      const before = layers(GOALS, MEASURED).get('g_biz');
       const after = layers(GOALS, richer).get('g_biz');
       return ok(after === 1 && before > 1, before + ' -> ' + after);
     } },
 
     { name: 'blockers are the goals that PRODUCE what is missing', run: () =>
       ok(blockers(BUSINESS, GOALS, REALITY).includes('g_taxes')) },
+
+    { name: '⚠ "no known path" is NOT rung 1 — that would be a false promise', run: () => {
+      // The first version gave every goal a rung, so anything nothing produced fell to the bottom and read
+      // as "start this today". On his real data that put the RANCH and $10k/mo on rung 1.
+      const orphan = { id: 'g_orphan', t: 'Own an island', tier: 'dream',
+        requires: [{ cap: 'liquid_capital', value: 5000000 }], produces: [] };
+      const L = layers([...GOALS, orphan], MEASURED);
+      return ok(L.get('g_orphan') === null, String(L.get('g_orphan')));
+    } },
+
+    { name: '⚠ unreachable goals go on their own shelf, not the bottom rung', run: () => {
+      const orphan = { id: 'g_orphan', t: 'Own an island', requires: [{ cap: 'liquid_capital', value: 5000000 }], produces: [] };
+      const l = ladder([...GOALS, orphan], MEASURED);
+      return ok(l.noPath.some((g) => g.id === 'g_orphan')
+        && !l.reachableNow.includes('g_orphan'), JSON.stringify(l.noPath.map((g) => g.id)));
+    } },
+
+    { name: 'a goal is placed only when EVERY missing capability has a producer', run: () => {
+      // Half a path is not a path: liquid_capital has a producer here, credit_score does not.
+      const half = { id: 'g_half', t: 'half', requires: [{ cap: 'liquid_capital', value: 999999 }, { cap: 'credit_score', value: 700 }], produces: [] };
+      const giver = { id: 'g_giver', t: 'giver', requires: [], produces: [{ cap: 'liquid_capital', value: 999999 }] };  // covers capital, nothing covers credit
+      return ok(layers([half, giver], MEASURED).get('g_half') === null);
+    } },
+
+    { name: '⚠ an UNMEASURED requirement makes a goal pending, not unreachable', run: () => {
+      // The business needs a 680 score. Nobody has pulled his report, so it might already be met — calling it
+      // unreachable would invent an obstacle, and placing it would invent a qualification.
+      const l = ladder(GOALS, REALITY);
+      const p = l.pending.find((g) => g.id === 'g_biz');
+      return ok(p && p.needsMeasuring.includes('credit_score') && !l.noPath.some((g) => g.id === 'g_biz'),
+        JSON.stringify(l.pending.map((g) => g.id + ':' + g.needsMeasuring)));
+    } },
+
+    { name: 'measuring the number moves it off the pending shelf onto a rung', run: () => {
+      const before = ladder(GOALS, REALITY).pending.some((g) => g.id === 'g_biz');
+      const after = layers(GOALS, MEASURED).get('g_biz');
+      return ok(before && after !== null, before + ' -> rung ' + after);
+    } },
+
+    { name: '⚠ "never measured" and "only partly known" are told apart', run: () => {
+      // Different problems, different remedies: one sends him to pull a credit report, the other tells Jarvis
+      // it is only counting rental income. Labelling both "unmeasured" would send him looking up a number he
+      // already has.
+      const partial = { ...REALITY, monthly_net: { value: 2500, source: 'rent only', asOf: 'x', partial: true } };
+      const g = { id: 'g_x', t: 'x', requires: [{ cap: 'monthly_net', value: 9000 }, { cap: 'credit_score', value: 700 }], produces: [] };
+      const p = ladder([g], partial).pending[0];
+      return ok(p.needsMeasuring.join() === 'credit_score' && p.needsCompleting.join() === 'monthly_net',
+        JSON.stringify({ m: p.needsMeasuring, c: p.needsCompleting }));
+    } },
 
     { name: 'a cycle renders a flat ladder instead of hanging', run: () => {
       const a = { id: 'a', t: 'a', requires: [{ cap: 'monthly_net', value: 99999 }], produces: [{ cap: 'filed_years', value: 9 }] };
@@ -145,7 +215,7 @@ export default {
     } },
 
     { name: 'ladder() returns rungs, climbing edges and what is reachable now', run: () => {
-      const l = ladder(GOALS, REALITY);
+      const l = ladder(GOALS, MEASURED);
       return ok(l.rungs.length >= 3 && l.reachableNow.includes('g_sends')
         && l.edges.some((e) => e.kind === 'affords' && e.from === 'g_biz' && e.to === 'g_lambo'),
         JSON.stringify({ rungs: l.rungs.length, now: l.reachableNow }));
@@ -176,7 +246,7 @@ export default {
     } },
 
     { name: 'each gap names the goal that closes it', run: () => {
-      const step = reverse(BUSINESS, GOALS, REALITY).steps.find((s) => s.cap === 'filed_years');
+      const step = reverse(BUSINESS, GOALS, MEASURED).steps.find((s) => s.cap === 'filed_years');
       return ok(step.via.some((v) => v.id === 'g_taxes'), JSON.stringify(step));
     } },
 
@@ -216,9 +286,48 @@ export default {
         meets(partial, { cap: 'debt_load', value: 100 }) + '/' + meets(partial, { cap: 'debt_load', value: 1500 }));
     } },
 
+    // ── GROUNDING: the model proposes, code disposes ───────────────────────────────────────────────
+    { name: 'an invented capability is DROPPED, never coerced', run: () => {
+      // A made-up capability becomes a made-up prerequisite, and then the whole ladder is reverse-engineered
+      // out of fiction. Same rule as the RFP shredder's groundRows.
+      const g = groundProposal({ horizon: '3y', requires: [{ cap: 'vibes', value: 10 }, { cap: 'monthly_net', value: 8000 }] });
+      return ok(g.requires.length === 1 && g.requires[0].cap === 'monthly_net' && g.dropped.includes('cap:vibes'),
+        JSON.stringify(g));
+    } },
+
+    { name: 'a horizon outside the fixed set is dropped', run: () => {
+      const g = groundProposal({ horizon: 'someday', requires: [] });
+      return ok(g.horizon === '' && g.dropped.some((d) => d.startsWith('horizon:')), JSON.stringify(g));
+    } },
+
+    { name: 'zero and non-numbers are not requirements', run: () => {
+      const g = groundProposal({ requires: [{ cap: 'monthly_net', value: 0 }, { cap: 'liquid_capital', value: 'lots' }] });
+      return ok(g.requires.length === 0 && g.dropped.length === 2, JSON.stringify(g));
+    } },
+
+    { name: 'a yes/no capability refuses a number', run: () => {
+      const g = groundProposal({ produces: [{ cap: 'legal_clear', value: 1 }, { cap: 'operating_entity', value: true }] });
+      return ok(g.produces.length === 1 && g.produces[0].cap === 'operating_entity', JSON.stringify(g));
+    } },
+
+    { name: 'every horizon the UI offers is one the grounder accepts', run: () =>
+      ok(HORIZONS.every((h) => groundProposal({ horizon: h }).horizon === h), JSON.stringify(HORIZONS)) },
+
+    { name: 'a proposal rides along UNCONFIRMED until he taps', run: () => {
+      const store = { proposals: { g_biz: { horizon: '3y', requires: [{ cap: 'filed_years', value: 2 }], produces: [], status: 'proposed', at: 'x' } } };
+      const g = applyProposals([BUSINESS], store)[0];
+      return ok(g.horizonConfirmed === false && g.proposalStatus === 'proposed' && g.requires.length === 1);
+    } },
+
+    { name: 'confirming one marks it his, not the machine\'s', run: () => {
+      const store = { proposals: { g_biz: { horizon: '10y', requires: [], produces: [], status: 'confirmed', at: 'x' } } };
+      const g = applyProposals([BUSINESS], store)[0];
+      return ok(g.horizonConfirmed === true && g.horizon === '10y');
+    } },
+
     { name: 'empty / garbage input does not throw', run: () => {
       const l = ladder(); const r = reverse();
-      return ok(l.rungs.length === 0 && r.steps.length === 0 && unmet().length === 0
+      return ok(l.rungs.length === 0 && l.pending.length === 0 && r.steps.length === 0 && unmet().length === 0
         && !affords().afforded && affordedMap().size === 0 && layers().size === 0);
     } },
   ],

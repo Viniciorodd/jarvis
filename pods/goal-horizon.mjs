@@ -95,8 +95,15 @@ const prods = (goal = {}) => (Array.isArray(goal.produces) ? goal.produces : [])
 // PURE: what this goal still needs, given where he actually stands. Unknowns come back flagged rather than
 // silently dropped or silently counted.
 export function unmet(goal = {}, reality = {}) {
-  return reqs(goal).map((r) => ({ ...r, verdict: meets(reality, r), have: capOf(reality, r.cap) }))
-    .filter((r) => r.verdict !== 'yes');
+  return reqs(goal).map((r) => {
+    const have = capOf(reality, r.cap);
+    const verdict = meets(reality, r);
+    // WHY it is unknown matters to him, because the two have different remedies: one is "go pull your credit
+    // report", the other is "Jarvis can only see your rental income — tell it the rest". Reporting both as
+    // "unmeasured" would send him looking up a number he has already got.
+    const reason = verdict !== 'unknown' ? '' : (have.known && have.partial ? 'partial' : 'unmeasured');
+    return { ...r, verdict, reason, have };
+  }).filter((r) => r.verdict !== 'yes');
 }
 
 // PURE: does A's production cover requirement R?
@@ -170,7 +177,16 @@ export function blockers(goal = {}, goals = [], reality = {}) {
   return out;
 }
 
-// PURE: the rung each goal stands on. Cycle-safe — a loop in the data must render a flat ladder, never hang.
+// PURE: the rung each goal stands on, or NULL when no modelled path reaches it.
+//
+// ⚠ Null is the whole point of this function, and the first version got it wrong. It gave every goal a rung,
+// so anything whose requirements NOTHING in the set produces fell to rung 1 — and rung 1 reads as "you can
+// start this today". On his real data that put "A small ranch or farm" and "$10,000/month NET" on the bottom
+// rung as though they were within reach. That is not an unplaced node, it is a false promise.
+//
+// A goal is placed only when every capability it still lacks is produced by something. Otherwise the honest
+// answer is "no path modelled yet" — the same distinction as free-wins vs unmodelled in the registry engine.
+// Cycle-safe: a loop in the data must render a flat ladder, never hang.
 export function layers(goals = [], reality = {}) {
   const list = (Array.isArray(goals) ? goals : []).filter((g) => g && g.id);
   const byId = new Map(list.map((g) => [g.id, g]));
@@ -178,14 +194,29 @@ export function layers(goals = [], reality = {}) {
   const depth = (id, seen) => {
     if (memo.has(id)) return memo.get(id);
     if (seen.has(id)) return 1;                       // cycle — stop climbing rather than spin
-    seen.add(id);
     const g = byId.get(id);
-    const bs = g ? blockers(g, list, reality) : [];
-    const d = bs.length ? 1 + Math.max(...bs.map((b) => depth(b, seen))) : 1;
+    if (!g) return null;
+    const all = unmet(g, reality);
+    // An UNMEASURED requirement is not an obstacle — it might already be satisfied. It makes the goal
+    // unplaceable rather than unreachable, and those belong on different shelves. Only KNOWN misses need a
+    // producer; unknowns send the goal to `pending` (see ladder()) with the number to go look up.
+    if (all.some((r) => r.verdict === 'unknown')) { memo.set(id, null); return null; }
+    const need = all;
+    if (!need.length) { memo.set(id, 1); return 1; }  // reality already covers it — genuinely rung 1
+    seen.add(id);
+    // Every missing capability must have a producer, or there is no complete path to this goal.
+    let best = 1, complete = true;
+    for (const r of need) {
+      const producers = list.filter((x) => x.id !== id && prods(x).some((p) => covers(p, r)));
+      if (!producers.length) { complete = false; break; }
+      const rungs = producers.map((p) => depth(p.id, seen)).filter((d) => d !== null);
+      if (!rungs.length) { complete = false; break; }
+      best = Math.max(best, Math.min.apply(null, rungs));   // the SHORTEST way to get each capability
+    }
     seen.delete(id);
-    const capped = Math.min(d, 6);                    // six rungs is already more than anyone reads
-    memo.set(id, capped);
-    return capped;
+    const out = complete ? Math.min(best + 1, 6) : null;    // six rungs is more than anyone reads
+    memo.set(id, out);
+    return out;
   };
   const out = new Map();
   for (const g of list) out.set(g.id, depth(g.id, new Set()));
@@ -197,14 +228,31 @@ export function ladder(goals = [], reality = {}) {
   const list = (Array.isArray(goals) ? goals : []).filter((g) => g && g.id);
   const L = layers(list, reality);
   const brings = affordedMap(list, reality);
-  const rungs = [];
+  // Three shelves, not two, because there are three genuinely different answers:
+  //   on a rung  — every requirement is known, and met or producible
+  //   pending    — some requirement has never been measured; we cannot place it either way
+  //   noPath     — a known miss that nothing in the set produces
+  // Collapsing pending into either of the others is the false-promise bug all over again.
+  const rungs = [], noPath = [], pending = [];
   for (const g of list) {
-    const n = L.get(g.id) || 1;
-    (rungs[n] = rungs[n] || []).push({
+    const gaps = unmet(g, reality);
+    const node = {
       id: g.id, t: g.t, tier: g.tier, horizon: g.horizon || '', confirmed: !!g.horizonConfirmed,
-      unmet: unmet(g, reality).map((r) => ({ cap: r.cap, need: r.value, verdict: r.verdict })),
+      unmet: gaps.map((r) => ({ cap: r.cap, need: r.value, verdict: r.verdict, reason: r.reason })),
       brings: (brings.get(g.id) || []).map((b) => b.id),
-    });
+    };
+    const n = L.get(g.id);
+    if (n === null || n === undefined) {
+      const unknowns = gaps.filter((r) => r.verdict === 'unknown');
+      if (unknowns.length) {
+        pending.push({ ...node,
+          needsMeasuring: [...new Set(unknowns.filter((r) => r.reason === 'unmeasured').map((r) => r.cap))],
+          needsCompleting: [...new Set(unknowns.filter((r) => r.reason === 'partial').map((r) => r.cap))] });
+        continue;
+      }
+      noPath.push(node); continue;
+    }
+    (rungs[n] = rungs[n] || []).push(node);
   }
   const edges = [];
   for (const g of list) for (const b of blockers(g, list, reality)) edges.push({ from: b, to: g.id, kind: 'requires' });
@@ -212,8 +260,68 @@ export function ladder(goals = [], reality = {}) {
   return {
     rungs: rungs.map((goalsOnRung, i) => ({ rung: i, goals: goalsOnRung || [] })).filter((r) => r.goals.length),
     edges,
+    noPath,
+    pending,
     reachableNow: (rungs[1] || []).map((g) => g.id),
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// GROUNDING A PROPOSAL — the model may suggest, but only code decides what survives.
+//
+// His registry carries no horizons and no `produces` values, and neither can be inferred from ten years of
+// notes: they tell us when he WROTE a goal, never when he wants it or what it would pay him. So a free brain
+// proposes and he confirms — and between those two steps this function throws away anything it invented.
+//
+// Same discipline as the RFP shredder's `groundRows`: an unrecognised capability is DROPPED rather than
+// coerced, because a made-up capability would quietly become a made-up prerequisite, and the entire ladder
+// would then be reverse-engineered from fiction. Doctrine #1 — the LLM proposes, code disposes.
+export const HORIZONS = ['now', '1y', '3y', '10y', '20y'];
+
+export function groundProposal(raw = {}) {
+  const out = { horizon: '', requires: [], produces: [], dropped: [] };
+  const h = String(raw && raw.horizon || '').trim().toLowerCase();
+  if (HORIZONS.includes(h)) out.horizon = h; else if (h) out.dropped.push('horizon:' + h);
+
+  const clean = (list, into) => {
+    for (const item of (Array.isArray(list) ? list : [])) {
+      if (!item || !isCap(item.cap)) { out.dropped.push('cap:' + (item && item.cap)); continue; }
+      const boolCap = CAPS[item.cap].unit === 'yes/no';
+      let v = item.value;
+      if (boolCap) {
+        if (typeof v !== 'boolean') { out.dropped.push(item.cap + ':not-bool'); continue; }
+      } else {
+        v = Number(v);
+        // Zero is not a requirement and not a production — it is a model with nothing to say.
+        if (!Number.isFinite(v) || v <= 0) { out.dropped.push(item.cap + ':' + item.value); continue; }
+      }
+      if (into.some((x) => x.cap === item.cap)) { out.dropped.push(item.cap + ':dup'); continue; }
+      into.push({ cap: item.cap, value: v });
+    }
+  };
+  clean(raw && raw.requires, out.requires);
+  clean(raw && raw.produces, out.produces);
+  return out;
+}
+
+// PURE: fold confirmed proposals onto the goals. Unconfirmed ones ride along flagged, so a surface can show
+// them greyed — visible enough to accept or reject, never counted as fact.
+export function applyProposals(goals = [], store = {}) {
+  const p = (store && store.proposals) || {};
+  return (Array.isArray(goals) ? goals : []).map((g) => {
+    const prop = g && p[g.id];
+    if (!prop) return g;
+    const confirmed = prop.status === 'confirmed';
+    return {
+      ...g,
+      horizon: prop.horizon || g.horizon || '',
+      requires: prop.requires || [],
+      produces: prop.produces || [],
+      horizonConfirmed: confirmed,
+      proposedAt: prop.at || '',
+      proposalStatus: prop.status || 'proposed',
+    };
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────

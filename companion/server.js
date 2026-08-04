@@ -198,6 +198,14 @@ function writeGoalState(st) {
   try { fs.mkdirSync(path.dirname(goalStatePath()), { recursive: true }); } catch { /* exists */ }
   fs.writeFileSync(goalStatePath(), JSON.stringify(st, null, 2));
 }
+// Machine-proposed horizons + produces, kept apart from his decisions AND from his goals.json. Separate file
+// on purpose: these are estimates awaiting his yes, and they must never be mistaken for something he said.
+const goalPropPath = () => path.join(__dirname, 'data', 'goal-proposals.json');
+function readGoalProposals() { try { return JSON.parse(fs.readFileSync(goalPropPath(), 'utf8')) || {}; } catch { return {}; } }
+function writeGoalProposals(st) {
+  try { fs.mkdirSync(path.dirname(goalPropPath()), { recursive: true }); } catch { /* exists */ }
+  fs.writeFileSync(goalPropPath(), JSON.stringify(st, null, 2));
+}
 
 // ── HIS CURRENT REALITY — layer 0 of the ladder ────────────────────────────────────────────────────
 // Operator, 2026-08-04: *"we have to look at my current reality, and generate tasks and to dos based on my
@@ -3706,6 +3714,110 @@ const server = http.createServer(async (req, res) => {
       const unknown = Object.keys(H.CAPS).filter((c) => !known.includes(c))
         .map((c) => ({ cap: c, label: H.CAPS[c].label, unit: H.CAPS[c].unit }));
       return send(res, 200, JSON.stringify({ ok: true, asOf: todayISO(), reality, caps: H.CAPS, unknown }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  // PROPOSE HORIZONS + PRODUCES — the two things ten years of notes cannot tell us.
+  //
+  // His registry says when he WROTE each goal, never when he wants it, and never what achieving it would pay
+  // him. Both are needed for the ladder and neither is mine to invent. So a free brain proposes, code grounds
+  // (groundProposal drops any capability outside the closed ledger), and every row renders UNCONFIRMED until
+  // he taps it.
+  //
+  // LIVE GOALS ONLY — true + operating. The 60 dream-tier goals are surfaced once a year and never planned,
+  // so proposing chains for them would burn tokens building a ladder to a castle he has already outgrown.
+  if (req.method === 'POST' && url.pathname === '/api/goals/propose') {
+    try {
+      const H = await import('../pods/goal-horizon.mjs');
+      const data = readGoalRegistry();
+      if (!data) return send(res, 200, JSON.stringify({ ok: false, error: 'no goal registry found' }));
+      const store = readGoalProposals();
+      store.proposals = store.proposals || {};
+      const b = await readBody(req);
+      const redo = !!b.redo;
+      const live = (data.goals || []).filter((g) => g && (g.tier === 'true' || g.tier === 'operating'))
+        .filter((g) => redo || !store.proposals[g.id]);
+      if (!live.length) return send(res, 200, JSON.stringify({ ok: true, proposed: 0, note: 'every live goal already has a proposal' }));
+
+      const capList = Object.entries(H.CAPS).map(([id, c]) => `${id} (${c.unit}) — ${c.label}`).join('\n');
+      const sys = 'You estimate what a personal goal REQUIRES and what it PRODUCES, using ONLY this fixed list of capabilities:\n'
+        + capList + '\n\n'
+        + 'For each goal return: {"id":"...","horizon":"now|1y|3y|10y|20y","requires":[{"cap":"...","value":N}],"produces":[{"cap":"...","value":N}]}\n'
+        + 'requires = what must be true BEFORE it happens. produces = durable capability it yields AFTER, and most goals produce NOTHING — only include produces when achieving the goal genuinely hands over ongoing capability (a business produces cash flow; a vacation does not).\n'
+        + 'Values are plain numbers in the stated unit. legal_clear and operating_entity take true/false.\n'
+        + 'horizon is how long it plausibly takes from a standing start, not a deadline.\n'
+        + 'Use ONLY capability ids from the list. Omit anything you are unsure of — an omission is cheap, a wrong number is not.\n'
+        + 'Reply with ONLY a JSON array. No prose.';
+
+      const R = await import('../pods/gateway/router.mjs');
+      let proposed = 0, dropped = 0;
+      // Batched: one call per goal would be ~31 round trips for data he then has to review anyway.
+      for (let i = 0; i < live.length; i += 8) {
+        const batch = live.slice(i, i + 8);
+        const ask = batch.map((g) => `${g.id}: ${g.t}${g.target ? ' (target: ' + g.target + ')' : ''}`).join('\n');
+        try {
+          const r = await R.complete({ messages: [{ role: 'system', content: sys }, { role: 'user', content: ask }], maxTokens: 1400, env: envAll() });
+          const m = r.ok && r.message && String(r.message.content || '').match(/\[[\s\S]*\]/);
+          if (!m) continue;
+          for (const row of JSON.parse(m[0])) {
+            const g = batch.find((x) => x.id === (row && row.id));
+            if (!g) continue;                                  // an id it invented is not a goal
+            const clean = H.groundProposal(row);
+            dropped += clean.dropped.length;
+            if (!clean.horizon && !clean.requires.length && !clean.produces.length) continue;
+            store.proposals[g.id] = { horizon: clean.horizon, requires: clean.requires, produces: clean.produces,
+              status: 'proposed', at: new Date().toISOString() };
+            proposed += 1;
+          }
+        } catch { /* a batch we couldn't read proposes nothing rather than something invented */ }
+      }
+      writeGoalProposals(store);
+      return send(res, 200, JSON.stringify({ ok: true, proposed, dropped, considered: live.length }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  // CONFIRM / REJECT one proposal. Until he does, nothing here is treated as fact.
+  if (req.method === 'POST' && url.pathname === '/api/goals/confirm') {
+    try {
+      const b = await readBody(req);
+      const id = String(b.id || '').trim();
+      const verdict = String(b.verdict || '').trim();
+      if (!id || !['confirm', 'reject'].includes(verdict)) {
+        return send(res, 200, JSON.stringify({ ok: false, error: 'need id + verdict (confirm|reject)' }));
+      }
+      const store = readGoalProposals();
+      store.proposals = store.proposals || {};
+      if (!store.proposals[id]) return send(res, 200, JSON.stringify({ ok: false, error: 'no proposal for that goal' }));
+      if (verdict === 'reject') delete store.proposals[id];
+      else {
+        store.proposals[id].status = 'confirmed';
+        // Let him correct the numbers as he confirms — his figure always wins over the estimate.
+        if (b.horizon) { const g = (await import('../pods/goal-horizon.mjs')).groundProposal({ horizon: b.horizon }); if (g.horizon) store.proposals[id].horizon = g.horizon; }
+        store.proposals[id].confirmedAt = new Date().toISOString();
+      }
+      writeGoalProposals(store);
+      return send(res, 200, JSON.stringify({ ok: true, id, verdict }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  // THE LADDER — bottom-up, standing on his live position.
+  if (req.method === 'GET' && url.pathname === '/api/goals/ladder') {
+    try {
+      const H = await import('../pods/goal-horizon.mjs');
+      const Rg = await import('../pods/goal-registry.mjs');
+      const data = readGoalRegistry();
+      if (!data) return send(res, 200, JSON.stringify({ ok: false, error: 'no goal registry found' }));
+      const reality = await readReality();
+      let goals = Rg.applyDecisions(data.goals || [], readGoalState());
+      goals = H.applyProposals(goals, readGoalProposals())
+        .filter((g) => !g.retired && g.status !== 'achieved')
+        // Only goals we can actually place — one with no modelled requirements would float on rung 1 and
+        // claim to be within reach, which is the "missing data asserted as fact" failure all over again.
+        .filter((g) => (g.requires || []).length || (g.produces || []).length);
+      const l = H.ladder(goals, reality);
+      const unknown = Object.keys(H.CAPS).filter((c) => !reality[c]);
+      return send(res, 200, JSON.stringify({ ok: true, ...l, reality, caps: H.CAPS, unknown,
+        placed: goals.length, total: (data.goals || []).length }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
 

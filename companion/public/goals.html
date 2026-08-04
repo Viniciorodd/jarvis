@@ -22,65 +22,81 @@
   goal, never that he is late. There is no gap number, no "days behind", no progress bar against a target.
   The heavy-day switch takes even the leverage table away and leaves one thing that costs nothing.
 -->
+<script>try{var _t=localStorage.getItem('jarvis-theme');document.documentElement.dataset.theme=(!_t||_t==='exec')?'black':_t;}catch(e){document.documentElement.dataset.theme='black';}</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 <style>
-  :root { --teal-rgb: 90,190,180; --teal: #5abeb4; --cream: #e8e6e1; --dim: #7d8b96; --line: rgba(90,190,180,.16); }
+  /* ── ON THE DESIGN SYSTEM ────────────────────────────────────────────────────────────────────────
+     This page first shipped with four invented hexes and no style.css, which meant it ignored
+     data-theme entirely — a black page inside the app in True White. The design system's own rule:
+     "tint with rgba(var(--teal-rgb),α) — never invent a hex", and "Jet Black is canonical".
+
+     So every colour below comes from the theme contract in style.css. The radii and the type sizes are
+     the system's own values: 15px on the one thing, 14px on cards, 10px on buttons, full on anything
+     selectable; 14px body, 13.5 dense rows, 12 meta, and caps labels at 10/.12em. Counts use tabular
+     numerals, which the system marks "no exceptions" — a leverage table whose digits shift width as it
+     re-ranks is exactly the kind of small wrongness he notices and stops trusting. */
   * { box-sizing: border-box; }
-  body { margin: 0; background: #04070f; color: var(--cream); font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
+  body { margin: 0; background: var(--ink); color: var(--cream); font-family: var(--font, 'Inter', system-ui, sans-serif);
+    font-size: 14px; letter-spacing: -.011em; -webkit-font-smoothing: antialiased; }
   .wrap { max-width: 1280px; margin: 0 auto; padding: 22px 20px 60px; }
-  a.back { display: inline-block; margin-bottom: 12px; font-size: 12.5px; color: var(--teal); text-decoration: none; opacity: .85; }
-  h1 { font-size: 21px; margin: 0 0 4px; }
+  a.back { display: inline-block; margin-bottom: 12px; font-size: 13px; color: var(--teal); text-decoration: none; }
+  h1 { font-size: clamp(24px, 3vw, 32px); font-weight: 600; letter-spacing: -.02em; margin: 0 0 4px; }
   .sub { color: var(--dim); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
 
-  /* THE ONE THING — the router's answer, above everything else. */
+  /* THE ONE THING — the router's answer, above everything else. 15px radius is its own token. */
   .one { border: 1px solid rgba(var(--teal-rgb),.3); background: linear-gradient(180deg, rgba(var(--teal-rgb),.10), rgba(var(--teal-rgb),.03));
-    border-radius: 14px; padding: 15px 18px; margin-bottom: 16px; }
-  .one .lab { font-size: 10.5px; letter-spacing: .18em; color: var(--teal); margin-bottom: 6px; }
-  .one .t { font-size: 17px; line-height: 1.35; }
-  .one .why { font-size: 12.5px; color: var(--dim); margin-top: 7px; line-height: 1.5; }
+    border-radius: 15px; padding: 15px 18px; margin-bottom: 16px; }
+  .one .lab { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--teal); margin-bottom: 6px; }
+  .one .t { font-size: 18px; font-weight: 500; line-height: 1.35; }
+  .one .why { font-size: 12px; color: var(--dim); margin-top: 7px; line-height: 1.5; }
 
   .bar { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; align-items: center; }
+  /* chips + tabs are "anything selectable" → full radius */
   button { background: rgba(var(--teal-rgb),.1); border: 1px solid rgba(var(--teal-rgb),.28); color: var(--cream);
-    border-radius: 9px; padding: 7px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+    border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s; }
   button:hover:not(:disabled) { background: rgba(var(--teal-rgb),.2); }
   button:disabled { opacity: .4; cursor: default; }
-  button.on { background: rgba(var(--teal-rgb),.28); border-color: rgba(var(--teal-rgb),.5); }
-  .status { font-size: 12px; color: var(--dim); margin-left: auto; }
+  button.on { background: var(--teal); color: var(--ink-on-accent); border-color: var(--teal); font-weight: 600; }
+  button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .status { font-size: 12px; color: var(--dim); margin-left: auto; font-variant-numeric: tabular-nums; }
 
   .grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; }
   @media (max-width: 950px) { .grid { grid-template-columns: 1fr; } }
-  #cv { width: 100%; height: 580px; display: block; border-radius: 14px; border: 1px solid rgba(var(--teal-rgb),.2);
-    background: radial-gradient(circle at 50% 40%, #071120, #04070f 70%); cursor: grab; touch-action: none; }
+  #cv { width: 100%; height: 580px; display: block; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--panel); cursor: grab; touch-action: none; }
   #cv:active { cursor: grabbing; }
 
-  .side { border: 1px solid var(--line); background: rgba(var(--teal-rgb),.03); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
-  .side h2 { font-size: 10.5px; letter-spacing: .16em; color: var(--dim); margin: 0 0 10px; font-weight: 500; }
-  .row { padding: 8px 0; border-bottom: 1px solid rgba(var(--teal-rgb),.09); cursor: pointer; }
+  .side { border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+  .side h2 { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--dim); margin: 0 0 10px; }
+  .row { padding: 8px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
   .row:last-child { border-bottom: 0; }
   .row:hover .rt { color: var(--teal); }
-  .rt { font-size: 13px; line-height: 1.35; }
-  .rn { color: var(--teal); font-size: 12px; font-variant-numeric: tabular-nums; float: right; margin-left: 8px; }
-  .rs { font-size: 11.5px; color: var(--dim); margin-top: 3px; line-height: 1.45; }
-  .muted { color: var(--dim); font-size: 12.5px; line-height: 1.55; }
+  .rt { font-size: 13.5px; line-height: 1.35; }
+  .rn { color: var(--teal); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; float: right; margin-left: 8px; }
+  .rs { font-size: 12px; color: var(--dim); margin-top: 3px; line-height: 1.45; }
+  .muted { color: var(--dim); font-size: 13px; line-height: 1.55; }
 
   /* the detail panel */
-  .d-tier { display: inline-block; font-size: 10.5px; letter-spacing: .1em; padding: 2px 8px; border-radius: 20px; margin-right: 6px; }
-  .t-true { background: rgba(20,184,166,.18); color: #5eead4; }
-  .t-operating { background: rgba(59,130,246,.18); color: #93c5fd; }
-  .t-dream { background: rgba(148,163,184,.14); color: #cbd5e1; }
+  .d-tier { display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: .12em; padding: 3px 9px;
+    border-radius: 999px; margin-right: 6px; background: rgba(var(--teal-rgb),.16); color: var(--teal); }
+  /* Dormant reads quieter than live — the tier IS the message, so it carries no accent. */
+  .t-dream { background: rgba(var(--teal-rgb),.07); color: var(--dim); }
   .unconf { border-bottom: 1px dotted var(--dim); cursor: help; font-size: 11px; color: var(--dim); }
-  .quote { border-left: 2px solid rgba(var(--teal-rgb),.4); padding: 4px 0 4px 11px; margin: 10px 0; font-size: 13px;
-    line-height: 1.55; color: #cfd8de; font-style: italic; }
+  .quote { border-left: 2px solid rgba(var(--teal-rgb),.4); padding: 4px 0 4px 11px; margin: 10px 0; font-size: 13.5px;
+    line-height: 1.55; color: var(--cream); opacity: .88; font-style: italic; }
   .chain { margin-top: 10px; }
-  .step { display: flex; gap: 9px; align-items: flex-start; padding: 5px 0; font-size: 12.5px; line-height: 1.4; }
-  .step .dot { color: var(--dim); flex: 0 0 auto; width: 46px; font-size: 10.5px; letter-spacing: .05em; }
+  .step { display: flex; gap: 9px; align-items: flex-start; padding: 5px 0; font-size: 13px; line-height: 1.4; }
+  .step .dot { color: var(--dim); flex: 0 0 auto; width: 46px; font-size: 10px; font-weight: 600; letter-spacing: .12em; }
   .step.go .dot { color: var(--teal); }
   .step.go { color: var(--cream); }
   .step:not(.go) { color: var(--dim); }
   .decide { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
-  .decide button { font-size: 11.5px; padding: 6px 10px; }
+  .decide button { font-size: 12px; padding: 6px 12px; }
   .src { font-size: 11px; color: var(--dim); margin-top: 8px; }
   #pic img { width: 100%; border-radius: 10px; display: block; margin-top: 11px; }
-  .note { font-size: 11.5px; color: var(--dim); margin-top: 10px; line-height: 1.5; }
+  .note { font-size: 12px; color: var(--dim); margin-top: 10px; line-height: 1.5; }
 </style>
 
 <div class="wrap">
@@ -131,6 +147,18 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function short(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+
+  /* Canvas can't read CSS variables, so it samples them. Without this the graph would be the one part of
+     the page still painted in fixed hexes — teal strokes on a white page in True White. Re-sampled on every
+     draw so a theme change repaints correctly rather than needing a reload. */
+  var CSS = getComputedStyle(document.documentElement);
+  function tok(name, fallback) { return (CSS.getPropertyValue(name) || '').trim() || fallback; }
+  function wash(a) { return 'rgba(' + tok('--teal-rgb', '67,230,212') + ',' + a + ')'; }
+  function theme() {
+    CSS = getComputedStyle(document.documentElement);
+    return { teal: tok('--teal', '#43e6d4'), cream: tok('--cream', '#f3f4f6'), dim: tok('--dim', '#8b909a'),
+      line: tok('--line', 'rgba(255,255,255,.09)') };
+  }
 
   /* ── load ───────────────────────────────────────────────────────────────────────────────────── */
   function load() {
@@ -228,7 +256,7 @@
          feeling the Hard Day Protocol exists to keep off the screen. What survives is what he could
          start, because that is help rather than an accounting. */
       var steps = heavy ? c.chain.filter(function (s) { return s.startable; }) : c.chain;
-      el.innerHTML = '<h2 style="margin:15px 0 2px;font-size:10.5px;letter-spacing:.16em;color:#7d8b96;font-weight:500">' +
+      el.innerHTML = '<h2 style="margin:15px 0 2px">' +
         (heavy ? 'WHERE IT STARTS' : 'WHAT IT TAKES') + '</h2>' +
         steps.map(function (s) {
           return '<div class="step ' + (s.startable ? 'go' : '') + '"><span class="dot">' +
@@ -309,12 +337,14 @@
     acts.forEach(function (a) {
       if (!need[a.id]) { return; }
       var L = lev[a.id] || { live: 0, unlocks: 0 };
+      /* No colour is chosen here — draw() reads the theme. Only the FACT of being blocked is recorded. */
       nodes.push({ id: a.id, kind: 'action', label: a.title, r: 7 + Math.min(16, L.live * 1.6),
-        color: a.status === 'blocked' ? '#64748b' : '#5abeb4', dashed: false, faded: a.status === 'blocked' });
+        dashed: false, blocked: a.status === 'blocked', faded: a.status === 'blocked' });
     });
     goals.forEach(function (g) {
       nodes.push({ id: g.id, kind: 'goal', label: g.t, r: 4 + Math.min(9, (g.n || 1) * 1.1),
-        color: cats[g.cat] || '#94a3b8',
+        /* his own category colours from goals.json; an uncategorised goal falls back to the theme's --dim */
+        color: cats[g.cat] || theme().dim,
         /* dream tier renders dashed: present and visible, explicitly not planned */
         dashed: g.tier === 'dream', faded: !!g.blocked || !!g.retired });
       (g.req || []).forEach(function (r) { if (need[r]) { edges.push([g.id, r]); } });
@@ -379,34 +409,39 @@
   var P = function (n) { return { x: n.x * view.s + view.x, y: n.y * view.s + view.y }; };
 
   function draw() {
-    var r = cv.getBoundingClientRect();
+    var r = cv.getBoundingClientRect(), T = theme();
     ctx.clearRect(0, 0, r.width, r.height);
     edges.forEach(function (e) {
       var a = P(nodes[e[0]]), b = P(nodes[e[1]]);
-      ctx.strokeStyle = 'rgba(90,190,180,.16)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = wash(.22); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     });
     nodes.forEach(function (n) {
       var p = P(n), rr = Math.max(3, n.r * view.s);
+      /* An action is the theme's own accent; a blocked one drops to --dim. Goal nodes keep the category
+         colours out of his goals.json — those are HIS data, not a hex this page invented. */
+      var fill = n.kind === 'action' ? (n.blocked ? T.dim : T.teal) : n.color;
       ctx.globalAlpha = n.faded ? 0.42 : 1;
       ctx.beginPath(); ctx.arc(p.x, p.y, rr, 0, 6.284);
       if (n.kind === 'action') {
-        ctx.fillStyle = n.color; ctx.fill();
-        ctx.strokeStyle = 'rgba(232,230,225,.5)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = fill; ctx.fill();
+        ctx.strokeStyle = T.cream; ctx.globalAlpha = (n.faded ? 0.42 : 1) * 0.5; ctx.lineWidth = 1; ctx.stroke();
+        ctx.globalAlpha = n.faded ? 0.42 : 1;
       } else if (n.dashed) {
         /* dormant: outline only, so it is present without competing for his attention */
-        ctx.setLineDash([3, 3]); ctx.strokeStyle = n.color; ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]);
+        ctx.setLineDash([3, 3]); ctx.strokeStyle = fill; ctx.lineWidth = 1.2; ctx.stroke(); ctx.setLineDash([]);
       } else {
-        ctx.fillStyle = n.color; ctx.fill();
+        ctx.fillStyle = fill; ctx.fill();
       }
-      if (n.id === sel) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); }
+      if (n.id === sel) { ctx.strokeStyle = T.cream; ctx.lineWidth = 2; ctx.stroke(); }
       ctx.globalAlpha = 1;
       /* Label the hubs only. 114 labels at once is a hairball, not a picture. */
       if (n.kind === 'action' && rr > 9) {
-        ctx.fillStyle = 'rgba(232,230,225,.92)';
-        ctx.font = '11px -apple-system, Segoe UI, sans-serif';
+        ctx.fillStyle = T.cream; ctx.globalAlpha = .92;
+        ctx.font = '500 11px Inter, -apple-system, Segoe UI, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(short(n.label, 26), p.x, p.y - rr - 5);
+        ctx.globalAlpha = 1;
       }
     });
   }

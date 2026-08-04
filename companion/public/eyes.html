@@ -14,41 +14,54 @@
   which the server also refuses if it smells like a standing watch. Gesture detection runs entirely in this
   page from frame differences — no model, no library, no network. Nothing is recorded, nothing is stored.
 -->
+<script>try{var _t=localStorage.getItem('jarvis-theme');document.documentElement.dataset.theme=(!_t||_t==='exec')?'black':_t;}catch(e){document.documentElement.dataset.theme='black';}</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 <style>
-  :root { --teal-rgb: 90,190,180; --teal: #5abeb4; --cream: #e8e6e1; --dim: #7d8b96; }
-  body { margin: 0; background: #04070f; color: var(--cream); font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
+  /* Colours come from the theme contract in style.css — the design system's rule is "tint with
+     rgba(var(--teal-rgb),α), never invent a hex". This page used to hardcode its own palette and skip
+     style.css, so it stayed dark while the rest of the app went True White. */
+  body { margin: 0; background: var(--ink); color: var(--cream); font-family: var(--font, 'Inter', system-ui, sans-serif);
+    font-size: 14px; letter-spacing: -.011em; -webkit-font-smoothing: antialiased; }
   .wrap { max-width: 880px; margin: 0 auto; padding: 24px 20px 60px; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .sub { color: var(--dim); font-size: 13px; margin-bottom: 18px; }
+  h1 { font-size: clamp(24px, 3vw, 32px); font-weight: 600; letter-spacing: -.02em; margin: 0 0 4px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 18px; line-height: 1.5; }
+  /* The video stage stays black in EVERY theme — it is a camera feed, not a surface. */
   .stage { position: relative; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 16/9;
-    border: 1px solid rgba(var(--teal-rgb),.2); }
+    border: 1px solid var(--line); }
   video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
-  /* The indicator is deliberately large and red. A subtle dot is how a camera becomes something you forget. */
+  /* The indicator is deliberately large and red, and stays red in both themes: it is a privacy signal, not
+     decoration. A subtle dot is how a camera becomes something you forget is on. */
   .live { position: absolute; top: 12px; left: 12px; display: none; align-items: center; gap: 8px;
-    background: rgba(226,60,45,.92); color: #fff; padding: 7px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
+    background: rgba(226,60,45,.92); color: #fff; padding: 7px 13px; border-radius: 999px; font-size: 12px;
+    font-weight: 600; letter-spacing: .04em; }
   .live.on { display: flex; }
   .live i { width: 9px; height: 9px; border-radius: 50%; background: #fff; animation: blink .8s infinite; }
   @keyframes blink { 50% { opacity: .2; } }
+  /* Fixed grey, not var(--dim): this text sits INSIDE the black stage above, so it has to stay legible on
+     black in every theme. In True White var(--dim) is near-black and this would vanish. */
   .off-note { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    color: var(--dim); font-size: 13.5px; text-align: center; padding: 20px; }
+    color: #8b909a; font-size: 13.5px; text-align: center; padding: 20px; }
   .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   button { background: rgba(var(--teal-rgb),.1); border: 1px solid rgba(var(--teal-rgb),.28); color: var(--cream);
-    border-radius: 9px; padding: 9px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+    border-radius: 999px; padding: 9px 15px; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: background .15s, border-color .15s; }
   button:hover:not(:disabled) { background: rgba(var(--teal-rgb),.2); }
   button:disabled { opacity: .45; cursor: default; }
-  button.danger { border-color: rgba(226,133,122,.4); color: #e2857a; }
+  button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  button.danger { border-color: rgba(var(--teal-rgb),.18); color: var(--err); }
   .out { margin-top: 16px; padding: 14px 16px; border-radius: 12px; font-size: 14px; line-height: 1.6; min-height: 22px;
-    border: 1px solid rgba(var(--teal-rgb),.16); background: rgba(var(--teal-rgb),.04); }
-  .out.err { border-color: rgba(226,133,122,.35); color: #e2857a; }
+    border: 1px solid var(--line); background: var(--panel); }
+  .out.err { border-color: rgba(var(--teal-rgb),.18); color: var(--err); }
   .ges { margin-top: 12px; font-size: 12px; color: var(--dim); }
   .ges b { color: var(--teal); }
   .note { margin-top: 22px; font-size: 12px; color: var(--dim); line-height: 1.65;
-    border: 1px solid rgba(var(--teal-rgb),.14); background: rgba(var(--teal-rgb),.03); border-radius: 11px; padding: 13px 15px; }
+    border: 1px solid var(--line); background: var(--panel); border-radius: 11px; padding: 13px 15px; }
 </style>
 
 <div class="wrap">
-  <a href="/" style="display:inline-block; margin-bottom:14px; font-size:12.5px; color:var(--teal);
-     text-decoration:none; opacity:.85;" title="Back to the JARVIS cockpit">← Jarvis</a>
+  <a href="/" style="display:inline-block; margin-bottom:14px; font-size:13px; color:var(--teal);
+     text-decoration:none;" title="Back to the JARVIS cockpit">← Jarvis</a>
   <h1>Eyes</h1>
   <div class="sub">Jarvis looks only when you ask. Nothing is recorded, nothing is stored, nothing leaves this machine until you press a button.</div>
 

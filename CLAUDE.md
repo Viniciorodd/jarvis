@@ -70,7 +70,12 @@ iPhone/iPad — nothing is exposed to the public internet.
     Analysis+artifact only (never sends). Spec: `docs/superpowers/specs/2026-07-24-gov-rfp-shredder-phase1-design.md`.
   - Front-end: `companion/public/index.html` (Home + Today tab + Gov overlay), `today.js`/`today.css`
     (Home glance + Today + gov-board styles), `govboard.js`. Theme follows `data-theme` via shared CSS vars.
-- **Goals (the filter and the router)**: source of truth is his hand-built vault registry
+- **Goals** — 🔴 the shipped engine is a FILTER only; he rejected it as *"just another to-do list"*. The
+  intended model is the **Horizon Engine**: 10-20yr goals reverse-engineered from LIVE reality, connected by
+  **capabilities** (a goal *produces* cash flow/credit/collateral; another *requires* it — so the Lambo is a
+  byproduct of the business, not its sibling). Read
+  `docs/superpowers/specs/2026-08-04-goal-horizon-engine-design.md` BEFORE changing anything under goals.
+- **Goals (the filter and the router, as built)**: source of truth is his hand-built vault registry
   `<VAULT>/05 - Knowledge/Goals/goals.json` (91 goals, 23 actions, tiers, verbatim quotes, real DAG edges).
   Engine `pods/goal-registry.mjs` (pure, eval-pinned) → `/api/goals` (+`?hardDay=1`), `/api/goals/decide`,
   `/api/goals/chain`, `/api/goals/candidates`. Decisions in `companion/data/goal-decisions.json` — **never

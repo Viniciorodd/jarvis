@@ -2,6 +2,41 @@
 
 _Updated 2026-08-04. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
+### 🔴 2026-08-04 (READ FIRST) — He rejected the goal engine: "just another to-do list, another tracker"
+
+He is right, and the correction is a MODEL change, not a UI change.
+**Spec: `docs/superpowers/specs/2026-08-04-goal-horizon-engine-design.md`. Read it before touching goals.**
+
+His words: *"the whole point of the system is for me to have long term vision and long term goals that will
+take 10 20 years and then see the reverse engineering to get there, what neeeeeds to happen before i get
+there… if i want a new lambo, and i also want to buy a business doing $1m usd per year, maybe those two goals
+can be related because if i buy the business, i could probably lease the lambo too.. so which other goals can
+be accomplished along side other. I like graph views connecting from the bottom up, and then we have to look
+at my current reality, and generate tasks and to dos based on my reality."*
+
+**THE REFRAME — goals connect through CAPABILITIES, not shared tasks.** A goal *produces* capability (cash
+flow, credit, collateral, filed years); another *requires* it. `affords(A,B)` — derived, never stored — is when
+A's production covers B's unmet requirements. The Lambo is a **byproduct** of the business, not its sibling.
+The shipped engine ranks actions by shared prerequisites, which answers "what do these have in common?" — a
+different question from the one he asked, and it can never produce the Lambo insight.
+
+**Three specific failures of what shipped (2026-08-03):** no time axis at all (a 20-year goal and a this-week
+task are the same kind of node) · the wrong relation between goals · nothing anchored to his real numbers, so
+the chain never changes as his situation changes.
+
+**Layer 0 must be LIVE** — the bottom of the graph is his actual position pulled from the money/tax/debt/
+credit/focus pods, not a form. That is also the commercial moat: he intends to sell this
+(*"i want to make this into a software later on to sell it"*), and a capability engine wired to real financial
+position is not a vision-board app. **Track 2 stays PARKED behind REDOS earning** per his own boundary.
+
+**Needs HIM before the engine is anything but guesswork:** target horizons (91 goals have none — we know when
+he WROTE each, never when he wants it), the `produces` values (what a $1M/yr business actually yields is a
+financial estimate, not mine to invent), and credit score + liquid capital, which are not wired into Jarvis yet.
+
+**Keep from the 2026-08-03 build:** the crisis suppression gate, the six boundaries in code, the tier filter,
+the compassion clause / Hard Day Protocol, and the free-wins surface. The filter was right; it just is not the
+whole product.
+
 ### 🆕 2026-08-04 — The Jarvis Design System, checked and applied
 
 He shared the published **Jarvis Design System** (claude.ai/design, "Jarvis Design System") and the v1

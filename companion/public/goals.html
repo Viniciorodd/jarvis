@@ -140,6 +140,50 @@
   .fill.dormant { background: rgba(var(--teal-rgb),.26); }
   .b-s { font-size: 11.5px; color: var(--dim); margin-top: 5px; line-height: 1.45; }
   .stage > [hidden] { display: none; }
+
+  /* ── THE CLIMB — bottom-up, because that is how he asked to see it ─────────────────────────────── */
+  .climb { position: relative; }
+  .wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .rung { position: relative; z-index: 1; padding: 0 0 20px; }
+  .rung-l { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--dim); margin-bottom: 8px;
+    display: flex; align-items: center; gap: 10px; }
+  .rung-l::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .rung-cards { display: flex; flex-wrap: wrap; gap: 9px; }
+  .gc { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 10px 13px;
+    max-width: 260px; cursor: pointer; transition: border-color .15s, transform .15s; }
+  .gc:hover { border-color: rgba(var(--teal-rgb),.5); }
+  .gc.sel { border-color: var(--teal); }
+  .gc.lit { border-color: rgba(var(--teal-rgb),.55); }
+  .gc.dim { opacity: .35; }
+  .gc-t { font-size: 13px; line-height: 1.35; }
+  .gc-m { font-size: 11px; color: var(--dim); margin-top: 5px; display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+  .gc-h { font-size: 9.5px; font-weight: 600; letter-spacing: .1em; padding: 2px 7px; border-radius: 999px;
+    background: rgba(var(--teal-rgb),.14); color: var(--teal); }
+  .gc-b { color: var(--teal); }
+  /* THE GROUND — his live position, and the thing every rung above is measured from. */
+  .ground { border: 1px solid rgba(var(--teal-rgb),.32); background: linear-gradient(180deg, rgba(var(--teal-rgb),.03), rgba(var(--teal-rgb),.10));
+    border-radius: 14px; padding: 13px 16px; margin-top: 4px; }
+  .ground h3 { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--teal); margin: 0 0 9px; }
+  .caps { display: flex; flex-wrap: wrap; gap: 7px 18px; }
+  .cap { font-size: 12px; }
+  .cap b { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .cap i { color: var(--dim); font-style: normal; font-size: 10.5px; display: block; }
+  .cap.miss b { color: var(--dim); font-weight: 400; }
+  .shelf { border: 1px dashed var(--line); border-radius: 12px; padding: 12px 15px; margin-top: 12px; }
+  .shelf h3 { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--dim); margin: 0 0 8px; }
+  .shelf .gc { max-width: none; border-style: dashed; }
+
+  /* ── THE ASK — one number can move a dozen goals, so it leads ──────────────────────────────────── */
+  .ask { border: 1px solid rgba(var(--teal-rgb),.32); background: rgba(var(--teal-rgb),.05);
+    border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; }
+  .ask h3 { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--teal); margin: 0 0 4px; }
+  .ask p { font-size: 12.5px; color: var(--dim); margin: 0 0 11px; line-height: 1.5; }
+  .ask-row { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin-bottom: 7px; }
+  .ask-row label { font-size: 13px; flex: 1 1 210px; }
+  .ask-row label b { color: var(--teal); font-variant-numeric: tabular-nums; }
+  .ask-row input { width: 130px; background: var(--panel); border: 1px solid var(--line); color: var(--cream);
+    border-radius: 10px; padding: 7px 12px; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .ask-row input:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 </style>
 
 <div class="wrap">
@@ -161,7 +205,8 @@
   </div>
 
   <div class="tabs" role="tablist">
-    <button class="tab" role="tab" data-v="list" aria-selected="true">Every goal &amp; its path</button>
+    <button class="tab" role="tab" data-v="climb" aria-selected="true">The climb</button>
+    <button class="tab" role="tab" data-v="list" aria-selected="false">Every goal &amp; its path</button>
     <button class="tab" role="tab" data-v="graph" aria-selected="false">The graph</button>
     <button class="tab" role="tab" data-v="lev" aria-selected="false">Shared actions</button>
   </div>
@@ -185,7 +230,14 @@
 
   <div class="grid">
     <div class="stage">
-      <div id="v-list"></div>
+      <div id="v-climb">
+        <div class="ask" id="ask" hidden></div>
+        <div class="climb" id="climb"><svg class="wires" id="wires"></svg></div>
+        <div class="ground" id="ground"></div>
+        <div class="shelf" id="pendingShelf" hidden></div>
+        <div class="shelf" id="noPathShelf" hidden></div>
+      </div>
+      <div id="v-list" hidden></div>
       <canvas id="cv" hidden></canvas>
       <div id="v-lev" class="bars" hidden></div>
     </div>
@@ -205,7 +257,7 @@
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
-  var D = null, tierFilter = 'all', heavy = false, sel = null, view_ = 'list';
+  var D = null, tierFilter = 'all', heavy = false, sel = null, view_ = 'climb';
   var nodes = [], edges = [], byId = {};
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
@@ -231,7 +283,7 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) { $('sub').textContent = d.error || 'no registry found'; $('status').textContent = ''; return; }
-        D = d; render();
+        D = d; render(); loadLadder();
       })
       .catch(function (e) { $('status').textContent = String(e.message || e); });
   }
@@ -360,14 +412,139 @@
       : '<div class="muted">Nothing ranked yet.</div>';
   }
 
+  /* ── THE CLIMB ──────────────────────────────────────────────────────────────────────────────────
+     Operator: *"I like graph views connecting from the bottom up, and then we have to look at my current
+     reality."* So the ground is his live position and the rungs rise from it. Height is not the horizon he
+     typed — it is computed from the capability gap, which is why the ladder re-draws itself as he moves.
+
+     Wires are drawn only for the SELECTED goal. Twenty-eight nodes with every edge showing is the hairball
+     he already told me reads as noise; one chain at a time is a climb you can follow. */
+  var LAD = null;
+  function loadLadder() {
+    fetch('/api/goals/ladder').then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) { $('climb').innerHTML = '<div class="muted">' + esc(d.error || 'no ladder') + '</div>'; return; }
+      LAD = d; renderClimb();
+    }).catch(function (e) { $('climb').innerHTML = '<div class="muted">' + esc(e.message) + '</div>'; });
+  }
+
+  function capLine(cap, r, meta) {
+    var v = r.value === true ? 'yes' : (r.value === false ? 'no' : r.value);
+    return '<div class="cap"><b>' + (r.partial ? '≥' : '') + esc(v) + '</b> ' + esc(meta.label) +
+      '<i>' + esc(r.source) + (r.partial ? ' · partial' : '') + '</i></div>';
+  }
+
+  function cardFor(g, extra) {
+    var bits = [];
+    if (g.horizon) { bits.push('<span class="gc-h">' + esc(g.horizon) + '</span>'); }
+    if (g.brings && g.brings.length) { bits.push('<span class="gc-b">⇒ brings ' + g.brings.length + '</span>'); }
+    if (extra) { bits.push('<span>' + esc(extra) + '</span>'); }
+    return '<div class="gc" data-goal="' + esc(g.id) + '" data-gid="' + esc(g.id) + '">' +
+      '<div class="gc-t">' + esc(g.t) + '</div>' +
+      (bits.length ? '<div class="gc-m">' + bits.join('') + '</div>' : '') + '</div>';
+  }
+
+  function renderClimb() {
+    if (!LAD) { return; }
+    var caps = LAD.caps || {};
+
+    /* THE ASK. Right now the single most useful thing this engine knows is which number it is missing:
+       seven of his goals cannot be placed for want of a liquid-capital figure. Saying "12 goals pending" and
+       leaving it there would be a diagnosis with no remedy, so the remedy is right here — type it in. */
+    var blk = (LAD.blocking || []).filter(function (b) { return b.blocks > 1; });
+    $('ask').hidden = heavy || !blk.length;
+    if (!heavy && blk.length) {
+      $('ask').innerHTML = '<h3>THE LADDER IS WAITING ON YOU</h3>' +
+        '<p>These aren’t goals — they’re numbers Jarvis has never been told. ' +
+        'Each one places the goals stacked behind it.</p>' +
+        blk.map(function (b) {
+          return '<div class="ask-row"><label for="ask-' + esc(b.cap) + '"><b>' + b.blocks + '</b> goals waiting on your ' +
+            esc(b.label.toLowerCase()) + ' <span style="opacity:.6">(' + esc(b.why) + ')</span></label>' +
+            '<input id="ask-' + esc(b.cap) + '" data-cap="' + esc(b.cap) + '" type="number" inputmode="decimal" ' +
+            'placeholder="' + esc(b.unit) + '" aria-label="' + esc(b.label) + '" /></div>';
+        }).join('');
+    }
+    // Rungs render HIGHEST FIRST so the page reads bottom-up: the ground sits under everything.
+    var rungs = (LAD.rungs || []).slice().sort(function (a, b) { return b.rung - a.rung; });
+    var html = '<svg class="wires" id="wires"></svg>';
+    rungs.forEach(function (r) {
+      html += '<div class="rung" data-rung="' + r.rung + '"><div class="rung-l">' +
+        (r.rung === 1 ? 'WITHIN REACH TODAY' : 'AFTER ' + (r.rung - 1) + ' STEP' + (r.rung > 2 ? 'S' : '')) +
+        '</div><div class="rung-cards">' + r.goals.map(function (g) { return cardFor(g); }).join('') + '</div></div>';
+    });
+    $('climb').innerHTML = html || '<div class="muted">Nothing placed yet.</div>';
+
+    // THE GROUND — every number carries where it came from, so he can tell a fact from an estimate.
+    var known = Object.keys(LAD.reality || {});
+    $('ground').innerHTML = '<h3>WHERE YOU STAND TODAY</h3><div class="caps">' +
+      known.map(function (c) { return capLine(c, LAD.reality[c], caps[c] || { label: c }); }).join('') +
+      (LAD.unknown || []).map(function (c) {
+        return '<div class="cap miss"><b>—</b> ' + esc((caps[c] || {}).label || c) + '<i>not measured</i></div>';
+      }).join('') + '</div>';
+
+    /* Two shelves that exist so the ladder never lies. A goal nothing produces must not sit on rung 1
+       looking startable, and a goal whose numbers were never pulled is not the same as one out of reach. */
+    var pend = LAD.pending || [];
+    $('pendingShelf').hidden = !pend.length;
+    if (pend.length) {
+      $('pendingShelf').innerHTML = '<h3>WAITING ON A NUMBER — ' + pend.length + '</h3><div class="rung-cards">' +
+        pend.map(function (g) {
+          var need = [];
+          if (g.needsMeasuring && g.needsMeasuring.length) { need.push('look up ' + g.needsMeasuring.map(function (c) { return (caps[c] || {}).label || c; }).join(', ')); }
+          if (g.needsCompleting && g.needsCompleting.length) { need.push('complete ' + g.needsCompleting.map(function (c) { return (caps[c] || {}).label || c; }).join(', ')); }
+          return cardFor(g, need.join(' · '));
+        }).join('') + '</div>';
+    }
+    var np = LAD.noPath || [];
+    $('noPathShelf').hidden = !np.length;
+    if (np.length) {
+      $('noPathShelf').innerHTML = '<h3>NO PATH MODELLED YET — ' + np.length + '</h3><div class="rung-cards">' +
+        np.map(function (g) { return cardFor(g, 'nothing here produces what it needs'); }).join('') + '</div>';
+    }
+    wires();
+  }
+
+  /* Draw the selected goal's chain: what has to come first, and what it brings along. */
+  function wires() {
+    var svg = $('wires'); if (!svg || !LAD) { return; }
+    var box = $('climb').getBoundingClientRect();
+    svg.setAttribute('viewBox', '0 0 ' + Math.round(box.width) + ' ' + Math.round(box.height));
+    var cards = {};
+    var all = $('climb').querySelectorAll('.gc');
+    for (var i = 0; i < all.length; i++) {
+      all[i].classList.remove('sel', 'lit', 'dim');
+      cards[all[i].getAttribute('data-gid')] = all[i];
+    }
+    if (!sel || !cards[sel]) { svg.innerHTML = ''; return; }
+    var mine = (LAD.edges || []).filter(function (e) { return e.from === sel || e.to === sel; });
+    var touched = {}; touched[sel] = 1;
+    mine.forEach(function (e) { touched[e.from] = 1; touched[e.to] = 1; });
+    for (var id in cards) { cards[id].classList.add(touched[id] ? 'lit' : 'dim'); }
+    cards[sel].classList.remove('lit'); cards[sel].classList.add('sel');
+    var at = function (el) { var r = el.getBoundingClientRect();
+      return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 }; };
+    var out = '';
+    mine.forEach(function (e) {
+      var a = cards[e.from], b = cards[e.to];
+      if (!a || !b) { return; }
+      var p = at(a), q = at(b);
+      // `affords` is the payoff edge — dashed, because it is something he gets rather than something he does.
+      out += '<path d="M' + p.x + ' ' + p.y + ' C' + p.x + ' ' + ((p.y + q.y) / 2) + ' ' + q.x + ' ' + ((p.y + q.y) / 2) + ' ' + q.x + ' ' + q.y + '" ' +
+        'fill="none" stroke="' + (e.kind === 'affords' ? 'rgba(var(--teal-rgb),.75)' : 'rgba(var(--teal-rgb),.35)') + '" ' +
+        'stroke-width="1.5"' + (e.kind === 'affords' ? ' stroke-dasharray="4 3"' : '') + ' />';
+    });
+    svg.innerHTML = out;
+  }
+
   /* ── views ──────────────────────────────────────────────────────────────────────────────────── */
   function setView(v) {
     view_ = v;
     var tabs = document.querySelectorAll('.tab');
     for (var i = 0; i < tabs.length; i++) { tabs[i].setAttribute('aria-selected', String(tabs[i].getAttribute('data-v') === v)); }
+    $('v-climb').hidden = v !== 'climb';
     $('v-list').hidden = v !== 'list';
     $('cv').hidden = v !== 'graph';
     $('v-lev').hidden = v !== 'lev';
+    if (v === 'climb') { wires(); }
     /* the canvas can only be measured once it is visible */
     if (v === 'graph') { fit(); draw(); }
   }
@@ -398,6 +575,7 @@
     h += '<div id="pic"></div>';
     $('detail').innerHTML = h;
 
+    wires();
     fetch('/api/goals/chain?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (c) {
       var el = $('chain'); if (!el) { return; }
       if (!c.ok) { el.innerHTML = ''; return; }
@@ -661,9 +839,21 @@
     var dec = e.target.closest('[data-dec]');
     if (dec) { decide(dec.getAttribute('data-dec')); }
   });
+  /* Enter commits. He is typing his own bank balance — a Save button would just be one more thing to press. */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') { return; }
+    var inp = e.target.closest('#ask input[data-cap]'); if (!inp) { return; }
+    var v = inp.value.trim(); if (!v) { return; }
+    inp.disabled = true;
+    fetch('/api/goals/reality/set', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cap: inp.getAttribute('data-cap'), value: Number(v) }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.ok) { loadLadder(); } else { inp.disabled = false; } })
+      .catch(function () { inp.disabled = false; });
+  });
   $('q').addEventListener('input', function () { renderList(); if (view_ !== 'list') { setView('list'); } });
   $('sort').addEventListener('change', renderList);
-  window.addEventListener('resize', function () { if (view_ === 'graph') { fit(); draw(); } });
+  window.addEventListener('resize', function () { if (view_ === 'graph') { fit(); draw(); } else if (view_ === 'climb') { wires(); } });
   load();
 })();
 </script>

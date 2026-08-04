@@ -200,6 +200,13 @@ function writeGoalState(st) {
 }
 // Machine-proposed horizons + produces, kept apart from his decisions AND from his goals.json. Separate file
 // on purpose: these are estimates awaiting his yes, and they must never be mistaken for something he said.
+// Capability values HE typed. Kept apart from the derived ones so it is always clear which numbers are his.
+const toldPath = () => path.join(__dirname, 'data', 'goal-reality.json');
+function readToldReality() { try { return JSON.parse(fs.readFileSync(toldPath(), 'utf8')) || {}; } catch { return {}; } }
+function writeToldReality(st) {
+  try { fs.mkdirSync(path.dirname(toldPath()), { recursive: true }); } catch { /* exists */ }
+  fs.writeFileSync(toldPath(), JSON.stringify(st, null, 2));
+}
 const goalPropPath = () => path.join(__dirname, 'data', 'goal-proposals.json');
 function readGoalProposals() { try { return JSON.parse(fs.readFileSync(goalPropPath(), 'utf8')) || {}; } catch { return {}; } }
 function writeGoalProposals(st) {
@@ -260,6 +267,15 @@ async function readReality() {
   }
   // Rodgate LLC exists — this one is a fact of record, not a measurement.
   put('operating_entity', true, 'Rodgate LLC');
+  // Numbers he has told us himself. Last, so they OVERRIDE a derived guess: if he says his monthly net is
+  // $3,350, that beats the $2,500 we could total from rent alone. He knows his own position better than the
+  // pods do, and a figure he typed is not partial.
+  try {
+    const told = readToldReality();
+    for (const [cap, v] of Object.entries(told.caps || {})) {
+      if (v && v.value !== null && v.value !== undefined) R[cap] = { value: v.value, source: 'you told Jarvis', asOf: v.at || todayISO(), partial: false };
+    }
+  } catch { /* nothing told yet */ }
   try {
     const { taxStatus } = await import('../pods/tax/status.mjs');
     const s = await taxStatus();
@@ -3743,7 +3759,16 @@ const server = http.createServer(async (req, res) => {
       const sys = 'You estimate what a personal goal REQUIRES and what it PRODUCES, using ONLY this fixed list of capabilities:\n'
         + capList + '\n\n'
         + 'For each goal return: {"id":"...","horizon":"now|1y|3y|10y|20y","requires":[{"cap":"...","value":N}],"produces":[{"cap":"...","value":N}]}\n'
-        + 'requires = what must be true BEFORE it happens. produces = durable capability it yields AFTER, and most goals produce NOTHING — only include produces when achieving the goal genuinely hands over ongoing capability (a business produces cash flow; a vacation does not).\n'
+        + 'requires = what must be true BEFORE it happens.\n'
+        + 'produces = durable capability the goal HANDS OVER once achieved. Be generous and literal here:\n'
+        + '  · If the goal NAMES a capability, it produces it. "$10,000/month NET" produces monthly_net 10000.\n'
+        + '    "Debt gone" produces debt_load 0 — wait, debt_load counts DOWN, so produce the low number: 0.\n'
+        + '    "Two years of filed returns" produces filed_years 2. "First gov award" produces past_performance 1.\n'
+        + '  · A business, rental or product produces monthly_net and often collateral.\n'
+        + '  · A goal that frees time produces free_hours. One that fixes credit produces credit_score.\n'
+        + '  · Only a goal that genuinely hands over nothing ongoing (reading a book, a trip) has empty produces.\n'
+        + 'THIS FIELD IS THE WHOLE POINT: it is how one goal makes another reachable. A goal set where nothing\n'
+        + 'produces anything is a flat list, which is exactly what we are replacing.\n'
         + 'Values are plain numbers in the stated unit. legal_clear and operating_entity take true/false.\n'
         + 'horizon is how long it plausibly takes from a standing start, not a deadline.\n'
         + 'Use ONLY capability ids from the list. Omit anything you are unsure of — an omission is cheap, a wrong number is not.\n'
@@ -3800,6 +3825,31 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
 
+  // TELL JARVIS A NUMBER — the loop that lets the ladder climb.
+  //
+  // 11 of his goals require liquid capital and 4 require a credit score, and neither has ever been measured,
+  // so the engine correctly refuses to place any of them. That refusal is honest but useless on its own —
+  // the useful version lets him answer. One number can move a dozen goals off the pending shelf.
+  if (req.method === 'POST' && url.pathname === '/api/goals/reality/set') {
+    try {
+      const H = await import('../pods/goal-horizon.mjs');
+      const b = await readBody(req);
+      const cap = String(b.cap || '').trim();
+      if (!H.isCap(cap)) return send(res, 200, JSON.stringify({ ok: false, error: 'not a capability we track' }));
+      const st = readToldReality();
+      st.caps = st.caps || {};
+      if (b.value === null || b.value === '' || b.value === undefined) delete st.caps[cap];
+      else {
+        const boolCap = H.CAPS[cap].unit === 'yes/no';
+        const v = boolCap ? !!b.value : Number(b.value);
+        if (!boolCap && !Number.isFinite(v)) return send(res, 200, JSON.stringify({ ok: false, error: 'needs a number' }));
+        st.caps[cap] = { value: v, at: new Date().toISOString() };
+      }
+      writeToldReality(st);
+      return send(res, 200, JSON.stringify({ ok: true, cap, value: (st.caps[cap] || {}).value }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
   // THE LADDER — bottom-up, standing on his live position.
   if (req.method === 'GET' && url.pathname === '/api/goals/ladder') {
     try {
@@ -3816,7 +3866,14 @@ const server = http.createServer(async (req, res) => {
         .filter((g) => (g.requires || []).length || (g.produces || []).length);
       const l = H.ladder(goals, reality);
       const unknown = Object.keys(H.CAPS).filter((c) => !reality[c]);
-      return send(res, 200, JSON.stringify({ ok: true, ...l, reality, caps: H.CAPS, unknown,
+      // Which single unmeasured number is holding up the most goals. This is the engine's most useful
+      // output right now, and it should be the first thing the page says — not a footnote.
+      const tally = {};
+      for (const g of l.pending) for (const c of (g.needsMeasuring || []).concat(g.needsCompleting || [])) tally[c] = (tally[c] || 0) + 1;
+      const blocking = Object.entries(tally).sort((a, b2) => b2[1] - a[1])
+        .map(([cap, n]) => ({ cap, label: H.CAPS[cap].label, unit: H.CAPS[cap].unit, blocks: n,
+          why: reality[cap] ? 'only partly known' : 'never measured' }));
+      return send(res, 200, JSON.stringify({ ok: true, ...l, reality, caps: H.CAPS, unknown, blocking,
         placed: goals.length, total: (data.goals || []).length }));
     } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }

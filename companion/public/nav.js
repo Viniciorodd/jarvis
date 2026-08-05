@@ -101,6 +101,7 @@ var moreItems = {
   jMoreControl: function(){ window.location.href = '/control'; },   /* agent on/off + autonomy tiers + kill */
   jMoreEyes:    function(){ window.location.href = '/eyes'; },      /* the camera — on-demand looking */
   jMoreGoals:   function(){ window.location.href = '/goals'; },     /* ten years of goals, as a picture */
+  jMoreJournal: function(){ window.location.href = '/journal'; },   /* the log — short stamped entries */
   jMoreGovconOs: function(){ window.location.href = '/govcon-os'; },
   jMoreFinances: function(){ window.location.href = '/finances'; },
   jMoreMap:     function(){ triggerGhost('mapBtn'); },

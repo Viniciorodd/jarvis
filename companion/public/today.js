@@ -266,3 +266,80 @@
   load();
   setInterval(load, 60000);
 })();
+
+/* ── ⚡ THE LOG ON HOME (2026-08-05) ────────────────────────────────────────────────────────────────
+   Operator: "i need to have the capability to log time and thoughts from the main menu. also i want to see
+   these stats in the main menu too."
+
+   His two real entries were "i wish it was raining today" and "nobody cares" — four words, no audience. So
+   this is one input and Enter. No prompt, no title, no tag picker; every extra field is a reason the entry
+   he actually wanted to make doesn't get made.
+
+   🚨 Nothing typed here is filtered. The crisis list stops the SYSTEM turning his worst night into a goal;
+   it must never stop him writing the sentence. */
+(function () {
+  var $id = function (i) { return document.getElementById(i); };
+  var input = $id('jLogInput'), save = $id('jLogSave'), timeBtn = $id('jLogTime');
+  if (!input || !save) { return; }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function timeLabel(hhmm) {
+    var p = String(hhmm || '').split(':'); if (p.length !== 2) { return hhmm || ''; }
+    var h = Number(p[0]); return ((h % 12) || 12) + ':' + p[1] + ' ' + (h >= 12 ? 'PM' : 'AM');
+  }
+
+  function refresh() {
+    fetch('/api/journal?limit=3').then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) { return; }
+      var s = d.stats || {};
+      var st = $id('jLogStats');
+      /* Numbers over adjectives, and silence when there is nothing: a "0 today" badge on the front door
+         every morning is a scoreboard he didn't ask for. */
+      if (st) {
+        st.textContent = s.total
+          ? s.today + ' today · ' + s.week + ' this week' + (s.streak > 1 ? ' · ' + s.streak + '-day streak' : '')
+          : '';
+      }
+      var box = $id('jLogRecent'); if (!box) { return; }
+      var e = (d.entries || []).slice(0, 3);
+      box.className = 'j-log-recent';
+      box.innerHTML = e.map(function (x) {
+        return '<div class="j-log-e">' + esc(x.text) + '<div class="m">' + esc(timeLabel(x.time)) +
+          (x.place ? ' · <span class="pin">📍 ' + esc(x.place) + '</span>' : '') + '</div></div>';
+      }).join('');
+    }).catch(function () { /* the glance never breaks because the log is unreachable */ });
+  }
+
+  function commit() {
+    var text = input.value.trim();
+    if (!text) { return; }
+    save.disabled = true;
+    fetch('/api/journal', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { save.disabled = false; if (d.ok) { input.value = ''; refresh(); } })
+      .catch(function () { save.disabled = false; });
+  }
+
+  save.addEventListener('click', commit);
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+
+  /* Time goes to the SAME focus log /focus already writes — one place for hours, not a second one that
+     quietly disagrees with it. */
+  if (timeBtn) {
+    timeBtn.addEventListener('click', function () {
+      var mins = window.prompt('How many minutes of focused time?');
+      if (!mins || !Number(mins)) { return; }
+      var note = window.prompt('On what? (optional)') || '';
+      timeBtn.disabled = true;
+      fetch('/api/focus/log', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ minutes: Number(mins), note: note, source: 'home' }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { timeBtn.disabled = false; timeBtn.textContent = d && d.ok ? '✓ logged' : '＋ time';
+          setTimeout(function () { timeBtn.textContent = '＋ time'; }, 2500); })
+        .catch(function () { timeBtn.disabled = false; });
+    });
+  }
+  refresh();
+})();

@@ -184,6 +184,19 @@ const todayISO = () => new Date().toLocaleDateString('en-CA');   // local YYYY-M
 // editing it through Jarvis are the same act. Anything else recreates the exact problem the whole registry
 // exists to solve: another place he has to remember to look.
 const vaultRoot = () => VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
+
+// ── The log ───────────────────────────────────────────────────────────────────────────────────────
+// One file per month inside his existing Journals folder. NOT the daily note: his daily notes are full of
+// Jarvis's own gov briefings, and "i wish it was raining today" does not belong under a contract deadline.
+const journalDir = () => path.join(vaultRoot(), '06 - Journals', 'Log');
+// Names he has given coordinates. Repo-side, not vault-side — a list of where he physically is belongs in
+// application state, not in a note that syncs.
+const placesPath = () => path.join(__dirname, 'data', 'journal-places.json');
+function readPlaces() { try { return JSON.parse(fs.readFileSync(placesPath(), 'utf8')) || {}; } catch { return {}; } }
+function writePlaces(p) {
+  try { fs.mkdirSync(path.dirname(placesPath()), { recursive: true }); } catch { /* exists */ }
+  fs.writeFileSync(placesPath(), JSON.stringify(p, null, 2));
+}
 function goalsJsonPath() { return path.join(vaultRoot(), '05 - Knowledge', 'Goals', 'goals.json'); }
 function readGoalRegistry() {
   try {
@@ -3679,6 +3692,69 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
   }
 
+  // ── THE LOG — short entries, stamped, straight into his Obsidian vault ────────────────────────────
+  // *"i want it to look like tweets. I need time and date and place if possible for each entry… 'i wish it
+  // was raining today.' thats too deep for me to post on x.com. 'nobody cares.' that was another entry."*
+  //
+  // Four words, no insight, no audience. So there is no prompt, no title, no required tag and no minimum —
+  // and 🚨 NOTHING he writes is ever filtered or refused. The crisis list stops the system turning his worst
+  // night into a goal; it must never stop him writing the sentence.
+  if (req.method === 'GET' && url.pathname === '/api/journal') {
+    try {
+      const J = await import('../pods/journal.mjs');
+      const months = Number(url.searchParams.get('months')) || 6;
+      const all = [];
+      const dir = journalDir();
+      let files = []; try { files = fs.readdirSync(dir).filter((f) => /^\d{4}-\d{2}\.md$/.test(f)).sort().reverse(); } catch { /* none yet */ }
+      for (const f of files.slice(0, Math.max(1, months))) {
+        try { all.push(...J.parseMonth(fs.readFileSync(path.join(dir, f), 'utf8'))); } catch { /* skip */ }
+      }
+      const feed = J.feed(all, Number(url.searchParams.get('limit')) || 200);
+      return send(res, 200, JSON.stringify({ ok: true, entries: feed, stats: J.stats(all, todayISO()),
+        places: Object.values(readPlaces()).map((p) => (typeof p === 'string' ? p : p.name)).filter(Boolean) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/journal') {
+    try {
+      const J = await import('../pods/journal.mjs');
+      const b = await readBody(req);
+      const text = String(b.text || '').trim();
+      if (!text) return send(res, 200, JSON.stringify({ ok: false, error: 'nothing to save' }));
+      const now = new Date();
+      const date = String(b.date || '').match(/^\d{4}-\d{2}-\d{2}$/) ? b.date : todayISO();
+      const time = String(b.time || '').match(/^\d{1,2}:\d{2}$/) ? b.time
+        : now.toTimeString().slice(0, 5);
+      // Place: a name he typed, or one he gave these coordinates before. NEVER reverse-geocoded — that would
+      // mean handing his exact location to a third party, and the whole system is self-hosted so that never
+      // happens. He names a spot once and Jarvis remembers it.
+      let place = String(b.place || '').trim();
+      const lat = b.lat, lon = b.lon;
+      const places = readPlaces();
+      if (!place && lat !== undefined && lon !== undefined) place = J.nameFor(places, lat, lon);
+      if (place && lat !== undefined && lon !== undefined) writePlaces(J.rememberPlace(places, lat, lon, place));
+
+      const dir = journalDir();
+      try { fs.mkdirSync(dir, { recursive: true }); } catch { /* exists */ }
+      const file = path.join(dir, J.monthFile(date));
+      let md = ''; try { md = fs.readFileSync(file, 'utf8'); } catch { /* new month */ }
+      fs.writeFileSync(file, J.insertEntry(md, { date, time, place, text }));
+      return send(res, 200, JSON.stringify({ ok: true, entry: { date, time, place, text }, file: J.monthFile(date) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  // Name the spot he is standing in, so it is recognised next time.
+  if (req.method === 'POST' && url.pathname === '/api/journal/place') {
+    try {
+      const J = await import('../pods/journal.mjs');
+      const b = await readBody(req);
+      const name = String(b.name || '').trim();
+      if (!name || b.lat === undefined || b.lon === undefined) return send(res, 200, JSON.stringify({ ok: false, error: 'need name + coordinates' }));
+      writePlaces(J.rememberPlace(readPlaces(), b.lat, b.lon, name));
+      return send(res, 200, JSON.stringify({ ok: true, name }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
   // ── GOALS: the filter and the router ─────────────────────────────────────────────────────────────
   // *"Having written goals sometimes feels like writing something and putting it on a shelf and never
   // seeing them again... if you're not constantly thinking about a goal, seeing it, you're not pursuing it."*
@@ -4009,7 +4085,11 @@ const server = http.createServer(async (req, res) => {
       if (!cached) {
         const I = await import('../pods/goals-import.mjs');
         const vault = VAULT_DIR || path.join(os.homedir(), 'Documents', 'Second Brain');
-        const SKIP = new Set(['.obsidian', '.trash', '.git', '.smart-env', 'node_modules', '.jarvis-trash']);
+        // 🚨 'Log' is his private journal — see /api/journal. His own words go in there unfiltered, by
+        // design, and they must NEVER be scraped back out as "goals". "i wish it was raining today" is not
+        // an ambition, and on a bad night the entry would be something far worse than that. The crisis
+        // suppression list is the second line of defence; not walking the folder at all is the first.
+        const SKIP = new Set(['.obsidian', '.trash', '.git', '.smart-env', 'node_modules', '.jarvis-trash', 'Log']);
         const lists = [];
         (function walk(d) {
           let es; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
@@ -4980,7 +5060,7 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return send(res, 200, JSON.stringify({ items: [], error: e.message })); }
   }
 
-  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname === '/control' ? 'control.html' : url.pathname === '/goals' ? 'goals.html' : url.pathname === '/eyes' ? 'eyes.html' : url.pathname === '/govcon-os' ? 'govcon-os.html' : url.pathname === '/finances' ? 'finances.html' : url.pathname === '/real-estate' ? 'real-estate.html' : url.pathname.replace(/^\/+/, '');
+  let rel = url.pathname === '/' ? 'index.html' : url.pathname === '/govcon' ? 'govcon.html' : url.pathname === '/ideas' ? 'ideas.html' : url.pathname === '/dealroom' ? 'dealroom.html' : url.pathname === '/focus' ? 'focus.html' : url.pathname === '/quickwins' ? 'quickwins.html' : url.pathname === '/teaming' ? 'teaming.html' : url.pathname === '/lendability' ? 'lendability.html' : url.pathname === '/control' ? 'control.html' : url.pathname === '/goals' ? 'goals.html' : url.pathname === '/journal' || url.pathname === '/log' ? 'journal.html' : url.pathname === '/eyes' ? 'eyes.html' : url.pathname === '/govcon-os' ? 'govcon-os.html' : url.pathname === '/finances' ? 'finances.html' : url.pathname === '/real-estate' ? 'real-estate.html' : url.pathname.replace(/^\/+/, '');
   const file = path.normalize(path.join(PUBLIC_DIR, rel));
   if (!file.startsWith(PUBLIC_DIR)) return send(res, 404, 'no');
   fs.readFile(file, (err, data) => err ? send(res, 404, 'not found', 'text/plain') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream'));

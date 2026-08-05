@@ -1,0 +1,184 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Log — Jarvis</title>
+<!--
+  journal.html — the log.
+
+  Operator: "i want it to look like tweets. I need time and date and place if possible for each entry…
+  'i wish it was raining today.' thats too deep for me to post on x.com. 'nobody cares.' that was another
+  entry."
+
+  Those two examples ARE the design. Four words, no insight, no audience. So: no prompt, no title field, no
+  tags, no minimum length, no formatting toolbar. One box, Enter, done. Anything else and the entry he
+  actually wanted to make does not get made.
+
+  🚨 Nothing typed here is ever filtered. The crisis-suppression list stops the SYSTEM turning his worst
+  night into a goal — it must never stop him writing the sentence. The vault folder this writes to is
+  excluded from the goal harvest instead.
+
+  Every colour is from the theme contract in style.css — the design system's rule is "never invent a hex".
+-->
+<script>try{var _t=localStorage.getItem('jarvis-theme');document.documentElement.dataset.theme=(!_t||_t==='exec')?'black':_t;}catch(e){document.documentElement.dataset.theme='black';}</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ink); color: var(--cream); font-family: var(--font, 'Inter', system-ui, sans-serif);
+    font-size: 14px; letter-spacing: -.011em; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 22px 20px 80px; }
+  a.back { display: inline-block; margin-bottom: 12px; font-size: 13px; color: var(--teal); text-decoration: none; }
+  h1 { font-size: clamp(24px, 3vw, 32px); font-weight: 600; letter-spacing: -.02em; margin: 0 0 4px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 16px; }
+
+  /* the box — deliberately the only thing on the page that asks for anything */
+  .compose { border: 1px solid rgba(var(--teal-rgb),.3); background: var(--panel); border-radius: 15px;
+    padding: 14px 16px; margin-bottom: 8px; }
+  .compose textarea { width: 100%; background: transparent; border: 0; color: var(--cream); font: inherit;
+    font-size: 16px; line-height: 1.5; resize: none; outline: none; min-height: 52px; }
+  .compose textarea::placeholder { color: var(--dim); }
+  .crow { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+  .crow .where { font-size: 12px; color: var(--dim); flex: 1; min-width: 120px; }
+  .crow .where b { color: var(--teal); font-weight: 500; }
+  button { background: rgba(var(--teal-rgb),.1); border: 1px solid rgba(var(--teal-rgb),.28); color: var(--cream);
+    border-radius: 999px; padding: 7px 15px; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+  button:hover:not(:disabled) { background: rgba(var(--teal-rgb),.2); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.go { background: var(--teal); color: var(--ink-on-accent); border-color: var(--teal); font-weight: 600; }
+  button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .hint { font-size: 11.5px; color: var(--dim); margin: 0 0 18px 2px; }
+
+  /* stats — 12px is the metric-tile radius */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-bottom: 20px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; }
+  .stat .n { font-size: 24px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 11px; color: var(--dim); margin-top: 2px; }
+
+  /* the feed */
+  .day { font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--dim); margin: 20px 0 8px;
+    display: flex; align-items: center; gap: 10px; }
+  .day::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .tw { border-bottom: 1px solid var(--line); padding: 13px 2px; }
+  .tw:last-child { border-bottom: 0; }
+  .tw-t { font-size: 15.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .tw-m { font-size: 11.5px; color: var(--dim); margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .tw-m .pin { color: var(--teal); }
+  .empty { color: var(--dim); font-size: 13.5px; line-height: 1.6; padding: 24px 0; }
+</style>
+
+<div class="wrap">
+  <a class="back" href="/">← Jarvis</a>
+  <h1>Log</h1>
+  <div class="sub" id="sub">Yours only. Nothing here is posted anywhere.</div>
+
+  <div class="compose">
+    <textarea id="box" rows="2" placeholder="What's on your mind?" aria-label="New log entry"></textarea>
+    <div class="crow">
+      <span class="where" id="where">📍 <button id="loc" style="padding:4px 10px;font-size:11.5px">use my location</button></span>
+      <button id="save" class="go">Log it</button>
+    </div>
+  </div>
+  <p class="hint">⌘/Ctrl + Enter saves. Time and date are stamped for you.</p>
+
+  <div class="stats" id="stats"></div>
+  <div id="feed"><div class="empty">Loading…</div></div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var coords = null, placeName = '';
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  /* Dates read the way he'd say them, not as ISO. "Today" and "Yesterday" carry more than a number does. */
+  function dayLabel(d) {
+    var t = new Date().toISOString().slice(0, 10);
+    var y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    if (d === t) { return 'TODAY'; }
+    if (d === y) { return 'YESTERDAY'; }
+    var dt = new Date(d + 'T12:00:00');
+    return dt.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase();
+  }
+  function timeLabel(hhmm) {
+    var p = String(hhmm || '').split(':');
+    if (p.length !== 2) { return hhmm || ''; }
+    var h = Number(p[0]), ap = h >= 12 ? 'PM' : 'AM';
+    return ((h % 12) || 12) + ':' + p[1] + ' ' + ap;
+  }
+
+  function load() {
+    fetch('/api/journal').then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) { $('feed').innerHTML = '<div class="empty">' + esc(d.error) + '</div>'; return; }
+      var s = d.stats || {};
+      $('stats').innerHTML =
+        '<div class="stat"><div class="n">' + (s.today || 0) + '</div><div class="l">today</div></div>' +
+        '<div class="stat"><div class="n">' + (s.week || 0) + '</div><div class="l">this week</div></div>' +
+        '<div class="stat"><div class="n">' + (s.streak || 0) + '</div><div class="l">day streak</div></div>' +
+        '<div class="stat"><div class="n">' + (s.total || 0) + '</div><div class="l">all time</div></div>';
+      var e = d.entries || [];
+      if (!e.length) {
+        /* Empty states say what is absent, never "All clear!". */
+        $('feed').innerHTML = '<div class="empty">Nothing logged yet.<br>Two words is a valid entry.</div>';
+        return;
+      }
+      var html = '', day = '';
+      e.forEach(function (x) {
+        if (x.date !== day) { day = x.date; html += '<div class="day">' + esc(dayLabel(day)) + '</div>'; }
+        html += '<div class="tw"><div class="tw-t">' + esc(x.text) + '</div><div class="tw-m">' +
+          '<span>' + esc(timeLabel(x.time)) + '</span>' +
+          (x.place ? '<span class="pin">📍 ' + esc(x.place) + '</span>' : '') + '</div></div>';
+      });
+      $('feed').innerHTML = html;
+    }).catch(function (err) { $('feed').innerHTML = '<div class="empty">' + esc(err.message) + '</div>'; });
+  }
+
+  function save() {
+    var text = $('box').value.trim();
+    if (!text) { return; }
+    $('save').disabled = true;
+    var body = { text: text };
+    if (coords) { body.lat = coords.lat; body.lon = coords.lon; }
+    if (placeName) { body.place = placeName; }
+    fetch('/api/journal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        $('save').disabled = false;
+        if (!d.ok) { return; }
+        $('box').value = '';
+        /* If this spot has no name yet, ask ONCE — and only after he's already saved, so naming a place
+           never stands between him and writing the thing down. */
+        if (coords && !d.entry.place) {
+          var n = window.prompt('Name this place? (leave blank to skip)');
+          if (n && n.trim()) {
+            fetch('/api/journal/place', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: n.trim(), lat: coords.lat, lon: coords.lon }) })
+              .then(function () { placeName = n.trim(); $('where').innerHTML = '📍 <b>' + esc(placeName) + '</b>'; });
+          }
+        }
+        load();
+      })
+      .catch(function () { $('save').disabled = false; });
+  }
+
+  /* Location is opt-in per session and never leaves the machine — no reverse geocoding, no third party.
+     He names a spot once and Jarvis remembers the coordinates locally. */
+  $('loc').addEventListener('click', function () {
+    if (!navigator.geolocation) { $('where').textContent = 'This browser has no location.'; return; }
+    $('where').textContent = 'finding you…';
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      fetch('/api/journal').then(function (r) { return r.json(); }).then(function () {
+        $('where').innerHTML = '📍 <b>' + (placeName ? esc(placeName) : 'here') + '</b> <span style="opacity:.6">· named after you save</span>';
+      });
+    }, function () { $('where').textContent = 'Location declined — entries still save.'; }, { timeout: 8000 });
+  });
+
+  $('save').addEventListener('click', save);
+  $('box').addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); save(); }
+  });
+  load();
+})();
+</script>

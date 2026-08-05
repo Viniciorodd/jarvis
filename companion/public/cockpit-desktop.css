@@ -85,9 +85,13 @@
   #jHomeView.active > #jTodaySection { grid-column: 1; grid-row: 5; }
   /* right column (the glancing) */
   #jHomeView.active > #homeMetrics { grid-column: 2; grid-row: 3; align-self: start; }
-  #jHomeView.active > .j-section:has(#jGovPipe) { grid-column: 2; grid-row: 4; }
-  #jHomeView.active > #jFeedSection { grid-column: 2; grid-row: 5; }
-  #jHomeView.active > .j-section:has(#wxBar) { grid-column: 2; grid-row: 6; }
+  /* The log sits high on the right rail on purpose. He asked to "log time and thoughts from the main menu"
+     — a capture box below 155 tasks is a capture box he never reaches, and the thought he wanted to keep
+     ("i wish it was raining today") is gone by the time he scrolls to it. Rows below shift down by one. */
+  #jHomeView.active > #jLogSection { grid-column: 2; grid-row: 4; }
+  #jHomeView.active > .j-section:has(#jGovPipe) { grid-column: 2; grid-row: 5; }
+  #jHomeView.active > #jFeedSection { grid-column: 2; grid-row: 6; }
+  #jHomeView.active > .j-section:has(#wxBar) { grid-column: 2; grid-row: 7; }
 
   /* the ONE THING gets room to breathe as the hero it is */
   #jHomeView.active > #jOneThing { padding: 20px 22px; border-radius: 16px; }

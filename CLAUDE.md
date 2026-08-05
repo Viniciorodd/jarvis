@@ -86,6 +86,12 @@ iPhone/iPad — nothing is exposed to the public internet.
   rewrite his goals.json**. UI `companion/public/goals.html`. 🚨 The crisis-content suppression list
   (`isCrisisContent`, `pods/goals-import.mjs`) is a P0 SAFETY GATE — his journals contain "I want to die";
   it runs before every other import rule and every future reader of his journals must use it.
+- **The log (journal)**: `pods/journal.mjs` (pure, eval-pinned) → `/api/journal` (+`/place`), page
+  `companion/public/journal.html`, plus the capture strip + stats on Home (`today.js`). Entries land in
+  `<VAULT>/06 - Journals/Log/YYYY-MM.md`, tweet-style, stamped with time and an optional place.
+  🚨 **Nothing he writes is ever filtered** — the crisis list stops the SYSTEM making a goal out of his worst
+  night, never him writing it. The `Log` folder is excluded from the goal harvest instead (SKIP set in
+  `/api/goals/candidates`). Place names are stored locally from browser coordinates; **never reverse-geocode**.
 - HQ API contract: documented at the top of `hq/server.js` (POST /api/event, /api/approval, GET /api/state).
 - Room/rank unlock thresholds: `hq/config/rooms.json` (rooms) and the RANKS list in `hq/public/app.js`.
 - n8n workflows are exported JSON in `n8n/workflows/` — they are the source of truth; if you

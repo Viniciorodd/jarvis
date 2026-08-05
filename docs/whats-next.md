@@ -2,6 +2,28 @@
 
 _Updated 2026-08-04. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
+### 🆕 2026-08-05 — The log (journal), and Jarvis was down
+
+**Jarvis was down** because I repeatedly killed the companion process to pick up code changes during the
+goal-engine build, and the `run-loop.cmd` supervisor died with it. Restarted via `scripts/start-jarvis.cmd`,
+which brings back all four services (companion · telegram-bridge · gov inbox-watch · **watchdog**). If it is
+ever down again, run that script — do NOT start `node companion/server.js` bare, or nothing supervises it.
+
+**The log** — his ask: *"a journal inside jarvis that connects to my second brain inside obsidian, i want it
+to look like tweets… 'i wish it was raining today.' thats too deep for me to post on x.com. 'nobody cares.'
+that was another entry."* Both of those are now the first two entries in the vault.
+
+- `pods/journal.mjs` (22 evals) · `/api/journal` · `/journal` page · Home capture strip + stats.
+- Vault: `06 - Journals/Log/YYYY-MM.md`, days newest-first. Not the daily note (those are full of Jarvis's
+  own gov briefings).
+- 🚨 **Nothing he writes is filtered.** The crisis list guards the goal IMPORTER, not his own pen. The `Log`
+  folder is excluded from the harvest instead — verified live, 559 notes scanned, zero leaks.
+- Place: browser coordinates, named locally, **never reverse-geocoded** (self-hosted means his location never
+  leaves the machine). Rounded ~150m; he is asked to name a spot only AFTER the entry saves.
+- Home: box + Log + ＋time + last three + today/week/streak, high on the right rail. Time writes to the same
+  focus log `/focus` uses. Streak survives an empty morning; the stats line renders nothing when there is
+  nothing.
+
 ### 🆕 2026-08-04 (pt.2) — Horizon Engine phases 1-3 BUILT
 
 Spec: `docs/superpowers/specs/2026-08-04-goal-horizon-engine-design.md`. `pods/goal-horizon.mjs` (pure,

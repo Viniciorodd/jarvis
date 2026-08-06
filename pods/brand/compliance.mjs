@@ -117,6 +117,84 @@ export function complianceCheck(text = '') {
   };
 }
 
+// ── THE PUBLISHING GATE, added 2026-08-06 ────────────────────────────────────
+// The handoff lists what must block before anything reaches a platform, and four of them were not
+// enforced anywhere: em dashes, "guaranteed", the Headline Bank banned-word list, and any number the
+// claims log has not verified.
+//
+// These are publish-time rules, not writing-time ones. `voiceDrift()` already flags em dashes as a
+// VOICE problem so the producer regenerates; here the same thing is a BLOCK, because by this point
+// regenerating is no longer an option and the post is about to become a public artifact.
+//
+// The banned words come from `REDOS — Headline Bank` §7, built from 92 verbatim ICP quotes. They are
+// not taste: each one marks the writer as an outsider to the people he is trying to reach, and
+// "guaranteed" additionally triggers the Section 8 reflex the library explicitly flags.
+const BANNED_WORDS = [
+  // guru bait
+  'financial freedom', 'generational wealth', 'escape the rat race', 'let your money work for you',
+  '10x', 'empire', 'secure your legacy', 'proven system', 'blueprint', 'playbook', 'secrets',
+  // software marketing — "nothing in 42 threads read like this"
+  'seamless', 'effortless', 'ai-powered', 'unlock', 'supercharge', 'game-changer', 'game changer',
+  'revolutionize', 'revolutionise',
+  // institutional register
+  'portfolio optimization', 'asset class', 'risk-adjusted', 'capital stack', 'equity multiple',
+  // wrong register for this audience
+  'deal flow', 'sourcing opportunities', 'underwrite the asset',
+  // the specific traps
+  'novice', 'amateur',
+];
+
+// PURE: every number a post asserts, so it can be checked against what the product actually produced.
+// Skips ordinals, years and the small counts that appear in ordinary prose ("three ways", "2 beds").
+export function figuresIn(text = '') {
+  const out = [];
+  // The inner group must not END on a comma, or "62, and" yields the figure "62," — which still
+  // compares correctly but reads like a bug in every log line it appears in.
+  const re = /\$?\d(?:[\d,]*\d)?(?:\.\d+)?%?/g;
+  let m;
+  while ((m = re.exec(String(text))) !== null) {
+    const raw = m[0];
+    const n = Number(raw.replace(/[$,%]/g, ''));
+    if (!Number.isFinite(n)) continue;
+    if (!/[$%,.]/.test(raw) && n <= 20) continue;      // "three of the 5 checks" is prose, not a claim
+    if (/^\d{4}$/.test(raw) && n >= 1900 && n <= 2100) continue;   // a year
+    out.push(raw);
+  }
+  return [...new Set(out)];
+}
+
+/**
+ * PURE. The gate that runs immediately before a post reaches a platform.
+ *
+ * `verifiedFigures` is the allowlist from the claims log — every number the product actually output.
+ * Anything else in the text is an unverified claim and blocks. That is the rule that has been
+ * enforced by hand until now, and by hand is how a wrong number eventually ships.
+ */
+export function complianceCheckPublish(text = '', { verifiedFigures = null } = {}) {
+  const body = String(text);
+  const r = complianceCheckRedos(body);
+  const blocks = [...r.blocks];
+
+  if (/—/.test(body)) blocks.push({ group: 'voice', why: 'em dash; he does not use them and it reads as machine-written', matched: '—' });
+  if (/\bguarantee(d|s)?\b/i.test(body)) blocks.push({ group: 'claim', why: '"guaranteed" — never, in any REDOS copy', matched: (body.match(/\bguarantee\w*/i) || [''])[0] });
+
+  const lower = body.toLowerCase();
+  for (const w of BANNED_WORDS) {
+    if (lower.includes(w)) blocks.push({ group: 'register', why: `banned phrase "${w}" (Headline Bank §7)`, matched: w });
+  }
+
+  if (Array.isArray(verifiedFigures)) {
+    const allow = new Set(verifiedFigures.map((f) => String(f).replace(/[$,%\s]/g, '')));
+    for (const f of figuresIn(body)) {
+      if (!allow.has(String(f).replace(/[$,%\s]/g, ''))) {
+        blocks.push({ group: 'claim', why: `figure ${f} is not in the claims log — never publish a number the product did not produce`, matched: f });
+      }
+    }
+  }
+
+  return { ...r, ok: blocks.length === 0, blocks };
+}
+
 /** Stricter variant for anything published as REDOS rather than as him. */
 export function complianceCheckRedos(text = '') {
   const r = complianceCheck(text);

@@ -29,7 +29,10 @@ const INCOME = [
   [/\b(I|we)\s+(own|hold|control|manage)\s+\d+\s*(door|unit|propert|home|house|rental)/i, 'asset count claim'],
   [/\b\d+\s*(doors?|units?|properties|rentals)\s+(I|we)\s/i, 'asset count claim'],
   [/\b(六|my)\s*portfolio\s+(does|makes|generates|returns)/i, 'portfolio performance claim'],
-  [/\bfrom\s+\$?[\d,]+\s+to\s+\$?[\d,]+\b/i, 'transformation figure, the banned hook form'],
+  // ⚠ The k/m/b suffix used to defeat this. "from 0 to 10k in 90 days" passed, because \b sits
+  // between the digits and the k, so the second [\d,]+ never reached a word boundary. Found by
+  // running all 897 archived posts through the guard.
+  [/\bfrom\s+\$?[\d,]+(?:\.\d+)?\s*[kmb]?\+?\s+to\s+\$?[\d,]+(?:\.\d+)?\s*[kmb]?\b/i, 'transformation figure, the banned hook form'],
 ];
 
 // ── Traction and audience ───────────────────────────────────────────────────
@@ -40,6 +43,18 @@ const TRACTION = [
   [/\b(grew|went|scaled)\s+(from|to)\s+[\d,]+\s*(followers?|subscribers?|users?|customers?)/i, 'growth claim'],
   [/\b\d[\d,]*\s*\+?\s*(reviews?|ratings?|testimonials?|five[- ]stars?)\b/i, 'review count'],
   [/\b(sold out|fully booked|waitlist of|joined by)\s*\d/i, 'demand claim'],
+  // ── PERCENTAGE GROWTH, added 2026-08-06 ──────────────────────────────────
+  // The rules above all key on a COUNT ("10,000 followers"). His actual top-performing post was
+  // "I increased my Twitter engagement by 116,308% in 28 days" — a first-person traction claim with
+  // no count in it, which sailed straight through. So did "I grew my account 400% last month" and
+  // "my engagement is up 250%".
+  //
+  // Every one of these is tied to FIRST PERSON on purpose. Deal arithmetic is most of what he writes
+  // and a bare percentage is the language of it — "cap rate went from 6% to 7%" is analysis, not a
+  // claim about him, and a guard that blocks it would be turned off within a week.
+  [/\b(I|we)\s+(increased|grew|scaled|boosted|doubled|tripled|quadrupled)\b/i, 'first-person growth claim'],
+  [/\b(my|our)\s+(?:\w+\s+){0,3}?(engagement|reach|following|followers|audience|traffic|account|list|impressions)\b[^.!?]{0,40}?[\d,]+(?:\.\d+)?\s*%/i, 'growth percentage on his own account'],
+  [/\b(engagement|reach|following|audience|traffic|impressions)\b[^.!?]{0,30}?\b(up|by|increased|grew)\b[^.!?]{0,15}?[\d,]+(?:\.\d+)?\s*%/i, 'platform growth percentage'],
 ];
 
 // ── Guru register. Not illegal, but off-voice and it invites the wrong reader.

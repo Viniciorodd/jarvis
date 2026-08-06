@@ -108,6 +108,8 @@ actions/
 
 # Focus/time tracker ledger (personal)
 focus/
+# 897 of his own published posts, seeded as the loop's baseline — his data, not the repo's.
+brand-features/
 
 # GovCon capture win/loss ledger (business outcomes — machine data, never commit)
 gov-capture/

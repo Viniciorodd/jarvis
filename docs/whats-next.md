@@ -2,6 +2,30 @@
 
 _Updated 2026-08-04. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
+### 2026-08-06 (pt.2) - Brand pod: PRD revised, then items 0-3 built
+
+Revision: `docs/superpowers/specs/2026-08-06-brand-pod-prd-REVISED.md`. Read it before item 4.
+
+- **Item 0.** `pods/brand/` + `pods/redos/` + 3 eval files were UNTRACKED despite the PRD and session
+  log saying "committed". 107 evals existed only in the working tree. Now committed (945bac9).
+- **Item 1a.** `pods/brand/archive.mjs` + `scripts/brand-seed.mjs` -> 897 posts seeded into
+  `brand-features/<year>.jsonl` with REAL engagement, each row labelled era / on_domain /
+  publishable_today. 🚨 Running the guard over all 897 found **four leaks**, incl. his single
+  highest-engagement post ("I increased my Twitter engagement by 116,308%"). All now block; deal
+  arithmetic still passes.
+- **Item 1b — NOT BUILDABLE, and that is the finding.** Only 12 of 897 posts are on-domain,
+  publishable and his own words. Top-by-reach is 2023 Twitter-agency content. **`examples/` must come
+  from new writing**, and it is the quality ceiling on everything the producer generates.
+- **Item 2.** `pods/brand/policy.mjs` — closes the safety hole: `/kill` reached gov but NOT brand.
+  Proven against the live switch, file restored byte-identical. Kill switch is IMPORTED from the gov
+  policy, never copied, so it cannot drift. No tier grants publishing without an approval.
+- **Item 3.** `pods/brand/store.mjs` — append-only JSONL, folded. Rule 1 now has two independent
+  layers (gate + ledger). Killed is terminal. Unfetched metrics null, never zero. Claims log has no
+  update path at all.
+
+**Next: item 4** (fold the seeded features into the store), then 5 (producer), 6 (Sunday batch).
+**Needs him:** ~$6 Apify for commenter data, and `evidence.md`. Neither is blocked on handles.
+
 ### 2026-08-06 - The stopwatch + /log from Telegram
 
 - **`/log <anything>` in Telegram** writes verbatim to the journal and replies with a receipt ("log 16:39").

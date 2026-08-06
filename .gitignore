@@ -110,6 +110,11 @@ actions/
 focus/
 # 897 of his own published posts, seeded as the loop's baseline — his data, not the repo's.
 brand-features/
+# The draft ledger and the claims log — his posts and his approvals, not the repo's.
+# NOTE: the claims log is a legal record. Gitignoring matches tax-ledger/ precedent and keeps it off
+# GitHub, but it means it is NOT backed up by the repo. Worth a deliberate backup decision.
+brand-store/
+brand-claims/
 
 # GovCon capture win/loss ledger (business outcomes — machine data, never commit)
 gov-capture/

@@ -54,6 +54,14 @@ async function get(pathname, token, params = {}) {
 
 const cents = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.round(n) : 0; };
 
+// ── This pod is REDOS Ops, not "every product he has ever sold" ─────────────────────────────────
+// The account also carries an old Twitter ebook with four free downloads on it. Counting those as
+// REDOS customers would have put "4" against a north-star metric that is supposed to mean "strangers
+// who wanted THIS", and it would have been wrong in the flattering direction, which is the worst
+// kind. Product scoping is the fix, and it belongs here rather than in the metric layer so the
+// snapshot never contains the other product at all.
+export const isRedosProduct = (name = '') => /redos/i.test(String(name));
+
 // PURE: one Gumroad sale → the only fields we keep. The email is deliberately absent.
 export function normaliseSale(s = {}, classifications = {}) {
   const id = s.id || s.sale_id || '';
@@ -66,16 +74,23 @@ export function normaliseSale(s = {}, classifications = {}) {
     feeCents: cents(s.gumroad_fee),
     affiliateCents: cents(s.affiliate_credit_amount_cents),
     refunded: s.refunded === true || s.partially_refunded === true,
-    // 🚨 Both default to UNDEFINED, not false. Unknown is a real state and it must survive to the
-    // metric layer, where unclassified buyers are excluded from the headline number.
+    // 🚨 All three default to UNDEFINED, not false. Unknown is a real state and it must survive to
+    // the metric layer, where unclassified buyers are excluded from the headline number.
     is_friend: typeof c.is_friend === 'boolean' ? c.is_friend : undefined,
     hand_sold: typeof c.hand_sold === 'boolean' ? c.hand_sold : undefined,
+    // A row he created himself while testing checkout. NOT a friend — a friend is at least a person.
+    // Conflating the two would quietly leave his own test sitting in the customer denominator.
+    is_test: c.is_test === true,
   };
 }
 
 // PURE: the sales list → the shape metrics.mjs consumes.
 export function summarise(sales = [], classifications = {}) {
-  const rows = (Array.isArray(sales) ? sales : []).map((s) => normaliseSale(s, classifications));
+  const all = (Array.isArray(sales) ? sales : []).map((s) => normaliseSale(s, classifications));
+  // Scope to REDOS, then drop his own test rows. Both exclusions are counted and reported rather
+  // than silently applied — a number that quietly got smaller is a number nobody can audit.
+  const scoped = all.filter((r) => isRedosProduct(r.tier));
+  const rows = scoped.filter((r) => !r.is_test);
   const live = rows.filter((r) => !r.refunded);
   const byTier = {};
   for (const r of live) byTier[r.tier] = (byTier[r.tier] || 0) + 1;
@@ -88,6 +103,10 @@ export function summarise(sales = [], classifications = {}) {
     orders: live.length,
     by_tier: byTier,
     unclassified: rows.filter((r) => r.is_friend === undefined).length,
+    excluded: {
+      other_products: all.length - scoped.length,
+      self_tests: scoped.length - rows.length,
+    },
   };
 }
 

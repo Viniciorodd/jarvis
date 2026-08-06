@@ -13,6 +13,7 @@ import { customers, revenue, funnel, sends, needsFollowUp, health, isStale, dige
   assertNoVanity, BANNED_METRICS, NET_DEFINITION, STALE_HOURS } from '../pods/redos-ops/metrics.mjs';
 import { evaluate, phase, gateLine, GATES } from '../pods/redos-ops/gates.mjs';
 import { emptySnapshot, withSource, series } from '../pods/redos-ops/store.mjs';
+import { summarise, isRedosProduct, normaliseSale } from '../pods/redos-ops/sources/gumroad.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
@@ -80,6 +81,48 @@ export default {
     { name: '⚠ a dead revenue source gives null customers, never 0', run: () => {
       const c = customers({ sources: { gumroad: dead('no API key') } });
       return ok(c.nonFriend === null && c.total === null && /no API key/.test(c.why), JSON.stringify(c));
+    } },
+
+    // ── 🚨 what must never end up in the customer count ───────────────────────────────────────────
+    { name: '🚨 his own checkout test is not a customer', run: () => {
+      // Confirmed 2026-08-06: the one apparent REDOS sale was him testing checkout. A test row is not
+      // a friend — a friend is at least a person — so conflating the two would have left his own test
+      // sitting in the denominator of the north-star metric.
+      const sales = [{ id: 's1', product_name: 'REDOS — Starter (Lifetime)', price: 0, created_at: '2026-08-01' }];
+      const d = summarise(sales, { s1: { is_test: true } });
+      return ok(d.customers.length === 0 && d.orders === 0 && d.excluded.self_tests === 1,
+        JSON.stringify(d.excluded));
+    } },
+
+    { name: '🚨 buyers of a DIFFERENT product are not REDOS customers', run: () => {
+      // The account carries an old Twitter ebook with four free downloads. Counting those would have
+      // put "4" against a metric that means "strangers who wanted THIS" — wrong in the flattering
+      // direction, which is the worst kind.
+      const sales = [
+        { id: 'a', product_name: 'How I Increased My Twitter Engagement over 116,308%', price: 0 },
+        { id: 'b', product_name: 'REDOS — Starter (Lifetime)', price: 7900 },
+      ];
+      const d = summarise(sales, {});
+      return ok(d.customers.length === 1 && d.excluded.other_products === 1
+        && isRedosProduct('REDOS — Starter') && !isRedosProduct('Twitter Pro'), JSON.stringify(d.excluded));
+    } },
+
+    { name: '⚠ exclusions are COUNTED, never silent', run: () => {
+      // A number that quietly got smaller is a number nobody can audit.
+      const d = summarise([{ id: 'x', product_name: 'Other thing', price: 100 }], {});
+      return ok(d.excluded.other_products === 1 && d.excluded.self_tests === 0);
+    } },
+
+    { name: '🔒 no buyer email survives normalisation', run: () => {
+      const row = normaliseSale({ id: 's', product_name: 'REDOS', email: 'a@b.com',
+        purchase_email: 'a@b.com', zip_code: '18641', license_key: 'ABC' }, {});
+      return ok(!JSON.stringify(row).includes('@') && !('email' in row) && !('zip_code' in row),
+        JSON.stringify(row));
+    } },
+
+    { name: 'is_test defaults to false, is_friend to undefined', run: () => {
+      const row = normaliseSale({ id: 's', product_name: 'REDOS' }, {});
+      return ok(row.is_test === false && row.is_friend === undefined && row.hand_sold === undefined);
     } },
 
     // ── money ─────────────────────────────────────────────────────────────────────────────────────

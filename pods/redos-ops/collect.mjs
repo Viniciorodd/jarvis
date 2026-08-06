@@ -70,6 +70,12 @@ async function main() {
   console.log('  net                   ' + usd(r.netUsd) + '   [' + r.netDefinition + ']');
   console.log('  refunds               ' + usd(r.refundsUsd));
   console.log('  by tier               ' + JSON.stringify(r.byTier));
+  // Exclusions are PRINTED, never silent. A number that quietly got smaller is one nobody can audit.
+  const ex = snap.sources.gumroad && snap.sources.gumroad.ok && snap.sources.gumroad.data.excluded;
+  if (ex && (ex.other_products || ex.self_tests)) {
+    console.log('  excluded              ' + ex.other_products + ' non-REDOS product row(s), '
+      + ex.self_tests + ' self-test row(s)');
+  }
   console.log('');
   console.log('  ' + gateLine(snap));
   const st = isStale(snap, now);

@@ -50,9 +50,6 @@ export const SURFACES = [
   { id: 'goals',     route: '/goals',       name: 'Goals',
     says: 'every goal you have written, and where they share a path',
     aliases: ['goals', 'my goals', 'goal map', 'the goals', 'vision board', 'dreams', 'ambitions'] },
-  { id: 'journal',   route: '/journal',     name: 'Log',
-    says: 'your log — short thoughts, stamped with time and place',
-    aliases: ['log', 'journal', 'my log', 'my journal', 'diary', 'thoughts', 'my thoughts', 'entries', 'the log'] },
   { id: 'ideas',     route: '/ideas',       name: 'Ideas',
     says: 'ideas waiting on your yes',
     aliases: ['ideas', 'idea vault', 'suggestions'] },
@@ -60,8 +57,11 @@ export const SURFACES = [
     says: 'time and focus — where you log productive time',
     aliases: ['focus', 'time', 'deep work', 'focus time', 'log time', 'log my time', 'time log', 'timer', 'productive time'] },
   { id: 'personal',  route: '/#personal',   name: 'Personal',
-    says: 'the personal side — Ana, health, family',
-    aliases: ['personal', 'ana', 'health', 'family', 'personal stuff'] },
+    says: 'the brain dump and your log, plus Ana, health and family',
+    // The log lives in Personal -> Brain, not on a page of its own: he already had a fully functional brain
+    // dump and a second destination was one more door onto the same habit.
+    aliases: ['personal', 'ana', 'health', 'family', 'personal stuff', 'brain dump', 'braindump', 'brain',
+      'log', 'my log', 'journal', 'my journal', 'diary', 'thoughts', 'my thoughts', 'the log'] },
   { id: 'activity',  route: '/#activity',   name: 'Activity',
     says: 'everything Jarvis and the agents did',
     aliases: ['activity', 'the log', 'what happened', 'history', 'what did you do', 'the record', 'timeline'] },

@@ -1188,3 +1188,16 @@ body.dock-open .j-dock-fab{ display:none; }
 .j-drawer-rule { height: 1px; margin: 10px 14px; background: rgba(255,255,255,.09); }
 .j-drawer-item.sec { opacity: .62; font-size: 13px; }
 .j-drawer-item.sec:hover { opacity: 1; }
+
+/* ─── BRAIN DUMP + LOG, merged (2026-08-06) ───────────────────────────────────────────────────────
+   He already had a fully functional brain dump; a separate Log tab was a second door onto the same
+   habit. One box now: Log it keeps it verbatim, Sort it files it. */
+.ps-btn-ghost{ background:rgba(var(--teal-rgb),.10); color:var(--cream); border-color:rgba(var(--teal-rgb),.28); }
+.ps-brain-stats{ display:flex; gap:16px; flex-wrap:wrap; margin-top:18px; font-size:12px; color:var(--dim); }
+.ps-brain-stats b{ color:var(--cream); font-weight:600; font-variant-numeric:tabular-nums; }
+.ps-brain-day{ font-size:10px; font-weight:600; letter-spacing:.12em; color:var(--dim); margin:16px 0 2px; }
+.ps-brain-e{ padding:10px 0; border-bottom:1px solid var(--line); }
+.ps-brain-e:last-child{ border-bottom:0; }
+.ps-brain-t{ font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+.ps-brain-m{ font-size:11px; color:var(--dim); margin-top:4px; }
+.ps-brain-pin{ color:var(--teal); }

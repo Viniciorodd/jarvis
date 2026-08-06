@@ -94,31 +94,84 @@ function loadBrainDump(){
   var wrap = el('div','ps-brain');
   wrap.innerHTML =
     '<div class="ps-brain-h">Brain dump</div>' +
-    '<div class="ps-brain-sub">Empty your head. Jarvis sorts each dump into the right place in your second brain.</div>';
+    '<div class="ps-brain-sub">Empty your head. Short thoughts get stamped and kept as they are; ' +
+    'anything longer, Jarvis files into the right place in your second brain.</div>';
   var area = el('textarea','ps-brain-area');
-  area.placeholder = 'Type or paste anything — a thought, a meeting, an idea, a person, a to-do…';
+  area.placeholder = "What's on your mind? A thought, a meeting, an idea, a person, a to-do…";
   wrap.appendChild(area);
   var actions = el('div','ps-brain-acts');
-  var sortBtn = el('button','ps-btn','Sort it →');
-  var status = el('div','ps-brain-status','');
-  actions.appendChild(sortBtn); actions.appendChild(status);
+  var logBtn  = el('button','ps-btn','Log it');
+  var sortBtn = el('button','ps-btn ps-btn-ghost','Sort it →');
+  var status  = el('div','ps-brain-status','');
+  actions.appendChild(logBtn); actions.appendChild(sortBtn); actions.appendChild(status);
   wrap.appendChild(actions);
+  var stats = el('div','ps-brain-stats'); stats.id = 'psBrainStats';
+  wrap.appendChild(stats);
   var feed = el('div','ps-brain-feed'); feed.id = 'psBrainFeed';
   wrap.appendChild(feed);
   body.appendChild(wrap);
   area.focus();
 
-  function submit(){
+  function timeLabel(hhmm){
+    var q = String(hhmm||'').split(':'); if(q.length!==2) return hhmm||'';
+    var h = Number(q[0]); return ((h%12)||12)+':'+q[1]+' '+(h>=12?'PM':'AM');
+  }
+  function dayLabel(d){
+    var t = today();
+    var y = new Date(Date.now()-86400000).toISOString().slice(0,10);
+    if(d===t) return 'TODAY';
+    if(d===y) return 'YESTERDAY';
+    return new Date(d+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}).toUpperCase();
+  }
+
+  /* The stream he actually reads back: his own stamped entries, newest first. Filed dumps get prepended
+     as cards by the sorter, so both kinds of capture land in one place instead of two. */
+  function refresh(){
+    fetch('/api/journal?limit=40').then(function(r){ return r.json(); }).then(function(d){
+      if(!d || !d.ok) return;
+      var st = d.stats || {};
+      /* Silence when there is nothing — a "0 today" badge every morning is a scoreboard he didn't ask for. */
+      stats.innerHTML = st.total
+        ? '<span><b>'+st.today+'</b> today</span><span><b>'+st.week+'</b> this week</span>' +
+          (st.streak>1 ? '<span><b>'+st.streak+'</b>-day streak</span>' : '') +
+          '<span><b>'+st.total+'</b> all time</span>'
+        : '';
+      var day = '', html = '';
+      (d.entries||[]).forEach(function(x){
+        if(x.date !== day){ day = x.date; html += '<div class="ps-brain-day">'+esc(dayLabel(day))+'</div>'; }
+        html += '<div class="ps-brain-e"><div class="ps-brain-t">'+esc(x.text)+'</div>'+
+          '<div class="ps-brain-m">'+esc(timeLabel(x.time))+
+          (x.place ? ' · <span class="ps-brain-pin">📍 '+esc(x.place)+'</span>' : '')+'</div></div>';
+      });
+      feed.innerHTML = html || '<div class="ps-empty">Nothing logged yet. Two words is a valid entry.</div>';
+    }).catch(function(){ /* the tab still works if the log is unreachable */ });
+  }
+
+  /* 🚨 LOG IT saves VERBATIM. No filter, no cleanup, no AI in the path. The crisis-suppression list stops
+     the SYSTEM turning his worst night into a goal — it must never stop him writing the sentence. */
+  function logIt(){
     var text = area.value.trim();
-    if(!text){ return; }
+    if(!text) return;
+    logBtn.disabled = true; status.textContent = 'saving…';
+    post('/api/journal', { text: text })
+      .then(function(d){
+        logBtn.disabled = false;
+        if(d && d.ok){ area.value = ''; status.textContent = ''; refresh(); }
+        else status.textContent = 'error: '+esc((d&&d.error)||'failed');
+      })
+      .catch(function(){ logBtn.disabled = false; status.textContent = 'network error'; });
+  }
+
+  /* SORT IT hands it to the filer instead — for the dumps that belong somewhere specific. */
+  function sortIt(){
+    var text = area.value.trim();
+    if(!text) return;
     sortBtn.disabled = true; status.textContent = 'sorting…';
-    fetch('/api/knowledge/braindump',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})})
-      .then(function(r){ return r.json(); })
+    post('/api/knowledge/braindump', { text: text })
       .then(function(d){
         sortBtn.disabled = false;
         if(d.ok && d.filed){
-          area.value = '';
-          status.textContent = '';
+          area.value = ''; status.textContent = '';
           var card = el('div','ps-brain-filed');
           card.innerHTML = '<span class="ps-brain-folder">'+esc(d.filed.folder)+'</span> '+esc(d.filed.title)+
             '<span class="ps-brain-path">'+esc(d.filed.file)+'</span>';
@@ -129,8 +182,16 @@ function loadBrainDump(){
       })
       .catch(function(){ sortBtn.disabled=false; status.textContent='network error'; });
   }
-  sortBtn.addEventListener('click', submit);
-  area.addEventListener('keydown', function(e){ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); submit(); } });
+
+  logBtn.addEventListener('click', logIt);
+  sortBtn.addEventListener('click', sortIt);
+  /* Enter logs, ⌘/Ctrl+Enter sorts. The common case is the short one, so it gets the plain key. */
+  area.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter') return;
+    if(e.metaKey || e.ctrlKey){ e.preventDefault(); sortIt(); return; }
+    if(!e.shiftKey && area.value.indexOf('\n') === -1){ e.preventDefault(); logIt(); }
+  });
+  refresh();
 }
 
 /* ══════════════════════════════════════════════════════════════

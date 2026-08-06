@@ -322,6 +322,17 @@
       .catch(function () { save.disabled = false; });
   }
 
+  /* "all ->" opens Personal -> Brain. He already had a fully functional brain dump and did not know it;
+     a second Log destination was one more door onto the same habit, so there is only one now. */
+  var more = $id('jLogMore');
+  if (more) {
+    more.addEventListener('click', function (e) {
+      e.preventDefault();
+      var p = $id('jMorePersonal');
+      if (p) { p.click(); } else { window.location.href = '/#personal'; }
+    });
+  }
+
   save.addEventListener('click', commit);
   input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
 

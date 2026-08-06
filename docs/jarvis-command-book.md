@@ -101,6 +101,13 @@ Instant, no waiting. If a screen doesn't exist she says so rather than guessing.
 | "create a note called X" | writes it, then reads it back to prove it |
 | "what did we talk about yesterday" | the unified record — chat, agents, approvals |
 
+### The brain dump (and your log)
+> Drawer → **Personal** → **Brain** · or "brain dump" / "show me my log"
+
+One box. **Log it** keeps a short thought exactly as you typed it, stamped with the time (and place if you
+gave one). **Sort it →** hands a longer dump to Jarvis to file into the right vault folder. Your stamped
+entries live in `06 - Journals/Log/`. From Telegram: `/log <anything>` (add `@the shop` to name the place).
+
 ### Your goals
 > "show me my goals" · or the **Goals** item in the drawer
 

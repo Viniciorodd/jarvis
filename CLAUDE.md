@@ -87,7 +87,10 @@ iPhone/iPad — nothing is exposed to the public internet.
   (`isCrisisContent`, `pods/goals-import.mjs`) is a P0 SAFETY GATE — his journals contain "I want to die";
   it runs before every other import rule and every future reader of his journals must use it.
 - **The log (journal)**: `pods/journal.mjs` (pure, eval-pinned) → `/api/journal` (+`/place`), page
-  `companion/public/journal.html`, plus the capture strip + stats on Home (`today.js`). Entries land in
+  the **Personal → Brain** tab (`companion/public/personal.js` `loadBrainDump`), plus the capture strip +
+  stats on Home (`today.js`). Merged into the pre-existing brain dump 2026-08-06 at his request — "i honestly
+  didnt need a new log section, i didn't know we had a fully functional one" — so there is NO separate /journal
+  page. `Log it` saves verbatim; `Sort it →` hands it to the AI filer. Entries land in
   `<VAULT>/06 - Journals/Log/YYYY-MM.md`, tweet-style, stamped with time and an optional place.
   🚨 **Nothing he writes is ever filtered** — the crisis list stops the SYSTEM making a goal out of his worst
   night, never him writing it. The `Log` folder is excluded from the goal harvest instead (SKIP set in

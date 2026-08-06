@@ -329,6 +329,15 @@
      quietly disagrees with it. */
   if (timeBtn) {
     timeBtn.addEventListener('click', function () {
+      /* Starts the SERVER stopwatch rather than asking him to estimate minutes after the fact. He asked to
+         "track my time... pause it and continue whenever" - a prompt box can only ever capture a guess made
+         once the work is already over. The floating pill takes it from here, on every page. */
+      if (window.JarvisStopwatch) {
+        window.JarvisStopwatch.start('');
+        timeBtn.textContent = '⏱ running';
+        setTimeout(function () { timeBtn.textContent = '＋ time'; }, 2000);
+        return;
+      }
       var mins = window.prompt('How many minutes of focused time?');
       if (!mins || !Number(mins)) { return; }
       var note = window.prompt('On what? (optional)') || '';

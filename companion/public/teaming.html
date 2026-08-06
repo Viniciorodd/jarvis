@@ -110,5 +110,6 @@ document.getElementById('modal').addEventListener('click',function(e){ if(e.targ
 document.getElementById('mCopy').addEventListener('click',function(){ var t=document.getElementById('mText'); t.select(); try{ navigator.clipboard.writeText(t.value); this.textContent='Copied ✓'; var b=this; setTimeout(function(){b.textContent='📋 Copy the intro';},1500); }catch(e){} });
 scan();
 </script>
+  <script src="stopwatch.js" defer></script>
 </body>
 </html>

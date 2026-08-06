@@ -191,6 +191,14 @@ const vaultRoot = () => VAULT_DIR || path.join(os.homedir(), 'Documents', 'Secon
 const journalDir = () => path.join(vaultRoot(), '06 - Journals', 'Log');
 // Names he has given coordinates. Repo-side, not vault-side — a list of where he physically is belongs in
 // application state, not in a note that syncs.
+// The stopwatch. Server-side so the same clock answers the phone and the PC, and so closing the laptop
+// mid-session does not throw the time away.
+const stopwatchPath = () => path.join(__dirname, 'data', 'stopwatch.json');
+function readStopwatch() { try { return JSON.parse(fs.readFileSync(stopwatchPath(), 'utf8')) || {}; } catch { return { running: false, startedAt: '', accumulatedMs: 0, label: '', since: '' }; } }
+function writeStopwatch(st) {
+  try { fs.mkdirSync(path.dirname(stopwatchPath()), { recursive: true }); } catch { /* exists */ }
+  fs.writeFileSync(stopwatchPath(), JSON.stringify(st, null, 2));
+}
 const placesPath = () => path.join(__dirname, 'data', 'journal-places.json');
 function readPlaces() { try { return JSON.parse(fs.readFileSync(placesPath(), 'utf8')) || {}; } catch { return {}; } }
 function writePlaces(p) {
@@ -3690,6 +3698,52 @@ const server = http.createServer(async (req, res) => {
       const r = saveFoundation(patch || {});
       return send(res, r.ok ? 200 : 400, JSON.stringify(r));
     } catch (e) { return send(res, 500, JSON.stringify({ error: e.message })); }
+  }
+
+  // ── THE STOPWATCH — one clock, everywhere ────────────────────────────────────────────────────────
+  // *"i want it accessible from everywhere, i want to be able to pause it and continue whenever, after i am
+  // done, i want to be able to click a button log the time in."*
+  //
+  // The state lives HERE, not in the tab. "Everywhere" means the same clock on his phone and his PC;
+  // "continue whenever" means it survives closing the laptop. A browser timer would reset on a reload and
+  // lose him two hours of real work, which is worse than having no timer.
+  if (req.method === 'GET' && url.pathname === '/api/stopwatch') {
+    try {
+      const S = await import('../pods/stopwatch.mjs');
+      const st = readStopwatch();
+      const now = new Date().toISOString();
+      return send(res, 200, JSON.stringify({ ok: true, ...S.view(st, now), forgotten: S.looksForgotten(st, now) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/stopwatch') {
+    try {
+      const S = await import('../pods/stopwatch.mjs');
+      const b = await readBody(req);
+      const action = String(b.action || '').trim();
+      const now = new Date().toISOString();
+      let st = readStopwatch();
+
+      if (action === 'start' || action === 'resume') st = S.resume(st, now, b.label);
+      else if (action === 'pause') st = S.pause(st, now);
+      else if (action === 'discard') st = S.reset();
+      else if (action === 'label') st = { ...st, label: String(b.label || '') };
+      else if (action === 'log') {
+        // The button he asked for. Bank the time first so a failing write cannot silently eat the session.
+        const stopped = S.pause(st, now);
+        const minutes = S.minutesOf(stopped, now);
+        if (!minutes) return send(res, 200, JSON.stringify({ ok: false, error: 'nothing on the clock yet' }));
+        const F = await import('../pods/focus.mjs');
+        const r = F.logFocus({ minutes, note: String(b.note || stopped.label || '').trim(), source: 'stopwatch' });
+        if (!r || r.ok === false) return send(res, 200, JSON.stringify({ ok: false, error: (r && r.error) || 'could not write the focus log', kept: S.view(stopped, now) }));
+        // Only cleared once the log actually took it.
+        writeStopwatch(S.reset());
+        return send(res, 200, JSON.stringify({ ok: true, logged: minutes, ...S.view(S.reset(), now) }));
+      } else return send(res, 200, JSON.stringify({ ok: false, error: 'unknown action' }));
+
+      writeStopwatch(st);
+      return send(res, 200, JSON.stringify({ ok: true, ...S.view(st, now), forgotten: S.looksForgotten(st, now) }));
+    } catch (e) { return send(res, 200, JSON.stringify({ ok: false, error: e.message })); }
   }
 
   // ── THE LOG — short entries, stamped, straight into his Obsidian vault ────────────────────────────

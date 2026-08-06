@@ -149,12 +149,48 @@
   .addbtn:active{ opacity:.85; }
   .addhint{ font-size:12px; color:var(--dim); margin-top:12px; line-height:1.45; }
   .addstatus{ font-size:12.5px; margin-top:10px; min-height:16px; color:var(--teal); font-weight:600; }
+
+  /* stopwatch panel - radii and type from the design system (15px hero card, full-radius controls) */
+  .swpanel{display:flex;gap:18px;align-items:center;flex-wrap:wrap;border:1px solid rgba(var(--teal-rgb),.3);
+    background:linear-gradient(180deg,rgba(var(--teal-rgb),.10),rgba(var(--teal-rgb),.03));
+    border-radius:15px;padding:16px 20px;margin:14px 0 20px}
+  .swread{font-size:44px;font-weight:600;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;min-width:150px}
+  .swpanel.run .swread{color:var(--teal)}
+  .swside{flex:1;min-width:230px}
+  .swside input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--cream);
+    border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;margin-bottom:8px}
+  .swside input:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
+  .swbtns{display:flex;gap:7px;flex-wrap:wrap}
+  .swbtns button{background:rgba(var(--teal-rgb),.1);border:1px solid rgba(var(--teal-rgb),.28);color:var(--cream);
+    border-radius:999px;padding:8px 16px;font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+  .swbtns button.prim{background:var(--teal);color:var(--ink-on-accent);border-color:var(--teal);font-weight:600}
+  .swbtns button:disabled{opacity:.4;cursor:default}
+  .swbtns button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+  .swnote{font-size:11.5px;color:var(--dim);margin-top:8px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top"><h1>🌳 Focus</h1><a class="back" href="/">‹ Jarvis</a></div>
-  <div class="sub" id="sub">Loading your time…</div>
+  <div class="sub" id="sub">Loading your time&hellip;</div>
+
+  <!-- STOPWATCH. Operator, 2026-08-05: "create a stop watch inside jarvis focus, for me to track my time.
+       I want it accessible from everywhere, i want to be able to pause it and continue whenever, after i am
+       done, i want to be able to click a button log the time in."
+       The clock lives on the SERVER (pods/stopwatch.mjs) - this panel and the floating pill on every other
+       page are two views of one running session, which is what "everywhere" has to mean. -->
+  <div class="swpanel" id="swPanel">
+    <div class="swread" id="swRead">0:00</div>
+    <div class="swside">
+      <input id="swLabel" placeholder="What are you working on? (optional)" autocomplete="off" aria-label="What this session is for" />
+      <div class="swbtns">
+        <button id="swGo" class="prim" type="button">Start</button>
+        <button id="swLog" type="button" disabled>Log it</button>
+        <button id="swClear" type="button" disabled title="Throw it away without logging">Discard</button>
+      </div>
+      <div class="swnote">Runs on the server &mdash; close this tab and it keeps going.</div>
+    </div>
+  </div>
 
   <div class="toggle" id="toggle">
     <button data-g="day">Day</button>
@@ -724,6 +760,56 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDay
 
 load();
 loadHeat();
+</script>
+  <script src="stopwatch.js" defer></script>
+<script>
+(function(){
+  var $=function(i){return document.getElementById(i);};
+  var panel=$('swPanel'); if(!panel){ return; }
+  var S={running:false,elapsedMs:0,label:''}, at=Date.now(), busy=false;
+
+  function fmt(ms){var t=Math.max(0,Math.floor(ms/1000)),h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60,
+    p=function(n){return String(n).padStart(2,'0');};return h>0?h+':'+p(m)+':'+p(s):m+':'+p(s);}
+
+  function paint(){
+    var shown=S.running?S.elapsedMs+(Date.now()-at):S.elapsedMs;
+    $('swRead').textContent=fmt(shown);
+    panel.classList.toggle('run',!!S.running);
+    $('swGo').textContent=S.running?'Pause':(S.elapsedMs>0?'Continue':'Start');
+    $('swLog').disabled=!(S.elapsedMs>0||S.running);
+    $('swClear').disabled=!(S.elapsedMs>0||S.running);
+    if(S.label&&document.activeElement!==$('swLabel')){ $('swLabel').value=S.label; }
+  }
+  function apply(d){ if(!d||!d.ok){ return; } S=d; at=Date.now(); paint(); }
+  function act(action,extra){
+    if(busy){ return; } busy=true;
+    var body={action:action}; if(extra){ Object.keys(extra).forEach(function(k){body[k]=extra[k];}); }
+    fetch('/api/stopwatch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){return r.json();}).then(function(d){busy=false;apply(d);}).catch(function(){busy=false;});
+  }
+  $('swGo').addEventListener('click',function(){
+    if(S.running){ act('pause'); } else { act('resume',{label:$('swLabel').value.trim()}); }
+  });
+  $('swClear').addEventListener('click',function(){
+    if(window.confirm('Throw away '+fmt(S.elapsedMs)+' without logging it?')){ act('discard'); }
+  });
+  $('swLog').addEventListener('click',function(){
+    /* A watch left running overnight is nearly always one he forgot to stop, and banking nine hours
+       silently would poison the very history this page reports. */
+    if(S.elapsedMs>8*3600000&&!window.confirm('That is '+fmt(S.elapsedMs)+'. Log all of it?')){ return; }
+    busy=true;
+    fetch('/api/stopwatch',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'log',note:$('swLabel').value.trim()})})
+      .then(function(r){return r.json();}).then(function(d){
+        busy=false;
+        if(d&&d.ok){ $('swLabel').value='';
+          apply({ok:true,running:false,elapsedMs:0,label:''});
+          setTimeout(function(){ location.reload(); },600); }
+      }).catch(function(){busy=false;});
+  });
+  function poll(){ fetch('/api/stopwatch').then(function(r){return r.json();}).then(apply).catch(function(){}); }
+  poll(); setInterval(paint,1000); setInterval(poll,5000);
+})();
 </script>
 </body>
 </html>

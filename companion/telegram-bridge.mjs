@@ -317,6 +317,37 @@ async function handle(chat, text, thread) {
   text = (text || '').trim();
   if (/^\/start/.test(text)) return send(chat, `Jarvis here. Text me anything — ask, draft, decide. Commands: /opps · /brief · /capture <thought> · /money · /agents (who's on, and how much rope) · /off <name> · /tier <name> 0-2 · 🛑 /kill (halt everything) · /resume · /killstatus.\n\nYour chat id is ${chat} — put it in .env as TELEGRAM_CHAT_ID to lock the bot to this phone.${isUnsupported() ? '' : '\n\nTip: each agent (Gideon, Hector, Elle, Victor…) now gets its own topic thread for updates/approvals — this thread is just for talking to me directly.'}`, thread);
   if (/^\/brief/.test(text)) { const b = await get('/api/brief'); return send(chat, b.text || b.error || 'no brief yet', thread); }
+
+  // ── THE LOG, from the phone ──────────────────────────────────────────────────────────────────────
+  // Operator, 2026-08-05: *"i want to log from telegram too."* Which is where most of these will actually
+  // be written — "i wish it was raining today" happens in a car park, not at the desk.
+  //
+  // 🚨 Whatever he types is saved VERBATIM. No filter, no cleanup, no confirmation prompt. The reply is
+  // deliberately tiny: a receipt, not a conversation. Anything chattier turns a private thought into an
+  // exchange with a bot, which is the opposite of what the log is for.
+  const logCmd = text.match(/^\/log(?:\s+([\s\S]+))?$/i);
+  if (logCmd) {
+    const body = (logCmd[1] || '').trim();
+    if (!body) {
+      // Bare /log shows the day back to him rather than scolding him for forgetting the text.
+      const d = await get('/api/journal?limit=5');
+      if (!d || !d.ok) return send(chat, `⚠️ Couldn't reach the log — ${(d && d.error) || 'unknown'}.`, thread);
+      const today = (d.entries || []).filter((e) => e.date === new Date().toLocaleDateString('en-CA'));
+      const s = d.stats || {};
+      if (!today.length) return send(chat, `Nothing logged today.\n\nSend \`/log <anything>\` — two words is a valid entry.`, thread);
+      return send(chat, `*Today*\n` + today.map((e) => `${e.time} — ${e.text}${e.place ? ` (${e.place})` : ''}`).join('\n')
+        + `\n\n_${s.week} this week${s.streak > 1 ? ` · ${s.streak}-day streak` : ''}_`, thread);
+    }
+    // A trailing "@somewhere" names the place and is REMOVED from the entry — otherwise the text he reads
+    // back next year has a stray @ on the end of it.
+    const at = body.match(/^([\s\S]*?)\s+@([\w' .-]{2,30})$/);
+    const r = await fetch(COMPANION + '/api/journal', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: at ? at[1].trim() : body, place: at ? at[2].trim() : '' }),
+    }).then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+    if (!r.ok) return send(chat, `⚠️ Couldn't save that — ${r.error || 'unknown'}. Nothing was written.`, thread);
+    return send(chat, `📓 ${r.entry.time}${r.entry.place ? ` · ${r.entry.place}` : ''}`, thread);
+  }
   // ── AUTONOMOUS-OUTREACH KILL SWITCH from the phone (Phase 9). /kill halts ALL agent sending instantly;
   // /resume releases it; /killstatus reports. Deliberately simple + always available — this must never fail
   // to stop. Anything unclear defaults to HALTING (the safe direction).

@@ -177,25 +177,87 @@ the only piece that can start today.
 
 ---
 
+## C3. Addendum — the input files, checked (and a correction to my own §D)
+
+Checked after the first pass, against the vault.
+
+**The voice profile path in §2.2 is CORRECT.** `<VAULT>/00 - System/✍️ Writing Voice — how Vinicio
+writes.md` exists. `REDOS — How Vinicio Writes.md` is a tombstone that redirects to it. I expected a
+path error here and there is not one.
+
+**`examples/` does NOT exist.** §2.2 tells the producer to read it "for reference posts" and to give
+the model his actual sentences rather than a description of his voice. There is no such directory
+anywhere in the vault. As written, the producer would silently fall back to describing his voice —
+the exact failure §2.2 warns against, caused by the PRD's own missing prerequisite.
+
+**But it is now cheap to build, because of what the archive turned out to contain.**
+
+**🔍 The X archive carries engagement counts.** `06 - Journals/Transcribed (…)/X Archive (own
+posts).md` — 897 posts, 150 KB — stores every post as:
+
+```
+**2018-10-24** · ❤️ 3 🔁 1
+> 2 minutes of my life I'll never get back.
+```
+
+Likes and retweets, per post, already in the vault. Two consequences:
+
+1. **The features table gets a real outcome column on day one.** The Rogoff teardown says "the outcome
+   half attaches the day you start posting again" — that is too pessimistic. Rank by engagement now,
+   and `examples/` can be generated from the top performers automatically, which is the manual step
+   Rogoff did by hand and the note calls his hardest.
+2. **⚠ Correction to my §D item 1.** I said the audience classifier can run "over the existing 897
+   posts" with nothing blocking it. **That is wrong and I should have opened the file before writing
+   it.** The archive holds his posts and their counts — it does not hold a single commenter. The $6
+   question is *who replies*, and those people are not in the vault. That item needs an Apify scrape
+   or an X export, exactly as both notes budget for.
+
+So the split is sharper than I had it:
+
+| Piece | Status |
+|---|---|
+| Features table over 897 posts, with real engagement attached | **unblocked, today** |
+| `examples/` generated from top performers | **unblocked, today** |
+| Audience classifier — who actually replies | **blocked on ~$6 of Apify credits or an export** |
+
+The classifier is still the highest-value question. It is just not free, and I implied it was.
+
+**Rogoff Stage 1 files are all missing**: no `audience-info.md`, no `evidence.md`, no ICP language
+library. "The Machine" note calls these the foundation — *"Nothing works without them"* — and puts
+them at build order #1. The PRD never mentions them. `evidence.md` matters most here: it is the
+non-financial credibility file (years licensed, deals analysed as a count never a value, published
+methodology, corrections issued) that a post reaches for when it needs proof. Without it the producer
+has nothing legitimate to cite, and reaching for proof is precisely where an unwritten guard gets
+tested.
+
+---
+
 ## D. What I would build, revised
 
 | # | Thing | Depends on | Blocked? |
 |---|---|---|---|
 | 0 | Commit the existing pods | nothing | **no — do this first** |
-| 1 | Audience classifier over the 897 posts (`tier:'cheap', provider:'local'`) | nothing | no |
+| 1a | Features table over the 897 posts, real engagement attached | nothing | no |
+| 1b | Generate `examples/` from the top performers | 1a | no |
+| 1c | `evidence.md` + `audience-info.md` + ICP library (Rogoff Stage 1) | you | **needs your input** |
+| 1d | Audience classifier — *who replies* (`tier:'cheap', provider:'local'`) | commenter data | **~$6 Apify or an export** |
 | 2 | `pods/brand/policy.mjs` — kill switch + Control Center + tiers | outreach-policy as the model | no |
 | 3 | `store.mjs` — JSONL, append-only, fold-to-derive | — | no |
-| 4 | Seed `features.extract()` over the 897 posts | 3 | no |
+| 4 | Fold the seeded features into the store | 1a, 3 | no |
 | 5 | `producer.mjs` — raw → compress → guards | 2, 3 | no |
 | 6 | Sunday batch, emitting `approval.request` | 3, 5 | no |
 | 7 | `bluesky.mjs` + `mastodon.mjs`, injected client, dry-run default | 2, 6 | **handles** |
-| 8 | `loop.mjs`, scored on buyer composition | 1, 4 | no |
+| 8 | `loop.mjs`, scored on buyer composition | 1d, 4 | **needs 1d** |
 | 9 | One cockpit surface | 3 | no |
 | 10 | `linkedin.mjs` → `threads.mjs` → `x.mjs` last, + the 60-day refresh job | 7 | **app registration** |
 
-Items 0 through 6 and 8 are unblocked. The session log lists four things blocked on you; **none of
-them block the first seven steps**, which is worth knowing before another week passes waiting on
-handles.
+Items 0, 1a, 1b, 2, 3, 4, 5, 6 and 9 are unblocked and can start today. The session log lists four
+things blocked on you; **none of them block those nine steps**, which is worth knowing before another
+week passes waiting on handles.
+
+The two that do need you are small and unrelated to handles: **~$6 of Apify credits** (or an X
+export) for the commenter data, and **`evidence.md`** — the non-financial credibility file, which
+only you can populate.
 
 ---
 

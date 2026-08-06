@@ -113,6 +113,9 @@ brand-features/
 # The draft ledger and the claims log — his posts and his approvals, not the repo's.
 # NOTE: the claims log is a legal record. Gitignoring matches tax-ledger/ precedent and keeps it off
 # GitHub, but it means it is NOT backed up by the repo. Worth a deliberate backup decision.
+# dated REDOS business snapshots — his revenue and customer counts, not the repo's.
+# LEADING SLASH matters: bare `redos-ops/` also swallowed pods/redos-ops/, i.e. the source.
+/redos-ops/
 brand-store/
 brand-claims/
 

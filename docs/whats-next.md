@@ -2,6 +2,20 @@
 
 _Updated 2026-08-04. Committed + pushed (`main` and `feat/core-infrastructure-v2` kept identical). Resume from here._
 
+### 2026-08-06 - The stopwatch + /log from Telegram
+
+- **`/log <anything>` in Telegram** writes verbatim to the journal and replies with a receipt ("log 16:39").
+  Trailing `@the shop` names the place and is stripped from the text. Bare `/log` reads today back.
+  The PC bridge was restarted to pick it up.
+- **Stopwatch** (`pods/stopwatch.mjs`, 20 evals): server-side state, so the same session shows on phone and
+  PC and survives closing the laptop. Elapsed is derived from timestamps - a ticker would drift, stop on
+  sleep, and double-count across tabs. Panel on `/focus`; floating pill on all 12 themed pages via
+  `stopwatch.js` (one script tag per surface). Home's + time now STARTS it rather than asking for an
+  estimate after the fact.
+- Guards worth keeping: Start twice never restarts the clock; a backwards clock never subtracts worked time;
+  a 40-second session logs 1 minute not 0; >8h asks before logging (a forgotten overnight watch would poison
+  the focus history); the session is only cleared once the focus write succeeds.
+
 ### 🆕 2026-08-05 — The log (journal), and Jarvis was down
 
 **Jarvis was down** because I repeatedly killed the companion process to pick up code changes during the

@@ -92,6 +92,13 @@ iPhone/iPad — nothing is exposed to the public internet.
   🚨 **Nothing he writes is ever filtered** — the crisis list stops the SYSTEM making a goal out of his worst
   night, never him writing it. The `Log` folder is excluded from the goal harvest instead (SKIP set in
   `/api/goals/candidates`). Place names are stored locally from browser coordinates; **never reverse-geocode**.
+- **The stopwatch**: `pods/stopwatch.mjs` (pure, eval-pinned) -> `/api/stopwatch` (start/pause/resume/log/
+  discard). State is SERVER-side (`companion/data/stopwatch.json`) so one session answers phone and PC and
+  survives a tab reload. Elapsed is derived from timestamps, **never accumulated by a ticker**. Big panel on
+  `/focus`, floating pill via `companion/public/stopwatch.js` on every themed page (add the script tag to a
+  new surface and it just works). `Log it` writes minutes into the same focus ledger `/focus` reads.
+- **Telegram**: `/log <text>` writes straight to the journal (a trailing `@place` names the place and is
+  stripped); bare `/log` reads the day back.
 - HQ API contract: documented at the top of `hq/server.js` (POST /api/event, /api/approval, GET /api/state).
 - Room/rank unlock thresholds: `hq/config/rooms.json` (rooms) and the RANKS list in `hq/public/app.js`.
 - n8n workflows are exported JSON in `n8n/workflows/` — they are the source of truth; if you

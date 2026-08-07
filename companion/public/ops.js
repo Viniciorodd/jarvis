@@ -16,6 +16,11 @@
   // central exec/finance/system approvals so money gates stay visible). `tabs` = the views it shows.
   const BUSINESSES = [
     { id: 'gov', label: '🏛 Gov Contracting', pods: ['gov', 'exec', 'chief-of-staff', 'system'], tabs: ['leads', 'opps', 'props', 'crm'] },
+    // Operator, 2026-08-07: "I have no business control for REDOS within Jarvis." He was right — the
+    // engine (pods/redos-ops/) was built, eval-pinned, and reachable only from a CLI, so his one live
+    // product was the only business without a seat here. Placed second because it is the one with a
+    // launch actually running.
+    { id: 'redos', label: '📐 REDOS', pods: ['redos', 'brand', 'social'], tabs: ['launch', 'money', 'posts', 'funnel'] },
     { id: 'realestate', label: '🏢 Real Estate', pods: ['real-estate'], tabs: ['analyzer', 'units', 'flips', 'builds', 'rentals'] },
     { id: 'trading', label: '📈 Trading', pods: ['trading'], tabs: ['watchlist', 'positions', 'predictions', 'paper'] },
     { id: 'fiverr', label: '🎨 Fiverr Studio', pods: ['fiverr'], tabs: ['studio', 'activity', 'leads'] },
@@ -24,7 +29,7 @@
     { id: 'agents', label: '🤖 Agents', pods: ['chief-of-staff', 'exec'], tabs: ['assistant', 'busops', 'queue'] },
     { id: 'music', label: '🎵 Music', pods: ['music'], tabs: ['identity', 'tracks', 'releases'] },
   ];
-  const TAB_LABELS = { studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', analyzer: '📊 Deal Analyzer', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', predictions: '🔮 Predictions', paper: '🧪 Paper P&L', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline', assistant: '🧠 Assistant', busops: '⚙ Business Ops', queue: '✋ Review queue', identity: '🪪 Identity', tracks: '🎙 Studio', releases: '🚀 Releases' };
+  const TAB_LABELS = { launch: '🎯 Launch gates', money: '💵 Money', posts: '📣 Posting', funnel: '🕳 Funnel', studio: '🎨 Studio', leads: '⚑ Leads', opps: '◎ Opportunities', props: '▤ Proposals', crm: '⚇ CRM', activity: '⟁ Activity', analyzer: '📊 Deal Analyzer', units: '🏠 Units', flips: '🔨 Flips', builds: '🏗 New Builds', rentals: '🔑 Rentals', watchlist: '📊 Watchlist', positions: '📋 Positions', predictions: '🔮 Predictions', paper: '🧪 Paper P&L', projects: '🔨 Projects', sites: '🌐 Live Sites', clients: '👥 Clients', pipeline: '💰 Pipeline', assistant: '🧠 Assistant', busops: '⚙ Business Ops', queue: '✋ Review queue', identity: '🪪 Identity', tracks: '🎙 Studio', releases: '🚀 Releases' };
   let biz = 'gov', tab = 'leads';
   const curBiz = () => BUSINESSES.find((b) => b.id === biz) || BUSINESSES[0];
 
@@ -70,6 +75,10 @@
   }
 
   function render() {
+    if (tab === 'launch') return renderRedos('launch');
+    if (tab === 'money') return renderRedos('money');
+    if (tab === 'posts') return renderRedos('posts');
+    if (tab === 'funnel') return renderRedos('funnel');
     if (tab === 'studio') return renderStudio();
     if (tab === 'leads') return renderLeads();
     if (tab === 'opps') return renderOpps();
@@ -1326,6 +1335,153 @@
       <div class="re-row">In progress <span>${money(inProgress)}</span></div>
     </div>` + (ps.length ? `<div class="re-card"><div class="re-card-head"><div class="re-card-addr">All Projects</div></div>` +
       ps.map((p) => `<div class="re-row"><span class="re-hap-${WS_STATUS_COLOR[p.status] === 'go' ? 'ok' : 'pend'}">${WS_STATUS_LABEL[p.status] || p.status}</span><span style="flex:1;margin:0 8px">${esc(p.client)} · ${esc(p.type || '')}</span><b style="color:var(--teal)">${money(p.price || 0)}</b></div>`).join('') + `</div>` : '');
+  }
+
+  // ---- REDOS -- the business control he did not have -------------------------------------------
+  // Operator, 2026-08-07: "How do I know what's running, what's happening with that business?"
+  //
+  // Four tabs answer exactly that: where the launch stands (gates), what came in (money), what is
+  // going out and when (posting), and where people fall out (funnel).
+  //
+  // THE DISPLAY RULE, and it is the same one the engine enforces: UNKNOWN IS NEVER ZERO.
+  // A metric that could not be read renders as "unknown" with the reason, never as 0 or a dash. A
+  // dashboard that shows 0 for "we could not reach Gumroad" teaches him to trust a number that is not
+  // a measurement, and this pod's whole discipline (BANNED_METRICS, is_friend defaulting to unknown)
+  // exists to prevent exactly that.
+  let redosData = null;
+  async function loadRedos() {
+    body.innerHTML = '<div class="ops-empty">reading REDOS...</div>';
+    try { redosData = await fetch('/api/redos').then((r) => r.json()); render(); }
+    catch (e) { body.innerHTML = '<div class="ops-empty">REDOS offline - ' + esc(e.message) + '</div>'; }
+  }
+  const rNum = (v, suffix) => (v === null || v === undefined
+    ? '<span style="color:var(--dim)">unknown</span>'
+    : '<b style="color:var(--teal)">' + esc(String(v)) + (suffix || '') + '</b>');
+  const rMoney = (v) => (v === null || v === undefined
+    ? '<span style="color:var(--dim)">unknown</span>'
+    : '<b style="color:var(--teal)">$' + Number(v).toFixed(2) + '</b>');
+  const rAgo = (iso) => {
+    if (!iso) return 'never';
+    const h = Math.round((Date.now() - new Date(iso).getTime()) / 36e5);
+    return h < 1 ? 'just now' : h < 48 ? h + 'h ago' : Math.round(h / 24) + 'd ago';
+  };
+
+  function renderRedos(which) {
+    if (!redosData) { loadRedos(); return; }
+    const d = redosData;
+    if (d.error) { body.innerHTML = '<div class="ops-empty">REDOS engine error - ' + esc(d.error) + '</div>'; return; }
+
+    // The freshness line rides on EVERY tab. A stale dashboard that looks live is worse than no
+    // dashboard, and the snapshot only refreshes when collect.mjs runs.
+    const head = '<div class="re-card"><div class="re-row" style="justify-content:space-between">'
+      + '<span style="color:var(--dim)">snapshot ' + esc(rAgo(d.at)) + '</span>'
+      + (d.stale ? '<span style="color:var(--warn)">stale - ' + esc(d.staleWhy || '') + '</span>'
+                 : '<span style="color:var(--dim)">fresh</span>')
+      + '</div></div>';
+
+    if (which === 'launch') {
+      const p = d.phase || {};
+      body.innerHTML = head
+        + '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">Where the launch stands</div></div>'
+        + '<div class="re-row" style="color:var(--teal);font-weight:600">' + esc(d.gateLine || '') + '</div>'
+        + (p.blocked ? '<div class="re-row" style="color:var(--warn)">cannot confirm this gate - the number could not be read, which is not the same as not being there yet</div>' : '')
+        + '</div>'
+        + '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">The three gates, in order</div></div>'
+        + (d.gates || []).map((g) => {
+            const mark = g.met === true ? '<span class="re-hap-ok">met</span>'
+              : g.met === null ? '<span class="re-hap-pend" style="color:var(--dim)">unknown</span>'
+              : '<span class="re-hap-pend">not yet</span>';
+            return '<div class="re-row">' + mark
+              + '<span style="flex:1;margin:0 8px">' + esc(g.label) + '</span>'
+              + rNum(g.value)
+              + '<span style="color:var(--dim)"> / ' + esc(String(g.target)) + ' ' + esc(g.unit) + '</span></div>'
+              + (g.why ? '<div class="re-row" style="color:var(--dim);font-size:12px">' + esc(g.why) + '</div>' : '');
+          }).join('')
+        + '</div>'
+        + '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">Today</div></div>'
+        + (d.digest || []).map((l) => '<div class="re-row" style="font-family:ui-monospace,monospace;font-size:13px">' + esc(l) + '</div>').join('')
+        + '</div>';
+      return;
+    }
+
+    if (which === 'money') {
+      const r = d.revenue || {}, c = d.customers || {};
+      body.innerHTML = head
+        + '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">What actually came in</div></div>'
+        + '<div class="re-row">Net ' + rMoney(r.netUsd) + '<span style="color:var(--dim);margin-left:8px">' + esc(r.netDefinition || '') + '</span></div>'
+        + '<div class="re-row">Gross ' + rMoney(r.grossUsd) + '</div>'
+        + '<div class="re-row">Refunds ' + rMoney(r.refundsUsd) + '</div>'
+        + '<div class="re-row">Average order ' + rMoney(r.aovUsd) + '</div>'
+        + (r.why ? '<div class="re-row" style="color:var(--dim);font-size:12px">' + esc(r.why) + '</div>' : '')
+        + '</div>'
+        + '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">Who bought</div></div>'
+        + '<div class="re-row">Strangers (the gate) ' + rNum(c.nonFriend) + '</div>'
+        + '<div class="re-row">Friends ' + rNum(c.friend) + '<span style="color:var(--dim);margin-left:8px">never counted toward the gate</span></div>'
+        + '<div class="re-row">Unclassified ' + rNum(c.unknown) + '<span style="color:var(--dim);margin-left:8px">unknown is not zero</span></div>'
+        + (c.why ? '<div class="re-row" style="color:var(--dim);font-size:12px">' + esc(c.why) + '</div>' : '')
+        + '</div>';
+      return;
+    }
+
+    if (which === 'posts') {
+      const p = d.posts;
+      if (!p) { body.innerHTML = head + '<div class="ops-empty">the publishing loop is not wired on this machine</div>'; return; }
+      if (p.error) { body.innerHTML = head + '<div class="ops-empty">posting engine error - ' + esc(p.error) + '</div>'; return; }
+      const st = p.status || {};
+      const pend = p.pending;
+      body.innerHTML = head
+        + '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">The loop</div></div>'
+        + '<div class="re-row">Mode <b style="color:' + (p.mode === 'notify' ? 'var(--teal)' : 'var(--warn)') + '">' + esc(p.mode) + '</b>'
+        + '<span style="color:var(--dim);margin-left:8px">' + (p.mode === 'notify' ? 'posts unless you stop it' : 'nothing posts until you approve') + '</span></div>'
+        + '<div class="re-row">Pack ' + rNum(st.published) + '<span style="color:var(--dim)"> of ' + esc(String(st.total || 0)) + ' sent, ' + esc(String(st.remaining || 0)) + ' left</span></div>'
+        + (pend
+            ? '<div class="re-row">Batch <b>' + esc(pend.batchId) + '</b><span style="color:var(--dim);margin-left:8px">'
+              + (pend.decision ? 'you said: ' + esc(pend.decision)
+                 : pend.closesAt ? 'window closes ' + esc(new Date(pend.closesAt).toLocaleTimeString())
+                 : 'waiting')
+              + '</span></div>'
+            : '<div class="re-row" style="color:var(--dim)">no batch in flight</div>')
+        + '</div>'
+        + '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">Going out next</div></div>'
+        + ((p.next || []).length
+            ? (p.next || []).map((n) => '<div class="re-row"><span class="re-hap-ok">#' + esc(String(n.n)) + '</span>'
+                + '<span style="flex:1;margin:0 8px">' + esc(n.title) + '</span>'
+                + '<span style="color:var(--dim);font-size:12px">' + esc((n.platforms || []).join(' / ')) + '</span></div>').join('')
+            : '<div class="re-row" style="color:var(--dim)">nothing queued - the pack may be finished</div>')
+        + '</div>'
+        + ((p.held || []).length
+            ? '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">Held - numbers you have not confirmed</div></div>'
+              + (p.held || []).map((h) => '<div class="re-row"><span class="re-hap-pend">#' + esc(String(h.n)) + '</span>'
+                  + '<span style="flex:1;margin:0 8px">' + esc(h.title) + '</span>'
+                  + '<span style="color:var(--warn);font-size:12px">' + esc((h.pending || []).join(' ')) + '</span></div>').join('')
+              + '<div class="re-row" style="color:var(--dim);font-size:12px">These never post on silence. Confirm with: node pods/social/run.mjs --confirm &lt;n&gt; &lt;figures&gt;</div>'
+              + '</div>'
+            : '');
+      return;
+    }
+
+    // funnel
+    const f = d.funnel || {}, sn = d.sends || {}, fu = d.followUp || {};
+    const fRows = Object.keys(f).length
+      ? Object.keys(f).map((k) => {
+          const v = f[k];
+          return '<div class="re-row"><span style="flex:1">' + esc(k) + '</span>'
+            + rNum(v && typeof v === 'object' ? v.value : v) + '</div>';
+        }).join('')
+      : '<div class="re-row" style="color:var(--dim)">no funnel source connected yet</div>';
+    const fuItems = Array.isArray(fu) ? fu : (fu.items || []);
+    body.innerHTML = head
+      + '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">Where people fall out</div></div>' + fRows + '</div>'
+      + '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">What went out</div></div>'
+      + '<div class="re-row">Affiliate emails ' + rNum(sn.emails) + '</div>'
+      + '<div class="re-row">Posts ' + rNum(sn.posts) + '</div>'
+      + '<div class="re-row">Replies ' + rNum(sn.replies) + '</div>'
+      + '</div>'
+      + '<div class="re-card"><div class="re-card-head"><div class="re-card-addr">Waiting on you</div></div>'
+      + (fuItems.length
+          ? fuItems.map((i) => '<div class="re-row">' + esc(typeof i === 'string' ? i : (i.label || i.why || JSON.stringify(i))) + '</div>').join('')
+          : '<div class="re-row" style="color:var(--dim)">nothing waiting</div>')
+      + '</div>';
   }
 
   el('oppDetailBody').addEventListener('click', (e) => {

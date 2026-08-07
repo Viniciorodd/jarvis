@@ -181,7 +181,12 @@
     var body = $id('bizDetailBody'); body.innerHTML = '';
     if(b && b.error){ body.appendChild(el('div','ops-empty','Could not load: ' + b.error)); return; }
     var nx = el('div','gov-next');
-    nx.appendChild(el('div','gov-next-label','YOUR NEXT MOVE'));
+    /* The label must follow `who`, not assume it. It was hardcoded to "YOUR NEXT MOVE" for every
+       business, so a row that correctly read "Jarvis" opened onto a panel claiming the move was his —
+       two contradictory answers on one screen. The whole point of this surface is knowing what is
+       actually his to do; a banner that says "you" nine times out of nine teaches him to ignore it. */
+    var mine = !b.next || b.next.who === 'you';
+    nx.appendChild(el('div','gov-next-label', mine ? 'YOUR NEXT MOVE' : 'JARVIS IS ON IT'));
     nx.appendChild(el('div','gov-next-text', b.next.text));
     nx.appendChild(el('div','gov-next-sub', b.status || ''));
     body.appendChild(nx);

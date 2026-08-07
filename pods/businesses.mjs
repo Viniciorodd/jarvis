@@ -12,6 +12,10 @@ const jarvis = (text) => ({ who: 'jarvis', text });
 // `crm` = true scaffolds a Contacts (CRM) file (gov subs, real-estate tenants).
 export const BUSINESSES = [
   { id: 'gov',        name: 'Gov contracting', icon: 'building-bank', source: 'gov',         board: 'gov',     folder: 'Gov Contracting', crm: true },
+  // Operator, 2026-08-07: *"I have no business control for REDOS within Jarvis."* He was right, and this
+  // was the file that made it true — pods/redos-ops/ was built and eval-pinned months before anything
+  // listed it here, so the hub showed eight businesses and not the one with a live launch running.
+  { id: 'redos',      name: 'REDOS',           icon: 'calculator',    source: 'redos',       board: 'generic', folder: 'REDOS' },
   { id: 'fiverr',     name: 'Fiverr Studio',   icon: 'palette',       source: 'fiverr',      board: 'generic', folder: 'Fiverr Studio' },
   { id: 'web',        name: 'Web Studio',      icon: 'world',         source: 'web',         board: 'generic', folder: 'Web Studio' },
   { id: 'realestate', name: 'Real estate',     icon: 'home',          source: 'realestate',  board: 'generic', folder: 'Real Estate', crm: true },
@@ -23,6 +27,66 @@ export const BUSINESSES = [
 
 // PURE per-source summarizers: (raw, biz) => { status, metric, next:{who,text}, setup?, board?, empty? }
 const SUMMARIZERS = {
+  /**
+   * REDOS. `r` is the /api/redos payload: launch gates, revenue, and the publishing loop's position.
+   *
+   * 🚨 UNKNOWN IS NEVER ZERO, on the hub row as much as anywhere. `customers.nonFriend === null` means
+   * the source could not be read; rendering that as "0 customers" would read as a measured flop rather
+   * than a broken connector, and he would make decisions on it. Same discipline the engine enforces.
+   *
+   * WHOSE MOVE is answered honestly too. The loop posting on its own is Jarvis's move. A post held for
+   * figures he has not confirmed is HIS move and nothing else can release it — so that outranks
+   * everything else this summarizer could say.
+   */
+  redos(r) {
+    if (!r || r.error) return { setup: true, status: 'not reporting', next: you('Run: node pods/redos-ops/collect.mjs --write') };
+
+    const c = r.customers || {};
+    const rev = r.revenue || {};
+    const p = r.posts || null;
+    const n = (v, word) => (v === null || v === undefined ? 'unknown ' + word : v + ' ' + word);
+
+    const bits = [n(c.nonFriend, 'strangers'), rev.netUsd === null || rev.netUsd === undefined ? 'unknown net' : '$' + Number(rev.netUsd).toFixed(2) + ' net'];
+    if (p && p.status) bits.push(`${p.status.published}/${p.status.total} posts sent`);
+    if (r.stale) bits.push('⚠ stale');
+
+    // Precedence: his blocked decisions first, then a live batch, then the standing gate.
+    let next;
+    const held = (p && p.held) || [];
+    if (held.length) {
+      next = you(`${held.length} post${held.length > 1 ? 's' : ''} held — confirm the figures, nothing else can`);
+    } else if (p && p.pending && !p.pending.decision && p.pending.closesAt) {
+      next = jarvis(`Batch ${p.pending.batchId} posting unless you stop it`);
+    } else if (r.stale) {
+      next = you('Snapshot is stale — re-run collect.mjs');
+    } else {
+      next = jarvis(r.gateLine || 'Tracking the launch');
+    }
+
+    // The board reads as the launch itself: three gates in order, plus what is queued to go out.
+    const gateCards = (r.gates || []).map((g) => ({
+      title: g.label,
+      stage: g.met === true ? 'Met' : g.met === null ? 'Unknown' : 'Not yet',
+      who: g.met === null ? 'you' : 'jarvis',
+      next: (g.value === null ? 'unknown' : g.value) + ' / ' + g.target + ' ' + g.unit,
+      meta: g.why || '',
+    }));
+    const postCards = ((p && p.next) || []).map((x) => ({
+      title: '#' + x.n + ' ' + x.title, stage: 'Queued', who: 'jarvis',
+      next: (x.platforms || []).join(' · '), meta: '',
+    })).concat(held.map((h) => ({
+      title: '#' + h.n + ' ' + h.title, stage: 'Held', who: 'you',
+      next: 'confirm: ' + (h.pending || []).join(' '), meta: '',
+    })));
+
+    return {
+      status: bits.join(' · '),
+      metric: c.nonFriend === null ? 'unknown' : c.nonFriend + ' strangers',
+      next,
+      board: { stages: ['Met', 'Not yet', 'Unknown', 'Queued', 'Held'], cards: gateCards.concat(postCards) },
+      empty: 'Nothing tracked yet — run collect.mjs to take the first snapshot.',
+    };
+  },
   gov(b) {
     if (!b || !b.counts) return { status: 'Scouting…', next: jarvis('Scanning SAM.gov for new work') };
     const c = b.counts;

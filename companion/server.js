@@ -356,6 +356,56 @@ async function gatherBusinessRaw() {
     fiverr: loadJson(ORDERS_FILE, { seen: [] }),
     music: loadJson(MUSIC_FILE, { identity: {}, tracks: [], releases: [] }),
     finance: money,
+    // REDOS reads from its own engine + the publishing loop. Same shape /api/redos serves, so the hub
+    // row and the REDOS panel can never disagree — the gov board's one-source rule, applied here too.
+    redos: await redosSnapshot().catch(() => null),
+  };
+}
+
+/**
+ * The REDOS position: launch gates, money, and where the publishing loop stands.
+ *
+ * READ-ONLY and it never collects — a hub render must not fire a Gumroad call. The snapshot is written
+ * by `node pods/redos-ops/collect.mjs --write`; if it is old this reports `stale` rather than silently
+ * refreshing, because staleness is information he needs, not a problem to hide from him.
+ */
+async function redosSnapshot() {
+  const [store, metrics, gates] = await Promise.all([
+    import('../pods/redos-ops/store.mjs'),
+    import('../pods/redos-ops/metrics.mjs'),
+    import('../pods/redos-ops/gates.mjs'),
+  ]);
+  const now = new Date().toISOString();
+  const snap = store.latest() || store.emptySnapshot('');
+  const stale = metrics.isStale(snap, now);
+
+  let posts = null;
+  try {
+    const [lib, batch, social, brand] = await Promise.all([
+      import('../pods/social/library.mjs'), import('../pods/social/batch.mjs'),
+      import('../pods/social/run.mjs'), import('../pods/brand/store.mjs'),
+    ]);
+    const pack = lib.loadPack();
+    const done = social.publishedPackNumbers(brand.load().records);
+    const b = batch.buildBatch(pack, done, { verified: social.readVerified() });
+    const state = social.readState();
+    posts = {
+      mode: batch.readMode(),
+      status: lib.packStatus(pack, done),
+      next: b.items.map((i) => ({ n: i.n, title: i.title, platforms: Object.keys(i.posts) })),
+      held: b.held,
+      pending: state ? { batchId: state.batchId, sentAt: state.sentAt, closesAt: state.closesAt,
+        decision: state.decision || null, result: state.result || null } : null,
+    };
+  } catch (e) { posts = { error: e.message }; }
+
+  return {
+    at: snap.at || '', stale: stale.stale, staleWhy: stale.why || '',
+    customers: metrics.customers(snap), revenue: metrics.revenue(snap),
+    funnel: metrics.funnel(snap), sends: metrics.sends(snap),
+    followUp: metrics.needsFollowUp(snap, now), health: metrics.health(snap),
+    gates: gates.evaluate(snap), phase: gates.phase(snap), gateLine: gates.gateLine(snap),
+    digest: metrics.digest(snap, now), posts,
   };
 }
 
@@ -4717,6 +4767,25 @@ const server = http.createServer(async (req, res) => {
       const C = await getCouncil(); return send(res, 200, JSON.stringify(await C.council(String(question)))); }
     catch (e) { return send(res, 500, JSON.stringify({ ok: false, reason: e.message })); }
   }
+  // ── REDOS BUSINESS CONTROL ───────────────────────────────────────────────────────────────────────
+  // Operator, 2026-08-07: *"I have no business control for REDOS within Jarvis."* He was right. The
+  // whole engine (pods/redos-ops/) was built and eval-pinned and then only ever reachable from a CLI,
+  // so from inside the cockpit his one live product was invisible while eight other businesses had
+  // seats on the Ops page.
+  //
+  // This route is READ-ONLY and it never collects. A UI request must not fire a Gumroad call — the
+  // snapshot is written by `node pods/redos-ops/collect.mjs --write`, and if it is stale this says so
+  // rather than quietly refreshing behind him. Staleness is information, not a problem to hide.
+  if (req.method === 'GET' && url.pathname === '/api/redos') {
+    // One source with the hub row (redosSnapshot above), so the panel and the business list can never
+    // disagree — the same rule govBoardData() follows for gov.
+    try { return send(res, 200, JSON.stringify(await redosSnapshot())); }
+    catch (e) {
+      // An honest empty rather than a 500: a panel that says why beats a blank one.
+      return send(res, 200, JSON.stringify({ error: e.message, gates: [], digest: [], posts: null }));
+    }
+  }
+
   // ── GOV PIPELINE BOARD: one plain view of where every opportunity stands + whose move is next ────
   if (req.method === 'GET' && url.pathname === '/api/gov-board') {
     try { return send(res, 200, JSON.stringify(await govBoardData())); }

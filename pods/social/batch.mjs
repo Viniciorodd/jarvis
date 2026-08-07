@@ -85,7 +85,11 @@ export function buildBatch(pack = [], done = [], { verified = {}, size = DEFAULT
     if (!Object.keys(built.posts).length) { broken.push({ n: post.n, title: post.title, fails: ['no variants fit'] }); continue; }
 
     items.push({ n: post.n, title: post.title, day: post.day, week: post.week, image: post.image,
-      posts: built.posts, derived: built.derived, overLimit: built.overLimit, gate: g });
+      // `trimmed` must survive to the caller: it is the record of which platforms had a paragraph
+      // dropped. Losing it made the log report "0 trimmed" for a batch where 7 posts were shortened,
+      // which reads as "his text went out untouched".
+      posts: built.posts, derived: built.derived, overLimit: built.overLimit,
+      trimmed: built.trimmed || [], gate: g });
   }
 
   return { items, held, broken, status: packStatus(pack, done) };

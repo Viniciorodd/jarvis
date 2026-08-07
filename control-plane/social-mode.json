@@ -1,0 +1,5 @@
+{
+  "mode": "notify",
+  "at": "2026-08-07T00:00:00.000Z",
+  "note": "Authorised by the operator 2026-08-07: full autonomous posting on his own accounts. 'notify' means the batch card lands, a kill window opens, and silence publishes. Set to 'review' to put every batch back behind an explicit approval. A post held for unconfirmed deal figures is never released by silence in either mode."
+}

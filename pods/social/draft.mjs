@@ -23,10 +23,14 @@
 // on the platforms where it fits. A post cut off mid-sentence is a post he did not write.
 
 import { llm, pickChain } from '../model-router.mjs';
-import { checkPost, LIMITS } from './gate.mjs';
+import { checkPost, LIMITS, trim } from './gate.mjs';
 import { figuresIn } from './library.mjs';
 
 export const AGENT = 'SOCIAL-01';
+
+// The deterministic trimmer lives in gate.mjs (it is length arithmetic). Re-exported so callers that
+// think of it as "drafting" find it here.
+export { trim };
 
 /**
  * PURE: refuse a provider chain that could bill him.
@@ -83,6 +87,12 @@ export async function adapt(text, platform, { attempts = 2, agent = AGENT } = {}
 
   const first = checkPost(platform, { text, community: 'x', linkInReply: 'n/a' });
   if (first.room >= 0) return { ok: true, text, why: 'already fits', attempts: 0 };
+
+  // Deterministic first. On his real pack this resolves every case, so no model runs and no GPU is
+  // needed — see the note above trim(). The model below is the fallback for prose that has no
+  // paragraph structure to drop.
+  const t = trim(text, platform, { community: 'x', linkInReply: 'n/a' });
+  if (t.ok) return { ok: true, text: t.text, why: t.why, attempts: 0 };
 
   let tried = 0;
   for (let i = 0; i < attempts; i++) {

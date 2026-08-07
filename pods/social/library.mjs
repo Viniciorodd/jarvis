@@ -30,7 +30,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkPost, PLATFORMS } from './gate.mjs';
+import { checkPost, trim, PLATFORMS } from './gate.mjs';
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 
@@ -193,9 +193,9 @@ export function figureHold(post = {}, verified = []) {
  * X gets `linkInReply` when its body promises a link — the gate hard-fails a body that says "link
  * below" with nothing behind it, and the pack writes that phrasing on purpose.
  */
-export function variantsFor(post = {}, { link = 'https://redoshq.com/quick', community = 'Real estate investing' } = {}) {
+export function variantsFor(post = {}, { link = 'https://redoshq.com/quick', community = 'Real estate investing', autoTrim = true } = {}) {
   const v = post.variants || {};
-  const posts = {}, derived = [], overLimit = [];
+  const posts = {}, derived = [], overLimit = [], trimmed = [];
 
   for (const platform of PLATFORMS) {
     const text = v[SOURCE_OF[platform]];
@@ -206,12 +206,21 @@ export function variantsFor(post = {}, { link = 'https://redoshq.com/quick', com
     if (platform === 'threads') p.community = community;
     if (platform === 'x' && /link below|link in (the )?(reply|comments|bio)/i.test(text)) p.linkInReply = link;
 
-    const r = checkPost(platform, p);
-    // Carry the source text so draft.mjs can shorten it without re-reading the pack.
+    let r = checkPost(platform, p);
+
+    // Over the limit? Drop whole paragraphs — his words, never cut mid-sentence, no model involved.
+    // 10 of his 15 X variants land here, and because Bluesky derives from X it blocked that too, so
+    // this is the ordinary path rather than an exception.
+    if (r.room < 0 && autoTrim) {
+      const t = trim(text, platform, { community: p.community, linkInReply: p.linkInReply });
+      if (t.ok) { p.text = t.text; r = checkPost(platform, p); trimmed.push({ platform, dropped: t.dropped }); }
+    }
+
+    // Carry the source text so draft.mjs can attempt a local rewrite without re-reading the pack.
     if (r.room < 0) { overLimit.push({ platform, text, length: r.length, max: r.max, over: -r.room }); continue; }
     posts[platform] = p;
   }
-  return { posts, derived, overLimit };
+  return { posts, derived, overLimit, trimmed };
 }
 
 // ── PURE: what to post next ────────────────────────────────────────────────────────────────────────

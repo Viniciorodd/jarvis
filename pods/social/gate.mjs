@@ -148,3 +148,57 @@ export function gateLines(g = {}) {
   for (const w of (g.warns || [])) out.push('warn  ' + w);
   return out;
 }
+
+// ── THE DETERMINISTIC TRIMMER, AND WHY IT RUNS FIRST ────────────────────────────────────────────────
+// 10 of his 15 hand-written X variants are over X's 280 limit, and because Bluesky derives from the X
+// variant, that blocked his target platform too. So shortening is not an edge case in this system, it is
+// the critical path.
+//
+// Then his GPU came back out-of-memory on both local models, which made the honest question obvious:
+// why is a language model involved in this at all? His posts are paragraph-separated arguments. Making
+// one shorter means DROPPING A PARAGRAPH. That is arithmetic, not writing:
+//
+//   · it preserves his exact words, so nothing drifts out of his voice
+//   · it CANNOT invent or round a number, which was the whole risk of the model path
+//   · it costs nothing and cannot be broken by a busy GPU
+//
+// The rule: keep the FIRST paragraph (the hook — it earns the read) and the LAST (the point — it is why
+// the post exists), then drop middle paragraphs from the bottom up until it fits. Bottom-up because in
+// his structure the middle paragraphs elaborate in descending order of necessity.
+//
+// The model only runs when the trimmer cannot get there, which on his real pack is never.
+
+/** PURE: split on blank lines, preserving paragraph text. */
+const paras = (t = '') => String(t).split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+
+/**
+ * PURE: shorten by dropping whole paragraphs. Returns { ok, text, dropped, why }.
+ *
+ * Never touches the words inside a paragraph. If keeping only the first and last still does not fit,
+ * it gives up rather than cutting into a sentence — a post cut mid-sentence is a post he did not write.
+ */
+export function trim(text, platform, opts = {}) {
+  const cfg = LIMITS[platform];
+  if (!cfg) return { ok: false, text: '', dropped: 0, why: `unknown platform "${platform}"` };
+
+  const fits = (t) => {
+    const r = checkPost(platform, { text: t, ...opts });
+    return r.room >= 0;
+  };
+  if (fits(text)) return { ok: true, text: String(text), dropped: 0, why: 'already fits' };
+
+  const p = paras(text);
+  if (p.length < 3) return { ok: false, text: '', dropped: 0, why: 'too few paragraphs to trim without cutting a sentence' };
+
+  // Drop middle paragraphs from the bottom up: indices length-2 down to 1.
+  const keep = p.map(() => true);
+  for (let i = p.length - 2; i >= 1; i--) {
+    keep[i] = false;
+    const candidate = p.filter((_, j) => keep[j]).join('\n\n');
+    if (fits(candidate)) {
+      return { ok: true, text: candidate, dropped: keep.filter((k) => !k).length,
+        why: `dropped ${keep.filter((k) => !k).length} middle paragraph(s), kept his words exactly` };
+    }
+  }
+  return { ok: false, text: '', dropped: p.length - 2, why: 'even hook + point alone does not fit — will not cut into a sentence' };
+}

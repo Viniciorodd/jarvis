@@ -11,9 +11,20 @@
 import { complianceCheck, complianceCheckRedos, complianceLine } from '../pods/brand/compliance.mjs';
 import { extract, voiceDrift, withJudgement, withOutcome, score, summarise, HOOK_TYPES } from '../pods/brand/features.mjs';
 import { checkPost, assertRoute, weeklyCost, jitter, PLATFORMS, START_WITH } from '../pods/brand/platforms.mjs';
+import { executeSteps, finalizeRun, decideOutcome, matchAssert, reportMarkdown, resolveSelector,
+         assertFictionalAddresses, assertNoAuth, RecorderError } from '../pods/brand/record.mjs';
 
 const ok = (pass, detail = '') => ({ pass, detail });
 const blocked = (t) => complianceCheck(t).ok === false;
+
+// A stand-in browser for the recorder cases: `text` returns whatever the fixture says the product
+// said, everything else is a no-op. The assert rule is the thing under test, not Playwright.
+const fakeDriver = (texts = {}) => ({
+  goto: async () => {}, click: async () => {}, fill: async () => {}, wait: async () => {},
+  hover: async () => {}, scrollTo: async () => {}, highlight: async () => {}, still: async () => null,
+  zoom: async () => {}, cue: async () => 0,
+  text: async (sel) => (Object.prototype.hasOwnProperty.call(texts, sel) ? texts[sel] : null),
+});
 
 export default {
   agent: 'brand',
@@ -219,5 +230,103 @@ export default {
 
     { name: 'the taxonomy is fixed, so months stay comparable', run: () =>
       ok(HOOK_TYPES.length === 7 && HOOK_TYPES.includes('flat-fact')) },
+
+    // ── the RECORDER, and the one rule that justifies the whole module ────────
+    // A demo video is the highest-leverage place to publish a number, and the
+    // hardest place to correct one. These cases pin the guarantee that a video
+    // can never contain a figure the product did not just produce.
+
+    { name: 'RECORDER: a failing assert kills the run AND deletes the video', run: () => {
+      const deleted = [];
+      const fake = { rmSync: (p) => deleted.push(p) };
+      const r = finalizeRun({
+        asserts: [{ field: 'dealScore', expected: '31', actual: '48', pass: false }],
+        videoPath: 'out/appsumo/appsumo-demo.webm',
+        fsLike: fake,
+      });
+      return ok(r.ok === false && r.videoDeleted === true && r.videoPath === null
+        && deleted[0] === 'out/appsumo/appsumo-demo.webm', JSON.stringify({ r, deleted }));
+    } },
+
+    // Regression: the first version deleted on a failed assert but NOT on a thrown step, so a run
+    // that died on a vanished selector left a .webm behind that had recorded nothing worth shipping.
+    { name: 'RECORDER: a step that THROWS also deletes the video', run: () => {
+      const deleted = [];
+      const r = finalizeRun({
+        asserts: [], videoPath: 'out/appsumo/appsumo-demo.webm',
+        hardError: 'locator.click: Timeout 15000ms exceeded',
+        fsLike: { rmSync: (p) => deleted.push(p) },
+      });
+      return ok(r.ok === false && r.videoDeleted === true && deleted.length === 1, JSON.stringify({ r, deleted }));
+    } },
+
+    { name: 'RECORDER: a passing run keeps its video', run: () => {
+      const deleted = [];
+      const r = finalizeRun({
+        asserts: [{ field: 'dealScore', expected: '31', actual: '31', pass: true }],
+        videoPath: 'out/appsumo/appsumo-demo.webm',
+        fsLike: { rmSync: (p) => deleted.push(p) },
+      });
+      return ok(r.ok === true && deleted.length === 0 && r.videoPath.endsWith('.webm'), JSON.stringify(r));
+    } },
+
+    { name: 'RECORDER: an assert step FAILS when the product says something else', run: async () => {
+      const script = { id: 't', url: 'u', outDir: 'out/', steps: [{ assert: { dealScore: '31' } }], stills: [] };
+      const r = await executeSteps({ script, selectors: { dealScore: '#score' }, driver: fakeDriver({ '#score': '48' }) });
+      return ok(r.asserts.length === 1 && r.asserts[0].pass === false && r.asserts[0].actual === '48', JSON.stringify(r.asserts));
+    } },
+
+    { name: 'RECORDER: an assert PASSES on a substring of a longer coach sentence', run: async () => {
+      const live = 'Loses money as structured. To hit your target you’d need to buy at $85,000, that’s $55,000 below your current price.';
+      const script = { id: 't', url: 'u', outDir: 'out/', steps: [{ assert: { dealCoachDealbreaker: "you'd need to buy at $85,000" } }], stills: [] };
+      const r = await executeSteps({ script, selectors: { dealCoachDealbreaker: '#c' }, driver: fakeDriver({ '#c': live }) });
+      return ok(r.asserts[0].pass === true, JSON.stringify(r.asserts[0]));
+    } },
+
+    { name: 'RECORDER: a typographic minus still matches the ASCII one in the script', run: () =>
+      ok(matchAssert('-$3,626', 'Net profit −$3,626') === true) },
+
+    { name: 'RECORDER: a missing selector fails LOUDLY with the field name', run: async () => {
+      const script = { id: 't', url: 'u', outDir: 'out/', steps: [{ set: { purchasePrice: 85000 } }], stills: [] };
+      try {
+        await executeSteps({ script, selectors: { dealScore: '#score' }, driver: fakeDriver({}) });
+        return ok(false, 'a missing selector was silently skipped');
+      } catch (e) {
+        return ok(e instanceof RecorderError && /purchasePrice/.test(e.message), e.message);
+      }
+    } },
+
+    { name: 'RECORDER: a non-Springfield address is REFUSED', run: () => {
+      const r = assertFictionalAddresses({ steps: [{ set: { address: '4417 Maple Grove Avenue, Austin, TX' } }] });
+      return ok(r.ok === false && /Austin|Maple Grove/.test(r.error), JSON.stringify(r));
+    } },
+
+    { name: 'RECORDER: the fictional Springfield IL set is allowed', run: () => {
+      const r = assertFictionalAddresses({ steps: [{ set: { address: '742 Evergreen Terrace, Springfield, IL 62704' } }] });
+      return ok(r.ok === true, JSON.stringify(r));
+    } },
+
+    { name: 'RECORDER: "capture" NEVER fails a run, even when it finds nothing', run: async () => {
+      const script = { id: 't', url: 'u', outDir: 'out/', steps: [{ capture: { scoreAfter: 'dealScore' } }], stills: [] };
+      const r = await executeSteps({ script, selectors: { dealScore: '#gone' }, driver: fakeDriver({}) });
+      return ok(r.asserts.length === 0 && r.captures.scoreAfter === null
+        && decideOutcome(r.asserts).ok === true, JSON.stringify(r.captures));
+    } },
+
+    { name: 'RECORDER: the report carries every assert with expected AND actual', run: () => {
+      const md = reportMarkdown({
+        id: 'appsumo-demo', ok: false, startedAt: '2026-08-06T00:00:00.000Z', durationMs: 61000,
+        url: 'https://redoshq.com/analyze', videoPath: null, stillPaths: [],
+        asserts: [{ field: 'netProfit', expected: '-$3,626', actual: '-$9,999', pass: false }],
+        captures: { scoreAfter: '72' }, steps: [], warnings: [],
+      });
+      return ok(/-\$3,626/.test(md) && /-\$9,999/.test(md) && /netProfit/.test(md) && /scoreAfter/.test(md)
+        && /video deleted/i.test(md), md.slice(0, 200));
+    } },
+
+    { name: 'RECORDER: a script that needs a signed-in page is refused, never logged into', run: () => {
+      const r = assertNoAuth({ steps: [{ goto: 'https://redoshq.com/dashboard' }] });
+      return ok(r.ok === false && /public surface/.test(r.error), JSON.stringify(r));
+    } },
   ],
 };

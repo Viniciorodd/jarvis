@@ -31,6 +31,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkPost, trim, PLATFORMS } from './gate.mjs';
+import { figuresIn as brandFiguresIn } from '../brand/compliance.mjs';
 
 const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 
@@ -169,18 +170,41 @@ export function figuresIn(text = '') {
  * Absence is never treated as approval — L-013, blind is not clean.
  */
 export function figureHold(post = {}, verified = []) {
-  const seen = new Set((verified || []).map((v) => String(v).trim()));
+  // ⚠ The HOLD SET is the brand pod's, not this module's.
+  //
+  // pods/brand/compliance.mjs runs at publish time and blocks any figure absent from the claims log —
+  // including the heuristics ("the 1% rule", "5% vacancy", "20% contingency"). Holding on a narrower
+  // set here meant three posts sailed onto the card, got scheduled, and then FAILED at publish time.
+  // A batch that dies at the last gate is worse than one that asks up front.
+  //
+  // The fix is NOT to loosen the publish guard — that guard covers all brand content, and marking "1%"
+  // as verified when nobody verified it is exactly the laundering this system exists to prevent. So the
+  // hold matches publish-time reality, he confirms each figure ONCE, and the confirmation is permanent
+  // and recorded. One command, and the ledger says a human vouched for it.
+  //
+  // What this module still contributes is the READING: which of those figures is a result he is
+  // reporting, and which is an industry heuristic he is arguing about. Same confirmation either way,
+  // but he should know which ones actually need checking against REDOS output.
+  const norm = (v) => String(v).replace(/[$,%\s]/g, '');
+  const seen = new Set((verified || []).map(norm));
   const all = [];
-  for (const [platform, text] of Object.entries(post.variants || {})) {
-    for (const f of figuresIn(text)) if (!all.some((a) => a.figure === f)) all.push({ figure: f, platform });
+  for (const text of Object.values(post.variants || {})) {
+    for (const f of brandFiguresIn(text)) {
+      if (all.some((a) => a.figure === f)) continue;
+      all.push({ figure: f, kind: figuresIn(text).includes(f) ? 'claim' : 'heuristic' });
+    }
   }
-  const pending = all.filter((a) => !seen.has(a.figure));
+  const pending = all.filter((a) => !seen.has(norm(a.figure)));
+  const claims = pending.filter((p) => p.kind === 'claim').map((p) => p.figure);
   return {
     held: pending.length > 0,
     figures: all.map((a) => a.figure),
     pending: pending.map((a) => a.figure),
+    claims,
+    heuristics: pending.filter((p) => p.kind === 'heuristic').map((p) => p.figure),
     why: pending.length
-      ? `${pending.length} figure(s) not confirmed against REDOS output: ${pending.map((p) => p.figure).join(', ')}`
+      ? `${pending.length} figure(s) not in the claims log: ${pending.map((p) => p.figure).join(', ')}`
+        + (claims.length ? ` — ${claims.join(', ')} ${claims.length === 1 ? 'is a result that needs' : 'are results that need'} checking against REDOS output` : '')
       : '',
   };
 }

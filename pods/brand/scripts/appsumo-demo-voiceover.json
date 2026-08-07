@@ -1,0 +1,30 @@
+{
+  "_note": [
+    "The narration, spoken by the local Kokoro model (Apache-2.0, safe on a paid listing).",
+    "",
+    "atSec is where the line WANTS to start — the video beat it narrates. It is a floor, not a mark:",
+    "if the previous line overruns, the next is pushed later and the video hold is widened to match.",
+    "The picture is re-timed to the words, never the other way round.",
+    "",
+    "Every figure spoken here is asserted by record.mjs against the live product before the video can",
+    "render. If REDOS stops producing them the run fails rather than narrating a number that is gone."
+  ],
+
+  "voice": "af_heart",
+  "speed": 1.0,
+  "leadIn": 0.8,
+  "gap": 0.35,
+
+  "lines": [
+    { "id": "hook",      "atSec": 0.8,  "text": "Every calculator tells you a deal is bad." },
+    { "id": "promise",   "atSec": 5.0,  "text": "This one tells you what would make it good." },
+    { "id": "verdict",   "atSec": 10.0, "text": "Twenty two. F. Walk away." },
+    { "id": "loss",      "atSec": 13.5, "text": "It loses fifteen thousand dollars." },
+    { "id": "turn",      "atSec": 17.5, "text": "Here is the part nobody else does." },
+    { "id": "price",     "atSec": 21.0, "text": "It gives you the number. Buy it at a hundred and twenty five thousand." },
+    { "id": "same",      "atSec": 28.0, "text": "Same house. Same rehab. Same sale price." },
+    { "id": "flip",      "atSec": 33.0, "text": "Ninety five. A. Ninety seven thousand in profit." },
+    { "id": "offer",     "atSec": 39.0, "text": "That is not a verdict. That is an offer." },
+    { "id": "close",     "atSec": 43.5, "text": "Free to try. Pay once, own it for life." }
+  ]
+}

@@ -73,7 +73,11 @@ export function buildBatch(pack = [], done = [], { verified = {}, size = DEFAULT
     if (doneSet.has(post.n)) continue;
 
     const hold = figureHold(post, verified[post.n] || []);
-    if (hold.held) { held.push({ n: post.n, title: post.title, pending: hold.pending }); continue; }
+    if (hold.held) {
+      held.push({ n: post.n, title: post.title, pending: hold.pending,
+        claims: hold.claims || [], heuristics: hold.heuristics || [] });
+      continue;
+    }
 
     const built = variantsFor(post, { link, community });
     const g = gate({ posts: built.posts });
@@ -151,9 +155,15 @@ export function cardText(batch = {}, { mode = DEFAULT_MODE, closesAt = null } = 
 
   // Held posts are NAMED. A post that silently never appears is a post he assumes went out.
   if ((batch.held || []).length) {
-    L.push(`HELD — numbers not confirmed against REDOS output (${batch.held.length}):`);
-    for (const h of batch.held) L.push(`   ${h.n}. ${h.title}  [${h.pending.join(' ')}]`);
-    L.push('   These will not post in any mode until you confirm the figures.');
+    L.push(`HELD — figures not in the claims log (${batch.held.length}):`);
+    for (const h of batch.held) {
+      L.push(`   ${h.n}. ${h.title}`);
+      // Claims and heuristics need the same confirmation, but he should know which is which: one is a
+      // number that came out of a deal, the other is an industry rule of thumb he is arguing about.
+      if ((h.claims || []).length) L.push(`      check against REDOS: ${h.claims.join(' ')}`);
+      if ((h.heuristics || []).length) L.push(`      rules of thumb: ${h.heuristics.join(' ')}`);
+    }
+    L.push('   These will not post in any mode until you confirm them, once.');
     L.push('');
   }
   if ((batch.broken || []).length) {

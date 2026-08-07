@@ -1,0 +1,69 @@
+{
+  "id": "appsumo-demo-analyze",
+  "url": "https://redoshq.com/analyze",
+  "outDir": "out/appsumo/",
+
+  "_status": [
+    "BLOCKED — kept verbatim from the work order as the evidence, not as a shipping script.",
+    "",
+    "Part 2 of the work order says 'the demo uses the public /analyze' and lists numbers 'verified live",
+    "on 2026-08-06': 31 · F, -$3,626, buy at $85,000, capped at $115,000.",
+    "",
+    "Anonymous, /analyze renders no calculator at all. It renders the lifetime paywall — 'Unlock the",
+    "full REDOS analyzer' — with zero inputs and two 401s on the page. Those numbers were verified while",
+    "signed in. The recorder never logs in, so this script cannot produce a video.",
+    "",
+    "Run it and every assert reports actual: null, the run exits non-zero, and no video survives. That",
+    "is the module working, not the module failing. appsumo-demo.json ships the same arc on the free",
+    "calculators, which are genuinely public.",
+    "",
+    "To un-block: make /analyze render a read-only example deal for anonymous visitors (which is also a",
+    "distribution win — the free public Deal Score is the wedge), then re-point this script at it."
+  ],
+
+  "steps": [
+    { "goto": "https://redoshq.com/analyze" },
+    { "wait": 3000 },
+    { "click": "strategyFlip" },
+    { "wait": 2000 },
+
+    { "still": "01-deal-report" },
+    { "highlight": "dealScore", "hold": 3000 },
+    { "assert": { "dealScore": "31", "dealGrade": "F", "verdict": "PASS" } },
+    { "assert": { "netProfit": "-$3,626" } },
+
+    { "scrollTo": "dealCoach" },
+    { "wait": 1500 },
+    { "still": "02-deal-coach" },
+    { "highlight": "dealCoachDealbreaker", "hold": 4000 },
+    { "assert": { "dealCoachDealbreaker": "you'd need to buy at $85,000" } },
+    { "highlight": "dealCoachBuyBox", "hold": 3500 },
+    { "assert": { "dealCoachBuyBox": "caps you at $115,000" } },
+
+    { "scrollTo": "purchasePrice" },
+    { "set": { "purchasePrice": 85000 } },
+    { "wait": 2500 },
+    { "scrollTo": "dealScore" },
+    { "highlight": "dealScore", "hold": 3500 },
+    { "capture": { "scoreAfter": "dealScore", "gradeAfter": "dealGrade",
+                   "verdictAfter": "verdict", "netProfitAfter": "netProfit" } },
+    { "still": "03-after-the-fix" },
+
+    { "goto": "https://redoshq.com/quick" },
+    { "wait": 2500 },
+    { "still": "04-free-calculator" },
+    { "goto": "https://redoshq.com/analyze" },
+    { "wait": 2500 },
+    { "click": "strategyBrrrr" },
+    { "wait": 2000 },
+    { "still": "05-brrrr" }
+  ],
+
+  "stills": [
+    { "name": "01-deal-report",     "clip": null },
+    { "name": "02-deal-coach",      "clip": "dealCoach" },
+    { "name": "03-after-the-fix",   "clip": null },
+    { "name": "04-free-calculator", "clip": null },
+    { "name": "05-brrrr",           "clip": null }
+  ]
+}

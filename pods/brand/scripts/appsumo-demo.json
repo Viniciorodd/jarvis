@@ -1,0 +1,78 @@
+{
+  "id": "appsumo-demo",
+  "url": "https://redoshq.com/house-flipping-calculator",
+  "outDir": "out/appsumo/",
+
+  "_arc": [
+    "The AppSumo differentiator is not that REDOS scores a deal. Every calculator does that.",
+    "It is that REDOS returns a PRICE. So: a deal fails, the product names the exact purchase price",
+    "that fixes it, that price goes in, the verdict flips. One continuous idea, about 60 seconds.",
+    "",
+    "Runs entirely on the free public calculators — no login, per the recorder's hard rule.",
+    "(/analyze is behind the lifetime paywall for anonymous visitors; see appsumo-demo-analyze.json.)",
+    "",
+    "Every number below was measured live on 2026-08-06 and is an ASSERT, not a guess. If the product",
+    "stops producing them the run fails and the video is deleted rather than shipped."
+  ],
+
+  "steps": [
+    { "goto": "https://redoshq.com/house-flipping-calculator" },
+    { "wait": 1800 },
+
+    { "cue": "typing" },
+    { "set": { "purchasePrice": 225000 } },
+    { "wait": 1600 },
+
+    { "scrollTo": "dealScorePanel" },
+    { "cue": "impact-bass-1" },
+    { "zoom": "dealScorePanel", "scale": 1.12, "hold": 2600 },
+    { "assert": { "dealScore": "22", "dealGrade": "F", "dealGradeWord": "Walk" } },
+    { "assert": { "netProfitTile": "-$15,363" } },
+    { "still": "01-losing-deal" },
+    { "highlight": "netProfitTile", "hold": 2200 },
+
+    { "scrollTo": "moneyTable" },
+    { "cue": "ping" },
+    { "highlight": "maxOfferRow", "hold": 3400 },
+    { "assert": { "maxOfferRow": "$125,000" } },
+    { "assert": { "netProfitRow": "-$15,363" } },
+    { "still": "02-the-price" },
+
+    { "cue": "typing" },
+    { "set": { "purchasePrice": 125000 } },
+    { "wait": 1400 },
+
+    { "scrollTo": "dealScorePanel" },
+    { "cue": "chime" },
+    { "zoom": "dealScorePanel", "scale": 1.12, "hold": 3000 },
+    { "assert": { "dealScore": "95", "dealGrade": "A", "dealGradeWord": "Exceptional" } },
+    { "assert": { "netProfitTile": "$97,088" } },
+    { "capture": { "scoreAfter": "dealScore", "gradeAfter": "dealGrade", "verdictAfter": "dealGradeWord",
+                   "netProfitAfter": "netProfitTile", "maxOffer": "maxOfferRow" } },
+    { "still": "03-after-the-fix" },
+    { "highlight": "netProfitTile", "hold": 2000 },
+
+    { "cue": "whoosh-short" },
+    { "goto": "https://redoshq.com/quick" },
+    { "wait": 1400 },
+    { "set": { "purchasePrice": 125000, "rehabCost": 40000, "arvQuick": 300000 }, "instant": true },
+    { "wait": 1800 },
+    { "assert": { "dealScore": "95", "dealGrade": "A" } },
+    { "still": "04-free-calculator" },
+    { "wait": 900 },
+
+    { "cue": "whoosh-short" },
+    { "goto": "https://redoshq.com/brrrr-calculator" },
+    { "wait": 2200 },
+    { "still": "05-brrrr" },
+    { "wait": 1200 }
+  ],
+
+  "stills": [
+    { "name": "01-losing-deal",     "clip": null },
+    { "name": "02-the-price",       "clip": "moneyTable" },
+    { "name": "03-after-the-fix",   "clip": null },
+    { "name": "04-free-calculator", "clip": "quickCard" },
+    { "name": "05-brrrr",           "clip": null }
+  ]
+}

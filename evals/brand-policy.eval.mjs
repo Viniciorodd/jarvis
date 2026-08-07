@@ -10,6 +10,10 @@ import { canQueue, canPublish, policy, policyLine, TIERS } from '../pods/brand/p
 
 const ok = (pass, detail = '') => ({ pass, detail });
 
+// A path that does not exist, so file-backed settings fall through to env and these cases test the
+// LOGIC rather than the operator's live configuration.
+const NO_FILE = 'C:/no/such/auto-send.json';
+
 const CLEAR = { ok: true, blocks: [], warnings: [] };
 const BLOCKED = { ok: false, blocks: [{ group: 'income', why: 'first-person income claim' }], warnings: [] };
 
@@ -46,7 +50,8 @@ export default {
     } },
 
     { name: '🚨 publishing is OFF by default — the shipped state', run: () => {
-      const r = canPublish(good({ env: { BRAND_TIER: '3' } }));   // no BRAND_AUTO_PUBLISH
+      // NO_FILE so this tests the DEFAULT, not whatever the live auto-send.json currently says.
+      const r = canPublish(good({ env: { BRAND_TIER: '3' }, configFile: NO_FILE }));
       return ok(!r.allow && /publishing is OFF/.test(r.reason), r.reason);
     } },
 
@@ -68,7 +73,7 @@ export default {
 
     // ── tiers ─────────────────────────────────────────────────────────────────────────────────────
     { name: 'tier 0 keeps approved posts queued', run: () => {
-      const r = canPublish(good({ env: { ...ON, BRAND_TIER: '0' } }));
+      const r = canPublish(good({ env: { ...ON, BRAND_TIER: '0' }, configFile: NO_FILE }));
       return ok(!r.allow && /Tier 0/.test(r.reason), r.reason);
     } },
 
@@ -118,8 +123,8 @@ export default {
 
     // ── reporting ─────────────────────────────────────────────────────────────────────────────────
     { name: 'the policy line says which of the three states it is in', run: () => {
-      const off = policyLine({ BRAND_TIER: '3' });
-      const on = policyLine(ON);
+      const off = policyLine({ BRAND_TIER: '3' }, NO_FILE);
+      const on = policyLine(ON, NO_FILE);
       return ok(/OFF/.test(off) && /Tier 3/.test(on), off + ' | ' + on);
     } },
 

@@ -14,3 +14,7 @@ findstr /b /c:"RODGATE_GMAIL_USER=" .env >nul 2>&1 && start "Jarvis GovWatch" /m
 REM Watchdog: re-asserts the Tailscale HTTPS tunnel + recovers a HUNG companion (run-loop only catches
 REM a full crash). Safe by design — only kills a confirmed-node listener on :8095 after sustained failure.
 start "Jarvis Watchdog" /min cmd /c ""%~dp0run-loop.cmd" scripts\jarvis-watchdog.mjs"
+REM Social publishing loop. Runs on the PC because the content pack lives in his Obsidian vault, which
+REM the NAS cannot see. Only starts when a Bluesky credential exists — no credential, no service, so a
+REM fresh clone never spins a loop that can do nothing.
+findstr /b /c:"BLUESKY_APP_PASSWORD=" .env >nul 2>&1 && start "Jarvis Social" /min cmd /c ""%~dp0run-loop.cmd" scripts\social-loop.mjs"

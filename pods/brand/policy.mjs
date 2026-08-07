@@ -34,14 +34,17 @@ export { KILL_FILE, killSwitchOn };
 // still running and that I can operate it."* An env var means editing `.env` on the NAS and
 // restarting, which is impossible from a phone. The file wins when set; env is the fallback for a
 // fresh install; absent both it is OFF, because the safe default for "does this really publish" is no.
-export function brandSendFromFile() {
+// `file` is injectable so the pure logic can be tested independently of live config. The evals caught
+// this the hard way: they asserted "publishing is OFF by default" while passing env only, and the
+// assertion silently became a test of the live auto-send.json the moment that file said otherwise.
+export function brandSendFromFile(file = KILL_FILE) {
   try {
-    const v = JSON.parse(fs.readFileSync(KILL_FILE, 'utf8')).brandSend;
+    const v = JSON.parse(fs.readFileSync(file, 'utf8')).brandSend;
     return typeof v === 'boolean' ? v : null;
   } catch { return null; }
 }
-export function brandSendOn(env = process.env) {
-  const f = brandSendFromFile();
+export function brandSendOn(env = process.env, file = KILL_FILE) {
+  const f = brandSendFromFile(file);
   if (f !== null) return f;
   return /^(1|true|yes|on)$/i.test(String(env.BRAND_AUTO_PUBLISH || ''));
 }
@@ -64,21 +67,21 @@ const PLATFORM_TIER = { bluesky: 1, mastodon: 1, linkedin: 2, threads: 2, x: 3 }
 const num = (v, d) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
-export function tierFromFile() {
+export function tierFromFile(file = KILL_FILE) {
   try {
-    const t = JSON.parse(fs.readFileSync(KILL_FILE, 'utf8')).brandTier;
+    const t = JSON.parse(fs.readFileSync(file, 'utf8')).brandTier;
     return Number.isFinite(Number(t)) ? Number(t) : null;
   } catch { return null; }
 }
 
 // PURE-ish: the current settings. Default tier 0 — the shipped state.
-export function policy(env = process.env) {
-  const fromFile = tierFromFile();
+export function policy(env = process.env, file = KILL_FILE) {
+  const fromFile = tierFromFile(file);
   const tier = clamp(num(fromFile !== null ? fromFile : env.BRAND_TIER, 0), 0, 3);
   return {
     tier,
     kill: killSwitchOn(),
-    publish: brandSendOn(env),
+    publish: brandSendOn(env, file),
     dailyMax: clamp(num(env.BRAND_DAILY_MAX, 3), 0, 10),
   };
 }
@@ -112,8 +115,9 @@ export function canPublish({
   env = process.env,
   agent = '',
   control = null,
+  configFile = KILL_FILE,
 } = {}) {
-  const p = policy(env);
+  const p = policy(env, configFile);
 
   // 1. The halt. First, and it beats everything downstream including an approval he already gave.
   if (p.kill) return { allow: false, reason: 'kill switch is ON — nothing publishes until you /resume' };
@@ -165,8 +169,8 @@ export function canPublish({
 }
 
 // PURE: one line for a log or an approval card.
-export function policyLine(env = process.env) {
-  const p = policy(env);
+export function policyLine(env = process.env, file = KILL_FILE) {
+  const p = policy(env, file);
   if (p.kill) return '🛑 kill switch ON — nothing publishes';
   if (!p.publish) return '⏸ publishing OFF — approved posts stay queued';
   return `▶️ Tier ${p.tier} — ${TIERS[p.tier]}`;

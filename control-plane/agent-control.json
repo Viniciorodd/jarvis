@@ -1,0 +1,77 @@
+{
+  "killAll": false,
+  "agents": {
+    "CONNECT-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "EXEC-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "LEDGER-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "TAX-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "MAILROOM-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "SAM-SCOUT": {
+      "state": "active",
+      "tier": 1
+    },
+    "GOV-ANALYST": {
+      "state": "active",
+      "tier": 1
+    },
+    "OPERATOR-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "STUDIO-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "SOCIAL-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "RECON-DEV": {
+      "state": "active",
+      "tier": 1
+    },
+    "VAULT-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "WATCHTOWER-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "ESTATE-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "COUNSEL-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "CONCIERGE-01": {
+      "state": "active",
+      "tier": 1
+    },
+    "HERMES": {
+      "state": "active",
+      "tier": 1
+    },
+    "OPENCLAW": {
+      "state": "active",
+      "tier": 1
+    }
+  }
+}

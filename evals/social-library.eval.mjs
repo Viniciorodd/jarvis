@@ -49,28 +49,26 @@ Two minutes. It turned a yes into a no for me last week.
 
 ---
 
-## Post 2 (Tue) — The 1% rule
+## Post 2 (Tue) — The rule
 
 **Image:** \`02-one-percent.png\` — one card.
 
 ### X
 
 \`\`\`
-The 1% rule is a filter for what to open.
-
-People use it as a filter for what to buy.
+Never buy a deal the numbers said no to.
 \`\`\`
 
 ### LinkedIn
 
 \`\`\`
-I do not think the 1% rule is bad advice. I think it gets used for the wrong job.
+The listing is marketing. The county record is the deal.
 \`\`\`
 
 ### Threads
 
 \`\`\`
-It exists so you can look at 40 listings and open 4 of them.
+Run the deal. Get a grade, and the reason. Free, no account.
 \`\`\`
 `;
 
@@ -100,7 +98,8 @@ export default {
       const p = parsePack(PACK);
       const h = figureHold(p[0]);
       return ok(h.held && h.pending.includes('2,650') && h.pending.includes('4,100')
-        && /not confirmed against REDOS/.test(h.why), JSON.stringify(h)) } },
+        && h.claims.includes('2,650') && /checking against REDOS output/.test(h.why),
+        JSON.stringify(h)) } },
 
     { name: '🚨 confirming the figures releases the hold, and ONLY the confirmed ones count', run: () => {
       const p = parsePack(PACK);
@@ -125,7 +124,7 @@ export default {
     // ── ⚠ teaching vs claiming, the distinction his real pack forced ──────────────────────────────
     // Running this over the 15 posts held 5 of them; 4 were heuristics he was arguing ABOUT, not
     // results he was reporting. A guard that asks for confirmation it does not need gets tapped through.
-    { name: '⚠ a rate stated as a heuristic is teaching, and is not held', run: () => {
+    { name: '⚠ a rate stated as a heuristic READS as teaching (kind, not the hold set)', run: () => {
       const through = [
         'The 1% rule is a filter for what to open',
         '5% vacancy is not a number, it is a default nobody checked',

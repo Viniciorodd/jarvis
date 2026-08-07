@@ -39,10 +39,46 @@ export function fits(text = '') {
   return { ok: n <= MAX, count: n, over: Math.max(0, n - MAX) };
 }
 
+// ── ⚠ FACETS ARE MEASURED IN UTF-8 BYTES, NOT CHARACTERS ────────────────────────────────────────
+// A link is only clickable if the record carries a facet with byte offsets into the text. JavaScript
+// string indices are UTF-16 code units, so any emoji or accented character BEFORE a link shifts the
+// real byte offset and the link highlights the wrong span, or lands mid-word. Added when the social
+// pod started posting his content pack, which writes links as bare domains ("redoshq.com/quick") —
+// unfaceted, those are grey text nobody can tap.
+const enc = new TextEncoder();
+
+/** PURE: UTF-8 byte length of a string. The unit AT Protocol facets are measured in. */
+export const byteLen = (s = '') => enc.encode(String(s)).length;
+
+/**
+ * PURE: find links and return AT Protocol facets with correct UTF-8 byte offsets.
+ *
+ * Matches bare domains as well as http(s):// — his pack writes "redoshq.com/quick" without a scheme,
+ * and an unfaceted link is just grey text nobody can tap.
+ */
+export function detectFacets(text = '') {
+  const src = String(text || '');
+  const re = /(https?:\/\/[^\s)]+[^\s.,)!?])|(\b[a-z0-9-]+\.(?:com|net|org|io|co|app|dev|xyz|me)(?:\/[^\s)]*[^\s.,)!?])?)/gi;
+  const facets = [];
+  let m;
+  while ((m = re.exec(src))) {
+    const raw = m[0];
+    // Byte offsets, computed from the slices — NOT from m.index, which is a UTF-16 code-unit index.
+    const byteStart = byteLen(src.slice(0, m.index));
+    const byteEnd = byteStart + byteLen(raw);
+    facets.push({
+      index: { byteStart, byteEnd },
+      features: [{ $type: 'app.bsky.richtext.facet#link', uri: /^https?:\/\//i.test(raw) ? raw : 'https://' + raw }],
+    });
+  }
+  return facets;
+}
+
 // PURE: the record body. `createdAt` is the client's clock — Bluesky orders by it, so a wrong one
 // buries the post.
 export function record(text, at = new Date().toISOString()) {
-  return { $type: 'app.bsky.feed.post', text: String(text), createdAt: at };
+  const t = String(text);
+  return { $type: 'app.bsky.feed.post', text: t, createdAt: at, langs: ['en'], facets: detectFacets(t) };
 }
 
 // PURE: the public URL for a post, from the AT URI it returns.

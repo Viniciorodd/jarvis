@@ -119,7 +119,7 @@ export default {
     { name: '🚨 the card NAMES the held post — a silent omission reads as "it went out"', run: () => {
       const t = cardText(buildBatch(PACK, []), { mode: 'notify' });
       return ok(/HELD/.test(t) && /2\. Held one/.test(t) && /4,100/.test(t)
-        && /will not post in any mode/.test(t), t) } },
+        && /check against REDOS/.test(t) && /will not post in any mode/.test(t), t) } },
 
     { name: 'notify card says silence publishes; review card says silence does not', run: () => {
       const n = cardText(buildBatch(PACK, []), { mode: 'notify' });
@@ -146,6 +146,22 @@ export default {
       const l = batchGateLines(buildBatch(PACK, []));
       return ok(l.some((x) => /^#1 Clean one/.test(x)) && l.some((x) => /OK\s+x/.test(x)),
         JSON.stringify(l.slice(0, 4))) } },
+
+    // ── the weekly schedule ───────────────────────────────────────────────────────────────────────
+    { name: 'a batch is proposed Monday 09:00 and NOT twice in the same hour after a restart', run: async () => {
+      // 🚨 Importing this module must NOT start the loop. It once did, and tick() calls
+      // publishPending({ dryRun: false }) — a test suite one state file away from posting to his
+      // account. The isMain guard in social-loop.mjs is what this import silently verifies.
+      const mod = await import('../scripts/social-loop.mjs');
+      const { shouldPropose } = mod;
+      const mon9 = new Date(2026, 7, 10, 9, 5);      // Mon 2026-08-10 09:05 local
+      const tue9 = new Date(2026, 7, 11, 9, 5);
+      const mon10 = new Date(2026, 7, 10, 10, 5);
+      return ok(shouldPropose(mon9, '') === true
+        && shouldPropose(mon9, '20260810090000') === false   // already proposed today — restart safe
+        && shouldPropose(tue9, '') === false                 // wrong day
+        && shouldPropose(mon10, '') === false,               // wrong hour
+        JSON.stringify({ fresh: shouldPropose(mon9, ''), repeat: shouldPropose(mon9, '20260810090000') })) } },
 
     { name: 'an empty batch renders a card rather than throwing', run: () =>
       ok(typeof cardText({}, { mode: 'notify' }) === 'string' && cardText().length > 0

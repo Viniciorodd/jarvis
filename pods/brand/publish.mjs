@@ -78,6 +78,10 @@ export async function runOnce({
 } = {}) {
   const out = { checked: 0, published: [], skipped: [], failed: [], halted: '' };
 
+  // Per-platform tally for THIS run, folded into the cap check below. A dry run counts too — otherwise
+  // a dry run reports seven "would publish" that a live run would never actually perform.
+  const sentThisRun = {};
+
   // 1 + 2. The halts, before anything is even read.
   if (brandKillOn()) { out.halted = `BRAND_KILL exists at ${BRAND_KILL} — nothing publishes`; return out; }
   if (killSwitchOn()) { out.halted = 'kill switch is ON (control-plane/auto-send.json) — nothing publishes'; return out; }
@@ -103,9 +107,16 @@ export async function runOnce({
       continue;
     }
 
-    // 6. Caps, counted from the ledger.
+    // 6. Caps, counted from the ledger PLUS what this very run has already sent.
+    //
+    // 🚨 `records` is a snapshot taken before the loop and it never updates as posts publish. Counting
+    // from it alone meant every post in a run saw postedToday: 0, so a batch of seven all cleared a cap
+    // of two and went out together. The hard cap that "cannot be raised by an agent" was not being
+    // applied within a single run at all. Found when the social pod first proposed a real batch.
     const c = counts(records, rec.platform, now);
-    const capped = capReached(c);
+    const live = { postedToday: c.postedToday + (sentThisRun[rec.platform] || 0),
+      postedThisWeek: c.postedThisWeek + (sentThisRun[rec.platform] || 0) };
+    const capped = capReached(live);
     if (capped) { skip(capped); continue; }
 
     // 3. Policy: roster, switch, approval, tier, platform cadence.
@@ -118,7 +129,11 @@ export async function runOnce({
     const adapter = adapters[rec.platform];
     if (typeof adapter !== 'function') { skip(`no adapter supplied for ${rec.platform}`); continue; }
 
-    if (dryRun) { out.skipped.push({ id: rec.id, platform: rec.platform, reason: 'dry run — would have published' }); continue; }
+    if (dryRun) {
+      sentThisRun[rec.platform] = (sentThisRun[rec.platform] || 0) + 1;
+      out.skipped.push({ id: rec.id, platform: rec.platform, reason: 'dry run — would have published' });
+      continue;
+    }
 
     // 7. Publish, then verify. The adapter is responsible for the read-back and for reporting an
     //    unverifiable send as a failure rather than a success.
@@ -132,6 +147,7 @@ export async function runOnce({
       continue;
     }
 
+    sentThisRun[rec.platform] = (sentThisRun[rec.platform] || 0) + 1;
     append({ id: rec.id, type: 'publish', platformPostId: res.remoteId || '', url: res.url || '' });
     // The claims log gets the compliance record that cleared it, not a boolean.
     recordClaim({ id: rec.id, text: rec.body, platform: rec.platform, url: res.url || '', compliance: comp });

@@ -1,0 +1,6 @@
+{
+  "kill": false,
+  "brandSend": true,
+  "brandTier": 1,
+  "note": "brandSend/brandTier set 2026-08-07 on the operator's explicit authorisation: 'full autonomous posting on my behalf'. Tier 1 = bluesky + mastodon only; his personal Bluesky is the live account. LinkedIn, Threads and X stay off. Set kill:true (or Telegram /kill) to halt everything including gov within one cycle; set brandSend:false to stop only publishing."
+}

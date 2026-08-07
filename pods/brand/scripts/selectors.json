@@ -1,0 +1,50 @@
+{
+  "_README": [
+    "Every selector the recorder uses lives here, never inline in a script — one place to fix when the",
+    "UI moves. A script refers to a FIELD NAME; record.mjs resolves it through this map and fails loudly",
+    "with the field name if it is missing.",
+    "",
+    "Verified against live redoshq.com on 2026-08-06. REDOS ships no data-testid attributes, so these are",
+    "structural/text locators. If a run starts failing on 'not found' rather than on a wrong number, the",
+    "UI moved and this file is what needs editing — not the asserts."
+  ],
+
+  "_surface_free_calculators": "public, no login: /house-flipping-calculator, /brrrr-calculator, /quick",
+
+  "purchasePrice": "label:has-text(\"Purchase price\") input",
+  "rehabCost": "label:has-text(\"Rehab budget\") input",
+  "arv": "label:has-text(\"ARV (after-repair value)\") input",
+  "arvQuick": "label:has-text(\"After-repair value (ARV)\") input",
+  "holdMonths": "label:has-text(\"Hold (months)\") input",
+  "ratePct": "label:has-text(\"Rate %\") input",
+  "downPct": "label:has-text(\"Down %\") input",
+  "targetProfitPct": "label:has-text(\"Target profit % of ARV\") input",
+
+  "dealScore": "span.text-5xl",
+  "dealGrade": "span.rounded-md.font-black",
+  "dealGradeWord": "span.text-sm.font-bold:right-of(span.rounded-md.font-black)",
+  "dealScorePanel": "div.rounded-2xl:has(span:has-text(\"DEAL SCORE\"))",
+
+  "netProfitTile": "div.text-center:has-text(\"NET PROFIT\")",
+  "maxOffer70Tile": "div.rounded-xl:has-text(\"MAX OFFER (70%)\")",
+
+  "moneyTable": "div.rounded-2xl:has-text(\"Where the money goes\")",
+  "netProfitRow": "div:has(> span:text-is(\"Net profit\"))",
+  "maxOfferRow": "div:has(> span:text-is(\"Max offer to hit your target\"))",
+
+  "calcForm": "div.rounded-2xl:has-text(\"Your flip\")",
+  "brrrrForm": "div.rounded-2xl:has-text(\"Your deal\")",
+
+  "_quick": "/quick is a narrow centred app column (~460px), not a wide marketing page. Clipping a still to quickCard avoids a frame that is two-thirds black. Set the still's clip back to null for a full 1920x1080 frame.",
+  "quickCard": "div.mx-auto",
+
+  "_analyze_surface": "the signed-in analyzer — kept so the work-order script resolves, NOT reachable anonymously",
+  "dealScoreHero": "section:has(h3:text-is(\"Why this score\"))",
+  "verdict": "section:has(h3:text-is(\"Why this score\")) p.max-w-\\[180px\\]",
+  "netProfit": "div.text-center:has-text(\"Net Profit\")",
+  "dealCoach": "section:has(h3:text-is(\"Deal Coach\"))",
+  "dealCoachDealbreaker": "section:has(h3:text-is(\"Deal Coach\")) div.rounded-xl:has(span:text-is(\"Dealbreaker\"))",
+  "dealCoachBuyBox": "section:has(h3:text-is(\"Deal Coach\")) div.rounded-xl:has-text(\"70% rule\")",
+  "strategyFlip": "button:has-text(\"Fix & Flip\")",
+  "strategyBrrrr": "button:has-text(\"BRRRR\")"
+}

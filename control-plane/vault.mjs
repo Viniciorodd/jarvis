@@ -39,6 +39,13 @@ export const ACL = {
   'OPERATOR-01': ['ANTHROPIC_API_KEY'],
   'chief-of-staff': ['ANTHROPIC_API_KEY'], // the router's classifier
   'scheduler': [], // needs no secret — it only posts /command
+  // ── 🚨 SOCIAL-01 (Marta) — the ANTHROPIC key is ABSENT ON PURPOSE, do not "fix" this ──────────────
+  // She shortens social variants to fit platform limits, on a schedule, unattended. The Master PRD's
+  // exit test for that loop is "one week, zero Claude spend", and a promise made in a prompt is not a
+  // budget control. Leaving the key out makes haveClaude('SOCIAL-01') throw inside the router, so the
+  // provider chain comes back free-only and pods/social/draft.mjs `assertFree` refuses anything else.
+  // She gets the Bluesky credential because she is the one who posts. Nothing else.
+  'SOCIAL-01': ['BLUESKY_HANDLE', 'BLUESKY_APP_PASSWORD'],
 };
 
 // PURE: is `name` allowed for `agent` under `acl`? Supports PREFIX_* wildcards. Eval-tested.

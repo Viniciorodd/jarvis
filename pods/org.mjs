@@ -73,6 +73,13 @@ export const ROSTER = [
   { codename: 'OPENCLAW', nickname: 'OpenClaw', title: 'Local Hands (free, on-device)', pod: 'local', reports_to: 'EXEC-01', tier: 'draft',
     aliases: ['openclaw', 'hands', 'local hands', 'run a command', 'local agent', 'on-device agent', 'do it locally'],
     does: 'Jarvis\'s free, on-device HANDS (the OpenClaw CLI agent) — runs commands / touches files / browses locally. OPERATOR-TRIGGERED ONLY (explicit "openclaw:"/"hands:" prefix); keeps its own owner-approval gate.' },
+
+  // ── The publisher. She is the only agent that clicks Post on his own accounts. ───────────────────
+  // ⚠ Her vault ACL deliberately EXCLUDES ANTHROPIC_API_KEY (see control-plane/vault.mjs) so the
+  // publishing loop cannot bill him — $0 as a wiring property, not a prompt instruction.
+  { codename: 'SOCIAL-01', nickname: 'Marta', title: 'Publisher (owned accounts only)', pod: 'brand', reports_to: 'EXEC-01', tier: 'draft',
+    aliases: ['post', 'publish', 'social', 'tweet', 'thread', 'bluesky', 'mastodon', 'linkedin post', 'schedule a post', 'content pack'],
+    does: 'Serves his written content pack one post at a time, shortens variants LOCALLY to fit platform limits, and publishes to his OWN accounts through the brand-pod gates. Never originates claims; holds any post carrying an unconfirmed deal figure.' },
 ];
 
 // Model tiers — EXPERT defaults: Haiku for high-volume scanning, Sonnet for the real work (proposals,
